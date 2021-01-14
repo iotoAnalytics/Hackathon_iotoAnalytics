@@ -50,13 +50,13 @@ def get_urls():
     '''
     urls = []
 
-    # # Logic goes here! Some sample code:
-    # base_url = 'https://webscraper.io'
-    # path = '/test-sites/e-commerce/allinone'
-    # scrape_url = base_url + path
-    # page = requests.get(scrape_url)
-    # soup = BeautifulSoup(page.content, 'html.parser')
-    # urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
+    # Logic goes here! Some sample code:
+    base_url = 'https://webscraper.io'
+    path = '/test-sites/e-commerce/allinone'
+    scrape_url = base_url + path
+    page = requests.get(scrape_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
     
     return urls
 
