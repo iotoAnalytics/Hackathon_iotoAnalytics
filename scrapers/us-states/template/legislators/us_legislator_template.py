@@ -11,7 +11,7 @@ import sys, os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[3]
+p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
@@ -19,7 +19,9 @@ from scraper_utils import ScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
+from database import Database
 import configparser
+from pprint import pprint
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -29,6 +31,14 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
+#Initialize database
+db_user = str(configParser.get('databaseConfig', 'db_user'))
+db_pass = str(configParser.get('databaseConfig', 'db_pass'))
+db_host = str(configParser.get('databaseConfig', 'db_host'))
+db_name = str(configParser.get('databaseConfig', 'db_name'))
+
+Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+
 
 def get_urls():
     '''
@@ -36,13 +46,13 @@ def get_urls():
     '''
     urls = []
 
-    # Logic goes here! Some sample code:
-    base_url = 'https://webscraper.io'
-    path = '/test-sites/e-commerce/allinone'
-    scrape_url = base_url + path
-    page = requests.get(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
+    # # Logic goes here! Some sample code:
+    # base_url = 'https://webscraper.io'
+    # path = '/test-sites/e-commerce/allinone'
+    # scrape_url = base_url + path
+    # page = requests.get(scrape_url)
+    # soup = BeautifulSoup(page.content, 'html.parser')
+    # urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
     
     return urls
 
@@ -70,10 +80,13 @@ def scrape(url):
     row['state_url'] = url
 
     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
-    # the party name from the website, then get the party_id from the parties data frame.
+    # the party name from the website, then get the party_id from scraper_utils
     # This can be done like so:
-    party = 'Republican' # Insert logic to collect party for legislator. Must be full party name. Ie: Democrat, Republican, etc.
-    row['party_id'] = scraper_utils.get_party_id(party) # Get party_id using scraper_utils
+    
+    # Replace with your logic to collect party for legislator.
+    # Must be full party name. Ie: Democrat, Republican, etc.
+    party = 'Republican' 
+    row['party_id'] = scraper_utils.get_party_id(party) 
     row['party'] = party
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
@@ -81,15 +94,17 @@ def scrape(url):
     return row
 
 if __name__ == '__main__':
+
     scraper_utils = ScraperUtils(state_abbreviation, database_table_name, country)
 
-    urls = get_urls()
+    if get_urls:
+        urls = get_urls()
 
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can iterate through the URLs individually, which is slower:
-    data = [scrape(url) for url in urls]
+    # data = [scrape(url) for url in urls]
 
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
 
     scraper_utils.insert_legislator_data_into_db(data)
