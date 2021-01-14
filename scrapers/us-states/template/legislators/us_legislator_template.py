@@ -97,8 +97,7 @@ if __name__ == '__main__':
 
     scraper_utils = ScraperUtils(state_abbreviation, database_table_name, country)
 
-    if get_urls:
-        urls = get_urls()
+    urls = get_urls()
 
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can iterate through the URLs individually, which is slower:
