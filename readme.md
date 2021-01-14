@@ -10,6 +10,26 @@ Be sure to check out the `template_demo` folder as well. This showcases the temp
 
 The template may not be suitable for every website, and is more of a guideline that should work for a sizable portion of the sites we scrape. The `scraper_utils` methods, such as `initialize_row()`, `get_party_id()`, and `insert_legislator_data_into_db()`, may still be useful if you need to make heavy modifications. Once you copy the template, you are free to modify it however you see fit.
 
+You are free to use libraries such as Pandas, but note that when passing data to the `insert_legislator_data_into_db()` method, it must be in the form of a list of dictionaries. ie:
+```python
+data = [
+    {
+        'state_member_id': '1',
+        'most_recent_term_id': '2020',
+        'state_url': 'frogsarenice.com',
+        # Etc...
+    },
+    {
+        'state_member_id': '2',
+        'most_recent_term_id': '2020',
+        'state_url': 'theyrereallyreallynice.com',
+        # Etc...
+    },
+    # Etc...
+    }
+]
+```
+
 #### Usage
 - Copy the `template` folder. Be sure it is in the `scrapers/us-states` directory. Rename the copied folder to the state abbreviation of the state you are building a scraper for.
 - Go to the copied folder, then open the `config.cfg`. Change the `state_abbreviation`, `database_table_name`, and `country` field to the appropriate value. Database table name should be in the following format: `us_<state-abbreviation>_<dataset>`. Eg: `us_ca_legislators`

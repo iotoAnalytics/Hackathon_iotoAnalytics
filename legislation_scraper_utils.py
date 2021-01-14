@@ -86,7 +86,7 @@ class LegislatorScraperUtils:
         return row
 
     
-    def get_party_id(self, party_name):
+    def get_party_id(self, party_name : str):
         try:
             party_id = int(self.db_tables.parties.loc[self.db_tables.parties['party'] == party_name]['id'].values[0])
         except IndexError:
@@ -97,7 +97,7 @@ class LegislatorScraperUtils:
         return party_id
 
     
-    def insert_legislator_data_into_db(self, data):
+    def insert_legislator_data_into_db(self, data : list):
 
         with CursorFromConnectionFromPool() as curs:
             try:
