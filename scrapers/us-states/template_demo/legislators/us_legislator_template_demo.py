@@ -15,13 +15,15 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from scraper_utils import ScraperUtils
+from legislator_scraper_utils import LegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
 from database import Database
 import configparser
 from pprint import pprint
+from nameparser import HumanName
+import re
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -30,20 +32,16 @@ configParser.read('config.cfg')
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
-write_to_database = configParser.getboolean('miscConfig', 'write_to_database')
-print_max_recods = configParser.getboolean('miscConfig', 'print_max_recods')
-max_number_of_records_to_print = int(configParser.get('miscConfig', 'max_number_of_records_to_print'))
-get_urls = configParser.getboolean('miscConfig', 'get_urls')
-scrape_data = configParser.getboolean('miscConfig', 'scrape_data')
-print_collected_urls = configParser.getboolean('miscConfig', 'print_collected_urls')
 
-#Initialize database
+#Initialize database and scraper utils
 db_user = str(configParser.get('databaseConfig', 'db_user'))
 db_pass = str(configParser.get('databaseConfig', 'db_pass'))
 db_host = str(configParser.get('databaseConfig', 'db_host'))
 db_name = str(configParser.get('databaseConfig', 'db_name'))
 
 Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+
+scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 
 def get_urls():
@@ -52,7 +50,7 @@ def get_urls():
     '''
     urls = []
 
-    # Logic goes here!
+    # Logic goes here! Url we are scraping: https://www.azleg.gov/memberroster/
     base_url = 'https://www.azleg.gov'
     path = '/memberroster/'
     scrape_url = base_url + path
@@ -80,14 +78,15 @@ def scrape(url):
     Do not worry about trying to insert missing fields as the initialize_row function will
     insert empty values for us.
 
-    Be sure to insert the correct data type into each row. Refer to the data dictionary if
-    unsure.
+    Be sure to insert the correct data type into each row. Otherwise, you will get an error
+    when inserting data into database. Refer to the data dictionary to see data types for
+    each column.
     '''
     
     row = scraper_utils.initialize_row()
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
+    # keys are the columns in the data dictionary. For instance, we can insert the state_url
     # like so:
     row['state_url'] = url
 
@@ -97,34 +96,55 @@ def scrape(url):
     
     # Replace with your logic to collect party for legislator.
     # Must be full party name. Ie: Democrat, Republican, etc.
-    party = 'Republican' 
+    page = requests.get(url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    bio_container = soup.find('div', {'class': 'one-half first'})
+
+    party = bio_container.find('a').text
+    # Remove the 'ic' from the Democratic party
+    if party == 'Democratic':
+        party = party[:-2]
+    
     row['party_id'] = scraper_utils.get_party_id(party) 
     row['party'] = party
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
+    # Get names
+    name_full = bio_container.find('h3').text
+
+    hn = HumanName(name_full)
+    row['name_full'] = name_full
+    row['name_last'] = hn.last
+    row['name_first'] = hn.first
+    row['name_middle'] = hn.middle
+    row['name_suffix'] = hn.suffix
+
+    # Get district
+    district = bio_container.find('a', {'class': 'district-tooltip'}).text
+    district = district.replace('District ', '')
+    row['district'] = district
+
+    # Get phone number
+    bio_text = bio_container.text
+    phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
+    row['phone_number'] = phone_number
+
+    # There's other stuff we can gather on the page, but this will do for demo purposes
 
     return row
 
+
 if __name__ == '__main__':
 
-    scraper_utils = ScraperUtils(state_abbreviation, database_table_name, country)
-
-    if get_urls:
-        urls = get_urls()
-        if print_collected_urls:
-            pprint(urls)
+    urls = get_urls()
 
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can iterate through the URLs individually, which is slower:
+    # data = [scrape(url) for url in urls]
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
 
-    if scrape_data:
-        data = [scrape(url) for url in urls]
-
-        with Pool() as pool:
-            data = pool.map(scrape, urls)
-            
-        if write_to_database:
-            scraper_utils.insert_legislator_data_into_db(data)
-        if print_max_recods:
-            for d in data[:max_number_of_records_to_print]:
-                pprint(d)
+    scraper_utils.insert_legislator_data_into_db(data)
+    
+    print('Complete!')

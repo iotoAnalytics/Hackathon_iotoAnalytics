@@ -40,7 +40,7 @@ columns = [
 ]
 
 
-class ScraperUtils:
+class LegislatorScraperUtils:
     def __init__(self, state_abbreviation, database_table_name, country):
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
@@ -187,13 +187,13 @@ class ScraperUtils:
                     row['name_full'], row['name_last'], row['name_first'], row['name_middle'], row['name_suffix'],
                     row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'], row['party'],
                     row['role'], row['district'], row['years_active'],
-                    json.dumps(row['committees'], default=ScraperUtils.__json_serial),
+                    json.dumps(row['committees'], default=LegislatorScraperUtils.__json_serial),
                     row['areas_served'],
-                    json.dumps(row['phone_number'], default=ScraperUtils.__json_serial),
-                    json.dumps(row['addresses'], default=ScraperUtils.__json_serial),
+                    json.dumps(row['phone_number'], default=LegislatorScraperUtils.__json_serial),
+                    json.dumps(row['addresses'], default=LegislatorScraperUtils.__json_serial),
                     row['email'], row['birthday'], row['seniority'],
                     row['occupation'],
-                    json.dumps(row['education'], default=ScraperUtils.__json_serial),
+                    json.dumps(row['education'], default=LegislatorScraperUtils.__json_serial),
                     row['military_experience'])
 
                     # print(f'Inserting <Row {row["state_url"]}>')

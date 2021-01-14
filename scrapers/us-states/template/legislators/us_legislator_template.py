@@ -15,13 +15,15 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from scraper_utils import ScraperUtils
+from legislator_scraper_utils import LegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
 from database import Database
 import configparser
 from pprint import pprint
+from nameparser import HumanName
+import re
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -31,13 +33,15 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-#Initialize database
+#Initialize database and scraper utils
 db_user = str(configParser.get('databaseConfig', 'db_user'))
 db_pass = str(configParser.get('databaseConfig', 'db_pass'))
 db_host = str(configParser.get('databaseConfig', 'db_host'))
 db_name = str(configParser.get('databaseConfig', 'db_name'))
 
 Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+
+scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 
 def get_urls():
@@ -68,8 +72,9 @@ def scrape(url):
     Do not worry about trying to insert missing fields as the initialize_row function will
     insert empty values for us.
 
-    Be sure to insert the correct data type into each row. Refer to the data dictionary if
-    unsure.
+    Be sure to insert the correct data type into each row. Otherwise, you will get an error
+    when inserting data into database. Refer to the data dictionary to see data types for
+    each column.
     '''
     
     row = scraper_utils.initialize_row()
@@ -95,8 +100,6 @@ def scrape(url):
 
 if __name__ == '__main__':
 
-    scraper_utils = ScraperUtils(state_abbreviation, database_table_name, country)
-
     urls = get_urls()
 
     # Here we can use Pool from the multiprocessing library to speed things up.
@@ -107,3 +110,5 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     scraper_utils.insert_legislator_data_into_db(data)
+
+    print('Complete!')
