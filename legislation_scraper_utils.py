@@ -248,4 +248,4 @@ class LegislationScraperUtils:
         df = self.search_for_legislators(**kwargs)
         if df is not None:
             return df.loc[df["name_first"].str.startswith(first_name_initial)]["name_first"].values[0]
-        return 
+        return None
