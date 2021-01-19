@@ -4,48 +4,68 @@ from psycopg2.extras import RealDictCursor
 from datetime import date, datetime
 import json
 import sys
-from database_tables import DatabaseTables
+import pandas as pd
 from database import CursorFromConnectionFromPool
+from dataclasses import dataclass, field
+from typing import List
 
 
-columns = [
-    'state_member_id',
-    'most_recent_term_id',
-    'state_url',
-    'url',
-    'name_full',
-    'name_last',
-    'name_first',
-    'name_middle',
-    'name_suffix',
-    'country_id',
-    'country',
-    'state_id',
-    'state',
-    'party_id',
-    'party',
-    'role',
-    'district',
-    'years_active',
-    'committees',
-    'areas_served',
-    'phone_number',
-    'addresses',
-    'email',
-    'birthday',
-    'seniority',
-    'occupation',
-    'education',
-    'military_experience'
-]
-
+@dataclass
+class LegislatorRow:
+    state_member_id: str = ''
+    most_recent_term_id: str = ''
+    state_url: str = ''
+    url: str = ''
+    name_full: str = ''
+    name_last: str = ''
+    name_first: str = ''
+    name_middle: str = ''
+    name_suffix: str = ''
+    country_id: int = None
+    country: str = ''
+    state_id: int = None
+    state: str = ''
+    party_id: int = None
+    party: str = ''
+    role: str = ''
+    district: str = ''
+    years_active: List[int] = field(default_factory=list)
+    committees: List[dict] = field(default_factory=list)
+    areas_served: List[str] = field(default_factory=list)
+    phone_number: List[dict] = field(default_factory=list)
+    addresses: List[dict] = field(default_factory=list)
+    email: str = ''
+    birthday: datetime = None
+    seniority: int = 0
+    occupation: List[str] = field(default_factory=list)
+    education: List[dict] = field(default_factory=list)
+    military_experience: str = ''
+    
 
 class LegislatorScraperUtils:
     def __init__(self, state_abbreviation, database_table_name, country):
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.country = country
-        self.db_tables = DatabaseTables()
+        with CursorFromConnectionFromPool() as curs:
+            try:
+                query = 'SELECT * FROM us_parties'
+                curs.execute(query)
+                parties_results = curs.fetchall()
+
+                query = 'SELECT * FROM countries'
+                curs.execute(query)
+                countries_results = curs.fetchall()
+
+                query = 'SELECT state_no, state_name, abbreviation FROM us_state_info'
+                curs.execute(query)
+                state_results = curs.fetchall()
+            except Exception as e:
+                sys.exit(f'An exception occurred retrieving us_parties, countries, us_state_info from database:\n{e}')
+
+        self.parties = pd.DataFrame(parties_results)
+        self.countries = pd.DataFrame(countries_results)
+        self.states = pd.DataFrame(state_results)
 
     
     def __json_serial(self, obj):
@@ -61,34 +81,24 @@ class LegislatorScraperUtils:
         which then gets filled in with values collected from the website.
         '''
 
-        row = {column_name: '' for column_name in columns}
+        row = LegislatorRow()
         
         try:
-            row['country'] = self.country
-            row['country_id'] = int(self.db_tables.countries.loc[self.db_tables.countries['country'] == self.country]['id'].values[0])
-            row['state'] = self.state_abbreviation
-            row['state_id'] = int(self.db_tables.states.loc[self.db_tables.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
+            row.country = self.country
+            row.country_id = int(self.countries.loc[self.countries['country'] == self.country]['id'].values[0])
+            row.state = self.state_abbreviation
+            row.state_id = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
         except IndexError:
             sys.exit('An error occurred inserting state_id and/or country_id. Did you update the config file?')
         except Exception as e:
             sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
-        
-        row['years_active'] = []
-        row['committees'] = {}
-        row['areas_served'] = []
-        row['phone_number'] = {}
-        row['seniority'] = 0
-        row['occupation'] = []
-        row['education'] = {}
-        row['addresses'] = []
-        row['birthday'] = None
 
         return row
 
     
     def get_party_id(self, party_name):
         try:
-            party_id = int(self.db_tables.parties.loc[self.db_tables.parties['party'] == party_name]['id'].values[0])
+            party_id = int(self.parties.loc[self.parties['party'] == party_name]['id'].values[0])
         except IndexError:
             sys.exit('An error occurred getting party_id.\nParty not found. Has the party been collected, and is it in the correct format?')
         except Exception as e:
@@ -183,21 +193,20 @@ class LegislatorScraperUtils:
 
             for row in data:
                 try:
-                    tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
-                    row['name_full'], row['name_last'], row['name_first'], row['name_middle'], row['name_suffix'],
-                    row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'], row['party'],
-                    row['role'], row['district'], row['years_active'],
-                    json.dumps(row['committees'], default=LegislatorScraperUtils.__json_serial),
-                    row['areas_served'],
-                    json.dumps(row['phone_number'], default=LegislatorScraperUtils.__json_serial),
-                    json.dumps(row['addresses'], default=LegislatorScraperUtils.__json_serial),
-                    row['email'], row['birthday'], row['seniority'],
-                    row['occupation'],
-                    json.dumps(row['education'], default=LegislatorScraperUtils.__json_serial),
-                    row['military_experience'])
+                    tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
+                    row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
+                    row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
+                    row.role, row.district, row.years_active,
+                    json.dumps(row.committees, default=LegislatorScraperUtils.__json_serial),
+                    row.areas_served,
+                    json.dumps(row.phone_number, default=LegislatorScraperUtils.__json_serial),
+                    json.dumps(row.addresses, default=LegislatorScraperUtils.__json_serial),
+                    row.email, row.birthday, row.seniority,
+                    row.occupation,
+                    json.dumps(row.education, default=LegislatorScraperUtils.__json_serial),
+                    row.military_experience)
 
-                    # print(f'Inserting <Row {row["state_url"]}>')
                     curs.execute(insert_legislator_query, tup)
 
                 except Exception as e:
-                    print(f'An exception occurred inserting <Row {row["state_url"]}>: {e}')
+                    print(f'An exception occurred inserting {row}: {e}')

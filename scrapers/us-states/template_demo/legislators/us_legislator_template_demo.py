@@ -25,6 +25,7 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 
+
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
@@ -88,7 +89,7 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url
     # like so:
-    row['state_url'] = url
+    row.state_url = url
 
     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
     # the party name from the website, then get the party_id from scraper_utils
@@ -106,29 +107,30 @@ def scrape(url):
     if party == 'Democratic':
         party = party[:-2]
     
-    row['party_id'] = scraper_utils.get_party_id(party) 
-    row['party'] = party
+    row.party_id = scraper_utils.get_party_id(party) 
+    row.party = party
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
     # Get names
     name_full = bio_container.find('h3').text
 
     hn = HumanName(name_full)
-    row['name_full'] = name_full
-    row['name_last'] = hn.last
-    row['name_first'] = hn.first
-    row['name_middle'] = hn.middle
-    row['name_suffix'] = hn.suffix
+    row.name_full = name_full
+    row.name_last = hn.last
+    row.name_first = hn.first
+    row.name_middle = hn.middle
+    row.name_suffix = hn.suffix
 
     # Get district
     district = bio_container.find('a', {'class': 'district-tooltip'}).text
     district = district.replace('District ', '')
-    row['district'] = district
+    row.district = district
 
     # Get phone number
     bio_text = bio_container.text
     phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
-    row['phone_number'] = phone_number
+    phone_number = [{'office': '', 'number': phone_number}]
+    row.phone_number += phone_number
 
     # There's other stuff we can gather on the page, but this will do for demo purposes
 
