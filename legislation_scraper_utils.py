@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class LegislationRow:
-    goverlytics_id: int = 5
+    goverlytics_id: int = None
     bill_state_id: str = ''
     bill_name: str = ''
     session: str = ''
