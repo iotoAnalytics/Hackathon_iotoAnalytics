@@ -51,12 +51,16 @@ def get_urls():
     urls = []
 
     # Logic goes here! Some sample code:
-    base_url = 'https://webscraper.io'
-    path = '/test-sites/e-commerce/allinone'
+    base_url = 'https://www.ilga.gov'
+    path = '/legislation/grplist.asp?num1=1&num2=100&DocTypeID=HB&GA=102&SessionId=110'
     scrape_url = base_url + path
     page = requests.get(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
+
+    table = soup.find('table', {'width': '490', 'boder': '0', 'align': 'left'})
+
+    print(table)
+    # urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
     
     return urls
 
@@ -143,14 +147,14 @@ if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    # # Next, we'll scrape the data we want to collect from those URLs.
+    # # Here we can use Pool from the multiprocessing library to speed things up.
+    # # We can also iterate through the URLs individually, which is slower:
+    # # data = [scrape(url) for url in urls]
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    # # Once we collect the data, we'll write it to the database.
+    # scraper_utils.insert_legislator_data_into_db(data)
 
     print('Complete!')

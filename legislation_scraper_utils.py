@@ -4,7 +4,6 @@ from psycopg2.extras import RealDictCursor
 from datetime import date, datetime
 import json
 import sys
-from database_tables import DatabaseTables
 from database import CursorFromConnectionFromPool
 import pandas as pd
 from pandas.core.computation.ops import UndefinedVariableError
