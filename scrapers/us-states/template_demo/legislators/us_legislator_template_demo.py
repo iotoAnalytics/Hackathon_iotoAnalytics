@@ -130,7 +130,8 @@ def scrape(url):
     bio_text = bio_container.text
     phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
     phone_number = [{'office': '', 'number': phone_number}]
-    row.phone_number += phone_number
+
+    row.phone_number = phone_number
 
     # There's other stuff we can gather on the page, but this will do for demo purposes
 
