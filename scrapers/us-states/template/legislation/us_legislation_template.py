@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import LegislationScraperUtils
+from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -82,17 +82,17 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row['state_url'] = url
+    row.state_url = url
 
     # Depending on the data you're able to collect, the legislation scraper may be more involved
     # Than the legislator scraper. For one, you will need to create the goverlytics_id. The 
     # goverlytics_id is composed of the state, session, and bill_name, The goverlytics_id can be
     # created like so:
     # goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-    # row['goverlytics_id'] = goverlytics_id
+    # row.goverlytics_id = goverlytics_id
 
     # Once you have the goverlytics_id, you can create the url:
-    # row['url'] = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
+    # row.url = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
 
     # The sponsor and cosponsor ID's are where things can get complicated, depending on how
     # much and what kind of data the legislation page has on the (co)sponsors. The
@@ -105,37 +105,35 @@ def scrape(url):
 
     # To get the ids, first get the identifying fields, then pass them into the
     # get_legislator_id() function:
-    # row['principal_sponsor_id'] = get_legislator_id(state_url=legislator_state_url)
+    # row.principal_sponsor_id = scraper_utils.get_legislator_id(state_url=legislator_state_url)
     # The get_legislator_id function takes in any number of arguments, where the key is
     # the column in the legislator table you want to search, and the value is the value
     # you want to search that column for. So having:
     # name_first = 'Joe'
     # name_last = 'Jimbo'
-    # row['principal_sponsor_id'] = get_legislator_id(name_first=name_first, name_last=name_last)
+    # row.principal_sponsor_id = get_legislator_id(name_first=name_first, name_last=name_last)
     # Will search the legislator table for the legislator with the first and last name Joe Jimbo.
     # Note that the value passed in must match exactly the value you are searching for, including
     # case and diacritics.
 
-    # In the past, I've typically seen legislators with the same last name denoted with with their
-    # first name initial. Eg: A. Smith. If this is the case, you will need to find out what the A.
-    # in A. smith stands for. scraper_utils has a function that lets you search for a legislator
-    # based on their first initial along with other parameters you want to search by:
+    # In the past, I've typically seen legislators with the same last name denoted with some sort
+    # of identifier, typically either their first initial or party. Eg: A. Smith, or (R) Smith.
+    # If this is the case, scraper_utils has a function that lets you search for a legislator
+    # based on these identifiers. You can also pass in the name of the column you would like to
+    # retrieve the results from, along with any additional search parameters:
     # fname_initial = 'A.'
     # name_last = 'Smith'
     # fname_initial = fname_initial.upper().replace('.', '') # Be sure to clean up the initial as necessary!
     # You can also search by multiple letters, say 'Ja' if you were searching for 'Jason'
-    # name_first = scraper_utils.get_first_name_using_initial(fname_initial, name_last=name_last)
+    # goverlytics_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', fname_initial, name_last=name_last)
+    # The above retrieves the goverlytics_id for the person with the first name initial "A" and
+    # the last name "Smith".
 
-    # Finally, you can get the list of (co)sponsor IDs using the get_legislator_id_list() function.
-    # This function takes in a list of dictionaries, where the dictionaries contain the data you 
-    # want to search by:
-    # search_for = [
-    #     {
-    #         'name_first': 'Joe', 'name_last': 'Jimbo',
-    #         'name_first': 'Billy', 'name_last': 'Williams', #etc...
-    #     }
-    # ]
-    # cosponsor_ids = scraper_utils.get_legislator_id_list(search_for)
+    # Searching by party is similar:
+    # party = '(R)'
+    # name_last = 'Smith'
+    # party = party[1] # Cleaning step; Grabs the 'R'
+    # goverlytics_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'party', party, name_last=name_last)
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
 
@@ -154,36 +152,5 @@ if __name__ == '__main__':
 
     # # Once we collect the data, we'll write it to the database.
     # scraper_utils.insert_legislator_data_into_db(data)
-
-    name_first = 'Patricia'
-    name_last = 'Van Pelt'
-
-    search = [
-        {
-            'name_first': 'Patricia',
-            'name_last': 'Van Pelt'
-        },
-        {
-            'name_first': 'Dale',
-            'name_last': 'Fowler'
-        },
-        {
-            'state_member_id': 2721
-        }
-    ]
-
-    # leg_id = scraper_utils.get_legislator_id(name_first=name_first, name_last=name_last)
-    # leg_id = scraper_utils.get_legislator_id(most_recent_term_id=None)
-    # leg_id = scraper_utils.get_legislator_id(butts='big')
-
-    # name_first = df.loc[df["name_first"].str.startswith(fname_initial) & df["name_last"] == lname]["name_first"].values[0]
-    
-    # print(leg_id)
-
-    # leg_ids = scraper_utils.get_legislator_ids(search)
-
-    name = scraper_utils.get_first_name_using_initial('Ja', name_last='Plummer')
-
-    print(name)
 
     print('Complete!')

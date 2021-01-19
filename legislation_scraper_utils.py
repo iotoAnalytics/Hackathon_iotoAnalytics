@@ -8,36 +8,38 @@ from database_tables import DatabaseTables
 from database import CursorFromConnectionFromPool
 import pandas as pd
 from pandas.core.computation.ops import UndefinedVariableError
+from typing import List
+from dataclasses import dataclass, field
 
-
-columns = [
-    'goverlytics_id',
-    'bill_state_id',
-    'bill_name',
-    'session',
-    'date_introduced',
-    'state_url',
-    'url',
-    'chamber_origin',
-    'committees',
-    'state_id',
-    'state',
-    'bill_type',
-    'bill_title',
-    'current_status',
-    'principal_sponsor_id',
-    'principal_sponsor',
-    'sponsors',
-    'sponsors_id',
-    'cosponsors',
-    'cosponsors_id',
-    'bill_text',
-    'bill_description',
-    'bill_summary',
-    'actions',
-    'votes',
-    'topic'
-]
+@dataclass
+class LegislationRow:
+    goverlytics_id: int = 5
+    bill_state_id: str = ''
+    bill_name: str = ''
+    session: str = ''
+    date_introduced: datetime = None
+    state_url: str = ''
+    url: str = ''
+    chamber_origin: str = ''
+    committees: List[dict] = field(default_factory=list)
+    state_id: int = 0
+    state: str = ''
+    bill_type: str =  ''
+    bill_title: str = ''
+    current_status: str = ''
+    principal_sponsor_id: int = None
+    principal_sponsor: str = ''
+    sponsors: List[str] = field(default_factory=list)
+    sponsors_id: List[int] = field(default_factory=list)
+    cosponsors: List[str] = field(default_factory=list)
+    cosponsors_id: List[int] = field(default_factory=list)
+    bill_text: str = ''
+    bill_description: str =''
+    bill_summary:str = ''
+    actions: List[dict] = field(default_factory=list)
+    votes: List[dict] = field(default_factory=list)
+    site_topic: str = ''
+    topic: str = ''
 
 
 class LegislationScraperUtils:
@@ -70,35 +72,28 @@ class LegislationScraperUtils:
         raise TypeError("Type %s not serializable" % type(obj))
 
     
-    def initialize_row(self):
+    def initialize_row(self) -> LegislationRow:
         '''
         Create a row and fill with empty values. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
 
-        row = {column_name: '' for column_name in columns}
+        row = LegislationRow()
         
         try:
-            row['state'] = self.state_abbreviation
-            row['state_id'] = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
+            row.state = self.state_abbreviation
+            row.state_id = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
         except IndexError:
             sys.exit('An error occurred inserting state_id. Has the config file been updated?')
         except Exception as e:
             sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
-        
-        row['date_introduced'] = None
-        row['committees'] = {}
-        row['principal_sponsor_id'] = 0
-        row['sponsors'] = []
-        row['sponsors_id'] = []
-        row['cosponsors'] = []
-        row['cosponsors_id'] = []
-        row['actions'] = {}
-        row['votes'] = {}
 
         return row
     
-    def insert_legislator_data_into_db(self, data : list):
+    def insert_legislation_data_into_db(self, data : List[LegislationRow]) -> None:
+
+        if not isinstance(data, list):
+            raise TypeError('Data being written to database must be a list of LegislationRows!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -179,23 +174,23 @@ class LegislationScraperUtils:
 
             for row in data:
                 try:
-                    tup = (row['goverlytics_id'], row['bill_state_id'], date_collected, row['bill_name'],
-                    row['session'], row['date_introduced'], row['state_url'], row['url'], row['chamber_origin'],
-                    json.dumps(row['committees'], default=LegislationScraperUtils.__json_serial),
-                    row['state_id'], row['state'], row['bill_type'], row['bill_title'], row['current_status'],
-                    row['principal_sponsor_id'], row['principal_sponsor'], row['sponsors'], row['sponsors_id'],
-                    row['cosponsors'], row['cosponsors_id'], row['bill_text'], row['bill_description'], row['bill_summary'],
-                    json.dumps(row['actions'], default=LegislationScraperUtils.__json_serial),
-                    json.dumps(row['votes'], default=LegislationScraperUtils.__json_serial),
-                    row['site_topic'], row['topic'])
+                    tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
+                    row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
+                    json.dumps(row.committees, default=LegislationScraperUtils.__json_serial),
+                    row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
+                    row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                    row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                    json.dumps(row.actions, default=LegislationScraperUtils.__json_serial),
+                    json.dumps(row.votes, default=LegislationScraperUtils.__json_serial),
+                    row.site_topic, row.topic)
 
                     # print(f'Inserting <Row {row["state_url"]}>')
                     curs.execute(insert_legislator_query, tup)
 
                 except Exception as e:
-                    print(f'An exception occurred inserting <Row {row["state_url"]}>: {e}')
+                    print(f'An exception occurred inserting {row}:\n{e}')
 
-    def search_for_legislators(self, **kwargs):
+    def search_for_legislators(self, **kwargs) -> pd.DataFrame:
         query_lst = []
         for k, v in kwargs.items():
             q = ''
@@ -228,24 +223,23 @@ class LegislationScraperUtils:
 
         return df
 
-    def get_legislator_id(self, **kwargs):
+    def get_legislator_id(self, **kwargs) -> int:
         df = self.search_for_legislators(**kwargs)
         if df is not None:
             return df.iloc[0]['goverlytics_id']
         else:
             return None
 
-    def get_legislator_id_list(self, search_list):
-        legislator_ids = []
-        for item in search_list:
-            if not isinstance(item, dict):
-                print(f'Unable to find legislator ID for: {item}. Search parameters must be a dictionary!')
-            else:
-                legislator_ids.append(self.get_legislator_id(**item))
-        return legislator_ids
-
-    def get_first_name_using_initial(self, first_name_initial, **kwargs):
-        df = self.search_for_legislators(**kwargs)
+    def legislators_search_startswith(self, column_val_to_return, column_to_search, startswith, **kwargs):
+        df = self.legislators
+        if kwargs:
+            df = self.search_for_legislators(**kwargs)
+        val = None
         if df is not None:
-            return df.loc[df["name_first"].str.startswith(first_name_initial)]["name_first"].values[0]
-        return None
+            try:
+                val = df.loc[df[column_to_search].str.startswith(startswith)][column_val_to_return].values[0]
+            except IndexError:
+                print(f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
+            except KeyError:
+                print(f"'{column_to_search}' is not a valid column name in the legislator data frame!")
+        return val
