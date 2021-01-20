@@ -24,6 +24,8 @@ import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -43,6 +45,7 @@ Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pa
 
 scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
+base_url = 'https://www.ilga.gov'
 
 def get_urls():
     '''
@@ -51,16 +54,16 @@ def get_urls():
     urls = []
 
     # Logic goes here! Some sample code:
-    base_url = 'https://www.ilga.gov'
-    path = '/legislation/grplist.asp?num1=1&num2=100&DocTypeID=HB&GA=102&SessionId=110'
+    
+    path = '/legislation/grplist.asp?num1=64&num2=3933&DocTypeID=HB&GA=101&SessionId=109&SpecSess=1'
     scrape_url = base_url + path
     page = requests.get(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    table = soup.find('table', {'width': '490', 'boder': '0', 'align': 'left'})
+    table = soup.find('table', {'width': '490', 'border': '0', 'align': 'left'})
 
-    print(table)
-    # urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
+    for li in table.findAll('li'):
+        urls.append(li.a['href'])
     
     return urls
 
@@ -86,60 +89,78 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row.state_url = url
+    state_url = f'{base_url}{url}'
+    row.state_url = state_url
 
-    # Depending on the data you're able to collect, the legislation scraper may be more involved
-    # Than the legislator scraper. For one, you will need to create the goverlytics_id. The 
-    # goverlytics_id is composed of the state, session, and bill_name, The goverlytics_id can be
-    # created like so:
-    # goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-    # row.goverlytics_id = goverlytics_id
+    # Get useful query string parameters from URL
+    parsed = urlparse.urlparse(url)
+    url_qsp = parse_qs(parsed.query)
 
-    # Once you have the goverlytics_id, you can create the url:
-    # row.url = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
+    doc_type = url_qsp['DocTypeID'][0]
+    doc_num = url_qsp['DocNum'][0]
+    session = url_qsp['SessionID'][0]
 
-    # The sponsor and cosponsor ID's are where things can get complicated, depending on how
-    # much and what kind of data the legislation page has on the (co)sponsors. The
-    # legislator_id's are pulled from the legislator database table, so you must be able to
-    # uniquely identify each (co)sponsor... using just a last name, for instance, is not
-    # sufficient since often more than one legislator will have the same last name. If you
-    # have a unique identifier such as the (co)sponsor's state_url or state_member_id, use
-    # that. Otherwise, you will have to use some combination of the data available to
-    # identify. Using a first and last name may be sufficient.
+    bill_name = f'{doc_type}{doc_num.zfill(4)}'
 
-    # To get the ids, first get the identifying fields, then pass them into the
-    # get_legislator_id() function:
-    # row.principal_sponsor_id = scraper_utils.get_legislator_id(state_url=legislator_state_url)
-    # The get_legislator_id function takes in any number of arguments, where the key is
-    # the column in the legislator table you want to search, and the value is the value
-    # you want to search that column for. So having:
-    # name_first = 'Joe'
-    # name_last = 'Jimbo'
-    # row.principal_sponsor_id = get_legislator_id(name_first=name_first, name_last=name_last)
-    # Will search the legislator table for the legislator with the first and last name Joe Jimbo.
-    # Note that the value passed in must match exactly the value you are searching for, including
-    # case and diacritics.
+    goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
+    url = f'us/{state_abbreviation}/legislation/{goverlytics_id}'
 
-    # In the past, I've typically seen legislators with the same last name denoted with some sort
-    # of identifier, typically either their first initial or party. Eg: A. Smith, or (R) Smith.
-    # If this is the case, scraper_utils has a function that lets you search for a legislator
-    # based on these identifiers. You can also pass in the name of the column you would like to
-    # retrieve the results from, along with any additional search parameters:
-    # fname_initial = 'A.'
-    # name_last = 'Smith'
-    # fname_initial = fname_initial.upper().replace('.', '') # Be sure to clean up the initial as necessary!
-    # You can also search by multiple letters, say 'Ja' if you were searching for 'Jason'
-    # goverlytics_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', fname_initial, name_last=name_last)
-    # The above retrieves the goverlytics_id for the person with the first name initial "A" and
-    # the last name "Smith".
+    row.goverlytics_id = goverlytics_id
+    row.bill_name = bill_name
+    row.session = session
+    row.url = url
 
-    # Searching by party is similar:
-    # party = '(R)'
-    # name_last = 'Smith'
-    # party = party[1] # Cleaning step; Grabs the 'R'
-    # goverlytics_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'party', party, name_last=name_last)
+    chamber_origin = ''
+    bill_type = ''
+    if 'HB' == doc_type:
+        chamber_origin = 'House'
+        bill_type = 'Bill'
+    # elif ...:
+        # Check for other types like SB (senate bills), HRes (House Resolutions), etc.
+        # For now we're only work with HB bills so we'll keep it simple
 
-    # Other than that, you can replace this statement with the rest of your scraper logic.
+    row.chamber_origin = chamber_origin
+    row.bill_type = bill_type
+
+    # Begin scraping page
+    page = requests.get(state_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    table = soup.find('table', {'width': '440', 'border': '0', 'align': 'left'})
+    table_td = table.find('td', {'width': '100%'})
+
+    # The Illinois state legislation website has their data stored in a weird way...
+    # everything is stored in spans so we're gonna try pulling the data we need from
+    # those. Your implementations will probably look quite a bit different than this.
+    bill_description = ''
+    bill_summary = ''
+    spans = table_td.findAll('span')
+    for idx, span in enumerate(spans):
+        txt = span.text
+        if 'Short Description:' in txt:
+            bill_description = spans[idx + 1].text
+        if 'Synopsis As Introduced' in txt:
+            bill_summary = spans[idx + 1].text
+    row.bill_description = bill_description
+    row.bill_summary = bill_summary
+
+    a_tag = table_td.findAll('a', href=True)
+    sponsor_full_name = ''
+
+    legislator_id = ''
+    for a in a_tag:
+        if '/house/' in a['href']:
+            sponsor = a.text
+            legislator_id = a['href'].split('=')[-2][:4]
+            # print(legislator_id)
+
+    # We'll now try to get the legislator goverlytics ID. Fortunately for us, this
+    # site provides a unique identifier for each legislator, so I am able to do the
+    # following:
+    sponsor_id = scraper_utils.get_legislator_id(state_member_id=legislator_id)
+
+    print(sponsor_id)
+
 
     return row
 
@@ -147,10 +168,10 @@ if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
 
-    # # Next, we'll scrape the data we want to collect from those URLs.
-    # # Here we can use Pool from the multiprocessing library to speed things up.
-    # # We can also iterate through the URLs individually, which is slower:
-    # # data = [scrape(url) for url in urls]
+    # Next, we'll scrape the data we want to collect from those URLs.
+    # Here we can use Pool from the multiprocessing library to speed things up.
+    # We can also iterate through the URLs individually, which is slower:
+    data = [scrape(url) for url in urls[:10]]
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
 
