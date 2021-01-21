@@ -237,4 +237,4 @@ class LegislatorScraperUtils:
                     curs.execute(insert_legislator_query, tup)
 
                 except Exception as e:
-                    print(f'An exception occurred inserting {row}: {e}')
+                    print(f'An exception occurred inserting {row.state_url}: {e}')
