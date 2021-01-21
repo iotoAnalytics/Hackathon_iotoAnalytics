@@ -9,6 +9,7 @@ import pandas as pd
 from pandas.core.computation.ops import UndefinedVariableError
 from typing import List
 from dataclasses import dataclass, field
+import numpy
 
 @dataclass
 class LegislationRow:
@@ -69,6 +70,14 @@ class LegislationScraperUtils:
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         raise TypeError("Type %s not serializable" % type(obj))
+
+
+    def __convert_to_int(self, value):
+        try:
+            value = int(value)
+        except ValueError:
+            pass
+        return value
 
     
     def initialize_row(self) -> LegislationRow:
@@ -182,17 +191,18 @@ class LegislationScraperUtils:
                     json.dumps(row.actions, default=LegislationScraperUtils.__json_serial),
                     json.dumps(row.votes, default=LegislationScraperUtils.__json_serial),
                     row.site_topic, row.topic)
-
-                    # print(f'Inserting <Row {row["state_url"]}>')
+                
                     curs.execute(insert_legislator_query, tup)
 
                 except Exception as e:
-                    print(f'An exception occurred inserting {row}:\n{e}')
+                    print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
+    
     def search_for_legislators(self, **kwargs) -> pd.DataFrame:
         query_lst = []
         for k, v in kwargs.items():
             q = ''
+            v = self.__convert_to_int(v)
             if isinstance(v, int):
                 q = f'{k}=={v}'
             elif isinstance(v, str):
@@ -225,7 +235,7 @@ class LegislationScraperUtils:
     def get_legislator_id(self, **kwargs) -> int:
         df = self.search_for_legislators(**kwargs)
         if df is not None:
-            return df.iloc[0]['goverlytics_id']
+            return int(df.iloc[0]['goverlytics_id'])
         else:
             return None
 
@@ -234,6 +244,7 @@ class LegislationScraperUtils:
         if kwargs:
             df = self.search_for_legislators(**kwargs)
         val = None
+        startswith = self.__convert_to_int(startswith)
         if df is not None:
             try:
                 val = df.loc[df[column_to_search].str.startswith(startswith)][column_val_to_return].values[0]
@@ -241,4 +252,6 @@ class LegislationScraperUtils:
                 print(f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
             except KeyError:
                 print(f"'{column_to_search}' is not a valid column name in the legislator data frame!")
+        if isinstance(val, numpy.int64):
+            val = int(val)
         return val
