@@ -9,9 +9,17 @@ from database import CursorFromConnectionFromPool
 from dataclasses import dataclass, field
 from typing import List
 
+"""
+Contains utilities and data structures meant to help resolve common issues
+that occur with data collection. These can be used with your legislator
+date collectors.
+"""
 
 @dataclass
 class LegislatorRow:
+    """
+    Data structure for housing data about each piece of legislator.
+    """
     state_member_id: str = ''
     most_recent_term_id: str = ''
     state_url: str = ''
@@ -43,7 +51,15 @@ class LegislatorRow:
     
 
 class LegislatorScraperUtils:
+    """
+    Utilities to help with collecting and storing legislator data.
+    """
     def __init__(self, state_abbreviation, database_table_name, country):
+        """
+        The state_abbreviation, database_table_name, and country come from
+        the config.cfg file and must be updated to work properly with your legislation
+        data collector.
+        """
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.country = country
@@ -69,7 +85,10 @@ class LegislatorScraperUtils:
 
     
     def __json_serial(self, obj):
-        """ Serializes date/datetime object. """
+        """
+        Serializes date/datetime object. This is used to convert date and datetime objects to
+        a format that can be digested by the database.
+        """
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         raise TypeError("Type %s not serializable" % type(obj))
@@ -97,6 +116,9 @@ class LegislatorScraperUtils:
 
     
     def get_party_id(self, party_name):
+        """
+        Used for getting the party ID number.
+        """
         try:
             party_id = int(self.parties.loc[self.parties['party'] == party_name]['id'].values[0])
         except IndexError:
@@ -108,6 +130,12 @@ class LegislatorScraperUtils:
 
     
     def insert_legislator_data_into_db(self, data):
+        """
+        Takes care of inserting legislator data into database.
+        """
+
+        if not isinstance(data, list):
+            raise TypeError('Data being written to database must be a list of LegislationRows!')
 
         with CursorFromConnectionFromPool() as curs:
             try:

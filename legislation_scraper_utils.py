@@ -11,8 +11,17 @@ from typing import List
 from dataclasses import dataclass, field
 import numpy
 
+"""
+Contains utilities and data structures meant to help resolve common issues
+that occur with data collection. These can be used with your legislation
+date collectors.
+"""
+
 @dataclass
 class LegislationRow:
+    """
+    Data structure for housing data about each piece of legislation.
+    """
     goverlytics_id: int = None
     bill_state_id: str = ''
     bill_name: str = ''
@@ -43,7 +52,15 @@ class LegislationRow:
 
 
 class LegislationScraperUtils:
+    """
+    Utilities to help with collecting and storing legislation data.
+    """
     def __init__(self, state_abbreviation, database_table_name, legislator_table_name):
+        """
+        The state_abbreviation, database_table_name, and legislator_table_name come from
+        the config.cfg file and must be updated to work properly with your legislation
+        data collector.
+        """
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.legislator_table_name = legislator_table_name
@@ -59,20 +76,28 @@ class LegislationScraperUtils:
                 legislator_results = curs.fetchall()
             except Exception as e:
                 sys.exit(f'An exception occurred retrieving either US parties or state legislator table from database. \
-                \nHas the legislator data been collected for this state yet?\n{e}')
+                \nHas the legislator data been collected for this state yet? Has the config.cfg file been updated?\n{e}')
 
         self.states = pd.DataFrame(state_results)
         self.legislators = pd.DataFrame(legislator_results)
 
     
     def __json_serial(self, obj):
-        """ Serializes date/datetime object. """
+        """
+        Serializes date/datetime object. This is used to convert date and datetime objects to
+        a format that can be digested by the database.
+        """
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         raise TypeError("Type %s not serializable" % type(obj))
 
 
     def __convert_to_int(self, value):
+        """
+        Used to try and convert values into int. Functions like df.loc might return
+        a numpy.int64 which is incompatible with the database, so this function must
+        be used.
+        """
         try:
             value = int(value)
         except ValueError:
@@ -82,7 +107,7 @@ class LegislationScraperUtils:
     
     def initialize_row(self) -> LegislationRow:
         '''
-        Create a row and fill with empty values. This gets sent back to the scrape() function
+        Factory method for creating a legislation row. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
 
@@ -98,8 +123,11 @@ class LegislationScraperUtils:
 
         return row
     
+    
     def insert_legislation_data_into_db(self, data : List[LegislationRow]) -> None:
-
+        """
+        Takes care of inserting legislation data into database.
+        """
         if not isinstance(data, list):
             raise TypeError('Data being written to database must be a list of LegislationRows!')
 
@@ -199,6 +227,9 @@ class LegislationScraperUtils:
 
     
     def search_for_legislators(self, **kwargs) -> pd.DataFrame:
+        """
+        Returns a dataframe containing search results based on kwargs.
+        """
         query_lst = []
         for k, v in kwargs.items():
             q = ''
@@ -232,14 +263,22 @@ class LegislationScraperUtils:
 
         return df
 
+
     def get_legislator_id(self, **kwargs) -> int:
+        """
+        Method for getting the Goverlytics ID based on search parameters.
+        """
         df = self.search_for_legislators(**kwargs)
         if df is not None:
-            return int(df.iloc[0]['goverlytics_id'])
+            return self.__convert_to_int(df.iloc[0]['goverlytics_id'])
         else:
             return None
 
     def legislators_search_startswith(self, column_val_to_return, column_to_search, startswith, **kwargs):
+        """
+        Utilizes panda's .startswith method for finding information about legislators. Useful for finding
+        things like the Goverlytics ID when given only the first initial and last name of a legislator.
+        """
         df = self.legislators
         if kwargs:
             df = self.search_for_legislators(**kwargs)
