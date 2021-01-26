@@ -220,6 +220,8 @@ def scrape(url):
     row.current_status = current_status
     row.date_introduced = date_introduced
 
+    # There's more data on other pages we can colelct, but we have enough data for this demo!
+
     return row
 
 if __name__ == '__main__':

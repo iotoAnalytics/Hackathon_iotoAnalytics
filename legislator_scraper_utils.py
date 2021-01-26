@@ -23,7 +23,6 @@ class LegislatorRow:
     state_member_id: str = ''
     most_recent_term_id: str = ''
     state_url: str = ''
-    url: str = ''
     name_full: str = ''
     name_last: str = ''
     name_first: str = ''
@@ -221,6 +220,8 @@ class LegislatorScraperUtils:
 
             for row in data:
                 try:
+                    print(f'Inserting {row}')
+
                     tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
                     row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
                     row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,

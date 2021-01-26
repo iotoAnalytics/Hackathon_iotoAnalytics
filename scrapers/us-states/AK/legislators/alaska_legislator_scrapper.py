@@ -11,8 +11,12 @@ import os
 import sys
 from pathlib import Path
 
-import pandas as pd
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
 
+sys.path.insert(0, str(p))
+
+import pandas as pd
 from legislator_scraper_utils import LegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
@@ -21,11 +25,7 @@ from multiprocessing import Pool
 from database import Database
 import configparser
 import re
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
-
-sys.path.insert(0, str(p))
+from pprint import pprint
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
