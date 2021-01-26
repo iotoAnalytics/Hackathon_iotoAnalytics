@@ -343,9 +343,9 @@ def scrape_gov(data_dict):
     row.name_first = data_dict['First Name']
     row.district = data_dict['District']
     row.email = data_dict['Email']
-    row.url = data_dict['URL']
+    row.state_url = data_dict['URL']
     row.role = data_dict['Role']
-    row.url = data_dict['URL']
+
 
     row.phone_number = find_phone(url)
     row.committees = find_com(url)
