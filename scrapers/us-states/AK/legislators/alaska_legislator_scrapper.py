@@ -285,6 +285,7 @@ def get_education(url):
         dict_list.append({"level": "", "field": "", "school": ""})
     return dict_list
 
+
 def get_gov_dicts():
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
@@ -345,7 +346,6 @@ def scrape_gov(data_dict):
     row.email = data_dict['Email']
     row.state_url = data_dict['URL']
     row.role = data_dict['Role']
-
 
     row.phone_number = find_phone(url)
     row.committees = find_com(url)
