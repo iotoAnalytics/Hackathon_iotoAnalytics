@@ -340,7 +340,7 @@ def scrape_gov(data_dict):
     row = scraper_utils.initialize_row()
 
     row.name_full = data_dict['Full Name']
-    row.name_last = data_dict['Last Name']
+    row.name_last = data_dict['Last Name'].title()
     row.name_first = data_dict['First Name']
     row.district = data_dict['District']
     row.email = data_dict['Email']

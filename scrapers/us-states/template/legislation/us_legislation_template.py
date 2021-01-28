@@ -151,6 +151,6 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.insert_legislation_data_into_db()(data)
 
     print('Complete!')
