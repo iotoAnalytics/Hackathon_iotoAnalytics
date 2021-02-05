@@ -124,6 +124,23 @@ def split_url_lists(url_lst):
     return lst
 
 
+def get_bill_text(url):
+    try:
+        url_request = request_url.UrlRequest.make_request(url, header)
+        url_soup = BeautifulSoup(url_request.content, 'lxml')
+        bill_url = url_soup.find('td', {'data-label': 'Version'}).find('a').get('href')
+        bill_url = 'http://www.akleg.gov' + bill_url
+
+        url_request = request_url.UrlRequest.make_request(bill_url, header)
+        url_soup = BeautifulSoup(url_request.content, 'lxml')
+        url_sum = url_soup.find('div', {'id': 'draftOverlay'}).text
+        text = url_sum.replace('\n', '').split('\r')
+        text = [re.sub('\d{2}', '', x).strip() for x in text if x]
+        return ' '.join(text)
+    except AttributeError:
+        return ''
+
+
 def split_cosponsors(page_info):
     r = 'REPRESENTATIVE'
     s = 'SENATOR'
@@ -202,6 +219,7 @@ def scrape(data_dict):
     row.state_url = url
     row.cosponsors = cosponsors['total']
     row.bill_summary = temp_dict['bill summary']
+    row.bill_text = get_bill_text(url)
 
     # find sponsor ID:
     if data_dict['Site Topic'] != 'NOT INTRODUCED':
