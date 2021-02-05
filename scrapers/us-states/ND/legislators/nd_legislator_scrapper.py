@@ -12,8 +12,14 @@ from datetime import date, datetime
 from nameparser import HumanName
 from pprint import pprint
 import configparser
-import sys
-import os
+import sys, os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
+
 sys.path.append("..")
 from database import Database
 from multiprocessing import Pool
@@ -21,10 +27,7 @@ import requests
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import LegislatorScraperUtils
 from pathlib import Path
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
-
-sys.path.insert(0, str(p))
+import boto3
 
 
 # Initialize config parser and get variables from config file
@@ -36,15 +39,6 @@ state_abbreviation = str(configParser.get(
 database_table_name = str(configParser.get(
     'scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
-
-# Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-Database.initialise(database=db_name, host=db_host,
-                    user=db_user, password=db_pass)
 
 scraper_utils = LegislatorScraperUtils(
     state_abbreviation, database_table_name, country)
@@ -389,12 +383,13 @@ if __name__ == '__main__':
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     try:
-        data = [scrape(url) for url in urls]
+        # data = [scrape(url) for url in urls]
         with Pool() as pool:
             data = pool.map(scrape, urls)
         # pprint(data)
         # Once we collect the data, we'll write it to the database.
         scraper_utils.insert_legislator_data_into_db(data)
+
     except:
         sys.exit('error\n')
     print('Complete!')

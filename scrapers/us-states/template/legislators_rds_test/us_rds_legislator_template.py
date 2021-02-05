@@ -19,12 +19,12 @@ from legislator_scraper_utils import LegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
-from database import Database
+# from database import Database
 import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
-import boto3
+# import boto3
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -34,18 +34,16 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-#Initialize database and scraper utils
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_port = str(configParser.get('databaseConfig', 'db_port'))
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_region = str(configParser.get('databaseConfig', 'db_region'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
+# #Initialize database and scraper utils
+# db_host = str(configParser.get('databaseConfig', 'db_host'))
+# db_port = str(configParser.get('databaseConfig', 'db_port'))
+# db_user = str(configParser.get('databaseConfig', 'db_user'))
+# db_region = str(configParser.get('databaseConfig', 'db_region'))
+# db_name = str(configParser.get('databaseConfig', 'db_name'))
 
-client = boto3.client('rds')
-
-db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
-
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_token)
+# client = boto3.client('rds')
+# db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+# Database.initialise()
 
 scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
 

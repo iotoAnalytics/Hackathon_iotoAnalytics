@@ -5,7 +5,7 @@ from datetime import date, datetime
 import json
 import sys
 import pandas as pd
-from database import CursorFromConnectionFromPool
+from database import CursorFromConnectionFromPool, Database
 from dataclasses import dataclass, field
 from typing import List
 
@@ -62,6 +62,9 @@ class LegislatorScraperUtils:
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.country = country
+
+        Database.initialise()
+
         with CursorFromConnectionFromPool() as curs:
             try:
                 query = 'SELECT * FROM us_parties'
@@ -171,6 +174,8 @@ class LegislatorScraperUtils:
                         education jsonb,
                         military_experience text
                     );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
                     """).format(table=sql.Identifier(self.database_table_name))
 
                 curs.execute(create_table_query)
@@ -220,7 +225,6 @@ class LegislatorScraperUtils:
 
             for row in data:
                 try:
-                    print(f'Inserting {row}')
 
                     tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
                     row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,

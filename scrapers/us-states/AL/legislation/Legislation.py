@@ -69,18 +69,11 @@ reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSRe
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
-configParser.read('C:\\Users\\Avery\\Desktop\\cpsc coop\\IOTO Jan 4 - Apr 30 2021\\Web Scraping\\goverlytics-scrapers\\scrapers\\us-states\\AL\\legislation\\config.cfg')
+configParser.read('config.cfg')
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-#Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
@@ -401,8 +394,3 @@ if __name__ == '__main__':
 
     scraper_utils.insert_legislation_data_into_db(list(fields_house.values()))
     scraper_utils.insert_legislation_data_into_db(list(fields.values()))
-
-
-
-
-
