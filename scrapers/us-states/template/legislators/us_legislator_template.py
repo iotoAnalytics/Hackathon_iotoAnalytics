@@ -24,6 +24,7 @@ import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
+import boto3
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -32,14 +33,6 @@ configParser.read('config.cfg')
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
-
-#Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
@@ -82,7 +75,7 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row['state_url'] = url
+    row.state_url = url
 
     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
     # the party name from the website, then get the party_id from scraper_utils
@@ -91,8 +84,8 @@ def scrape(url):
     # Replace with your logic to collect party for legislator.
     # Must be full party name. Ie: Democrat, Republican, etc.
     party = 'Republican' 
-    row['party_id'] = scraper_utils.get_party_id(party) 
-    row['party'] = party
+    row.party_id = scraper_utils.get_party_id(party) 
+    row.party = party
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
 
