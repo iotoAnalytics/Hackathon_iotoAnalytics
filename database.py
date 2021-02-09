@@ -15,7 +15,7 @@ db_user = str(configParser.get('databaseConfig', 'db_user'))
 db_region = str(configParser.get('databaseConfig', 'db_region'))
 db_name = str(configParser.get('databaseConfig', 'db_name'))
 
-client = boto3.client('rds')
+client = boto3.client('rds', db_region)
 
 class Database:
     __connection_pool = None
