@@ -635,7 +635,7 @@ def collect_legislator_details(biographyUrl):
                'occupation' : occupation, 'email': email, 'military_experience': military_experience,
                'addresses': addresses, 'committees': committees, 'most_recent_term_id': session}
 
-    print(legDict)
+    # print(legDict)
     return legDict
 
 
@@ -673,6 +673,8 @@ if __name__ == '__main__':
     wikiLinks = scrape_wiki_bio_Links(
         'https://en.wikipedia.org/wiki/North_Carolina_House_of_Representatives',
         "Representative")
+
+
     with Pool() as pool:
         role = 'Representative'
         func = partial(find_wiki_data, role)
@@ -745,6 +747,8 @@ if __name__ == '__main__':
 
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)
+
+    print('Writing data to database...')
 
     scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
 

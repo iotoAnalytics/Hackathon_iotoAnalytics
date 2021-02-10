@@ -394,3 +394,9 @@ if __name__ == '__main__':
 
     scraper_utils.insert_legislation_data_into_db(list(fields_house.values()))
     scraper_utils.insert_legislation_data_into_db(list(fields.values()))
+
+    # for d in list(fields_house.values())[:10]:
+    #     print(d)
+
+    # for d in list(fields.values())[:10]:
+    #     print(d)

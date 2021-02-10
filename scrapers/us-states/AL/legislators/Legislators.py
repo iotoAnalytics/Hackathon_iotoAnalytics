@@ -365,7 +365,6 @@ senate = dict_to_list(senate)
 
 senate_house_data_lst = house + senate
 
-
 # scraper_utils.insert_legislator_data_into_db(senate_house_data_lst)
 
 for d in senate_house_data_lst[:10]:

@@ -137,7 +137,7 @@ class LegislatorScraperUtils:
         """
 
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of LegislationRows!')
+            raise TypeError('Data being written to database must be a list of LegislationRows or dictionaries!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -179,6 +179,7 @@ class LegislatorScraperUtils:
                     """).format(table=sql.Identifier(self.database_table_name))
 
                 curs.execute(create_table_query)
+                curs.connection.commit()
 
             except Exception as e:
                 print(f'An exception occurred creating {self.database_table_name}:\n{e}')

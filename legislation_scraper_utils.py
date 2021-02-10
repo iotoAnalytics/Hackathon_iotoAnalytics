@@ -181,6 +181,7 @@ class LegislationScraperUtils:
                     """).format(table=sql.Identifier(self.database_table_name))
 
                 curs.execute(create_table_query)
+                curs.connection.commit()
 
             except Exception as e:
                 print(f'An exception occurred creating {self.database_table_name}:\n{e}')
