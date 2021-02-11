@@ -249,7 +249,7 @@ class LegislatorScraperUtils:
                 elif isinstance(row, dict):
                     try:
 
-                        tup = (row['state_member_id'], row['most_recent_term_id'], ['date_collected'], row['state_url'],
+                        tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
                                row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
                                row['name_suffix'],
                                row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
