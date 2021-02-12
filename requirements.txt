@@ -1,5 +1,5 @@
 requests==2.25.1
-urllib3==1.26.2
+urllib3~=1.26.3
 psycopg2==2.8.6
 beautifulsoup4==4.9.3
 pandas==1.2.0
@@ -25,3 +25,4 @@ soupsieve==2.1
 threadpoolctl==2.1.0
 Unidecode==1.2.0
 utils==1.0.1
+PyPDF2~=1.26.0

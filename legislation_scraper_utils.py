@@ -146,6 +146,7 @@ class LegislationScraperUtils:
         with CursorFromConnectionFromPool() as curs:
             try:
                 create_table_query = sql.SQL("""
+                  
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id text PRIMARY KEY,
                         bill_state_id text,
@@ -187,6 +188,8 @@ class LegislationScraperUtils:
                 print(f'An exception occurred creating {self.database_table_name}:\n{e}')
 
             insert_legislator_query = sql.SQL("""
+               
+              
                 INSERT INTO {table}
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
@@ -224,21 +227,42 @@ class LegislationScraperUtils:
             date_collected = datetime.now()
 
             for row in data:
-                try:
-                    tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
-                    row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
-                    json.dumps(row.committees, default=LegislationScraperUtils.__json_serial),
-                    row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
-                    row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                    row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                    json.dumps(row.actions, default=LegislationScraperUtils.__json_serial),
-                    json.dumps(row.votes, default=LegislationScraperUtils.__json_serial),
-                    row.site_topic, row.topic)
-                
-                    curs.execute(insert_legislator_query, tup)
+                if isinstance(row, LegislationRow):
+                    try:
+                        tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
+                        row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
+                        json.dumps(row.committees, default=LegislationScraperUtils.__json_serial),
+                        row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
+                        row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                        row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                        json.dumps(row.actions, default=LegislationScraperUtils.__json_serial),
+                        json.dumps(row.votes, default=LegislationScraperUtils.__json_serial),
+                        row.site_topic, row.topic)
 
-                except Exception as e:
-                    print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                        curs.execute(insert_legislator_query, tup)
+
+                    except Exception as e:
+                        print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+
+                elif isinstance(row, dict):
+                    # try:
+
+                        tup = (row['goverlytics_id'], row['bill_state_id'], date_collected, row['bill_name'],
+                               row['session'], row['date_introduced'], row['state_url'], row['url'],
+                               row['chamber_origin'],
+                               json.dumps(row['committees'], default=LegislationScraperUtils.__json_serial),
+                               row['state_id'], row['state'], row['bill_type'], row['bill_title'],
+                               row['current_status'],
+                               row['principal_sponsor_id'], row['principal_sponsor'], row['sponsors'],
+                               row['sponsors_id'],
+                               row['cosponsors'], row['cosponsors_id'], row['bill_text'], row['bill_description'],
+                               row['bill_summary'],
+                               json.dumps(row['actions'], default=LegislationScraperUtils.__json_serial),
+                               json.dumps(row['votes'], default=LegislationScraperUtils.__json_serial),
+                               row['site_topic'], row['topic'])
+                        curs.execute(insert_legislator_query, tup)
+                    # except Exception as e:
+                    #     print(f'An exception occurred inserting {row["state_url"]}: {e}')
 
     
     def search_for_legislators(self, **kwargs) -> pd.DataFrame:
