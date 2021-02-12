@@ -74,28 +74,20 @@ bills_sponsor_house_url = 'http://alisondb.legislature.state.al.us/alison/SESSBi
 reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSResosBySenateSponsorSelect.aspx'
 
 # Initialize config parser and get variables from config file
-<<<<<<< HEAD
-# configParser = configparser.RawConfigParser()
-# configParser.read('config.cfg')
-# state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-# legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
-
-# #Initialize database and scraper utils
-# db_user = str(configParser.get('databaseConfig', 'db_user'))
-# db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-# db_host = str(configParser.get('databaseConfig', 'db_host'))
-# db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-# Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
-=======
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
->>>>>>> 5daaf3b7c3896e21deaa6a30e2657b2c5f309f78
+#Initialize database and scraper utils
+db_user = str(configParser.get('databaseConfig', 'db_user'))
+db_pass = str(configParser.get('databaseConfig', 'db_pass'))
+db_host = str(configParser.get('databaseConfig', 'db_host'))
+db_name = str(configParser.get('databaseConfig', 'db_name'))
+
+Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+
 
 scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
