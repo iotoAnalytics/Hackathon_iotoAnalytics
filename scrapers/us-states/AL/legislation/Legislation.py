@@ -74,6 +74,7 @@ bills_sponsor_house_url = 'http://alisondb.legislature.state.al.us/alison/SESSBi
 reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSResosBySenateSponsorSelect.aspx'
 
 # Initialize config parser and get variables from config file
+<<<<<<< HEAD
 # configParser = configparser.RawConfigParser()
 # configParser.read('config.cfg')
 # state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
@@ -87,6 +88,14 @@ reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSRe
 # db_name = str(configParser.get('databaseConfig', 'db_name'))
 
 # Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+=======
+configParser = configparser.RawConfigParser()
+configParser.read('config.cfg')
+state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+
+>>>>>>> 5daaf3b7c3896e21deaa6a30e2657b2c5f309f78
 
 scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
@@ -440,7 +449,10 @@ def scrape():
     scraper_utils.insert_legislation_data_into_db(list(fields_house.values()))
     scraper_utils.insert_legislation_data_into_db(list(fields.values()))
 
+    # for d in list(fields_house.values())[:10]:
+    #     print(d)
 
+<<<<<<< HEAD
 session = requests.Session()
 
 page = session.get(select_session_url)
@@ -462,3 +474,7 @@ for session_no in range(1, 2):
 
 
 
+=======
+    # for d in list(fields.values())[:10]:
+    #     print(d)
+>>>>>>> 5daaf3b7c3896e21deaa6a30e2657b2c5f309f78

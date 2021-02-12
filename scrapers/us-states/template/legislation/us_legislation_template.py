@@ -24,6 +24,7 @@ import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
+import boto3
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -32,14 +33,6 @@ configParser.read('config.cfg')
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
-
-#Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
@@ -151,6 +144,6 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db()(data)
+    scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')

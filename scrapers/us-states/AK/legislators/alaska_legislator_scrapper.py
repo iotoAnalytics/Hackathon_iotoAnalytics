@@ -35,14 +35,6 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-# Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
-
 scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 house_url = "http://akleg.gov/house.php"

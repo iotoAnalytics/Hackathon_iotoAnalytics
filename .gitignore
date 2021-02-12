@@ -1,3 +1,6 @@
 .DS_STORE
-/venv
-/__pycache__
+venv/
+__pycache__/
+test_legislation/
+test_legislators/
+.idea

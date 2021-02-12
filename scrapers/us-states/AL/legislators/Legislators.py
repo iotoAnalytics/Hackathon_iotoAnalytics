@@ -19,8 +19,8 @@ import requests
 from bs4 import BeautifulSoup
 import request_url
 import pandas as pd
-from database import Database
-from database import CursorFromConnectionFromPool
+# from database import Database
+# from database import CursorFromConnectionFromPool
 from psycopg2 import sql
 import json
 import datetime
@@ -128,19 +128,19 @@ def scrape_legislator(links):
 
         fields = scraper_utils.initialize_row()
 
-        fields['state_member_id'] = value['oid_sponsor'].replace('OID_SPONSOR=', '')
-        fields['most_recent_term_id'] = value['session'].replace('%20', '').replace(' ', '').replace('SESSNAME=', '')
-        fields['date_collected'] = datetime.datetime.today().strftime('%d-%m-%Y') 
-        fields['state_url'] = base_url
-        fields['name_full'] = name.full_name
-        fields['name_last'] = name.last
-        fields['name_first'] = name.first
-        fields['name_middle'] = name.middle
-        fields['name_suffix'] = name.suffix
-        fields['party'] = party[district_table[1][0]]
-        fields['party_id'] = scraper_utils.get_party_id(fields['party'])
-        fields['role'] = complete_name.split()[0].title()
-        fields['district'] = district_table[1][1].split()[2]
+        fields.state_member_id = value['oid_sponsor'].replace('OID_SPONSOR=', '')
+        fields.most_recent_term_id = value['session'].replace('%20', '').replace(' ', '').replace('SESSNAME=', '')
+        fields.date_collected = datetime.datetime.today().strftime('%d-%m-%Y') 
+        fields.state_url = base_url
+        fields.name_full = name.full_name
+        fields.name_last = name.last
+        fields.name_first = name.first
+        fields.name_middle = name.middle
+        fields.name_suffix = name.suffix
+        fields.party = party[district_table[1][0]]
+        fields.party_id = scraper_utils.get_party_id(fields.party)
+        fields.role = complete_name.split()[0].title()
+        fields.district = district_table[1][1].split()[2]
 
         try:
             committees_table.index  = committees_table['Committees'].tolist()
@@ -152,16 +152,16 @@ def scrape_legislator(links):
                     'role': row['Position']
                 })
 
-            fields['committees'] = temp
+            fields.committees = temp
 
 
-            fields['committees'] = temp
+            # fields.committees'] = temp
 
         except KeyError:
             print('key error')
             pass
         
-        fields['areas_served'] = district_table[1][2].split(',')
+        fields.areas_served = district_table[1][2].split(',')
 
         temp = []
         if nan(district_table[1][3]) != '':
@@ -169,7 +169,7 @@ def scrape_legislator(links):
         if legislature_table[1][3] != '':
             temp.append({'number': legislature_table[1][3], 'office': 'Capitol Office'})
 
-        fields['phone_number'] = temp
+        fields.phone_number = temp
 
         temp = []
         # This just puts all the address components together, nan turns nan values to ''
@@ -179,12 +179,12 @@ def scrape_legislator(links):
         temp.append({'location': 'District Office', 'address': nan(str(district_table[1][5]) + ', ') + nan(str(district_table[1][6]) + ', ') + nan(district_table[1][7]) + 
                                                                 ', AL, ' + nan(district_table[1][9])})  
 
-        fields['addresses'] = temp
+        fields.addresses = temp
 
         email = legislature_table[1][10]
-        fields['email'] = nan(email if email == email else district_table[1][10]) # email == email checks if email = nan or not
+        fields.email = nan(email if email == email else district_table[1][10]) # email == email checks if email = nan or not
 
-        legislators[fields['district']] = fields
+        legislators[fields.district] = fields
     return legislators
 
 def get_wiki_links(link):
@@ -326,14 +326,14 @@ def merge_wiki(wiki, legislators):
     
 
 
-def init_database():
-    db_user = 'postgres'
-    db_pass = 'dionysos'
-    db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
-    db_port = '5432'
-    db_name = 'openparl'   
+# def init_database():
+#     db_user = 'postgres'
+#     db_pass = 'dionysos'
+#     db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
+#     db_port = '5432'
+#     db_name = 'openparl'   
 
-    Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+#     Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
     
 def dict_to_list(dictionary):
     my_list = []
@@ -344,7 +344,7 @@ def dict_to_list(dictionary):
     return my_list
 
 
-init_database()
+# init_database()
 scraper_utils = LegislatorScraperUtils('AL', 'us_al_legislators', 'United States of America')
 
 #house scraper
@@ -365,7 +365,9 @@ senate = dict_to_list(senate)
 
 senate_house_data_lst = house + senate
 
+# scraper_utils.insert_legislator_data_into_db(senate_house_data_lst)
 
-scraper_utils.insert_legislator_data_into_db(senate_house_data_lst)
+for d in senate_house_data_lst[:10]:
+    print(d)
 
 
