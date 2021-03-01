@@ -299,7 +299,7 @@ class LegislationScraperUtils:
         if len(df) > 1:
             print(f'WARNING: More than one legislator found using {kwargs} search parameter! \
             Must use a more unique identifier!')
-            return None
+            return df
         if len(df) == 0:
             print(f'WARNING: No legislators found while searching {kwargs}!')
             return None
