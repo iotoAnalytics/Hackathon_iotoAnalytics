@@ -47,16 +47,13 @@ header = {
 
 
 def get_name(soup):
-    name = soup.find('span', {'id': 'ctl00_ContentPlaceHolderCol1_LabelLegname'}).text
-    name = name.replace('\xa0', ' ').replace(',', '').strip()
-    f_name = name.split(' ')[0]
-    l_name = ''
-    for _ in range(1, len(name.split(' '))):
-        l_name = l_name + ' ' + name.split(' ')[_]
-    m_name = re.findall('[A-Z]\.', name)
-    m_name = ''.join(m_name)
-    l_name = l_name.replace(m_name, '')
-    return [name, f_name, l_name.strip(), m_name]
+    name = soup.find('span',{'id':'ctl00_ContentPlaceHolderCol1_LabelLegname'}).text
+    name = name.replace('\xa0',' ').replace(',','').strip()
+    temp_name = name.split(' ')
+    f_name = temp_name[0]
+    l_name = temp_name[-1].title().strip()
+    m_name = name.replace(f_name,'').replace(l_name,'').strip()
+    return [name,f_name,l_name,m_name]
 
 
 def get_role(soup):
