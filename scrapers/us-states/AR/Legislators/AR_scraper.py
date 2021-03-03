@@ -35,7 +35,7 @@ import pandas as pd
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
-configParser.read('C:\\Users\Avery\\Desktop\\cpsc coop\\IOTO Jan 4 - Apr 30 2021\\Web Scraping\\goverlytics-scrapers\\scrapers\\us-states\AR\\Legislators\\config.cfg')
+configParser.read('config.cfg')
 
 state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
