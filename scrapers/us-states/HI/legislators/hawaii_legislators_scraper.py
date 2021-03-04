@@ -49,14 +49,11 @@ header = {
 def get_name(soup):
     name = soup.find('span', {'id': 'ctl00_ContentPlaceHolderCol1_LabelLegname'}).text
     name = name.replace('\xa0', ' ').replace(',', '').strip()
-    f_name = name.split(' ')[0]
-    l_name = ''
-    for _ in range(1, len(name.split(' '))):
-        l_name = l_name + ' ' + name.split(' ')[_]
-    m_name = re.findall('[A-Z]\.', name)
-    m_name = ''.join(m_name)
-    l_name = l_name.replace(m_name, '')
-    return [name, f_name, l_name.strip(), m_name]
+    temp_name = name.split(' ')
+    f_name = temp_name[0]
+    l_name = temp_name[-1].title().strip()
+    m_name = name.replace(f_name, '').replace(l_name, '').strip()
+    return [name, f_name, l_name, m_name]
 
 
 def get_role(soup):
@@ -267,7 +264,7 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         data = pool.map(scrape, urls)
-        print('done scraping!')
+    print('done scraping!')
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.insert_legislator_data_into_db(data)
