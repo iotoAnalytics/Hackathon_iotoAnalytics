@@ -50,7 +50,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from database import Database
-from legislation_scraper_utils import USLegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, USLegislationRow
 from multiprocessing import Pool
 from itertools import product
 import datetime

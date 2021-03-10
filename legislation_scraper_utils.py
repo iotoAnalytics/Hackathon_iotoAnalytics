@@ -19,7 +19,7 @@ date collectors.
 
 
 @dataclass
-class LegislationRow:
+class USLegislationRow:
     """
     Data structure for housing data about each piece of legislation.
     """
@@ -117,12 +117,12 @@ class USLegislationScraperUtils:
             return self.__convert_to_int(value)
 
     
-    def initialize_row(self) -> LegislationRow:
+    def initialize_row(self) -> USLegislationRow:
         '''
         Factory method for creating a legislation row. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
-        row = LegislationRow()
+        row = USLegislationRow()
         
         try:
             row.state = self.state_abbreviation
@@ -135,12 +135,12 @@ class USLegislationScraperUtils:
         return row
     
     
-    def insert_legislation_data_into_db(self, data : List[LegislationRow]) -> None:
+    def insert_legislation_data_into_db(self, data : List[USLegislationRow]) -> None:
         """
         Takes care of inserting legislation data into database.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of LegislationRows!')
+            raise TypeError('Data being written to database must be a list of USLegislationRows!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -226,7 +226,7 @@ class USLegislationScraperUtils:
             date_collected = datetime.now()
 
             for row in data:
-                if isinstance(row, LegislationRow):
+                if isinstance(row, USLegislationRow):
                     try:
                         tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
                         row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,

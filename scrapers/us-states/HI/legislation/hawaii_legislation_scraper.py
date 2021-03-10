@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USLegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, USLegislationRow
 from bs4 import BeautifulSoup
 import requests
 import request_url

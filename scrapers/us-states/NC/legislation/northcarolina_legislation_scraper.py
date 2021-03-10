@@ -31,7 +31,7 @@ from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import psycopg2
 from nameparser import HumanName
-from legislation_scraper_utils import USLegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, USLegislationRow
 
 import datefinder
 import unidecode

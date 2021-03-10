@@ -17,7 +17,7 @@ date collectors.
 
 
 @dataclass
-class LegislatorRow:
+class USLegislatorRow:
     """
     Data structure for housing data about each piece of legislator.
     """
@@ -102,7 +102,7 @@ class USLegislatorScraperUtils:
         which then gets filled in with values collected from the website.
         '''
 
-        row = LegislatorRow()
+        row = USLegislatorRow()
 
         try:
             row.country = self.country
@@ -137,7 +137,7 @@ class USLegislatorScraperUtils:
         """
 
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of LegislationRows or dictionaries!')
+            raise TypeError('Data being written to database must be a list of USLegislationRows or dictionaries!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -225,7 +225,7 @@ class USLegislatorScraperUtils:
             date_collected = datetime.now()
 
             for row in data:
-                if isinstance(row, LegislatorRow):
+                if isinstance(row, USLegislatorRow):
                     try:
 
                         tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
