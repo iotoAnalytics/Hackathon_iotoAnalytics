@@ -18,7 +18,6 @@ date collectors.
 """
 
 
-
 @dataclass
 class LegislationRow:
     """

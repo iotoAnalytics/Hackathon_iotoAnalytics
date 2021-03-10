@@ -11,9 +11,7 @@ import sys, os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
 
-sys.path.insert(0, str(p))
 
 from legislator_scraper_utils import LegislatorScraperUtils
 from bs4 import BeautifulSoup
