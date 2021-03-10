@@ -50,7 +50,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from database import Database
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, LegislationRow
 from multiprocessing import Pool
 from itertools import product
 import datetime
@@ -89,7 +89,7 @@ db_name = str(configParser.get('databaseConfig', 'db_name'))
 Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
 #default sess_column scrapes current year only
 def set_session(sess_column):

@@ -51,7 +51,7 @@ class LegislationRow:
     topic: str = ''
 
 
-class LegislationScraperUtils:
+class USLegislationScraperUtils:
     """
     Utilities to help with collecting and storing legislation data.
     """
@@ -203,12 +203,12 @@ class LegislationScraperUtils:
                 try:
                     tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
                     row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
-                    json.dumps(row.committees, default=LegislationScraperUtils.__json_serial),
+                    json.dumps(row.committees, default=USLegislationScraperUtils.__json_serial),
                     row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
                     row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
                     row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                    json.dumps(row.actions, default=LegislationScraperUtils.__json_serial),
-                    json.dumps(row.votes, default=LegislationScraperUtils.__json_serial),
+                    json.dumps(row.actions, default=USLegislationScraperUtils.__json_serial),
+                    json.dumps(row.votes, default=USLegislationScraperUtils.__json_serial),
                     row.site_topic, row.topic)
                 
                     curs.execute(insert_legislator_query, tup)

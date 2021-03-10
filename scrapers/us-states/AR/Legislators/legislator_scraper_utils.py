@@ -50,7 +50,7 @@ class LegislatorRow:
     military_experience: str = ''
 
 
-class LegislatorScraperUtils:
+class USLegislatorScraperUtils:
     """
     Utilities to help with collecting and storing legislator data.
     """
@@ -232,13 +232,13 @@ class LegislatorScraperUtils:
                                row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
                                row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
                                row.role, row.district, row.years_active,
-                               json.dumps(row.committees, default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row.committees, default=USLegislatorScraperUtils.__json_serial),
                                row.areas_served,
-                               json.dumps(row.phone_number, default=LegislatorScraperUtils.__json_serial),
-                               json.dumps(row.addresses, default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row.phone_number, default=USLegislatorScraperUtils.__json_serial),
+                               json.dumps(row.addresses, default=USLegislatorScraperUtils.__json_serial),
                                row.email, row.birthday, row.seniority,
                                row.occupation,
-                               json.dumps(row.education, default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row.education, default=USLegislatorScraperUtils.__json_serial),
                                row.military_experience)
 
                         curs.execute(insert_legislator_query, tup)
@@ -255,13 +255,13 @@ class LegislatorScraperUtils:
                                row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
                                row['party'],
                                row['role'], row['district'], row['years_active'],
-                               json.dumps(row['committees'], default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row['committees'], default=USLegislatorScraperUtils.__json_serial),
                                row['areas_served'],
-                               json.dumps(row['phone_number'], default=LegislatorScraperUtils.__json_serial),
-                               json.dumps(row['addresses'], default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row['phone_number'], default=USLegislatorScraperUtils.__json_serial),
+                               json.dumps(row['addresses'], default=USLegislatorScraperUtils.__json_serial),
                                row['email'], row['birthday'], row['seniority'],
                                row['occupation'],
-                               json.dumps(row['education'], default=LegislatorScraperUtils.__json_serial),
+                               json.dumps(row['education'], default=USLegislatorScraperUtils.__json_serial),
                                row['military_experience'])
 
                         curs.execute(insert_legislator_query, tup)

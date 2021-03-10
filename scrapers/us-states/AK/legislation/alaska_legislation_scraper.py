@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, LegislationRow
 from database import Database
 import configparser
 import re
@@ -37,7 +37,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
 base_url = 'http://www.akleg.gov/basis/Home/BillsandLaws'
 
