@@ -7,7 +7,6 @@ lxml==4.6.2
 nameparser==1.0.6
 typing-extensions==3.7.4.3
 boto3==1.16.57
-
 bs4==0.0.1
 certifi==2020.12.5
 chardet==4.0.0

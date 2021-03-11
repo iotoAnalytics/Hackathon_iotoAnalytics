@@ -28,7 +28,7 @@ from nameparser import HumanName
 from nameparser.config import CONSTANTS
 import html
 import re
-from legislator_scraper_utils import LegislatorScraperUtils
+from legislator_scraper_utils import USLegislatorScraperUtils
 
 '''temp imports'''
 from pprint import pprint
@@ -345,7 +345,7 @@ def dict_to_list(dictionary):
 
 
 # init_database()
-scraper_utils = LegislatorScraperUtils('AL', 'us_al_legislators', 'United States of America')
+scraper_utils = USLegislatorScraperUtils('AL', 'us_al_legislators', 'United States of America')
 
 #house scraper
 house_wiki_links = get_wiki_links(wikipedia_house_url)

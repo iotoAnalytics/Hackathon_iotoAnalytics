@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislator_scraper_utils import LegislatorScraperUtils
+from legislator_scraper_utils import USLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 import request_url
@@ -35,7 +35,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 current_year = 2021
 rep_wiki_url = 'https://en.wikipedia.org/wiki/Hawaii_House_of_Representatives'
@@ -47,13 +47,13 @@ header = {
 
 
 def get_name(soup):
-    name = soup.find('span',{'id':'ctl00_ContentPlaceHolderCol1_LabelLegname'}).text
-    name = name.replace('\xa0',' ').replace(',','').strip()
+    name = soup.find('span', {'id': 'ctl00_ContentPlaceHolderCol1_LabelLegname'}).text
+    name = name.replace('\xa0', ' ').replace(',', '').strip()
     temp_name = name.split(' ')
     f_name = temp_name[0]
     l_name = temp_name[-1].title().strip()
-    m_name = name.replace(f_name,'').replace(l_name,'').strip()
-    return [name,f_name,l_name,m_name]
+    m_name = name.replace(f_name, '').replace(l_name, '').strip()
+    return [name, f_name, l_name, m_name]
 
 
 def get_role(soup):
@@ -264,7 +264,7 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         data = pool.map(scrape, urls)
-        print('done scraping!')
+    print('done scraping!')
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.insert_legislator_data_into_db(data)

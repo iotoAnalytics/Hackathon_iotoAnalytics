@@ -1,7 +1,7 @@
 .DS_STORE
 venv/
+.venv/
 __pycache__/
 test_legislation/
 test_legislators/
 .idea
-scrapers/us-states/NC/legislation/topic_classifier.joblib
