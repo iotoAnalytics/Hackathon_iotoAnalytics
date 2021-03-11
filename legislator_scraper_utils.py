@@ -142,6 +142,7 @@ class LegislatorScraperUtils:
         with CursorFromConnectionFromPool() as curs:
             try:
                 create_table_query = sql.SQL("""
+                 
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id bigint PRIMARY KEY,
                         state_member_id text,
@@ -247,23 +248,25 @@ class LegislatorScraperUtils:
                         print(f'An exception occurred inserting {row.state_url}: {e}')
 
                 elif isinstance(row, dict):
-                    try:
+                    if row['name_full'] != 'Bill Yearta':
+                        try:
 
-                        tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
-                               row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
-                               row['name_suffix'],
-                               row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
-                               row['party'],
-                               row['role'], row['district'], row['years_active'],
-                               json.dumps(row['committees'], default=LegislatorScraperUtils.__json_serial),
-                               row['areas_served'],
-                               json.dumps(row['phone_number'], default=LegislatorScraperUtils.__json_serial),
-                               json.dumps(row['addresses'], default=LegislatorScraperUtils.__json_serial),
-                               row['email'], row['birthday'], row['seniority'],
-                               row['occupation'],
-                               json.dumps(row['education'], default=LegislatorScraperUtils.__json_serial),
-                               row['military_experience'])
+                            tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
+                                   row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
+                                   row['name_suffix'],
+                                   row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
+                                   row['party'],
+                                   row['role'], row['district'], row['years_active'],
+                                   json.dumps(row['committees'], default=LegislatorScraperUtils.__json_serial),
+                                   row['areas_served'],
+                                   json.dumps(row['phone_number'], default=LegislatorScraperUtils.__json_serial),
+                                   json.dumps(row['addresses'], default=LegislatorScraperUtils.__json_serial),
+                                   row['email'], row['birthday'], row['seniority'],
+                                   row['occupation'],
+                                   json.dumps(row['education'], default=LegislatorScraperUtils.__json_serial),
+                                   row['military_experience'])
 
-                        curs.execute(insert_legislator_query, tup)
-                    except Exception as e:
-                        print(f'An exception occurred inserting {row["state_url"]}: {e}')
+                            curs.execute(insert_legislator_query, tup)
+                            print('Insertions of ' + row['name_full'] + ' completed')
+                        except Exception as e:
+                            print(f'An exception occurred inserting {row["state_url"]}: {e}')
