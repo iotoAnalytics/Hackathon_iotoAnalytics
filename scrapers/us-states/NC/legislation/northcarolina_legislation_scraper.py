@@ -31,7 +31,7 @@ from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import psycopg2
 from nameparser import HumanName
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USLegislationScraperUtils, USLegislationRow
 
 import datefinder
 import unidecode
@@ -60,7 +60,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
 
 def collect_bill_urls(myurl):
@@ -422,35 +422,35 @@ def collect_bill_details(bill_url):
               'topic': "", 'bill_text': bill_text, 'bill_description': bill_description, 'bill_summary': bill_summary}
 
     return bill_d
-
-def add_topics(df):
-    # model_name = open(os.path.join(os.path.dirname(__file__), os.pardir,
-    #                                'C:\Users\anvo2\PycharmProjects\goverlytics-scrapers\topic_classifier.joblib'))
-    model_name = 'topic_classifier.joblib'
-    print('Loading model...')
-
-    clf = load(model_name)
-
-    print('Model loaded.')
-
-    df.loc[df.bill_text == "", 'bill_text'] = df.loc[df.bill_text == "", 'site_topic']
-    # cast principal sponsor id to int
-    # df['bill_text'] = df['bill_text'].replace({np.nan: None})
-    # df['bill_summary'] = [str(d) if d else d for d in df['bill_summary']]
-
-    words = stopwords.words('english')
-    stemmer = WordNetLemmatizer()
-    # for bt in df['bill_text']:
-    #     print(type(bt))
-    df['processedtext'] = df['bill_text'].apply(
-        lambda x: ' '.join(
-            [stemmer.lemmatize(i) for i in re.sub('[^a-zA-Z]', ' ', x).split() if i not in words]).lower())
-
-    df['topic'] = clf.predict(df['processedtext'])
-    df['bill_text'] = df['processedtext']
-    print(df)
-
-    return df
+#
+# def add_topics(df):
+#     # model_name = open(os.path.join(os.path.dirname(__file__), os.pardir,
+#     #                                'C:\Users\anvo2\PycharmProjects\goverlytics-scrapers\topic_classifier.joblib'))
+#     model_name = 'topic_classifier.joblib'
+#     print('Loading model...')
+#
+#     clf = load(model_name)
+#
+#     print('Model loaded.')
+#
+#     df.loc[df.bill_text == "", 'bill_text'] = df.loc[df.bill_text == "", 'site_topic']
+#     # cast principal sponsor id to int
+#     # df['bill_text'] = df['bill_text'].replace({np.nan: None})
+#     # df['bill_summary'] = [str(d) if d else d for d in df['bill_summary']]
+#
+#     words = stopwords.words('english')
+#     stemmer = WordNetLemmatizer()
+#     # for bt in df['bill_text']:
+#     #     print(type(bt))
+#     df['processedtext'] = df['bill_text'].apply(
+#         lambda x: ' '.join(
+#             [stemmer.lemmatize(i) for i in re.sub('[^a-zA-Z]', ' ', x).split() if i not in words]).lower())
+#
+#     df['topic'] = clf.predict(df['processedtext'])
+#     df['bill_text'] = df['processedtext']
+#     print(df)
+#
+#     return df
 
 
 
@@ -495,9 +495,9 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     big_df = big_df.drop(['psurl'], axis=1)
     big_df['bill_state_id'] = ""
-    big_df = add_topics(big_df)
+    # big_df = add_topics(big_df)
     # big_df = topics.add_topics(big_df)
-    # print(big_df)
+    print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
