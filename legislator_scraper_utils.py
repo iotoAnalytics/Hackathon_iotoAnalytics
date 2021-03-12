@@ -8,6 +8,7 @@ import pandas as pd
 from database import CursorFromConnectionFromPool, Database
 from dataclasses import dataclass, field
 from typing import List
+import copy
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -16,13 +17,14 @@ date collectors.
 """
 
 
-# TODO Refactor so we have division and federal scraper utils. Do some data modeling.
-# Also take into consideration municipal data
-# TODO change get_party_id to get_attribute_id where use can pass in the ID of
-# the attribute they want (either party, division, or country) and it returns
-# the id for that.
+# TODO Finish writing insert query for US federal scraper
+# TODO Finish up canadian scrapers
+
 @dataclass
 class LegislatorRow:
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
     most_recent_term_id: str = ''
     name_full: str = ''
     name_last: str = ''
@@ -44,38 +46,34 @@ class LegislatorRow:
     occupation: List[str] = field(default_factory=list)
     education: List[dict] = field(default_factory=list)
     military_experience: str = ''
+    source_url: str = ''
+    source_id: str = ''
 
 @dataclass
-class USStateLegislatorRow(LegislatorRow):
+class USLegislatorRow(LegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
-    state_member_id: str = ''
-    state_url: str = ''
-    state_id: int = None
     state: str = ''
+    state_id: int = None
     district: str = ''
     areas_served: List[str] = field(default_factory=list)
 
 
 @dataclass
-class CadFedLegislatorRow(LegislatorRow):
+class CadLegislatorRow(LegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
-    mp_id: str = ''
-    mp_url: str = ''
     province_territory_id: int = None
     province_territory: str = ''
     riding: str = ''
 
 class LegislatorScraperUtils():
 
-    def __init__(self, country, database_table_name, party_table_name, division_table_name):
+    def __init__(self, country, database_table_name, row_type):
+        
         Database.initialise()
-
-        self.country = country
-        self.database_table_name = database_table_name
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -83,11 +81,11 @@ class LegislatorScraperUtils():
                 curs.execute(query)
                 countries_results = curs.fetchall()
 
-                query = f'SELECT * FROM {party_table_name}'
+                query = f'SELECT * FROM {country}_parties'
                 curs.execute(query)
                 parties_results = curs.fetchall()
 
-                query = f'SELECT * FROM {division_table_name}'
+                query = f'SELECT * FROM {country}_divisions'
                 curs.execute(query)
                 division_results = curs.fetchall()
             except Exception as e:
@@ -95,8 +93,12 @@ class LegislatorScraperUtils():
 
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
-        self.division = pd.DataFrame(division_results)
+        self.divisions = pd.DataFrame(division_results)
 
+        self.country = self.countries.loc[self.countries['abbreviation'] == country]['country'].values[0]
+        self.country_id = int(self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
+        self.database_table_name = database_table_name
+        self.row_type = row_type
 
     def _json_serial(self, obj):
         """
@@ -107,217 +109,231 @@ class LegislatorScraperUtils():
             return obj.isoformat()
         raise TypeError("Type %s not serializable" % type(obj))
 
+    def initialize_row(self):
+        row = copy.copy(self.row_type)
+        row.country_id = self.country_id
+        row.country = self.country
+        return row
+
+    def get_attribute_id(self, table_name, column_to_search, value):
+        accepted_tables = ['country', 'party', 'division']
+        if table_name not in accepted_tables:
+            raise Exception(f'Error: table must be one of the following: {accepted_tables}')
+
+        if table_name == 'country':
+            df = self.countries
+        if table_name == 'party':
+            df = self.parties
+        if table_name == 'division':
+            df = self.divisions
+
+        try:
+            return int(df.loc[df[column_to_search] == value]['id'].values[0])
+        except Exception as e:
+            raise Exception(f'Error retrieving ID from table {table_name}: {e}')
+
+
     def get_party_id(self, party_name):
         """
         Used for getting the party ID number.
         """
-        try:
-            party_id = int(self.parties.loc[self.parties['party'] == party_name]['id'].values[0])
-        except IndexError:
-            sys.exit(
-                'An error occurred getting party_id.\nParty not found. Has the party been collected, and is it in the correct format?')
-        except Exception as e:
-            sys.exit(f'An error occurred involving the party_id: {e}')
+        return self.get_attribute_id('party', 'party', party_name)
 
-        return party_id
-
-class USStateLegislatorScraperUtils(LegislatorScraperUtils):
-    """
-    Utilities to help with collecting and storing legislator data.
-    """
-
-    def __init__(self, state_abbreviation, database_table_name, country):
-        """
-        The state_abbreviation, database_table_name, and country come from
-        the config.cfg file and must be updated to work properly with your legislation
-        data collector.
-        """
-        super().__init__(country, database_table_name, 'us_parties', 'us_state_info')
-
-        self.state_abbreviation = state_abbreviation
-        # self.database_table_name = database_table_name
-        # self.country = country
-
-        # Database.initialise()
-
-        # with CursorFromConnectionFromPool() as curs:
-        #     try:
-        #         query = 'SELECT * FROM us_parties'
-        #         curs.execute(query)
-        #         parties_results = curs.fetchall()
-
-                # query = 'SELECT * FROM countries'
-                # curs.execute(query)
-                # countries_results = curs.fetchall()
-
-        #         query = 'SELECT * FROM us_state_info'
-        #         curs.execute(query)
-        #         state_results = curs.fetchall()
-        #     except Exception as e:
-        #         sys.exit(f'An exception occurred retrieving us_parties, and us_state_info from database:\n{e}')
-
-        # self.parties = pd.DataFrame(parties_results)
-        # # self.countries = pd.DataFrame(countries_results)
-        # self.states = pd.DataFrame(state_results)
-
-    def initialize_row(self):
-        '''
-        Create a row and fill with empty values. This gets sent back to the scrape() function
-        which then gets filled in with values collected from the website.
-        '''
-
-        row = USStateLegislatorRow()
-
-        try:
-            row.country = self.country
-            row.country_id = int(self.countries.loc[self.countries['country'] == self.country]['id'].values[0])
-            row.state = self.state_abbreviation
-            row.state_id = int(
-                self.division.loc[self.division['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
-        except IndexError:
-            sys.exit('An error occurred inserting state_id and/or country_id. Did you update the config file?')
-        except Exception as e:
-            sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
-
+    def convert_dict_to_row(self, row_dict):
+        row = copy.copy(self.row_type)
+        for k, v in row_dict.items():
+            row.k = v
         return row
 
-
-    def insert_legislator_data_into_db(self, data):
+    def write_data_to_database(self, create_table_query, data_write_query, data: list[LegislatorRow]):
         """
         Takes care of inserting legislator data into database.
         """
-
-        if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
-
         with CursorFromConnectionFromPool() as curs:
             try:
-                create_table_query = sql.SQL("""
-                    CREATE TABLE IF NOT EXISTS {table} (
-                        goverlytics_id bigint PRIMARY KEY,
-                        state_member_id text,
-                        most_recent_term_id text,
-                        date_collected timestamp,
-                        state_url TEXT UNIQUE,
-                        url text,
-                        name_full text,
-                        name_last text,
-                        name_first text,
-                        name_middle text,
-                        name_suffix text,
-                        country_id bigint,
-                        country text,
-                        state_id int,
-                        state char(2),
-                        party_id int,
-                        party text,
-                        role text,
-                        district text,
-                        years_active int[],
-                        committees jsonb,
-                        areas_served text[],
-                        phone_number jsonb,
-                        addresses jsonb,
-                        email text,
-                        birthday date,
-                        seniority int,
-                        occupation text[],
-                        education jsonb,
-                        military_experience text
-                    );
-
-                    ALTER TABLE {table} OWNER TO rds_ad;
-                    """).format(table=sql.Identifier(self.database_table_name))
-
                 curs.execute(create_table_query)
                 curs.connection.commit()
 
             except Exception as e:
                 print(f'An exception occurred creating {self.database_table_name}:\n{e}')
 
-            insert_legislator_query = sql.SQL("""
-                WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
-                INSERT INTO {table}
-                VALUES (
-                    (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                    CONCAT('us/{state}/legislators/', (SELECT leg_id FROM leg_id)),
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (state_url) DO UPDATE SET
-                    date_collected = excluded.date_collected,
-                    name_full = excluded.name_full,
-                    name_last = excluded.name_last,
-                    name_first = excluded.name_first,
-                    name_middle = excluded.name_middle,
-                    name_suffix = excluded.name_suffix,
-                    country_id = excluded.country_id,
-                    country = excluded.country,
-                    state_id = excluded.state_id,
-                    state = excluded.state,
-                    party_id = excluded.party_id,
-                    party = excluded.party,
-                    district = excluded.district,
-                    role = excluded.role,
-                    committees = excluded.committees,
-                    areas_served = excluded.areas_served,
-                    phone_number = excluded.phone_number,
-                    addresses = excluded.addresses,
-                    email = excluded.email,
-                    birthday = excluded.birthday,
-                    military_experience = excluded.military_experience,
-                    occupation = excluded.occupation,
-                    education = excluded.education,
-                    state_member_id = excluded.state_member_id,
-                    most_recent_term_id = excluded.most_recent_term_id,
-                    years_active = excluded.years_active,
-                    seniority = excluded.seniority;
-                """).format(table=sql.Identifier(self.database_table_name), state=sql.SQL(self.state_abbreviation))
+            for row_data in data:
+                try:
+                    curs.execute(data_write_query, row_data)
+                except Exception as e:
+                    print(f'An exception occurred inserting {row_data.source_url}: {e}')
+        
 
-            date_collected = datetime.now()
+class USFedLegislatorScraperUtils(LegislatorScraperUtils):
+    """
+    Utilities to help with collecting and storing legislator data.
+    """
 
-            for row in data:
-                if isinstance(row, USStateLegislatorRow):
-                    try:
+    def __init__(self, database_table_name='us_fed_legislators'):
+        """
+        The state_abbreviation, database_table_name, and country come from
+        the config.cfg file and must be updated to work properly with your legislation
+        data collector.
+        """
+        super().__init__('us', database_table_name, USLegislatorRow())
+    
+    def get_state_id(self, state_abbreviation):
+        return self.get_attribute_id('division', 'abbreviation', state_abbreviation)
 
-                        tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
-                               row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
-                               row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
-                               row.role, row.district, row.years_active,
-                               json.dumps(row.committees, default=self._json_serial),
-                               row.areas_served,
-                               json.dumps(row.phone_number, default=self._json_serial),
-                               json.dumps(row.addresses, default=self._json_serial),
-                               row.email, row.birthday, row.seniority,
-                               row.occupation,
-                               json.dumps(row.education, default=self._json_serial),
-                               row.military_experience)
+    def insert_legislator_data_into_db(self, data):
+        """
+        """
+        if not isinstance(data, list):
+            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
+            
+        # This is used to convert dictionaries to rows. Need to test it out!
+        for item in data:
+            if isinstance(item, dict):
+                item = self.convert_dict_to_row(item)
 
-                        curs.execute(insert_legislator_query, tup)
+        # Finish implementing this!
 
-                    except Exception as e:
-                        print(f'An exception occurred inserting {row.state_url}: {e}')
+    # with CursorFromConnectionFromPool() as curs:
+    #         try:
+    #             create_table_query = sql.SQL("""
+    #                 CREATE TABLE IF NOT EXISTS {table} (
+    #                     goverlytics_id bigint PRIMARY KEY,
+    #                     state_member_id text,
+    #                     most_recent_term_id text,
+    #                     date_collected timestamp,
+    #                     state_url TEXT UNIQUE,
+    #                     url text,
+    #                     name_full text,
+    #                     name_last text,
+    #                     name_first text,
+    #                     name_middle text,
+    #                     name_suffix text,
+    #                     country_id bigint,
+    #                     country text,
+    #                     state_id int,
+    #                     state char(2),
+    #                     party_id int,
+    #                     party text,
+    #                     role text,
+    #                     district text,
+    #                     years_active int[],
+    #                     committees jsonb,
+    #                     areas_served text[],
+    #                     phone_number jsonb,
+    #                     addresses jsonb,
+    #                     email text,
+    #                     birthday date,
+    #                     seniority int,
+    #                     occupation text[],
+    #                     education jsonb,
+    #                     military_experience text
+    #                 );
 
-                elif isinstance(row, dict):
-                    try:
+    #                 ALTER TABLE {table} OWNER TO rds_ad;
+    #                 """).format(table=sql.Identifier(self.database_table_name))
 
-                        tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
-                               row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
-                               row['name_suffix'],
-                               row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
-                               row['party'],
-                               row['role'], row['district'], row['years_active'],
-                               json.dumps(row['committees'], default=self._json_serial),
-                               row['areas_served'],
-                               json.dumps(row['phone_number'], default=self._json_serial),
-                               json.dumps(row['addresses'], default=self._json_serial),
-                               row['email'], row['birthday'], row['seniority'],
-                               row['occupation'],
-                               json.dumps(row['education'], default=self._json_serial),
-                               row['military_experience'])
+    #             curs.execute(create_table_query)
+    #             curs.connection.commit()
 
-                        curs.execute(insert_legislator_query, tup)
-                    except Exception as e:
-                        print(f'An exception occurred inserting {row["state_url"]}: {e}')
+    #         except Exception as e:
+    #             print(f'An exception occurred creating {self.database_table_name}:\n{e}')
+
+    #         insert_legislator_query = sql.SQL("""
+    #             WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+    #             INSERT INTO {table}
+    #             VALUES (
+    #                 (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
+    #                 CONCAT('us/{state}/legislators/', (SELECT leg_id FROM leg_id)),
+    #                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+    #                 %s, %s, %s, %s, %s, %s, %s)
+    #             ON CONFLICT (state_url) DO UPDATE SET
+    #                 date_collected = excluded.date_collected,
+    #                 name_full = excluded.name_full,
+    #                 name_last = excluded.name_last,
+    #                 name_first = excluded.name_first,
+    #                 name_middle = excluded.name_middle,
+    #                 name_suffix = excluded.name_suffix,
+    #                 country_id = excluded.country_id,
+    #                 country = excluded.country,
+    #                 state_id = excluded.state_id,
+    #                 state = excluded.state,
+    #                 party_id = excluded.party_id,
+    #                 party = excluded.party,
+    #                 district = excluded.district,
+    #                 role = excluded.role,
+    #                 committees = excluded.committees,
+    #                 areas_served = excluded.areas_served,
+    #                 phone_number = excluded.phone_number,
+    #                 addresses = excluded.addresses,
+    #                 email = excluded.email,
+    #                 birthday = excluded.birthday,
+    #                 military_experience = excluded.military_experience,
+    #                 occupation = excluded.occupation,
+    #                 education = excluded.education,
+    #                 state_member_id = excluded.state_member_id,
+    #                 most_recent_term_id = excluded.most_recent_term_id,
+    #                 years_active = excluded.years_active,
+    #                 seniority = excluded.seniority;
+    #             """).format(table=sql.Identifier(self.database_table_name), state=sql.SQL(self.state_abbreviation))
+
+    #         date_collected = datetime.now()
+
+    #         for row in data:
+    #             if isinstance(row, USStateLegislatorRow):
+    #                 try:
+
+    #                     tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
+    #                            row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
+    #                            row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
+    #                            row.role, row.district, row.years_active,
+    #                            json.dumps(row.committees, default=self._json_serial),
+    #                            row.areas_served,
+    #                            json.dumps(row.phone_number, default=self._json_serial),
+    #                            json.dumps(row.addresses, default=self._json_serial),
+    #                            row.email, row.birthday, row.seniority,
+    #                            row.occupation,
+    #                            json.dumps(row.education, default=self._json_serial),
+    #                            row.military_experience)
+
+    #                     curs.execute(insert_legislator_query, tup)
+
+    #                 except Exception as e:
+    #                     print(f'An exception occurred inserting {row.state_url}: {e}')
+
+    #             elif isinstance(row, dict):
+    #                 try:
+
+    #                     tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
+    #                            row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
+    #                            row['name_suffix'],
+    #                            row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
+    #                            row['party'],
+    #                            row['role'], row['district'], row['years_active'],
+    #                            json.dumps(row['committees'], default=self._json_serial),
+    #                            row['areas_served'],
+    #                            json.dumps(row['phone_number'], default=self._json_serial),
+    #                            json.dumps(row['addresses'], default=self._json_serial),
+    #                            row['email'], row['birthday'], row['seniority'],
+    #                            row['occupation'],
+    #                            json.dumps(row['education'], default=self._json_serial),
+    #                            row['military_experience'])
+
+    #                     curs.execute(insert_legislator_query, tup)
+    #                 except Exception as e:
+    #                     print(f'An exception occurred inserting {row["state_url"]}: {e}')
+            
+
+class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
+    def __init__(self, state_abbreviation, database_table_name='us_state_legislators'):
+        super().__init__(database_table_name)
+        self.state = state_abbreviation
+        self.state_id = self.get_state_id(state)
+
+    def initialize_row(self):
+        row = super().initialize_row()
+        row.state = self.state
+        row.state_id = self.state_id
+        return row
 
 
 class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
