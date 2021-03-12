@@ -184,25 +184,27 @@ def get_com(soup, name):
 
 
 def get_dicts(url):
-    item_lst = []
+    links = []
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
-    url_tr = url_soup.find('table', {'id': 'ctl00_ContentPlaceHolderCol1_GridView1'}).find_all('tr')
+    url_tr = url_soup.find('table',{'id':'ctl00_ContentPlaceHolderCol1_GridView1'}).find_all('tr')
     for item in url_tr:
         try:
-            url = 'https://www.capitol.hawaii.gov' + item.find('a').get('href')
-            party = [x for x in item.text.split('\n') if x][4][1]
-            if party == 'D':
-                party = 'Democrat'
-            elif party == 'R':
-                party = 'Republican'
-            areas = item.find_all('td')[-1].text.replace('\n', '')
-            areas = re.sub('[A-Z]District[0-9]*', '', areas).split(',')
-            areas_lst = [x.strip().replace('\x80\x98', '').replace('â', '') for x in areas]
-            item_lst.append({'url': url, 'party': party, 'areas': areas_lst})
+            link = 'https://www.capitol.hawaii.gov'+item.find('a').get('href')
+            party_lst = [x for x in item.text.split('\n') if x]
+            for el in party_lst:
+                if re.match('\([A-Z]\)', el):
+                    if el[1] == 'D':
+                        party = 'Democrat'
+                    elif el[1] == 'R':
+                        party = 'Republican'
+            areas = item.find_all('td')[-1].text.replace('\n','')
+            areas = re.sub('[A-Z]District[0-9]*','',areas).split(',')
+            areas_lst = [x.strip().replace('\x80\x98','').replace('â','') for x in areas]
+            links.append({'link':link,'party':party,'areas':areas_lst})
         except AttributeError:
             pass
-    return item_lst
+    return links
 
 
 def scrape(lst_item):
