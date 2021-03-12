@@ -344,11 +344,12 @@ def scrape_gov(data_dict):
     row.years_active = find_years(url)
 
     if data_dict['Party'] == 'Democrat' or data_dict['Party'] == 'Republican' or data_dict['Party'] == 'Independent':
-      row.party = data_dict['Party']
+      party = data_dict['Party']
     else:
-      row.party = 'No Affiliation'
-    
-    row.party_id = scraper_utils.get_party_id(data_dict['Party'])
+      party = 'No Affiliation'
+      
+    row.party = party
+    row.party_id = scraper_utils.get_party_id(party)
                  
     # wiki info
     get_wiki_links(data_dict)
