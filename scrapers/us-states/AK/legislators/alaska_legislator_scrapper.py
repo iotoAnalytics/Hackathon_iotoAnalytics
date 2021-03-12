@@ -28,7 +28,7 @@ from pprint import pprint
 
 
 state_abbreviation = 'AK'
-database_table_name = 'us_ak_legislators_rdstest'
+database_table_name = 'us_ak_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
 

@@ -216,8 +216,8 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                 INSERT INTO {table}
                 VALUES (
                     (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s)
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (source_url) DO UPDATE SET
                     date_collected = excluded.date_collected,
                     name_full = excluded.name_full,
@@ -225,14 +225,16 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                     name_first = excluded.name_first,
                     name_middle = excluded.name_middle,
                     name_suffix = excluded.name_suffix,
-                    country_id = excluded.country_id,
-                    country = excluded.country,
                     district = excluded.district,
                     role = excluded.role,
                     committees = excluded.committees,
                     areas_served = excluded.areas_served,
                     phone_number = excluded.phone_number,
                     addresses = excluded.addresses,
+                    state = excluded.state,
+                    state_id = excluded.state_id,
+                    party = excluded.party,
+                    party_id = excluded.party_id,
                     email = excluded.email,
                     birthday = excluded.birthday,
                     military_experience = excluded.military_experience,
@@ -303,51 +305,32 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
     Utilities to help with collecting and storing legislator data.
     """
 
-    def __init__(self, database_table_name, country):
+    def __init__(self, database_table_name='cad_fed_legislators'):
         """
         The state_abbreviation, database_table_name, and country come from
         the config.cfg file and must be updated to work properly with your legislation
         data collector.
         """
-        super.__init__(country, database_table_name, 'cad_parties', 'cad_province_territory_info')
+        super().__init__('cad', database_table_name, CadLegislatorRow())
+    
+    def get_prov_terr_id(self, prov_terr_id):
+        return self.get_attribute_id('division', 'abbreviation', prov_terr_id)
 
-    def initialize_row(self):
-        '''
-        Create a row and fill with empty values. This gets sent back to the scrape() function
-        which then gets filled in with values collected from the website.
-        '''
-
-        row = CadFedLegislatorRow()
-
-        try:
-            row.country = self.country
-            row.country_id = int(self.countries.loc[self.countries['country'] == self.country]['id'].values[0])
-        except IndexError:
-            sys.exit('An error occurred inserting state_id and/or country_id. Did you update the config file?')
-        except Exception as e:
-            sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
-
-        return row
-
-
+    
     def insert_legislator_data_into_db(self, data):
         """
-        Takes care of inserting legislator data into database.
         """
-
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of CadFedLegislatorRow')
+            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
 
-        with CursorFromConnectionFromPool() as self.db.cur:
-            try:
-                create_table_query = sql.SQL("""
+        try:
+            create_table_query = sql.SQL("""
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id bigint PRIMARY KEY,
-                        state_member_id text,
+                        source_id text,
                         most_recent_term_id text,
                         date_collected timestamp,
-                        state_url TEXT UNIQUE,
-                        url text,
+                        source_url TEXT UNIQUE,
                         name_full text,
                         name_last text,
                         name_first text,
@@ -355,15 +338,14 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                         name_suffix text,
                         country_id bigint,
                         country text,
-                        state_id int,
-                        state char(2),
+                        province_territory_id int,
+                        province_territory char(2),
                         party_id int,
                         party text,
                         role text,
-                        district text,
+                        riding text,
                         years_active int[],
                         committees jsonb,
-                        areas_served text[],
                         phone_number jsonb,
                         addresses jsonb,
                         email text,
@@ -377,36 +359,32 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                     ALTER TABLE {table} OWNER TO rds_ad;
                     """).format(table=sql.Identifier(self.database_table_name))
 
-                self.db.cur.execute(create_table_query)
-                self.db.cur.connection.commit()
+            self.db.cur.execute(create_table_query)
+            self.db.conn.commit()
+        except Exception as e:
+            print(f'An exception occurred executing a query:\n{e}')
 
-            except Exception as e:
-                print(f'An exception occurred creating {self.database_table_name}:\n{e}')
-
-            insert_legislator_query = sql.SQL("""
+        insert_legislator_query = sql.SQL("""
                 WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                 INSERT INTO {table}
                 VALUES (
                     (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (state_url) DO UPDATE SET
+                ON CONFLICT (source_url) DO UPDATE SET
                     date_collected = excluded.date_collected,
                     name_full = excluded.name_full,
                     name_last = excluded.name_last,
                     name_first = excluded.name_first,
                     name_middle = excluded.name_middle,
                     name_suffix = excluded.name_suffix,
-                    country_id = excluded.country_id,
-                    country = excluded.country,
-                    state_id = excluded.state_id,
-                    state = excluded.state,
-                    party_id = excluded.party_id,
+                    riding = excluded.riding,
+                    province_territory = excluded.province_territory,
+                    province_territory_id = excluded.province_territory_id,
                     party = excluded.party,
-                    district = excluded.district,
+                    party_id = excluded.party_id,
                     role = excluded.role,
                     committees = excluded.committees,
-                    areas_served = excluded.areas_served,
                     phone_number = excluded.phone_number,
                     addresses = excluded.addresses,
                     email = excluded.email,
@@ -414,55 +392,61 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                     military_experience = excluded.military_experience,
                     occupation = excluded.occupation,
                     education = excluded.education,
-                    state_member_id = excluded.source_id,
+                    source_id = excluded.source_id,
                     most_recent_term_id = excluded.most_recent_term_id,
                     years_active = excluded.years_active,
                     seniority = excluded.seniority;
-                """).format(table=sql.Identifier(self.database_table_name), state=sql.SQL(self.state_abbreviation))
+                """).format(table=sql.Identifier(self.database_table_name))
 
-            date_collected = datetime.now()
+        date_collected = datetime.now()
+            
+        # This is used to convert dictionaries to rows. Need to test it out!
+        for item in data:
+            if isinstance(item, dict):
+                item = DotDict(item)
 
-            for row in data:
-                if isinstance(row, USStateLegislatorRow):
-                    try:
+            tup = (
+                item.source_id,
+                item.most_recent_term_id,
+                date_collected,
+                item.source_url,
+                item.name_full,
+                item.name_last,
+                item.name_first,
+                item.name_middle,
+                item.name_suffix,
+                item.country_id,
+                item.country,
+                item.province_territory_id,
+                item.province_territory,
+                item.party_id,
+                item.party,
+                item.role,
+                item.riding,
+                item.years_active,
+                json.dumps(item.committees, default=self._json_serial),
+                json.dumps(item.phone_number, default=self._json_serial),
+                json.dumps(item.addresses, default=self._json_serial),
+                item.email,
+                item.birthday,
+                item.seniority,
+                item.occupation,
+                json.dumps(item.education, default=self._json_serial),
+                item.military_experience
+            )
+            print(tup)
 
-                        tup = (row.source_id, row.most_recent_term_id, date_collected, row.source_url,
-                               row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
-                               row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
-                               row.role, row.district, row.years_active,
-                               json.dumps(row.committees, default=self._json_serial),
-                               row.areas_served,
-                               json.dumps(row.phone_number, default=self._json_serial),
-                               json.dumps(row.addresses, default=self._json_serial),
-                               row.email, row.birthday, row.seniority,
-                               row.occupation,
-                               json.dumps(row.education, default=self._json_serial),
-                               row.military_experience)
-
-                        self.db.cur.execute(insert_legislator_query, tup)
+            self.db.cur.execute(insert_legislator_query, tup)
 
 
-                    except Exception as e:
-                        print(f'An exception occurred inserting {row.source_url}: {e}')
+class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
+    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislators'):
+        super().__init__(database_table_name)
+        self.province_territory = prov_terr_abbreviation
+        self.province_territory_id = self.get_prov_terr_id(prov_terr_abbreviation)
 
-                elif isinstance(row, dict):
-                    try:
-
-                        tup = (row['state_member_id'], row['most_recent_term_id'], date_collected, row['state_url'],
-                               row['name_full'], row['name_last'], row['name_first'], row['name_middle'],
-                               row['name_suffix'],
-                               row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
-                               row['party'],
-                               row['role'], row['district'], row['years_active'],
-                               json.dumps(row['committees'], default=self._json_serial),
-                               row['areas_served'],
-                               json.dumps(row['phone_number'], default=self._json_serial),
-                               json.dumps(row['addresses'], default=self._json_serial),
-                               row['email'], row['birthday'], row['seniority'],
-                               row['occupation'],
-                               json.dumps(row['education'], default=self._json_serial),
-                               row['military_experience'])
-
-                        self.db.cur.execute(insert_legislator_query, tup)
-                    except Exception as e:
-                        print(f'An exception occurred inserting {row["state_url"]}: {e}')
+    def initialize_row(self):
+        row = super().initialize_row()
+        row.province_territory = self.province_territory
+        row.province_territory_id = self.province_territory_id
+        return row
