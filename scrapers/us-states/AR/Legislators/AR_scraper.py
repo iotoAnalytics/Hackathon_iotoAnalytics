@@ -302,7 +302,7 @@ if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     url = get_urls()
     wiki_url = get_wiki_links('https://en.wikipedia.org/wiki/Arkansas_House_of_Representatives', 'House')
-    wiki_url = wiki_url | get_wiki_links('https://en.wikipedia.org/wiki/Arkansas_Senate', 'Senate')
+    wiki_url =  {**wiki_url, **get_wiki_links('https://en.wikipedia.org/wiki/Arkansas_Senate', 'Senate')}
 
     urls = [(path, wiki_url[key])for key, path in url.items()]
     session_id = set_session_id()
