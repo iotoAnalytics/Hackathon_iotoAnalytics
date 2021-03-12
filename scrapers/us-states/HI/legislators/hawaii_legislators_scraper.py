@@ -201,7 +201,7 @@ def get_dicts(url):
             areas = item.find_all('td')[-1].text.replace('\n','')
             areas = re.sub('[A-Z]District[0-9]*','',areas).split(',')
             areas_lst = [x.strip().replace('\x80\x98','').replace('â','') for x in areas]
-            links.append({'link':link,'party':party,'areas':areas_lst})
+            links.append({'url':link,'party':party,'areas':areas_lst})
         except AttributeError:
             pass
     return links
