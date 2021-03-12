@@ -343,9 +343,13 @@ def scrape_gov(data_dict):
     row.committees = find_com(url)
     row.years_active = find_years(url)
 
-    row.party = data_dict['Party']
-    if data_dict['Party'] == 'Democrat' or data_dict['Party'] == 'Republican':
-        row.party_id = scraper_utils.get_party_id(data_dict['Party'])
+    if data_dict['Party'] == 'Non Affiliated':
+      row.party = 'No Affiliation'
+    else:
+      row.party = data_dict['Party']
+    
+    row.party_id = scraper_utils.get_party_id(data_dict['Party'])
+                 
     # wiki info
     get_wiki_links(data_dict)
     if data_dict['wiki'] is not None:
