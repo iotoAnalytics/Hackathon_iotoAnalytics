@@ -75,7 +75,7 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row.state_url = url
+    row.source_url = url
 
     # Depending on the data you're able to collect, the legislation scraper may be more involved
     # Than the legislator scraper. For one, you will need to create the goverlytics_id. The 

@@ -202,7 +202,7 @@ class USStateLegislationScraperUtils:
             for row in data:
                 try:
                     tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
-                    row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
+                    row.session, row.date_introduced, row.source_url, row.url, row.chamber_origin,
                     json.dumps(row.committees, default=USStateLegislationScraperUtils.__json_serial),
                     row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
                     row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,

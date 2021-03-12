@@ -1,60 +1,30 @@
-from psycopg2 import pool
+# from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
+import psycopg2
 import configparser
 import boto3
 import sys, os
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
 
-#Initialize database and scraper utils
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_port = str(configParser.get('databaseConfig', 'db_port'))
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_region = str(configParser.get('databaseConfig', 'db_region'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
+db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
+db_port = 5432
+db_user = 'rds'
+db_region = 'us-west-2'
+db_name = 'openparl'
 
 client = boto3.client('rds', db_region)
 
 class Database:
-    __connection_pool = None
-
-    @staticmethod
-    def initialise():
+    
+    def __init__(self):
         db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
         
-        Database.__connection_pool = pool.SimpleConnectionPool(1,
-                                                               5,
-                                                               database=db_name, host=db_host, user=db_user, password=db_token)
+        self.conn = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
+        self.cur = self.conn.cursor(cursor_factory=RealDictCursor)
 
-    @classmethod
-    def get_connection(cls):
-        return cls.__connection_pool.getconn()
-
-    @classmethod
-    def return_connection(cls, connection):
-        Database.__connection_pool.putconn(connection)
-
-    @classmethod
-    def close_all_connections(cls):
-        Database.__connection_pool.closeall()
-
-
-class CursorFromConnectionFromPool:
-    def __init__(self):
-        self.connect = None
-        self.cursor = None
-
-    def __enter__(self):
-        self.connection = Database.get_connection()
-        self.cursor = self.connection.cursor(cursor_factory=RealDictCursor)
-        return self.cursor
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_val is not None:
-            self.connection.rollback()
-        else:
-            self.cursor.close()
-            self.connection.commit()
-        Database.return_connection(self.connection)
+    def close_all_connections(self):
+        if self.conn:
+            self.conn.commit()
+            if self.cur:
+                self.cur.close()
+            self.conn.close()

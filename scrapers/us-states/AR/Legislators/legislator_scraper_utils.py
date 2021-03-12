@@ -216,7 +216,7 @@ class USStateLegislatorScraperUtils:
                     military_experience = excluded.military_experience,
                     occupation = excluded.occupation,
                     education = excluded.education,
-                    state_member_id = excluded.state_member_id,
+                    state_member_id = excluded.source_id,
                     most_recent_term_id = excluded.most_recent_term_id,
                     years_active = excluded.years_active,
                     seniority = excluded.seniority;
@@ -228,7 +228,7 @@ class USStateLegislatorScraperUtils:
                 if isinstance(row, USStateLegislatorRow):
                     try:
 
-                        tup = (row.state_member_id, row.most_recent_term_id, date_collected, row.state_url,
+                        tup = (row.source_id, row.most_recent_term_id, date_collected, row.source_url,
                                row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
                                row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
                                row.role, row.district, row.years_active,
@@ -244,7 +244,7 @@ class USStateLegislatorScraperUtils:
                         curs.execute(insert_legislator_query, tup)
 
                     except Exception as e:
-                        print(f'An exception occurred inserting {row.state_url}: {e}')
+                        print(f'An exception occurred inserting {row.source_url}: {e}')
 
                 elif isinstance(row, dict):
                     try:

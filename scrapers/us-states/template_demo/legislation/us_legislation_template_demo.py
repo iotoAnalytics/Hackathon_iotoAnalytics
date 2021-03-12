@@ -84,7 +84,7 @@ def scrape(url):
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
     state_url = f'{base_url}{url}'
-    row.state_url = state_url
+    row.source_url = state_url
 
     # Get useful query string parameters from URL
     parsed = urlparse.urlparse(url)

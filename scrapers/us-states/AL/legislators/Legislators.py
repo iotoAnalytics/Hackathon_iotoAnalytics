@@ -128,10 +128,10 @@ def scrape_legislator(links):
 
         fields = scraper_utils.initialize_row()
 
-        fields.state_member_id = value['oid_sponsor'].replace('OID_SPONSOR=', '')
+        fields.source_id = value['oid_sponsor'].replace('OID_SPONSOR=', '')
         fields.most_recent_term_id = value['session'].replace('%20', '').replace(' ', '').replace('SESSNAME=', '')
         fields.date_collected = datetime.datetime.today().strftime('%d-%m-%Y') 
-        fields.state_url = base_url
+        fields.source_url = base_url
         fields.name_full = name.full_name
         fields.name_last = name.last
         fields.name_first = name.first
@@ -345,7 +345,7 @@ def dict_to_list(dictionary):
 
 
 # init_database()
-scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators', 'United States of America')
+scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
 
 #house scraper
 house_wiki_links = get_wiki_links(wikipedia_house_url)

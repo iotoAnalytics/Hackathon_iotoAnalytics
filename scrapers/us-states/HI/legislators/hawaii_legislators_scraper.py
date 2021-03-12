@@ -27,15 +27,15 @@ from nameparser import HumanName
 import re
 import boto3
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-country = str(configParser.get('scraperConfig', 'country'))
+# state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+# country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils('HI', 'us_hi_legislators')
 
 current_year = 2021
 rep_wiki_url = 'https://en.wikipedia.org/wiki/Hawaii_House_of_Representatives'
@@ -224,7 +224,7 @@ def scrape(lst_item):
     row = scraper_utils.initialize_row()
 
     url = lst_item['url']
-    row.state_url = url
+    row.source_url = url
     row.party = lst_item['party']
     if lst_item['party'] == 'Democrat' or lst_item['party'] == 'Republican':
         row.party_id = scraper_utils.get_party_id(lst_item['party'])

@@ -34,21 +34,20 @@ import psycopg2
 import datefinder
 import unidecode
 from functools import partial
-from database import CursorFromConnectionFromPool
 from psycopg2 import sql
 from datetime import datetime
 import json
 
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-country = str(configParser.get('scraperConfig', 'country'))
+# state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+# country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 
 
 # def get_urls(myurl):
@@ -107,7 +106,7 @@ scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table
 #     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
 #     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
 #     # like so:
-#     row.state_url = url
+#     row.source_url = url
 
 #     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
 #     # the party name from the website, then get the party_id from scraper_utils

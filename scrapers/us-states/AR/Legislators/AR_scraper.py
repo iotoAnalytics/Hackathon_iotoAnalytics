@@ -37,11 +37,12 @@ import pandas as pd
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-country = str(configParser.get('scraperConfig', 'country'))
+# state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+# country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+# scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils('AR', 'us_ar_legislators')
 session_id = ''
 
 def get_urls():
@@ -205,7 +206,7 @@ def scrape(urls):
 
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    row.state_url = url
+    row.source_url = url
     title = soup.find('h1')
     address = title.parent.find('b').string
     row.addresses.append({'location':'district office', 'address': address}) 

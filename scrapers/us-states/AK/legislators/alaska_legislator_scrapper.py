@@ -23,19 +23,14 @@ import requests
 import request_url
 from multiprocessing import Pool
 from database import Database
-import configparser
 import re
 from pprint import pprint
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-country = str(configParser.get('scraperConfig', 'country'))
+state_abbreviation = 'AK'
+database_table_name = 'us_ak_legislators_rdstest'
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
 
 house_url = "http://akleg.gov/house.php"
 senate_url = "http://akleg.gov/senate.php"
@@ -336,7 +331,7 @@ def scrape_gov(data_dict):
     row.name_first = data_dict['First Name']
     row.district = data_dict['District']
     row.email = data_dict['Email']
-    row.state_url = data_dict['URL']
+    row.source_url = data_dict['URL']
     row.role = data_dict['Role']
 
     row.phone_number = find_phone(url)
