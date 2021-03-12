@@ -343,10 +343,10 @@ def scrape_gov(data_dict):
     row.committees = find_com(url)
     row.years_active = find_years(url)
 
-    if data_dict['Party'] == 'Non Affiliated':
-      row.party = 'No Affiliation'
-    else:
+    if data_dict['Party'] == 'Democrat' or data_dict['Party'] == 'Republican' or data_dict['Party'] == 'Independent':
       row.party = data_dict['Party']
+    else:
+      row.party = 'No Affiliation'
     
     row.party_id = scraper_utils.get_party_id(data_dict['Party'])
                  
