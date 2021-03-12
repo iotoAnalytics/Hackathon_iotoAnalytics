@@ -30,18 +30,18 @@ from pathlib import Path
 import boto3
 
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get(
-    'scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get(
-    'scraperConfig', 'database_table_name'))
-country = str(configParser.get('scraperConfig', 'country'))
+# state_abbreviation = str(configParser.get(
+#     'scraperConfig', 'state_abbreviation'))
+# database_table_name = str(configParser.get(
+#     'scraperConfig', 'database_table_name'))
+# country = str(configParser.get('scraperConfig', 'country'))
 
 scraper_utils = USStateLegislatorScraperUtils(
-    state_abbreviation, database_table_name, country)
+    'ND', 'us_nd_legislators')
 
 POLITICAL_PARTIES = ['Republican', 'Democrat',
                      "Libertarian", 'Green', 'Consitituion']
@@ -319,7 +319,7 @@ def scrape(url):
     '''
 
     row = scraper_utils.initialize_row()
-    row.state_url = url
+    row.source_url = url
     row.most_recent_term_id = retrieve_current_term()
 
     page = requests.get(url)
