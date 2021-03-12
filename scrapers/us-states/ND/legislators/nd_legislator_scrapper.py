@@ -25,7 +25,7 @@ from database import Database
 from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USLegislatorScraperUtils
+from legislator_scraper_utils import USStateLegislatorScraperUtils
 from pathlib import Path
 import boto3
 
@@ -40,7 +40,7 @@ database_table_name = str(configParser.get(
     'scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USLegislatorScraperUtils(
+scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name, country)
 
 POLITICAL_PARTIES = ['Republican', 'Democrat',

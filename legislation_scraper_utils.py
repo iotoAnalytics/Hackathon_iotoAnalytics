@@ -19,7 +19,7 @@ date collectors.
 
 
 @dataclass
-class USLegislationRow:
+class USStateLegislationRow:
     """
     Data structure for housing data about each piece of legislation.
     """
@@ -52,7 +52,7 @@ class USLegislationRow:
     topic: str = ''
 
 
-class USLegislationScraperUtils:
+class USStateLegislationScraperUtils:
     """
     Utilities to help with collecting and storing legislation data.
     """
@@ -117,12 +117,12 @@ class USLegislationScraperUtils:
             return self.__convert_to_int(value)
 
     
-    def initialize_row(self) -> USLegislationRow:
+    def initialize_row(self) -> USStateLegislationRow:
         '''
         Factory method for creating a legislation row. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
-        row = USLegislationRow()
+        row = USStateLegislationRow()
         
         try:
             row.state = self.state_abbreviation
@@ -135,12 +135,12 @@ class USLegislationScraperUtils:
         return row
     
     
-    def insert_legislation_data_into_db(self, data : List[USLegislationRow]) -> None:
+    def insert_legislation_data_into_db(self, data : List[USStateLegislationRow]) -> None:
         """
         Takes care of inserting legislation data into database.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USLegislationRows!')
+            raise TypeError('Data being written to database must be a list of USStateLegislationRows!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -226,16 +226,16 @@ class USLegislationScraperUtils:
             date_collected = datetime.now()
 
             for row in data:
-                if isinstance(row, USLegislationRow):
+                if isinstance(row, USStateLegislationRow):
                     try:
                         tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
                         row.session, row.date_introduced, row.state_url, row.url, row.chamber_origin,
-                        json.dumps(row.committees, default=USLegislationScraperUtils.__json_serial),
+                        json.dumps(row.committees, default=USStateLegislationScraperUtils.__json_serial),
                         row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
                         row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
                         row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                        json.dumps(row.actions, default=USLegislationScraperUtils.__json_serial),
-                        json.dumps(row.votes, default=USLegislationScraperUtils.__json_serial),
+                        json.dumps(row.actions, default=USStateLegislationScraperUtils.__json_serial),
+                        json.dumps(row.votes, default=USStateLegislationScraperUtils.__json_serial),
                         row.site_topic, row.topic)
 
                         curs.execute(insert_legislator_query, tup)
@@ -249,15 +249,15 @@ class USLegislationScraperUtils:
                         tup = (row['goverlytics_id'], row['bill_state_id'], date_collected, row['bill_name'],
                                row['session'], row['date_introduced'], row['state_url'], row['url'],
                                row['chamber_origin'],
-                               json.dumps(row['committees'], default=USLegislationScraperUtils.__json_serial),
+                               json.dumps(row['committees'], default=USStateLegislationScraperUtils.__json_serial),
                                row['state_id'], row['state'], row['bill_type'], row['bill_title'],
                                row['current_status'],
                                row['principal_sponsor_id'], row['principal_sponsor'], row['sponsors'],
                                row['sponsors_id'],
                                row['cosponsors'], row['cosponsors_id'], row['bill_text'], row['bill_description'],
                                row['bill_summary'],
-                               json.dumps(row['actions'], default=USLegislationScraperUtils.__json_serial),
-                               json.dumps(row['votes'], default=USLegislationScraperUtils.__json_serial),
+                               json.dumps(row['actions'], default=USStateLegislationScraperUtils.__json_serial),
+                               json.dumps(row['votes'], default=USStateLegislationScraperUtils.__json_serial),
                                row['site_topic'], row['topic'])
                         curs.execute(insert_legislator_query, tup)
                     # except Exception as e:

@@ -13,7 +13,7 @@ from pathlib import Path
 # Get path to the root directory so we can import necessary modules
 
 
-from legislator_scraper_utils import USLegislatorScraperUtils
+from legislator_scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -33,7 +33,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 
 def get_urls():

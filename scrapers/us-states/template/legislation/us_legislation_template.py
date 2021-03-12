@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USLegislationScraperUtils, USLegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -34,7 +34,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = USLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
 
 def get_urls():
