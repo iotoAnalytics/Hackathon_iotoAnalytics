@@ -10,6 +10,9 @@ from pandas.core.computation.ops import UndefinedVariableError
 from typing import List
 from dataclasses import dataclass, field
 import numpy
+import atexit
+import copy
+
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -17,23 +20,19 @@ that occur with data collection. These can be used with your legislation
 date collectors.
 """
 
-
 @dataclass
-class USStateLegislationRow:
+class LegislationRow:
     """
     Data structure for housing data about each piece of legislation.
     """
     goverlytics_id: int = None
-    bill_state_id: str = ''
+    bill_source_id: str = ''
     bill_name: str = ''
     session: str = ''
     date_introduced: datetime = None
-    state_url: str = ''
-    url: str = ''
+    source_url: str = ''
     chamber_origin: str = ''
     committees: List[dict] = field(default_factory=list)
-    state_id: int = 0
-    state: str = ''
     bill_type: str =  ''
     bill_title: str = ''
     current_status: str = ''
@@ -51,41 +50,54 @@ class USStateLegislationRow:
     site_topic: str = ''
     topic: str = ''
 
+class USLegislationRow(LegislationRow):
+    """
+    Data structure for housing data about each piece of legislation.
+    """
+    state_id: int = 0
+    state: str = ''
 
-class USStateLegislationScraperUtils:
+class CadLegislationRow(LegislationRow):
+    """
+    Data structure for housing data about each piece of legislation.
+    """
+    province_territory_id: int = 0
+    province_territory: str = ''
+
+class LegislationScraperUtils:
     """
     Utilities to help with collecting and storing legislation data.
     """
-    def __init__(self, state_abbreviation, database_table_name, legislator_table_name):
+    def __init__(self, country, database_table_name, legislator_table_name, row_type):
         """
         The state_abbreviation, database_table_name, and legislator_table_name come from
         the config.cfg file and must be updated to work properly with your legislation
         data collector.
         """
-        self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.legislator_table_name = legislator_table_name
 
-        Database.initialise()
+        self.db = Database()
+        atexit.register(self.db.close_all_connections)
         
-        with CursorFromConnectionFromPool() as curs:
-            try:
-                query = 'SELECT state_no, state_name, abbreviation FROM us_state_info'
-                curs.execute(query)
-                state_results = curs.fetchall()
+        try:
+            query = f'SELECT * FROM {country}_divisions'
+            self.db.cur.execute(query)
+            division_results = self.db.cur.fetchall()
 
-                query = f'SELECT * FROM {legislator_table_name}'
-                curs.execute(query)
-                legislator_results = curs.fetchall()
-            except Exception as e:
-                sys.exit(f'An exception occurred retrieving either US parties or state legislator table from database. \
-                \nHas the legislator data been collected for this state yet? Has the config.cfg file been updated?\n{e}')
+            query = f'SELECT * FROM {legislator_table_name}'
+            self.db.cur.execute(query)
+            legislator_results = self.db.cur.fetchall()
+        except Exception as e:
+            sys.exit(f'An exception occurred retrieving either US parties or legislator table from database. \
+            \nHas the legislator data been collected for this state yet?\n{e}')
 
-        self.states = pd.DataFrame(state_results)
+        self.divisions = pd.DataFrame(division_results)
         self.legislators = pd.DataFrame(legislator_results)
+        self.row_type = row_type
 
     
-    def __json_serial(self, obj):
+    def _json_serial(self, obj):
         """
         Serializes date/datetime object. This is used to convert date and datetime objects to
         a format that can be digested by the database.
@@ -95,7 +107,7 @@ class USStateLegislationScraperUtils:
         raise TypeError("Type %s not serializable" % type(obj))
 
 
-    def __convert_to_int(self, value):
+    def _convert_to_int(self, value):
         """
         Used to try and convert values into int. Functions like df.loc might return
         a numpy.int64 which is incompatible with the database, so this function must
@@ -108,13 +120,13 @@ class USStateLegislationScraperUtils:
         return value
     
 
-    def __convert_value_to_column_type(self, column, value):
-        str_columns = ['state_member_id']
+    def _convert_value_to_column_type(self, column, value):
+        str_columns = ['source_id']
 
         if column in str_columns:
             return str(value)
         else:
-            return self.__convert_to_int(value)
+            return self._convert_to_int(value)
 
     
     def initialize_row(self) -> USStateLegislationRow:
@@ -122,17 +134,17 @@ class USStateLegislationScraperUtils:
         Factory method for creating a legislation row. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
-        row = USStateLegislationRow()
+        return copy.copy(self.row_type)
         
-        try:
-            row.state = self.state_abbreviation
-            row.state_id = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
-        except IndexError:
-            sys.exit('An error occurred inserting state_id. Has the config file been updated?')
-        except Exception as e:
-            sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
+        # try:
+        #     row.state = self.state_abbreviation
+        #     row.state_id = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
+        # except IndexError:
+        #     sys.exit('An error occurred inserting state_id. Has the config file been updated?')
+        # except Exception as e:
+        #     sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
 
-        return row
+        # return row
     
     
     def insert_legislation_data_into_db(self, data : List[USStateLegislationRow]) -> None:
@@ -230,12 +242,12 @@ class USStateLegislationScraperUtils:
                     try:
                         tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
                         row.session, row.date_introduced, row.source_url, row.url, row.chamber_origin,
-                        json.dumps(row.committees, default=USStateLegislationScraperUtils.__json_serial),
+                        json.dumps(row.committees, default=USStateLegislationScraperUtils._json_serial),
                         row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
                         row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
                         row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                        json.dumps(row.actions, default=USStateLegislationScraperUtils.__json_serial),
-                        json.dumps(row.votes, default=USStateLegislationScraperUtils.__json_serial),
+                        json.dumps(row.actions, default=USStateLegislationScraperUtils._json_serial),
+                        json.dumps(row.votes, default=USStateLegislationScraperUtils._json_serial),
                         row.site_topic, row.topic)
 
                         curs.execute(insert_legislator_query, tup)
@@ -249,15 +261,15 @@ class USStateLegislationScraperUtils:
                         tup = (row['goverlytics_id'], row['bill_state_id'], date_collected, row['bill_name'],
                                row['session'], row['date_introduced'], row['state_url'], row['url'],
                                row['chamber_origin'],
-                               json.dumps(row['committees'], default=USStateLegislationScraperUtils.__json_serial),
+                               json.dumps(row['committees'], default=USStateLegislationScraperUtils._json_serial),
                                row['state_id'], row['state'], row['bill_type'], row['bill_title'],
                                row['current_status'],
                                row['principal_sponsor_id'], row['principal_sponsor'], row['sponsors'],
                                row['sponsors_id'],
                                row['cosponsors'], row['cosponsors_id'], row['bill_text'], row['bill_description'],
                                row['bill_summary'],
-                               json.dumps(row['actions'], default=USStateLegislationScraperUtils.__json_serial),
-                               json.dumps(row['votes'], default=USStateLegislationScraperUtils.__json_serial),
+                               json.dumps(row['actions'], default=USStateLegislationScraperUtils._json_serial),
+                               json.dumps(row['votes'], default=USStateLegislationScraperUtils._json_serial),
                                row['site_topic'], row['topic'])
                         curs.execute(insert_legislator_query, tup)
                     # except Exception as e:
@@ -274,7 +286,7 @@ class USStateLegislationScraperUtils:
             q = ''
 
             # Certain fields may be converted to int while they need to stay as strings
-            v = self.__convert_value_to_column_type(k, v)
+            v = self._convert_value_to_column_type(k, v)
                 
             if isinstance(v, int):
                 q = f'{k}=={v}'
@@ -296,9 +308,7 @@ class USStateLegislationScraperUtils:
             return None
 
         if len(df) > 1:
-            # print(f'WARNING: More than one legislator found using {kwargs} search parameter! \Must use a more
-            # unique identifier!')
-            return df
+            print(f'WARNING: More than one legislator found using {kwargs} search parameter.')
         if len(df) == 0:
             print(f'WARNING: No legislators found while searching {kwargs}!')
             return None
@@ -311,7 +321,7 @@ class USStateLegislationScraperUtils:
         """
         df = self.search_for_legislators(**kwargs)
         if df is not None:
-            return self.__convert_to_int(df.iloc[0]['goverlytics_id'])
+            return self._convert_to_int(df.iloc[0]['goverlytics_id'])
         else:
             return None
 
@@ -328,7 +338,7 @@ class USStateLegislationScraperUtils:
 
         df = self.search_for_legislators(**kwargs)
         
-        startswith = self.__convert_value_to_column_type(column_to_search, startswith)
+        startswith = self._convert_value_to_column_type(column_to_search, startswith)
 
         if df is not None:
             try:

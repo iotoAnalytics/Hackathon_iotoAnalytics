@@ -18,13 +18,6 @@ that occur with data collection. These can be used with your legislator
 date collectors.
 """
 
-
-# TODO Finish writing insert query for US federal scraper
-# TODO Finish up canadian scrapers
-# TODO Test state scraper. if it works, replace instance of ScraperUtils 
-#   in existing scrapers with new class name. Be sure to remove country param.
-# TODO can also remove country from config files and scraper scripts
-
 @dataclass
 class LegislatorRow:
     def __iter__(self):
