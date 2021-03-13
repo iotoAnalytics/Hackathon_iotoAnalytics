@@ -191,13 +191,11 @@ def get_dicts(url):
     for item in url_tr:
         try:
             link = 'https://www.capitol.hawaii.gov'+item.find('a').get('href')
-            party_lst = [x for x in item.text.split('\n') if x]
-            for el in party_lst:
-                if re.match('\([A-Z]\)', el):
-                    if el[1] == 'D':
-                        party = 'Democrat'
-                    elif el[1] == 'R':
-                        party = 'Republican'
+            party = re.search('\([A-Z]\)',item.text).group()
+            if party == '(D)':
+                party = 'Democrat'
+            elif party == '(R)':
+                party = 'Republican'
             areas = item.find_all('td')[-1].text.replace('\n','')
             areas = re.sub('[A-Z]District[0-9]*','',areas).split(',')
             areas_lst = [x.strip().replace('\x80\x98','').replace('â','') for x in areas]
