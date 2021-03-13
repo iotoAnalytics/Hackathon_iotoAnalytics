@@ -117,7 +117,7 @@ class LegislatorScraperUtils():
         raise TypeError("Type %s not serializable" % type(obj))
 
     def initialize_row(self):
-        row = copy.copy(self.row_type)
+        row = copy.deepcopy(self.row_type)
         row.country_id = self.country_id
         row.country = self.country
         return row
