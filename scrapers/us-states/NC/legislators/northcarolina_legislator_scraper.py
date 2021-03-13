@@ -448,7 +448,7 @@ def collect_legislator_details(biographyUrl):
             session = sesh.text.replace(" Session", "")
 
     distDiv = page_soup.find("div", {
-        "class": "col-12 col-sm-7 col-md-8 col-lg-9 col-xl-2 order-2 align-self-center align-self-xl-start mt-3 mt-sm-0"})
+        "class": "col-12 col-sm-7 col-md-8 col-lg-9 col-xl-3 order-2 align-self-center align-self-xl-start mt-3 mt-sm-0"})
     distH = distDiv.find("h6", {"class": "text-nowrap"})
     distText = distH.text
 
@@ -545,7 +545,7 @@ def collect_legislator_details(biographyUrl):
 
     # addresses
     bio_left_column = page_soup.find("div", {
-        "class": "col-12 col-sm-7 col-md-8 col-lg-9 col-xl-2 order-2 align-self-center align-self-xl-start mt-3 mt-sm-0"})
+        "class": "col-12 col-sm-7 col-md-8 col-lg-9 col-xl-3 order-2 align-self-center align-self-xl-start mt-3 mt-sm-0"})
     left_column_tags = bio_left_column.findAll()
     lefttag = left_column_tags[0]
     addresses = []
