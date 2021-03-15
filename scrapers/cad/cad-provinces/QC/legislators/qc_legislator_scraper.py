@@ -13,8 +13,17 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
+import sys, os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
+from legislator_scraper_utils import CadProvTerrLegislatorScraperUtils
 
 
+scraper_utils = CadProvTerrLegislatorScraperUtils('QC', 'cad_qc_legislators')
 
 def getAssemblyLinks(myurl):
     infos = []
@@ -62,7 +71,7 @@ def collect_leg_data(myurl):
     # party_unaccented = unidecode.unidecode(party)
     # if party_unaccented.lower() in psparties_lower:
     #     index = psparties_lower.index(party_unaccented.lower())
-    #     print(dbwork.psids[index])
+    #
     #     party_id = dbwork.psids[index]
     # else:
     #     print(party)
@@ -87,7 +96,7 @@ def collect_leg_data(myurl):
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
             com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
-            # print(com_info)
+
             committees.append(com_info)
         elif " to the " in co:
             co = co.split(" to the ")
@@ -100,7 +109,7 @@ def collect_leg_data(myurl):
             committee = committee.replace("Minister of", "").strip()
 
             com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
-            # print(com_info)
+
             committees.append(com_info)
         elif " for " in co:
             co = co.split(" for ")
@@ -111,7 +120,7 @@ def collect_leg_data(myurl):
             committee = committee.split("from")[0].strip()
             com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
             committees.append(com_info)
-            # print(com_info)
+
         elif " of " in co:
             co = co.split(" of ")
             role = co[0]
@@ -120,7 +129,7 @@ def collect_leg_data(myurl):
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
             com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
-            # print(com_info)
+
             committees.append(com_info)
         elif " on the " in co:
             co = co.split(" on the ")
@@ -130,10 +139,10 @@ def collect_leg_data(myurl):
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
             com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
-            # print(com_info)
+
             committees.append(com_info)
 
-    # print(committees)
+
 
     contact_link = myurl.replace("index", "coordonnees")
 
@@ -186,9 +195,7 @@ def collect_leg_data(myurl):
         except:
             pass
 
-    # print(addresses)
 
-    # print(phone_number)
     email = ""
     try:
         email = (address_info[2].address.a["href"]).replace("mailto:", "")
@@ -201,12 +208,17 @@ def collect_leg_data(myurl):
                 email = (address_info[1].address.a["href"]).replace("mailto:", "")
             except:
                 pass
+    capitalized_party = party.title()
+
+    try:
+        party_id = scraper_utils.get_party_id(capitalized_party)
+    except:
+        party_id = 0
 
     info = {'province_url': myurl, 'member_id': member_id, 'role': 'Member of National Assembly', 'name_full': name,
             'name_first': hn.first, 'name_last': hn.last, 'name_suffix': hn.suffix, 'name_middle': hn.middle,
-            'riding': riding, 'party': party, 'party_id': 0, 'email': email, 'country': 'Canada',
-            'country_id': 2, 'province_territory': 'QC', 'province_territory_id': 24, 'committees': committees,
-            'phone_number': phone_number, 'addresses': addresses}
+            'riding': riding, 'party': party, 'party_id': party_id, 'email': email, 'committees': committees,
+            'phone_number': phone_number, 'addresses': addresses, 'military_experience': ""}
     return info
 
 
@@ -421,7 +433,7 @@ def find_wiki_data(repLink):
 
     info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
             'education': education, 'occupation': occupation, 'years_active': years_active,
-            'most_recent_term_id': str(most_recent_term_id), 'seniority': ""}
+            'most_recent_term_id': str(most_recent_term_id), 'seniority': 0}
 
     # print(info)
     return info
@@ -455,6 +467,33 @@ if __name__ == '__main__':
     mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
     mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
     big_df = mergedRepsData
-    big_df['seniority'] = None
+    big_df['seniority'] = 0
+
+
+
+    sample_row = scraper_utils.initialize_row()
+
+    #
+
+    big_df['province_territory'] = sample_row.province_territory
+    big_df['province_territory_id'] = sample_row.province_territory_id
+    #
+    #
+    big_df['country'] = sample_row.country
+    # # #
+    big_df['country_id'] = sample_row.country_id
+    big_df['source_url'] = big_df['province_url']
+
+    big_df['source_id'] = big_df['member_id']
 
     print(big_df)
+
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+
+    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
+
