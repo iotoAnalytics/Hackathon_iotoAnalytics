@@ -30,6 +30,7 @@ class LegislatorRow:
     def __iter__(self):
         for attr, value in self.__dict__.items():
             yield attr, value
+
     most_recent_term_id: str = ''
     name_full: str = ''
     name_last: str = ''
@@ -54,6 +55,7 @@ class LegislatorRow:
     source_url: str = ''
     source_id: str = ''
 
+
 @dataclass
 class USLegislatorRow(LegislatorRow):
     """
@@ -74,10 +76,11 @@ class CadLegislatorRow(LegislatorRow):
     province_territory: str = ''
     riding: str = ''
 
+
 class LegislatorScraperUtils():
 
     def __init__(self, country, database_table_name, row_type):
-        
+
         # Database.initialise()
         self.db = Database()
         atexit.register(self.db.close_all_connections)
@@ -144,7 +147,7 @@ class LegislatorScraperUtils():
         Used for getting the party ID number.
         """
         return self.get_attribute_id('party', 'party', party_name)
-        
+
 
 class USFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
@@ -158,11 +161,10 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         data collector.
         """
         super().__init__('us', database_table_name, USLegislatorRow())
-    
+
     def get_state_id(self, state_abbreviation):
         return self.get_attribute_id('division', 'abbreviation', state_abbreviation)
 
-    
     def insert_legislator_data_into_db(self, data):
         """
         """
@@ -247,7 +249,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                 """).format(table=sql.Identifier(self.database_table_name))
 
         date_collected = datetime.now()
-            
+
         # This is used to convert dictionaries to rows. Need to test it out!
         for item in data:
             if isinstance(item, dict):
@@ -285,7 +287,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
             )
 
             self.db.cur.execute(insert_legislator_query, tup)
-            
+
 
 class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
     def __init__(self, state_abbreviation, database_table_name='us_state_legislators'):
@@ -312,11 +314,10 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
         data collector.
         """
         super().__init__('cad', database_table_name, CadLegislatorRow())
-    
+
     def get_prov_terr_id(self, prov_terr_id):
         return self.get_attribute_id('division', 'abbreviation', prov_terr_id)
 
-    
     def insert_legislator_data_into_db(self, data):
         """
         """
@@ -325,6 +326,8 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
 
         try:
             create_table_query = sql.SQL("""
+                   
+
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id bigint PRIMARY KEY,
                         source_id text,
@@ -399,7 +402,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                 """).format(table=sql.Identifier(self.database_table_name))
 
         date_collected = datetime.now()
-            
+
         # This is used to convert dictionaries to rows. Need to test it out!
         for item in data:
             if isinstance(item, dict):
