@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import List
 import copy
 import atexit
-from utils import DotDict
+import utils
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -110,7 +110,7 @@ class LegislatorScraperUtils():
         raise TypeError("Type %s not serializable" % type(obj))
 
     def initialize_row(self):
-        row = copy.copy(self.row_type)
+        row = copy.deepcopy(self.row_type)
         row.country_id = self.country_id
         row.country = self.country
         return row
@@ -244,7 +244,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         # This is used to convert dictionaries to rows. Need to test it out!
         for item in data:
             if isinstance(item, dict):
-                item = DotDict(item)
+                item = utils.DotDict(item)
 
             tup = (
                 item.source_id,
@@ -265,15 +265,15 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                 item.role,
                 item.district,
                 item.years_active,
-                json.dumps(item.committees, default=self._json_serial),
+                json.dumps(item.committees, default=utils.json_serial),
                 item.areas_served,
-                json.dumps(item.phone_number, default=self._json_serial),
-                json.dumps(item.addresses, default=self._json_serial),
+                json.dumps(item.phone_number, default=utils.json_serial),
+                json.dumps(item.addresses, default=utils.json_serial),
                 item.email,
                 item.birthday,
                 item.seniority,
                 item.occupation,
-                json.dumps(item.education, default=self._json_serial),
+                json.dumps(item.education, default=utils.json_serial),
                 item.military_experience
             )
 
@@ -292,7 +292,6 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
         row.state_id = self.state_id
         return row
 
-
 class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
@@ -308,7 +307,6 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
     
     def get_prov_terr_id(self, prov_terr_id):
         return self.get_attribute_id('division', 'abbreviation', prov_terr_id)
-
     
     def insert_legislator_data_into_db(self, data):
         """
@@ -396,7 +394,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
         # This is used to convert dictionaries to rows. Need to test it out!
         for item in data:
             if isinstance(item, dict):
-                item = DotDict(item)
+                item = utils.DotDict(item)
 
             tup = (
                 item.source_id,
@@ -417,14 +415,14 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                 item.role,
                 item.riding,
                 item.years_active,
-                json.dumps(item.committees, default=self._json_serial),
-                json.dumps(item.phone_number, default=self._json_serial),
-                json.dumps(item.addresses, default=self._json_serial),
+                json.dumps(item.committees, default=utils.json_serial),
+                json.dumps(item.phone_number, default=utils.json_serial),
+                json.dumps(item.addresses, default=utils.json_serial),
                 item.email,
                 item.birthday,
                 item.seniority,
                 item.occupation,
-                json.dumps(item.education, default=self._json_serial),
+                json.dumps(item.education, default=utils.json_serial),
                 item.military_experience
             )
             print(tup)

@@ -31,7 +31,7 @@ from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import psycopg2
 from nameparser import HumanName
-from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 
 import datefinder
 import unidecode
@@ -52,13 +52,13 @@ from nltk.stem import WordNetLemmatizer
 from joblib import dump, load
 from sklearn import linear_model
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+state_abbreviation = 'NC'
+database_table_name = 'us_nc_legislation'
+legislator_table_name = 'us_nc_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
@@ -86,7 +86,7 @@ def collect_bill_urls(myurl):
         link = "https://www.ncleg.gov" + link
         gd = ("NC_20202021_" + bill_name)
         url = '/us/nc/legislation/' + gd
-        bill_info = {'state_url': link, 'bill_name': bill_name, 'goverlytics_id': gd, 'url': url}
+        bill_info = {'source_url': link, 'bill_name': bill_name, 'goverlytics_id': gd, 'url': url}
         if bill_info not in bill_infos:
             bill_infos.append(bill_info)
     return bill_infos
@@ -294,7 +294,7 @@ def collect_bill_details(bill_url):
                     # get the url for the principal sponsor so we can merge on it to get their goverlytics id
                     psurl = "https://www.ncleg.gov" + ps["href"]
                     psid = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last',
-                                                                       principal_sponsor, state_url=psurl)
+                                                                       principal_sponsor, source_url=psurl)
                     if psid is not None:
                         principal_sponsor_id = psid
 
@@ -330,7 +330,7 @@ def collect_bill_details(bill_url):
         hn = HumanName(name_last)
         if "." not in name_last:
             sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last', name_last,
-                                                                 state_url=su)
+                                                                 source_url=su)
         else:
             first_initial = name_last.split(".")[0]
             last = name_last.split(".")[1].strip()
@@ -413,13 +413,14 @@ def collect_bill_details(bill_url):
         date_introduced = ""
         chamber_origin = ""
 
-    bill_d = {'state_url': bill_url, 'bill_title': bill_title, 'bill_type': bill_type, 'sponsors': sponsors,
+    bill_d = {'source_url': bill_url, 'bill_title': bill_title, 'bill_type': bill_type, 'sponsors': sponsors,
               'sponsors_id': sponsors_id, 'principal_sponsor': principal_sponsor,
               'principal_sponsor_id': principal_sponsor_id, 'current_status': "",
               'psurl': psurl, 'actions': actions, 'date_introduced': date_introduced,
               'chamber_origin': chamber_origin, 'session': '2020-2021', 'state': 'NC', 'state_id': '37',
               'site_topic': site_topic, 'votes': votes, 'committees': [], 'cosponsors': [], 'cosponsors_id': [],
-              'topic': "", 'bill_text': bill_text, 'bill_description': bill_description, 'bill_summary': bill_summary}
+              'topic': "", 'bill_text': bill_text, 'bill_description': bill_description, 'bill_summary': bill_summary,
+              'country_id': scraper_utils.country_id, 'country': scraper_utils.country}
 
     return bill_d
 #
@@ -461,7 +462,7 @@ if __name__ == '__main__':
     smalldf = pd.DataFrame(billinfos[:100])
 
     # print(billinfos)
-    links = [d['state_url'] for d in billinfos]
+    links = [d['source_url'] for d in billinfos]
     lessLinks = links[:100]
     link = links[0]
 
@@ -489,12 +490,12 @@ if __name__ == '__main__':
 
     # mainwithid = maindf.merge(dbwork.id_df, on='psurl', how='inner')
 
-    big_df = pd.merge(maindf, smalldf, how='left', on="state_url")
+    big_df = pd.merge(maindf, smalldf, how='left', on="source_url")
 
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     big_df = big_df.drop(['psurl'], axis=1)
-    big_df['bill_state_id'] = ""
+    big_df['source_id'] = ""
     # big_df = add_topics(big_df)
     # big_df = topics.add_topics(big_df)
     print(big_df)
