@@ -50,7 +50,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from database import Database
-from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 from multiprocessing import Pool
 from itertools import product
 import datetime
@@ -74,19 +74,19 @@ bills_sponsor_house_url = 'http://alisondb.legislature.state.al.us/alison/SESSBi
 reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSResosBySenateSponsorSelect.aspx'
 
 # Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
+state_abbreviation = 'AL'
+database_table_name = 'us_al_legislation'
+legislator_table_name = 'us_al_legislators'
 
-#Initialize database and scraper utils
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
+# #Initialize database and scraper utils
+# db_user = str(configParser.get('databaseConfig', 'db_user'))
+# db_pass = str(configParser.get('databaseConfig', 'db_pass'))
+# db_host = str(configParser.get('databaseConfig', 'db_host'))
+# db_name = str(configParser.get('databaseConfig', 'db_name'))
 
-Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
+# Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 
 scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
@@ -153,9 +153,9 @@ def scrape_bills(chamber, bills_url, bill_type):
             fields = scraper_utils.initialize_row()
             fields.session = current_session
             
-            bill_state_id = (current_session.replace(' Session ', '') + '_' + row['Bill']).replace(' ', '')
-            fields.bill_state_id = bill_state_id
-            fields.goverlytics_id = f'AL_{bill_state_id}'
+            source_id = (current_session.replace(' Session ', '') + '_' + row['Bill']).replace(' ', '')
+            fields.source_id = source_id
+            fields.goverlytics_id = f'AL_{source_id}'
             fields.bill_name = row['Bill']
             fields.bill_summary = row['Unnamed: 7']
             fields.date_collected = datetime.datetime.now()
@@ -165,7 +165,7 @@ def scrape_bills(chamber, bills_url, bill_type):
             fields.principal_sponsor = row['Sponsor'].split(' ')[0]
             fields.sponsors.append(row['Sponsor'].split(' ')[0])
             fields.bill_type = bill_type
-            fields.url = f'/us/AL/legislation/{bill_state_id}'
+            # fields.url = f'/us/AL/legislation/{source_id}'
 
 
             bills[row['Bill']] =  fields
@@ -193,7 +193,7 @@ def scrape_bills_detailed(fields):
         members = member_soup.find('table', id='ContentPlaceHolder1_gvHistory')
         try:
             table = pd.read_html(str(members))[0]
-            fields[key].state_url = url_base
+            fields[key].source_url = url_base
             
             vote_rows = table.index[table['Vote'] == table['Vote']].tolist()
             if ~ bool(vote_rows):
@@ -444,29 +444,5 @@ def scrape():
     # for d in list(fields_house.values())[:10]:
     #     print(d)
 
-<<<<<<< HEAD
-session = requests.Session()
-
-page = session.get(select_session_url)
-member_soup = BeautifulSoup(page.text, 'lxml')
-member = member_soup.find('table', id='ContentPlaceHolder1_gvSessions')
-members = member.find_all('td')
-num_sessions = len(members)
-
-# num_sessions corresponds to the session years, to exclude scraping current year, change 0 in for loop to 1.
-# session numbers can be found at http://alisondb.legislature.state.al.us/Alison/SelectSession.aspx
-# and by inspecting the session link, it will be the second argument in the postback function
-for session_no in range(1, 2):
-    current_session = members[session_no].text
-    session_year = members[session_no].text.split(' ')[-1] 
-    # print(current_session)
-    set_session(session_no)
-    scrape()
-
-
-
-
-=======
     # for d in list(fields.values())[:10]:
     #     print(d)
->>>>>>> 5daaf3b7c3896e21deaa6a30e2657b2c5f309f78

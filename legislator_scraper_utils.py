@@ -5,25 +5,18 @@ from datetime import date, datetime
 import json
 import sys
 import pandas as pd
-from database import Database
+from database import Database, CursorFromConnectionFromPool
 from dataclasses import dataclass, field
 from typing import List
 import copy
 import atexit
-from utils import DotDict
+import utils
 
 """
 Contains utilities and data structures meant to help resolve common issues
 that occur with data collection. These can be used with your legislator
 date collectors.
 """
-
-
-# TODO Finish writing insert query for US federal scraper
-# TODO Finish up canadian scrapers
-# TODO Test state scraper. if it works, replace instance of ScraperUtils 
-#   in existing scrapers with new class name. Be sure to remove country param.
-# TODO can also remove country from config files and scraper scripts
 
 @dataclass
 class LegislatorRow:
@@ -81,25 +74,25 @@ class LegislatorScraperUtils():
 
     def __init__(self, country, database_table_name, row_type):
 
-        # Database.initialise()
-        self.db = Database()
-        atexit.register(self.db.close_all_connections)
+        Database.initialise()
+        # self.db = Database()
+        # atexit.register(self.db.close_all_connections)
 
-        # with CursorFromConnectionFromPool() as self.db.cur:
-        try:
-            query = 'SELECT * FROM countries'
-            self.db.cur.execute(query)
-            countries_results = self.db.cur.fetchall()
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM countries'
+                cur.execute(query)
+                countries_results = cur.fetchall()
 
-            query = f'SELECT * FROM {country}_parties'
-            self.db.cur.execute(query)
-            parties_results = self.db.cur.fetchall()
+                query = f'SELECT * FROM {country}_parties'
+                cur.execute(query)
+                parties_results = cur.fetchall()
 
-            query = f'SELECT * FROM {country}_divisions'
-            self.db.cur.execute(query)
-            division_results = self.db.cur.fetchall()
-        except Exception as e:
-            sys.exit(f'An exception occurred retrieving tables from database:\n{e}')
+                query = f'SELECT * FROM {country}_divisions'
+                cur.execute(query)
+                division_results = cur.fetchall()
+            except Exception as e:
+                sys.exit(f'An exception occurred retrieving tables from database:\n{e}')
 
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
@@ -171,122 +164,124 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         if not isinstance(data, list):
             raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
 
-        try:
-            create_table_query = sql.SQL("""
-                    CREATE TABLE IF NOT EXISTS {table} (
-                        goverlytics_id bigint PRIMARY KEY,
-                        source_id text,
-                        most_recent_term_id text,
-                        date_collected timestamp,
-                        source_url TEXT UNIQUE,
-                        name_full text,
-                        name_last text,
-                        name_first text,
-                        name_middle text,
-                        name_suffix text,
-                        country_id bigint,
-                        country text,
-                        state_id int,
-                        state char(2),
-                        party_id int,
-                        party text,
-                        role text,
-                        district text,
-                        years_active int[],
-                        committees jsonb,
-                        areas_served text[],
-                        phone_number jsonb,
-                        addresses jsonb,
-                        email text,
-                        birthday date,
-                        seniority int,
-                        occupation text[],
-                        education jsonb,
-                        military_experience text
-                    );
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+                        CREATE TABLE IF NOT EXISTS {table} (
+                            goverlytics_id bigint PRIMARY KEY,
+                            source_id text,
+                            most_recent_term_id text,
+                            date_collected timestamp,
+                            source_url TEXT UNIQUE,
+                            name_full text,
+                            name_last text,
+                            name_first text,
+                            name_middle text,
+                            name_suffix text,
+                            country_id bigint,
+                            country text,
+                            state_id int,
+                            state char(2),
+                            party_id int,
+                            party text,
+                            role text,
+                            district text,
+                            years_active int[],
+                            committees jsonb,
+                            areas_served text[],
+                            phone_number jsonb,
+                            addresses jsonb,
+                            email text,
+                            birthday date,
+                            seniority int,
+                            occupation text[],
+                            education jsonb,
+                            military_experience text
+                        );
 
-                    ALTER TABLE {table} OWNER TO rds_ad;
+                        ALTER TABLE {table} OWNER TO rds_ad;
+                        """).format(table=sql.Identifier(self.database_table_name))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            
+            except Exception as e:
+                print(f'An exception occurred executing a query:\n{e}')
+
+            insert_legislator_query = sql.SQL("""
+                    WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+                    INSERT INTO {table}
+                    VALUES (
+                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (source_url) DO UPDATE SET
+                        date_collected = excluded.date_collected,
+                        name_full = excluded.name_full,
+                        name_last = excluded.name_last,
+                        name_first = excluded.name_first,
+                        name_middle = excluded.name_middle,
+                        name_suffix = excluded.name_suffix,
+                        district = excluded.district,
+                        role = excluded.role,
+                        committees = excluded.committees,
+                        areas_served = excluded.areas_served,
+                        phone_number = excluded.phone_number,
+                        addresses = excluded.addresses,
+                        state = excluded.state,
+                        state_id = excluded.state_id,
+                        party = excluded.party,
+                        party_id = excluded.party_id,
+                        email = excluded.email,
+                        birthday = excluded.birthday,
+                        military_experience = excluded.military_experience,
+                        occupation = excluded.occupation,
+                        education = excluded.education,
+                        source_id = excluded.source_id,
+                        most_recent_term_id = excluded.most_recent_term_id,
+                        years_active = excluded.years_active,
+                        seniority = excluded.seniority;
                     """).format(table=sql.Identifier(self.database_table_name))
 
-            self.db.cur.execute(create_table_query)
-            self.db.conn.commit()
-        except Exception as e:
-            print(f'An exception occurred executing a query:\n{e}')
+            date_collected = datetime.now()
 
-        insert_legislator_query = sql.SQL("""
-                WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
-                INSERT INTO {table}
-                VALUES (
-                    (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (source_url) DO UPDATE SET
-                    date_collected = excluded.date_collected,
-                    name_full = excluded.name_full,
-                    name_last = excluded.name_last,
-                    name_first = excluded.name_first,
-                    name_middle = excluded.name_middle,
-                    name_suffix = excluded.name_suffix,
-                    district = excluded.district,
-                    role = excluded.role,
-                    committees = excluded.committees,
-                    areas_served = excluded.areas_served,
-                    phone_number = excluded.phone_number,
-                    addresses = excluded.addresses,
-                    state = excluded.state,
-                    state_id = excluded.state_id,
-                    party = excluded.party,
-                    party_id = excluded.party_id,
-                    email = excluded.email,
-                    birthday = excluded.birthday,
-                    military_experience = excluded.military_experience,
-                    occupation = excluded.occupation,
-                    education = excluded.education,
-                    source_id = excluded.source_id,
-                    most_recent_term_id = excluded.most_recent_term_id,
-                    years_active = excluded.years_active,
-                    seniority = excluded.seniority;
-                """).format(table=sql.Identifier(self.database_table_name))
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
 
-        date_collected = datetime.now()
+                tup = (
+                    item.source_id,
+                    item.most_recent_term_id,
+                    date_collected,
+                    item.source_url,
+                    item.name_full,
+                    item.name_last,
+                    item.name_first,
+                    item.name_middle,
+                    item.name_suffix,
+                    item.country_id,
+                    item.country,
+                    item.state_id,
+                    item.state,
+                    item.party_id,
+                    item.party,
+                    item.role,
+                    item.district,
+                    item.years_active,
+                    json.dumps(item.committees, default=utils.json_serial),
+                    item.areas_served,
+                    json.dumps(item.phone_number, default=utils.json_serial),
+                    json.dumps(item.addresses, default=utils.json_serial),
+                    item.email,
+                    item.birthday,
+                    item.seniority,
+                    item.occupation,
+                    json.dumps(item.education, default=utils.json_serial),
+                    item.military_experience
+                )
 
-        # This is used to convert dictionaries to rows. Need to test it out!
-        for item in data:
-            if isinstance(item, dict):
-                item = DotDict(item)
-
-            tup = (
-                item.source_id,
-                item.most_recent_term_id,
-                date_collected,
-                item.source_url,
-                item.name_full,
-                item.name_last,
-                item.name_first,
-                item.name_middle,
-                item.name_suffix,
-                item.country_id,
-                item.country,
-                item.state_id,
-                item.state,
-                item.party_id,
-                item.party,
-                item.role,
-                item.district,
-                item.years_active,
-                json.dumps(item.committees, default=self._json_serial),
-                item.areas_served,
-                json.dumps(item.phone_number, default=self._json_serial),
-                json.dumps(item.addresses, default=self._json_serial),
-                item.email,
-                item.birthday,
-                item.seniority,
-                item.occupation,
-                json.dumps(item.education, default=self._json_serial),
-                item.military_experience
-            )
-
-            self.db.cur.execute(insert_legislator_query, tup)
+                cur.execute(insert_legislator_query, tup)
 
 
 class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
@@ -300,7 +295,6 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
         row.state = self.state
         row.state_id = self.state_id
         return row
-
 
 class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
@@ -317,129 +311,128 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
 
     def get_prov_terr_id(self, prov_terr_id):
         return self.get_attribute_id('division', 'abbreviation', prov_terr_id)
-
+    
     def insert_legislator_data_into_db(self, data):
         """
         """
         if not isinstance(data, list):
             raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
 
-        try:
-            create_table_query = sql.SQL("""
-                   
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+                        CREATE TABLE IF NOT EXISTS {table} (
+                            goverlytics_id bigint PRIMARY KEY,
+                            source_id text,
+                            most_recent_term_id text,
+                            date_collected timestamp,
+                            source_url TEXT UNIQUE,
+                            name_full text,
+                            name_last text,
+                            name_first text,
+                            name_middle text,
+                            name_suffix text,
+                            country_id bigint,
+                            country text,
+                            province_territory_id int,
+                            province_territory char(2),
+                            party_id int,
+                            party text,
+                            role text,
+                            riding text,
+                            years_active int[],
+                            committees jsonb,
+                            phone_number jsonb,
+                            addresses jsonb,
+                            email text,
+                            birthday date,
+                            seniority int,
+                            occupation text[],
+                            education jsonb,
+                            military_experience text
+                        );
 
-                    CREATE TABLE IF NOT EXISTS {table} (
-                        goverlytics_id bigint PRIMARY KEY,
-                        source_id text,
-                        most_recent_term_id text,
-                        date_collected timestamp,
-                        source_url TEXT UNIQUE,
-                        name_full text,
-                        name_last text,
-                        name_first text,
-                        name_middle text,
-                        name_suffix text,
-                        country_id bigint,
-                        country text,
-                        province_territory_id int,
-                        province_territory char(2),
-                        party_id int,
-                        party text,
-                        role text,
-                        riding text,
-                        years_active int[],
-                        committees jsonb,
-                        phone_number jsonb,
-                        addresses jsonb,
-                        email text,
-                        birthday date,
-                        seniority int,
-                        occupation text[],
-                        education jsonb,
-                        military_experience text
-                    );
+                        ALTER TABLE {table} OWNER TO rds_ad;
+                        """).format(table=sql.Identifier(self.database_table_name))
 
-                    ALTER TABLE {table} OWNER TO rds_ad;
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            except Exception as e:
+                print(f'An exception occurred executing a query:\n{e}')
+
+            insert_legislator_query = sql.SQL("""
+                    WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+                    INSERT INTO {table}
+                    VALUES (
+                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (source_url) DO UPDATE SET
+                        date_collected = excluded.date_collected,
+                        name_full = excluded.name_full,
+                        name_last = excluded.name_last,
+                        name_first = excluded.name_first,
+                        name_middle = excluded.name_middle,
+                        name_suffix = excluded.name_suffix,
+                        riding = excluded.riding,
+                        province_territory = excluded.province_territory,
+                        province_territory_id = excluded.province_territory_id,
+                        party = excluded.party,
+                        party_id = excluded.party_id,
+                        role = excluded.role,
+                        committees = excluded.committees,
+                        phone_number = excluded.phone_number,
+                        addresses = excluded.addresses,
+                        email = excluded.email,
+                        birthday = excluded.birthday,
+                        military_experience = excluded.military_experience,
+                        occupation = excluded.occupation,
+                        education = excluded.education,
+                        source_id = excluded.source_id,
+                        most_recent_term_id = excluded.most_recent_term_id,
+                        years_active = excluded.years_active,
+                        seniority = excluded.seniority;
                     """).format(table=sql.Identifier(self.database_table_name))
 
-            self.db.cur.execute(create_table_query)
-            self.db.conn.commit()
-        except Exception as e:
-            print(f'An exception occurred executing a query:\n{e}')
+            date_collected = datetime.now()
 
-        insert_legislator_query = sql.SQL("""
-                WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
-                INSERT INTO {table}
-                VALUES (
-                    (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (source_url) DO UPDATE SET
-                    date_collected = excluded.date_collected,
-                    name_full = excluded.name_full,
-                    name_last = excluded.name_last,
-                    name_first = excluded.name_first,
-                    name_middle = excluded.name_middle,
-                    name_suffix = excluded.name_suffix,
-                    riding = excluded.riding,
-                    province_territory = excluded.province_territory,
-                    province_territory_id = excluded.province_territory_id,
-                    party = excluded.party,
-                    party_id = excluded.party_id,
-                    role = excluded.role,
-                    committees = excluded.committees,
-                    phone_number = excluded.phone_number,
-                    addresses = excluded.addresses,
-                    email = excluded.email,
-                    birthday = excluded.birthday,
-                    military_experience = excluded.military_experience,
-                    occupation = excluded.occupation,
-                    education = excluded.education,
-                    source_id = excluded.source_id,
-                    most_recent_term_id = excluded.most_recent_term_id,
-                    years_active = excluded.years_active,
-                    seniority = excluded.seniority;
-                """).format(table=sql.Identifier(self.database_table_name))
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
 
-        date_collected = datetime.now()
+                tup = (
+                    item.source_id,
+                    item.most_recent_term_id,
+                    date_collected,
+                    item.source_url,
+                    item.name_full,
+                    item.name_last,
+                    item.name_first,
+                    item.name_middle,
+                    item.name_suffix,
+                    item.country_id,
+                    item.country,
+                    item.province_territory_id,
+                    item.province_territory,
+                    item.party_id,
+                    item.party,
+                    item.role,
+                    item.riding,
+                    item.years_active,
+                    json.dumps(item.committees, default=utils.json_serial),
+                    json.dumps(item.phone_number, default=utils.json_serial),
+                    json.dumps(item.addresses, default=utils.json_serial),
+                    item.email,
+                    item.birthday,
+                    item.seniority,
+                    item.occupation,
+                    json.dumps(item.education, default=utils.json_serial),
+                    item.military_experience
+                )
+                print(tup)
 
-        # This is used to convert dictionaries to rows. Need to test it out!
-        for item in data:
-            if isinstance(item, dict):
-                item = DotDict(item)
-
-            tup = (
-                item.source_id,
-                item.most_recent_term_id,
-                date_collected,
-                item.source_url,
-                item.name_full,
-                item.name_last,
-                item.name_first,
-                item.name_middle,
-                item.name_suffix,
-                item.country_id,
-                item.country,
-                item.province_territory_id,
-                item.province_territory,
-                item.party_id,
-                item.party,
-                item.role,
-                item.riding,
-                item.years_active,
-                json.dumps(item.committees, default=self._json_serial),
-                json.dumps(item.phone_number, default=self._json_serial),
-                json.dumps(item.addresses, default=self._json_serial),
-                item.email,
-                item.birthday,
-                item.seniority,
-                item.occupation,
-                json.dumps(item.education, default=self._json_serial),
-                item.military_experience
-            )
-            print(tup)
-
-            self.db.cur.execute(insert_legislator_query, tup)
+                cur.execute(insert_legislator_query, tup)
 
 
 class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):

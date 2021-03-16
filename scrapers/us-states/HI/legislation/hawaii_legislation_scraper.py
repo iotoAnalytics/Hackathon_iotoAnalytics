@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
 import requests
 import request_url
@@ -34,13 +34,13 @@ from pprint import pprint
 import datetime
 import boto3
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+state_abbreviation = 'HI'
+database_table_name = 'us_hi_legislation'
+legislator_table_name = 'us_hi_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
@@ -208,7 +208,7 @@ def scrape(bill_item):
         soup = BeautifulSoup(url_request.content, 'lxml')
 
         # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-        # keys are the columns in the data dictionary. For instance, we can insert the state_url,
+        # keys are the columns in the data dictionary. For instance, we can insert the source_url,
         # like so:
 
         session = current_year
@@ -226,13 +226,13 @@ def scrape(bill_item):
         row.site_topic = get_site_topic(soup)
         row.actions = actions
         row.bill_text = get_billtext(pdf)
-        row.state_url = link
+        row.source_url = link
 
         goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
         url = f'us/{state_abbreviation}/legislation/{goverlytics_id}'
 
         row.goverlytics_id = goverlytics_id
-        row.state_url = url
+        row.source_url = url
 
         row.chamber_origin = bill_info['chamber_origin']
         row.bill_type = bill_info['type']
