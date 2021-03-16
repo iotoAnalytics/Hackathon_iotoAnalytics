@@ -6,8 +6,7 @@ import sys
 from database import Database, CursorFromConnectionFromPool
 import pandas as pd
 from pandas.core.computation.ops import UndefinedVariableError
-from typing import List
-from dataclasses import dataclass, field
+from rows import *
 import numpy
 import atexit
 import copy
@@ -24,52 +23,6 @@ Contains utilities and data structures meant to help resolve common issues
 that occur with data collection. These can be used with your legislation
 date collectors.
 """
-
-@dataclass
-class LegislationRow:
-    """
-    Data structure for housing data about each piece of legislation.
-    """
-    goverlytics_id: int = None
-    source_id: str = ''
-    bill_name: str = ''
-    session: str = ''
-    date_introduced: datetime = None
-    source_url: str = ''
-    chamber_origin: str = ''
-    committees: List[dict] = field(default_factory=list)
-    bill_type: str =  ''
-    bill_title: str = ''
-    country_id: int = 0
-    country: str = ''
-    current_status: str = ''
-    principal_sponsor_id: int = None
-    principal_sponsor: str = ''
-    sponsors: List[str] = field(default_factory=list)
-    sponsors_id: List[int] = field(default_factory=list)
-    cosponsors: List[str] = field(default_factory=list)
-    cosponsors_id: List[int] = field(default_factory=list)
-    bill_text: str = ''
-    bill_description: str =''
-    bill_summary:str = ''
-    actions: List[dict] = field(default_factory=list)
-    votes: List[dict] = field(default_factory=list)
-    site_topic: str = ''
-    topic: str = ''
-
-class USLegislationRow(LegislationRow):
-    """
-    Data structure for housing data about each piece of legislation.
-    """
-    state_id: int = 0
-    state: str = ''
-
-class CadLegislationRow(LegislationRow):
-    """
-    Data structure for housing data about each piece of legislation.
-    """
-    province_territory_id: int = 0
-    province_territory: str = ''
 
 class LegislationScraperUtils:
     """
@@ -113,16 +66,6 @@ class LegislationScraperUtils:
         self.country_id = int(self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
         
         self.row_type = row_type
-
-    
-    def _json_serial(self, obj):
-        """
-        Serializes date/datetime object. This is used to convert date and datetime objects to
-        a format that can be digested by the database.
-        """
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        raise TypeError("Type %s not serializable" % type(obj))
 
 
     def _convert_to_int(self, value):

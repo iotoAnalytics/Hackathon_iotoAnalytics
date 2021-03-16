@@ -8,6 +8,7 @@ import pandas as pd
 from database import Database, CursorFromConnectionFromPool
 from dataclasses import dataclass, field
 from typing import List
+from rows import *
 import copy
 import atexit
 import utils
@@ -17,57 +18,6 @@ Contains utilities and data structures meant to help resolve common issues
 that occur with data collection. These can be used with your legislator
 date collectors.
 """
-
-@dataclass
-class LegislatorRow:
-    def __iter__(self):
-        for attr, value in self.__dict__.items():
-            yield attr, value
-
-    most_recent_term_id: str = ''
-    name_full: str = ''
-    name_last: str = ''
-    name_first: str = ''
-    name_middle: str = ''
-    name_suffix: str = ''
-    country_id: int = None
-    country: str = ''
-    party_id: int = None
-    party: str = ''
-    role: str = ''
-    years_active: List[int] = field(default_factory=list)
-    committees: List[dict] = field(default_factory=list)
-    phone_number: List[dict] = field(default_factory=list)
-    addresses: List[dict] = field(default_factory=list)
-    email: str = ''
-    birthday: datetime = None
-    seniority: int = 0
-    occupation: List[str] = field(default_factory=list)
-    education: List[dict] = field(default_factory=list)
-    military_experience: str = ''
-    source_url: str = ''
-    source_id: str = ''
-
-
-@dataclass
-class USLegislatorRow(LegislatorRow):
-    """
-    Data structure for housing data about each piece of legislator.
-    """
-    state: str = ''
-    state_id: int = None
-    district: str = ''
-    areas_served: List[str] = field(default_factory=list)
-
-
-@dataclass
-class CadLegislatorRow(LegislatorRow):
-    """
-    Data structure for housing data about each piece of legislator.
-    """
-    province_territory_id: int = None
-    province_territory: str = ''
-    riding: str = ''
 
 
 class LegislatorScraperUtils():
@@ -103,14 +53,7 @@ class LegislatorScraperUtils():
         self.database_table_name = database_table_name
         self.row_type = row_type
 
-    def _json_serial(self, obj):
-        """
-        Serializes date/datetime object. This is used to convert date and datetime objects to
-        a format that can be digested by the database.
-        """
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        raise TypeError("Type %s not serializable" % type(obj))
+
 
     def initialize_row(self):
         row = copy.deepcopy(self.row_type)
