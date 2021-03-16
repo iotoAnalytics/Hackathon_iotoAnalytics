@@ -136,9 +136,9 @@ if __name__ == '__main__':
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.insert_legislator_data_into_db(data)
