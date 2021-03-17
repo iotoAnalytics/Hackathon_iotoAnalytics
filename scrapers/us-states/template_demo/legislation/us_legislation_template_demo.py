@@ -15,13 +15,12 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
 from database import Database
 import configparser
-from pprint import pprint
 from nameparser import HumanName
 import re
 import urllib.parse as urlparse
@@ -30,15 +29,16 @@ from pprint import pprint
 import datetime
 import boto3
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+# state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+# legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+state_abbreviation = 'IL'
+scraper_utils = USStateLegislationScraperUtils(state_abbreviation, 'demo_template_legislation', 'us_il_legislators')
 
 base_url = 'https://www.ilga.gov'
 
@@ -58,7 +58,7 @@ def get_urls():
 
     for li in table.findAll('li'):
         urls.append(li.a['href'])
-    
+
     return urls
 
 
@@ -83,8 +83,8 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    state_url = f'{base_url}{url}'
-    row.state_url = state_url
+    source_url = f'{base_url}{url}'
+    row.source_url = source_url
 
     # Get useful query string parameters from URL
     parsed = urlparse.urlparse(url)
@@ -97,12 +97,10 @@ def scrape(url):
     bill_name = f'{doc_type}{doc_num.zfill(4)}'
 
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-    url = f'us/{state_abbreviation}/legislation/{goverlytics_id}'
 
     row.goverlytics_id = goverlytics_id
     row.bill_name = bill_name
     row.session = session
-    row.url = url
 
     chamber_origin = ''
     bill_type = ''
@@ -117,7 +115,7 @@ def scrape(url):
     row.bill_type = bill_type
 
     # Begin scraping page
-    page = requests.get(state_url)
+    page = requests.get(source_url)
     soup = BeautifulSoup(page.content, 'lxml')
 
     # The Illinois state legislation website has their data stored in a weird way...
@@ -213,7 +211,7 @@ def scrape(url):
     row.current_status = current_status
     row.date_introduced = date_introduced
 
-    # There's more data on other pages we can colelct, but we have enough data for this demo!
+    # There's more data on other pages we can collect, but we have enough data for this demo!
 
     return row
 
@@ -228,9 +226,9 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.insert_legislation_data_into_db(data)

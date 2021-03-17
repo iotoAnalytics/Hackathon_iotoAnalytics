@@ -1,6 +1,7 @@
 .DS_STORE
 venv/
+.venv/
 __pycache__/
-legislators_rds_rds/
 test_legislation/
 test_legislators/
+.idea

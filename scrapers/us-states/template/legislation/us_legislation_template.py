@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -34,7 +34,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
 
 def get_urls():
@@ -75,7 +75,7 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row.state_url = url
+    row.source_url = url
 
     # Depending on the data you're able to collect, the legislation scraper may be more involved
     # Than the legislator scraper. For one, you will need to create the goverlytics_id. The 

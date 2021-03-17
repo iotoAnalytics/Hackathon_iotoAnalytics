@@ -1,14 +1,21 @@
 """
 Author: Avery Quan
-Date Created: Jan 28, 2021
-Function: Scrape legislation data for the state of Alabama
+Date Created: Feb 4, 2021
+Function: Scrape historical legislation data for the state of Alabama for ALL years
+Issues:
+
+    - Could not figure out how to access Resolutions page with bs4. Usual post arguments do not work. Can be done through Selenium, 
+        but will be very slow. i've left it unscraped, as I believe it is a simple problem to fix for someone with more experience.
+        
+
 Notes:
     - Url field isn't very useful as the Alabama website requires a session and will redirect you if you don't have one, it is also NOT UNIQUE, 
         the page depends on the session year you have chosen.
-    - Currently, session year is hardcoded. 
-            -Note that prefilled_bills_url is also hardcoded, the date syntax can be found on the Alabama session info page
-    - Could not figure out how to access Resolutions page with bs4. Can be done through Selenium, but will be very slow. i've left it un
-        scraped, as I believe it is a simple problem to fix for someone with more experience.
+
+    - Website server is not always reliable and you will occasionally get a missing page error, I've put solutions in place for bills but this could 
+        be the issue for future errors.
+
+    - Runtime: Approx 4 hours
 
 
 
@@ -25,7 +32,7 @@ Notes on how the website works: (ASP.NET)
     javascript:__doPostBack('ctl00$ContentPlaceHolder1$gvBills','Bill$0')
 
     The first argument is __EVENTTARGET and the second is __EVENTARGUMENT. The url is the page that holds the links. Once you have these,
-    send the POST request and you should be able to access that page. POST requests can be found in functions starting with set_
+    send the POST request and you should be able to access that page. Example of a POST request can be found in set_session()   
 
 """
 
@@ -43,15 +50,15 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from database import Database
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 from multiprocessing import Pool
 from itertools import product
 import datetime
 import numpy
 
 # Testing imports
-from pprint import pprint
-import pickle
+# from pprint import pprint
+# import pickle
 
 # Hardcoded for now
 current_session = 'Regular Session 2019'
@@ -62,24 +69,31 @@ chambers = {'S': 'Senate', 'H' : 'House'}
 headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 # URLs to POST to
 select_session_url = 'http://alisondb.legislature.state.al.us/Alison/SelectSession.aspx'
-prefiled_bills_url = 'http://alisondb.legislature.state.al.us/Alison/SESSBillsList.aspx?SELECTEDDAY=1:2019-03-05&BODY=1753&READINGTYPE=R1&READINGCODE=B&PREFILED=Y'
 bills_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/alison/SESSBillsBySenateSponsorSelect.aspx'
 bills_sponsor_house_url = 'http://alisondb.legislature.state.al.us/alison/SESSBillsByHouseSponsorSelect.aspx'
 reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSResosBySenateSponsorSelect.aspx'
 
 # Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
+state_abbreviation = 'AL'
+database_table_name = 'us_al_legislation_test'
+legislator_table_name = 'us_al_legislators'
+
+# #Initialize database and scraper utils
+# db_user = str(configParser.get('databaseConfig', 'db_user'))
+# db_pass = str(configParser.get('databaseConfig', 'db_pass'))
+# db_host = str(configParser.get('databaseConfig', 'db_host'))
+# db_name = str(configParser.get('databaseConfig', 'db_name'))
+
+# Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
-def set_session():
-    # change event argument to change session year, currently set to 2019
-    session_payload = {"__EVENTTARGET":"ctl00$ContentPlaceHolder1$gvSessions", "__EVENTARGUMENT": "$3"}
+#default sess_column scrapes current year only
+def set_session(sess_column):
+    session_payload = {"__EVENTTARGET":"ctl00$ContentPlaceHolder1$gvSessions", "__EVENTARGUMENT": f"${sess_column}"}
     
     session.post(select_session_url, session_payload, headers)
 
@@ -136,23 +150,23 @@ def scrape_bills(chamber, bills_url, bill_type):
 
         table = table.replace(numpy.nan, '', regex=True )
         for index, row in table.iterrows():
-            bill_name = row['Bill']
             fields = scraper_utils.initialize_row()
             fields.session = current_session
             
-            bill_state_id = (current_session.replace(' Session ', '') + '_' + row['Bill']).replace(' ', '')
-            fields.bill_state_id = bill_state_id
-            fields.goverlytics_id = f'AL_{bill_state_id}'
+            source_id = (current_session.replace(' Session ', '') + '_' + row['Bill']).replace(' ', '')
+            fields.source_id = source_id
+            fields.goverlytics_id = f'AL_{source_id}'
             fields.bill_name = row['Bill']
             fields.bill_summary = row['Unnamed: 7']
             fields.date_collected = datetime.datetime.now()
             fields.site_topic = row['Subject']
             fields.current_status = row['Status']
             fields.chamber_origin = chamber
-            fields.principal_sponsor = row['Sponsor']
-            fields.sponsors.append(row['Sponsor'])
+            fields.principal_sponsor = row['Sponsor'].split(' ')[0].split('(')[0]
+            fields.sponsors.append(row['Sponsor'].split(' ')[0].split('(')[0])
             fields.bill_type = bill_type
-            fields.url = f'/us/AL/legislation/{bill_state_id}'
+            fields.committees = []
+            # fields.url = f'/us/AL/legislation/{source_id}'
 
 
             bills[row['Bill']] =  fields
@@ -165,15 +179,22 @@ def scrape_bills(chamber, bills_url, bill_type):
 def scrape_bills_detailed(fields):
     url_first = 'http://alisondb.legislature.state.al.us/Alison/SESSBillStatusResult.aspx?BILL='
     url_last = '&WIN_TYPE=BillResult'
-    keys = fields.keys()
-    for key in keys:
+    keys = list(fields.keys())
+    keys_len = len(keys)
+    count = 0
+    unsuccess_attempts = 0
+    while count < keys_len:
+        
+        key = keys[count]
+        count += 1
+
         url_base = url_first + key + url_last
         page = session.get(url_base)
         member_soup = BeautifulSoup(page.text, 'lxml')
         members = member_soup.find('table', id='ContentPlaceHolder1_gvHistory')
         try:
             table = pd.read_html(str(members))[0]
-            fields[key].state_url = url_base
+            fields[key].source_url = url_base
             
             vote_rows = table.index[table['Vote'] == table['Vote']].tolist()
             if ~ bool(vote_rows):
@@ -196,12 +217,23 @@ def scrape_bills_detailed(fields):
                     if not pd.isna(table['Matter'][index]):
                         fields[key].actions.append({'date': nan(table['Calendar Date'][index]), 'action_by': chambers[table['Body'][index]], 'description': table['Matter'][index]})
                     if   table['Committee'][index] == table['Committee'][index]:
-                        fields[key].committees = {'committee': members.find('td',text=table['Committee'][index])['title'], 'chamber': chambers[table['Body'][index]]}
+                        fields[key].committees.append({'committee': members.find('td',text=table['Committee'][index])['title'], 'chamber': chambers[table['Body'][index]]})
+                unsuccess_attempts = 0
             except KeyError:
                 # probably has a blank row
                 pass
-        except ImportError:
+        except ImportError as e:
+            # If this doesnt print out twice for a bill, the error was fixed
             print('Likely a table not found at url: ' + url_base)
+            unsuccess_attempts += 1
+            # Either the table actually doesn't exist, or there is just a server error on their side. We can try again to see if we can get the page.
+            # Chance of a server error seems relatively low ~ 2% im guessing but you can raise the cap for unsuccess_attempts for guranteed bill scraping
+            # at the cost of higher runtime
+            if unsuccess_attempts > 1:
+                unsuccess_attempts = 0
+            else:
+                count -= 1
+            continue
 
     return fields
     
@@ -251,7 +283,10 @@ def count_votes(table):
         try:
             vote = {}
             vote['voted'] = abbreviation[value]
-            vote['legislator'] = table['Member'][index]
+            if pd.isna(table['Member'][index]):
+                vote['legislator'] = 'Unnamed Member'
+            else:
+                vote['legislator'] = table['Member'][index]
             votes.append(vote)
 
             total_votes[abbreviation[value]] += 1
@@ -263,7 +298,10 @@ def count_votes(table):
         try:
             vote = {}
             vote['voted'] = abbreviation[value]
-            vote['legislator'] = table['Member.1'][index]
+            if pd.isna(table['Member.1'][index]):
+                vote['legislator'] = 'Unnamed Member'
+            else:
+                vote['legislator'] = table['Member.1'][index]
             votes.append(vote)
 
             total_votes[abbreviation[value]] += 1
@@ -283,32 +321,34 @@ def scrape_sponsors(chamber, target_url, bill_type):
     people = session.get(target_url)
     member_soup = BeautifulSoup(people.text, 'lxml')
     sponsors = member_soup.find_all('input', type='image')
-
+    sponsor_names = member_soup.find_all('span', attrs={'class':'label label-default', 'style':'display:inline-block;'})
     for index, sponsor in enumerate(sponsors):
         try:
             # Set session for bill by Sponsor
             session_payload = {"__EVENTTARGET":f'ctl00$ContentPlaceHolder1$ImageButton{index + 1}', "__EVENTARGUMENT": f"ContentPlaceHolder1_ImageButton{index + 1}"}
             session.post(target_url, session_payload, headers)
-            name = sponsor['src'].split('/')[-1].split('_')[0]
+            name = (sponsor_names[index].string).replace(' ', '%20')
             oid = sponsor['alt']
-            
             sponsor_url = f'http://alisondb.legislature.state.al.us/alison/SESSBillsList.aspx?NAME={name}&SPONSOROID={oid}&BODY=1755&SESSNAME=Regular%20Session%20{session_year}'
-            # if bill_type == 'Resolution':
-            #     sponsor_url = f'http://alisondb.legislature.state.al.us/Alison/SESSResosList.aspx?NAME={name}&SPONSOROID={oid}&BODY=1753&SESSNAME=Regular%20Session%20{session_year}'
-            #     # Set session By Sponsor
-            #     session_payload = {"__EVENTTARGET":f'ctl00$ContentPlaceHolder1$Img{index + 1}', "__EVENTARGUMENT": f"ContentPlaceHolder1_Img{index + 1}"}
-            #     session.post(target_url, session_payload, headers)
+
 
             bills = scrape_bills(chamber, sponsor_url, bill_type)
             if bills is not None:
                 for key, bill in bills.items():
-                    bill.principal_sponsor_id = int(oid)
-                    bill.sponsors_id.append(int(oid))
+
+                    kwargs = {"source_id": oid}
+                    gover_id = scraper_utils.get_legislator_id(**kwargs)
+
+                    bill.principal_sponsor_id = gover_id
+                    bill.sponsors_id.append(gover_id)
 
                 list_bills = {**list_bills, **bills}
-        except KeyError:
-            # likely a unfinished legislator page
-            pass
+        except Exception as e:
+            # likely a unfinished legislator page at bottom -> leads to index out of range
+            print(f'Exception: {e.__class__.__name__}')
+            print(f'With exception values: {e}')
+            
+
 
     return list_bills
 
@@ -321,14 +361,16 @@ def scrape_co_sponsors(fields, target_url):
     people = session.get(target_url)
     member_soup = BeautifulSoup(people.text, 'lxml')
     sponsors = member_soup.find_all('input', type='image')
-    return get_cosponsor_url(fields, sponsors)
+    sponsor_names = member_soup.find_all('span', attrs={'class':'label label-default', 'style':'display:inline-block;'})
+    return get_cosponsor_url(fields, sponsors, sponsor_names)
     
 
-def get_cosponsor_url(fields, sponsors):
+def get_cosponsor_url(fields, sponsors, sponsor_names):
 
-    for sponsor in sponsors: 
+    for index, sponsor in enumerate(sponsors): 
         try:
-            name = sponsor['src'].split('/')[-1].split('_')[0]
+            name = (sponsor_names[index].string).replace(' ', '%20')
+            # name = sponsor['src'].split('/')[-1].split('_')[0]
             oid = sponsor['alt']
             sponsor_url = f'http://alisondb.legislature.state.al.us/alison/SESSBillsList.aspx?NAME={name}&SPONSOROID={oid}&BODY=1755&SESSNAME=Regular%20Session%20{session_year}'
             page = session.get(sponsor_url)
@@ -340,57 +382,86 @@ def get_cosponsor_url(fields, sponsors):
             bill_names = [x['value'] for x in bill_names]
 
             for bill in bill_names:
-                fields[bill].cosponsors.append(name)
-                fields[bill].cosponsors_id.append(int(oid))
+                fields[bill].cosponsors.append(name.split('%20')[0].split('(')[0])
+
+                kwargs = {"source_id": oid}
+                gover_id = scraper_utils.get_legislator_id(**kwargs)
+
+                fields[bill].cosponsors_id.append(gover_id)
                 
                     
         except Exception as e:
-            print(e)
+            print(f'Exception {e.__class__.__name__}')
+            print(f'With exception values {e}')
             print('Blank legislator at ' + sponsor['src'])
+            continue
             
     return fields
 
 # used for debugging functions that rely on data to already exist
-def save_file(my_list, name):
-    with open(name, 'wb') as f:
-        pickle.dump(my_list, f)
+# def save_file(my_list, name):
+#     with open(name, 'wb') as f:
+#         pickle.dump(my_list, f)
 
-def open_file(name):
-    with open(name, 'rb') as f:
-        my_list = pickle.load( f)
-        return my_list
-
-session = requests.Session()
-set_session()
-set_chamber('Senate')
-
-fields= {}
-
-if __name__ == '__main__':  
-    with Pool() as pool:
-
-        fields = pool.starmap(scrape_bills, [('Senate', prefiled_bills_url, 'Prefiled Bill')])[0]
-        fields = pool.starmap(scrape_sponsors, [('Senate', bills_sponsor_senate_url, 'Bill')])[0]
-        fields = pool.starmap(scrape_co_sponsors, [(fields, bills_sponsor_senate_url)])
-        fields = pool.map(scrape_bills_detailed, fields)[0]
+# def open_file(name):
+#     with open(name, 'rb') as f:
+#         my_list = pickle.load( f)
+#         return my_list
 
 
-        # save_file(fields, 'data.txt')
-        # fields = open_file()[0]
-        set_chamber('House')
-        fields_house = {}
 
-        fields_house = pool.starmap(scrape_bills, [('House', prefiled_bills_url, 'Prefiled Bill')])[0]
-        fields_house = pool.starmap(scrape_sponsors, [('House', bills_sponsor_house_url, 'Bill')])[0]
-        fields_house = pool.starmap(scrape_co_sponsors, [(fields_house, bills_sponsor_house_url)])
-        fields_house = pool.map(scrape_bills_detailed, fields_house)[0]
+def scrape():
 
-        pool.close()
-        pool.join()
+    print('step sponsor: ' + current_session)
+    fields = scrape_sponsors('Senate', bills_sponsor_senate_url, 'Bill')
+    print('step cosponsor: '+ current_session)
+    fields = scrape_co_sponsors(fields, bills_sponsor_senate_url)
+    
+    print('step bills: '+ current_session)
+    fields = scrape_bills_detailed(fields)
+    
 
+    # for debugging to save time    
+    # save_file(fields, 'data.txt')
+    # fields = open_file()[0]
+    fields_house = {}
+    print('step sponsor: ' + current_session)
+    fields_house = scrape_sponsors('House', bills_sponsor_house_url, 'Bill')
+    
+    print('step cosponsor: '+ current_session)
+    fields_house = scrape_co_sponsors(fields_house, bills_sponsor_house_url)
+    
+    print('step bills: '+ current_session)
+    fields_house = scrape_bills_detailed(fields_house)
+    
+    # for debugging to save time
     # save_file(fields_house, 'data2.txt')
     # fields_house = open_file('data2.txt')[0]
 
-
+    print('step Insert: ' + current_session)
     scraper_utils.insert_legislation_data_into_db(list(fields_house.values()))
     scraper_utils.insert_legislation_data_into_db(list(fields.values()))
+
+    # for d in list(fields_house.values())[:10]:
+    #     print(d)
+
+    # for d in list(fields.values())[:10]:
+    #     print(d)
+
+
+session = requests.Session()
+
+page = session.get(select_session_url)
+member_soup = BeautifulSoup(page.text, 'lxml')
+member = member_soup.find('table', id='ContentPlaceHolder1_gvSessions')
+members = member.find_all('td')
+num_sessions = len(members)
+# num_sessions corresponds to the session years, to exclude scraping current year, change 0 in for loop to 1.
+# session numbers can be found at http://alisondb.legislature.state.al.us/Alison/SelectSession.aspx
+# and by inspecting the session link, it will be the second argument in the postback function
+for session_no in range(1, 2):
+    current_session = members[session_no].text
+    session_year = members[session_no].text.split(' ')[-1] 
+    # print(current_session)
+    set_session(session_no)
+    scrape()

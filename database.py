@@ -1,21 +1,19 @@
-from psycopg2 import pool
+# from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
+from psycopg2 import pool
+import psycopg2
 import configparser
 import boto3
 import sys, os
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
 
-#Initialize database and scraper utils
-db_host = str(configParser.get('databaseConfig', 'db_host'))
-db_port = str(configParser.get('databaseConfig', 'db_port'))
-db_user = str(configParser.get('databaseConfig', 'db_user'))
-db_region = str(configParser.get('databaseConfig', 'db_region'))
-db_name = str(configParser.get('databaseConfig', 'db_name'))
+db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
+db_port = 5432
+db_user = 'rds'
+db_region = 'us-west-2'
+db_name = 'openparl'
 
-client = boto3.client('rds')
+client = boto3.client('rds', db_region)
 
 class Database:
     __connection_pool = None
@@ -25,7 +23,7 @@ class Database:
         db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
         
         Database.__connection_pool = pool.SimpleConnectionPool(1,
-                                                               5,
+                                                               10,
                                                                database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod

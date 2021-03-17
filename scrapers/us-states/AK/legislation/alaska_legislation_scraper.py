@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow
+from legislation_scraper_utils import USStateLegislationScraperUtils
 from database import Database
 import configparser
 import re
@@ -29,15 +29,15 @@ import time
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# # Initialize config parser and get variables from config file
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+state_abbreviation = 'AK'
+# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
+# legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = LegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USStateLegislationScraperUtils(state_abbreviation, 'us_ak_legislation', 'us_ak_legislators')
 
 base_url = 'http://www.akleg.gov/basis/Home/BillsandLaws'
 
@@ -212,11 +212,11 @@ def scrape(data_dict):
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
 
     row.goverlytics_id = goverlytics_id
-    row.url = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
+    # row.url = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
     row.bill_name = bill_name
     row.site_topic = data_dict['Site Topic']
     # row.principal_sponsor = p_sponsor
-    row.state_url = url
+    row.source_url = url
     row.cosponsors = cosponsors['total']
     row.bill_summary = temp_dict['bill summary']
     row.bill_text = get_bill_text(url)

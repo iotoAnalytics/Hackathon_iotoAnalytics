@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislator_scraper_utils import LegislatorScraperUtils
+from legislator_scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -34,7 +34,7 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = LegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 
 
 def get_urls():
@@ -75,7 +75,7 @@ def scrape(url):
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    row.state_url = url
+    row.source_url = url
 
     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
     # the party name from the website, then get the party_id from scraper_utils
