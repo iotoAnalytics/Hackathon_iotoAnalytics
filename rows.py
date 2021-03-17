@@ -35,7 +35,7 @@ class LegislationRow:
     bill_summary:str = ''
     actions: List[dict] = field(default_factory=list)
     votes: List[dict] = field(default_factory=list)
-    site_topic: str = ''
+    source_topic: str = ''
     topic: str = ''
 
 class USLegislationRow(LegislationRow):
@@ -106,3 +106,4 @@ class CadLegislatorRow(LegislatorRow):
     province_territory_id: int = None
     province_territory: str = ''
     riding: str = ''
+    region: str = ''

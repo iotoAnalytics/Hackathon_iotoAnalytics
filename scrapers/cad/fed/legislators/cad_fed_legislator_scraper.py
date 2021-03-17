@@ -24,71 +24,83 @@ import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
-import boto3
+import pandas as pd
 
 
 scraper_utils = CadFedLegislatorScraperUtils()
+base_url = 'https://www.ourcommons.ca'
 
-def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
-    urls = []
+df = pd.DataFrame()
 
-    # Logic goes here! Url we are scraping: https://www.azleg.gov/memberroster/
-    base_url = 'https://www.azleg.gov'
-    path = '/memberroster/'
-    scrape_url = base_url + path
-    page = requests.get(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    
-    table = soup.find('table', {'id': 'HouseRoster'})
+# Used to swap parties with database representation
+party_switcher = {
+    'NDP': 'New Democratic',
+    'Green Party': 'Green'
+}
 
-    # We'll collect only the first 10 to keep things simple. Need to skip first record
-    for tr in table.findAll('tr')[1:11]:
-        a = tr.find('a', {'class':'roster-tooltip'})
-        urls.append(a['href'])
-    
-    return urls
-
-
-def scrape(url):
-    
-    row = scraper_utils.initialize_row()
-
-    row.source_url = url
-
-    page = requests.get(url)
+def get_mp_basic_details(mp_list_url):
+    global df
+    page = requests.get(mp_list_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    bio_container = soup.find('div', {'class': 'one-half first'})
+    mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
-    party = 'Liberal'
+    mp_data = []
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
+        mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
+        
+        source_url = f'{base_url}{mp_url}'
+        source_id = mp_url.split('(')[-1][:-1]
+
+        name_suffix = tile.find('div', {'class': 'ce-mip-mp-honourable'}).text.strip()
+        name_suffix = 'Hon.' if name_suffix == 'The Honourable' else name_suffix
+        name_full = tile.find('div', {'class': 'ce-mip-mp-name'}).text
+        hn = HumanName(name_full)
+        name_last = hn.last
+        name_first = hn.first
+        name_middle = hn.middle
+        name_suffix = hn.suffix if hn.suffix else name_suffix
+
+        party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
+        party = party_switcher[party] if party in party_switcher else party
+        party_id = scraper_utils.get_party_id(party)
+
+        riding = tile.find('div', {'class': 'ce-mip-mp-constituency'}).text
+        province_territory = tile.find('div', {'class': 'ce-mip-mp-province'}).text
+        province_territory_id = scraper_utils.get_attribute('division', 'division', province_territory)
+
+        role = 'MP'
+
+        mp_data.append(dict(source_id=source_id, source_url=source_url, name_full=name_full,
+        name_last=name_last, name_first=name_first, name_middle=name_middle, name_suffix=name_suffix,
+        country_id=scraper_utils.country_id, country=scraper_utils.country, party_id=party_id,
+        party=party, role=role, riding=riding, province_territory_id=province_territory_id,
+        province_territory=province_territory))
     
-    row.party_id = scraper_utils.get_party_id(party) 
-    row.party = party
+    df = df.append(mp_data)
 
-    name_full = bio_container.find('h3').text
 
-    hn = HumanName(name_full)
-    row.name_full = name_full
-    row.name_last = hn.last
-    row.name_first = hn.first
-    row.name_middle = hn.middle
-    row.name_suffix = hn.suffix
+def get_mp_fine_details():
+    global df
+    pass
 
-    return row
+
+
+def scrape():
+    mp_list_url = f'{base_url}/members/en/search'
+    get_mp_basic_details(mp_list_url)
+    get_mp_fine_details()
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
-    urls = get_urls()
 
-    # data = [scrape(url) for url in urls]
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    scrape()
+
+    print(df.head())
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    # scraper_utils.insert_legislator_data_into_db(data)
 
     print('Complete!')

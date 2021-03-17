@@ -27,6 +27,7 @@ class LegislatorScraperUtils():
         Database.initialise()
         # self.db = Database()
         # atexit.register(self.db.close_all_connections)
+        atexit.register(Database.close_all_connections)
 
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -53,15 +54,13 @@ class LegislatorScraperUtils():
         self.database_table_name = database_table_name
         self.row_type = row_type
 
-
-
     def initialize_row(self):
         row = copy.deepcopy(self.row_type)
         row.country_id = self.country_id
         row.country = self.country
         return row
 
-    def get_attribute_id(self, table_name, column_to_search, value):
+    def get_attribute(self, table_name, column_to_search, value, attribute='id'):
         accepted_tables = ['country', 'party', 'division']
         if table_name not in accepted_tables:
             raise Exception(f'Error: table must be one of the following: {accepted_tables}')
@@ -74,7 +73,7 @@ class LegislatorScraperUtils():
             df = self.divisions
 
         try:
-            return int(df.loc[df[column_to_search] == value]['id'].values[0])
+            return int(df.loc[df[column_to_search] == value][attribute].values[0])
         except Exception as e:
             raise Exception(f'Error retrieving ID from table {table_name}: {e}')
 
@@ -82,7 +81,7 @@ class LegislatorScraperUtils():
         """
         Used for getting the party ID number.
         """
-        return self.get_attribute_id('party', 'party', party_name)
+        return self.get_attribute('party', 'party', party_name)
 
 
 class USFedLegislatorScraperUtils(LegislatorScraperUtils):
@@ -99,7 +98,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         super().__init__('us', database_table_name, USLegislatorRow())
 
     def get_state_id(self, state_abbreviation):
-        return self.get_attribute_id('division', 'abbreviation', state_abbreviation)
+        return self.get_attribute('division', 'abbreviation', state_abbreviation)
 
     def insert_legislator_data_into_db(self, data):
         """
@@ -252,8 +251,11 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         super().__init__('cad', database_table_name, CadLegislatorRow())
 
-    def get_prov_terr_id(self, prov_terr_id):
-        return self.get_attribute_id('division', 'abbreviation', prov_terr_id)
+    def get_prov_terr_id(self, prov_terr_abbrev):
+        return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
+
+    def get_region(self, prov_terr_abbrev):
+        return self.get_attribute('division', 'abbreviation', prov_terr_abbrev, 'region')
     
     def insert_legislator_data_into_db(self, data):
         """
@@ -292,7 +294,8 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                             seniority int,
                             occupation text[],
                             education jsonb,
-                            military_experience text
+                            military_experience text,
+                            region text
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -371,7 +374,8 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                     item.seniority,
                     item.occupation,
                     json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience
+                    item.military_experience,
+                    item.region
                 )
                 print(tup)
 

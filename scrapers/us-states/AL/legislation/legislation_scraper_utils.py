@@ -185,7 +185,7 @@ class USStateLegislationScraperUtils:
                     session = excluded.session,
                     state = excluded.state,
                     state_id = excluded.state_id,
-                    site_topic = excluded.site_topic,
+                    site_topic = excluded.source_topic,
                     votes = excluded.votes,
                     goverlytics_id = excluded.goverlytics_id,
                     url = excluded.url,
@@ -209,7 +209,7 @@ class USStateLegislationScraperUtils:
                     row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
                     json.dumps(row.actions, default=USStateLegislationScraperUtils.__json_serial),
                     json.dumps(row.votes, default=USStateLegislationScraperUtils.__json_serial),
-                    row.site_topic, row.topic)
+                    row.source_topic, row.topic)
                 
                     curs.execute(insert_legislator_query, tup)
                 except Exception as e:

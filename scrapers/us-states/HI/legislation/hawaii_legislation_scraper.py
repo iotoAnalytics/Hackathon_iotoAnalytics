@@ -223,7 +223,7 @@ def scrape(bill_item):
             row.sponsors = sponsors
 
         row.bill_summary = get_bill_summary(soup)
-        row.site_topic = get_site_topic(soup)
+        row.source_topic = get_site_topic(soup)
         row.actions = actions
         row.bill_text = get_billtext(pdf)
         row.source_url = link
