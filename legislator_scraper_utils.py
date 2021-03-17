@@ -256,6 +256,9 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
 
     def get_region(self, prov_terr_abbrev):
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev, 'region')
+
+    def get_prov_terr_abbrev(self, prov_terr):
+        return self.get_attribute('division', 'division', prov_terr, 'abbreviation')
     
     def insert_legislator_data_into_db(self, data):
         """
