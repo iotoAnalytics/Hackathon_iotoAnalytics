@@ -67,7 +67,9 @@ def get_mp_basic_details(mp_list_url):
 
         riding = tile.find('div', {'class': 'ce-mip-mp-constituency'}).text
         province_territory = tile.find('div', {'class': 'ce-mip-mp-province'}).text
-        province_territory_id = scraper_utils.get_attribute('division', 'division', province_territory)
+        province_territory = scraper_utils.get_prov_terr_abbrev(province_territory)
+        province_territory_id = scraper_utils.get_prov_terr_id(province_territory)
+        region = scraper_utils.get_region(province_territory)
 
         role = 'MP'
 
@@ -75,7 +77,7 @@ def get_mp_basic_details(mp_list_url):
         name_last=name_last, name_first=name_first, name_middle=name_middle, name_suffix=name_suffix,
         country_id=scraper_utils.country_id, country=scraper_utils.country, party_id=party_id,
         party=party, role=role, riding=riding, province_territory_id=province_territory_id,
-        province_territory=province_territory))
+        province_territory=province_territory, region=region))
     
     df = df.append(mp_data)
 

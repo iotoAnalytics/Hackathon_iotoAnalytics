@@ -71,11 +71,12 @@ class LegislatorScraperUtils():
             df = self.parties
         if table_name == 'division':
             df = self.divisions
-
+        
+        val = df.loc[df[column_to_search] == value][attribute].values[0]
         try:
-            return int(df.loc[df[column_to_search] == value][attribute].values[0])
-        except Exception as e:
-            raise Exception(f'Error retrieving ID from table {table_name}: {e}')
+            return int(val)
+        except Exception:
+            return val
 
     def get_party_id(self, party_name):
         """
