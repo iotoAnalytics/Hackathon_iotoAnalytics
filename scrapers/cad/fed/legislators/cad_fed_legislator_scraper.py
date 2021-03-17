@@ -49,7 +49,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:15]:
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
         
         source_url = f'{base_url}{mp_url}'
@@ -85,9 +85,43 @@ def get_mp_basic_details():
     df = df.append(mp_data)
 
 
+def get_contact_details(contact_url):
+    page = requests.get(contact_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    container = soup.find('div', {'id': 'contact'})
+
+    contact = {'phone_numbers': [], 'addresses': [], 'email': ''}
+
+    # Email found in first p tag of contact container
+    email = container.find('p').text.strip()
+
+    hill_container = container.find('div', {'class': 'col-md-3'})
+    hill_ptags = hill_container.findAll('p')
+    hill_address = hill_ptags[0].get_text(separator=", ").strip().replace('*,', '-').replace(',,', ',')
+    hill_phone = hill_ptags[1].get_text(separator=" ").strip().split(' ')[1]
+
+    con_container = container.find('div', {'class': 'ce-mip-contact-constituency-office'})
+    con_ptags = con_container.findAll('p')
+    con_address = con_ptags[0].get_text()
+    # con_phone = con_ptags[1].get_text(separator=" ").strip().split(' ')[1]
+
+    print(con_address)
+    
+
+
 def get_mp_fine_details():
     global df
-    pass
+
+    df = df.head(1)
+
+    for i, row in df.iterrows():
+        contact_url = f"{row['source_url']}#contact"
+        contact = get_contact_details(contact_url)
+
+
+    
+
 
 
 def scrape():
@@ -99,7 +133,6 @@ if __name__ == '__main__':
 
     scrape()
 
-    print(df.head())
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
 
