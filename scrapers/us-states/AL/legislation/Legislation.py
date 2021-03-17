@@ -77,7 +77,7 @@ reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSRe
 # configParser = configparser.RawConfigParser()
 # configParser.read('config.cfg')
 state_abbreviation = 'AL'
-database_table_name = 'us_al_legislation'
+database_table_name = 'us_al_legislation_test'
 legislator_table_name = 'us_al_legislators'
 
 # #Initialize database and scraper utils
@@ -162,9 +162,10 @@ def scrape_bills(chamber, bills_url, bill_type):
             fields.source_topic = row['Subject']
             fields.current_status = row['Status']
             fields.chamber_origin = chamber
-            fields.principal_sponsor = row['Sponsor'].split(' ')[0]
-            fields.sponsors.append(row['Sponsor'].split(' ')[0])
+            fields.principal_sponsor = row['Sponsor'].split(' ')[0].split('(')[0]
+            fields.sponsors.append(row['Sponsor'].split(' ')[0].split('(')[0])
             fields.bill_type = bill_type
+            fields.committees = []
             # fields.url = f'/us/AL/legislation/{source_id}'
 
 
@@ -216,7 +217,7 @@ def scrape_bills_detailed(fields):
                     if not pd.isna(table['Matter'][index]):
                         fields[key].actions.append({'date': nan(table['Calendar Date'][index]), 'action_by': chambers[table['Body'][index]], 'description': table['Matter'][index]})
                     if   table['Committee'][index] == table['Committee'][index]:
-                        fields[key].committees = {'committee': members.find('td',text=table['Committee'][index])['title'], 'chamber': chambers[table['Body'][index]]}
+                        fields[key].committees.append({'committee': members.find('td',text=table['Committee'][index])['title'], 'chamber': chambers[table['Body'][index]]})
                 unsuccess_attempts = 0
             except KeyError:
                 # probably has a blank row
@@ -335,7 +336,7 @@ def scrape_sponsors(chamber, target_url, bill_type):
             if bills is not None:
                 for key, bill in bills.items():
 
-                    kwargs = {"state_member_id": oid}
+                    kwargs = {"source_id": oid}
                     gover_id = scraper_utils.get_legislator_id(**kwargs)
 
                     bill.principal_sponsor_id = gover_id
@@ -381,9 +382,9 @@ def get_cosponsor_url(fields, sponsors, sponsor_names):
             bill_names = [x['value'] for x in bill_names]
 
             for bill in bill_names:
-                fields[bill].cosponsors.append(name.split('%20')[0])
+                fields[bill].cosponsors.append(name.split('%20')[0].split('(')[0])
 
-                kwargs = {"state_member_id": oid}
+                kwargs = {"source_id": oid}
                 gover_id = scraper_utils.get_legislator_id(**kwargs)
 
                 fields[bill].cosponsors_id.append(gover_id)
@@ -446,3 +447,21 @@ def scrape():
 
     # for d in list(fields.values())[:10]:
     #     print(d)
+
+
+session = requests.Session()
+
+page = session.get(select_session_url)
+member_soup = BeautifulSoup(page.text, 'lxml')
+member = member_soup.find('table', id='ContentPlaceHolder1_gvSessions')
+members = member.find_all('td')
+num_sessions = len(members)
+# num_sessions corresponds to the session years, to exclude scraping current year, change 0 in for loop to 1.
+# session numbers can be found at http://alisondb.legislature.state.al.us/Alison/SelectSession.aspx
+# and by inspecting the session link, it will be the second argument in the postback function
+for session_no in range(1, 2):
+    current_session = members[session_no].text
+    session_year = members[session_no].text.split(' ')[-1] 
+    # print(current_session)
+    set_session(session_no)
+    scrape()
