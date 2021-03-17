@@ -1,12 +1,13 @@
 '''
-Before beginning, be sure to update values in the config file.
-
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
+Scraper for collecting Canadian federal legislator (ie: MP, or Member of Parliament) data.
+Author: Justin Tendeck
+Notes:
+    Currently, this scraper just collects the most recent data, but it looks like they have
+        a swath of historical data we can come back for. It would be especially useful for
+        time series analysis. Eg: https://www.ourcommons.ca/members/en/wayne-easter(43)/roles
+        (that can be accessed by clicking the link under "All Roles" on an MP's page).
 '''
+
 import sys, os
 from pathlib import Path
 
@@ -38,8 +39,10 @@ party_switcher = {
     'Green Party': 'Green'
 }
 
-def get_mp_basic_details(mp_list_url):
+def get_mp_basic_details():
     global df
+    mp_list_url = f'{base_url}/members/en/search'
+
     page = requests.get(mp_list_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -87,10 +90,8 @@ def get_mp_fine_details():
     pass
 
 
-
 def scrape():
-    mp_list_url = f'{base_url}/members/en/search'
-    get_mp_basic_details(mp_list_url)
+    get_mp_basic_details()
     get_mp_fine_details()
 
 

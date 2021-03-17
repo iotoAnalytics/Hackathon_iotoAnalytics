@@ -107,3 +107,11 @@ class CadLegislatorRow(LegislatorRow):
     province_territory: str = ''
     riding: str = ''
     region: str = ''
+
+@dataclass
+class CadFedLegislatorRow(CadLegislatorRow):
+    """
+    Data structure for housing data about each piece of legislator.
+    """
+    offices_roles_as_mp: List[str] = field(default_factory=list)
+    parl_assoc_interparl_groups: List[dict] = field(default_factory=list)
