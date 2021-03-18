@@ -29,6 +29,8 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 import pandas as pd
+import xml.etree.ElementTree as ET
+import traceback
 
 
 scraper_utils = CadFedLegislatorScraperUtils()
@@ -56,7 +58,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:5]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -66,8 +68,8 @@ def get_mp_basic_details():
 
         name_suffix = tile.find('div', {'class': 'ce-mip-mp-honourable'}).text.strip()
         name_suffix = 'Hon.' if name_suffix == 'The Honourable' else name_suffix
-        name_full = tile.find('div', {'class': 'ce-mip-mp-name'}).text
-        hn = HumanName(name_full)
+        row.name_full = tile.find('div', {'class': 'ce-mip-mp-name'}).text
+        hn = HumanName(row.name_full)
         row.name_last = hn.last
         row.name_first = hn.first
         row.name_middle = hn.middle
@@ -96,7 +98,6 @@ def get_contact_details(contact_url):
     Eg: https://www.ourcommons.ca/members/en/ziad-aboultaif(89156)#contact
     Args:
         contact_url: URL for MP's contact page
-
     Returns:
         contact: dictionary containing contact details, including phone_numbers,
             addresses, and email.
@@ -106,35 +107,78 @@ def get_contact_details(contact_url):
 
     container = soup.find('div', {'id': 'contact'})
 
-    contact = {'phone_numbers': [], 'addresses': [], 'email': ''}
+    contact = {'phone_number': [], 'addresses': [], 'email': ''}
 
-    # Email found in first p tag of contact container
-    email = container.find('p').text.strip()
-    contact['email'] = email
+    try:
+        # Email found in first p tag of contact container
+        email = container.find('p').text.strip()
+        contact['email'] = email
 
-    hill_container = container.find('div', {'class': 'col-md-3'})
-    hill_ptags = hill_container.findAll('p')
-    hill_address = hill_ptags[0].get_text(separator=", ").strip().replace('*,', '-').replace(',,', ',')
-    hill_phone = hill_ptags[1].get_text(separator=" ").strip().split(' ')[1]
-    
-    contact['addresses'].append({'location': 'House of Commons', 'address': hill_address})
-    contact['phone_numbers'].append({'location': 'House of Commons', 'number': hill_phone})
-
-    # MP may have multiple constituency offices
-    con_containers = container.findAll('div', {'class': 'ce-mip-contact-constituency-office'})
-    for con_container in con_containers:
-        office_name = con_container.strong.extract().get_text()
-        office_name = ' '.join(office_name.split())
-        con_ptags = con_container.findAll('p')
-        con_address = con_ptags[0].get_text().strip()
-        con_address = ' '.join(con_address.split())
+        # Get House of Commons contact details
+        hill_container = container.find('div', {'class': 'col-md-3'})
+        hill_ptags = hill_container.findAll('p')
+        hill_address = hill_ptags[0].get_text(separator=", ").strip().replace('*,', '-').replace(',,', ',')
+        hill_phone = hill_ptags[1].get_text(separator=" ").strip().split(' ')[1]
         
-        con_phone = con_ptags[1].get_text().strip().split(' ')[2]
-        
-        contact['addresses'].append({'location': office_name, 'address': con_address})
-        contact['phone_numbers'].append({'location': office_name, 'number': con_phone})
+        contact['addresses'].append({'location': 'House of Commons', 'address': hill_address})
+        contact['phone_number'].append({'location': 'House of Commons', 'number': hill_phone})
+
+        # Get constituency contac details. MP may have multiple constituency offices
+        con_containers = container.findAll('div', {'class': 'ce-mip-contact-constituency-office'})
+        for con_container in con_containers:
+            office_name = con_container.strong.extract().get_text()
+            office_name = ' '.join(office_name.split())
+            con_ptags = con_container.findAll('p')
+            con_address = con_ptags[0].get_text().strip()
+            con_address = ' '.join(con_address.split())
+            
+            con_phone_txt_lst = con_ptags[1].get_text().strip().split(' ')
+            con_phone = '' if len(con_phone_txt_lst) < 3 else con_phone_txt_lst[2]
+            
+            contact['addresses'].append({'location': office_name, 'address': con_address})
+            contact['phone_number'].append({'location': office_name, 'number': con_phone})
+    except Exception:
+        print('An error occurred extracting contact information.')
+        print(f'Problem URL: {contact_url}')
+        print(traceback.format_exc())
 
     return contact
+
+
+def get_role_details(roles_url):
+    """
+    Get details about MP's role, including most recent parliamentary session, offices/roles
+    held as MP, committees, and Parliamentary associations and interparliamentary group roles.
+    Args:
+        roles_url: link to MP's XML data page containing role information
+    Returns:
+        roles: dictionary container MP role details
+    """
+    page = requests.get(roles_url)
+    tree = ET.fromstring(page.content)
+
+    roles = {'most_recent_term_id': '', 'offices_roles_as_mp': [],
+    'committees': [], 'parl_assoc_interparl_groups': []}
+
+    roles['most_recent_term_id'] = tree.find('CaucusMemberRoles').find('CaucusMemberRole') \
+    .find('ParliamentNumber').text
+
+    for parl_pos_role in tree.find('ParliamentaryPositionRoles').findall('ParliamentaryPositionRole'):
+        roles['offices_roles_as_mp'].append(parl_pos_role.find('Title').text)
+
+    for committee in tree.find('CommitteeMemberRoles').findall('CommitteeMemberRole'):
+        role = committee.find('AffiliationRoleName').text
+        com = committee.find('CommitteeName').text
+        roles['committees'].append({'role': role, 'committee': com})
+
+    for paigr in tree.find('ParliamentaryAssociationsandInterparliamentaryGroupRoles') \
+    .findall('ParliamentaryAssociationsandInterparliamentaryGroupRole'):
+        role = paigr.find('AssociationMemberRoleType').text
+        title = paigr.find('Title').text if paigr.find('Title').text else ''
+        organization = paigr.find('Organization').text
+        roles['parl_assoc_interparl_groups'].append({'role': role, 'title': title, 'organzation': organization})
+
+    return roles
 
 
 def get_mp_fine_details():
@@ -144,17 +188,30 @@ def get_mp_fine_details():
     """
     global df
 
-    df = df.head(1)
-
     for i, row in df.iterrows():
         contact_url = f"{row['source_url']}#contact"
         contact = get_contact_details(contact_url)
-        df.iloc[i, df.columns.get_loc('email')] = contact['email']
-        df.iloc[i, df.columns.get_loc('addresses')] = contact['addresses']
-        df.iloc[i, df.columns.get_loc('phone_numbers')] = contact['phone_numbers']
+
+        # df.at[i, 'email'] = contact['email']
+        df.at[i, df.columns.get_loc()] = contact['email']
+        df.at[i, 'addresses'] = contact['addresses']
+        df.at[i, 'phone_number'] = contact['phone_number']
+
+        roles_url = f"{row['source_url']}/xml"
+        roles = get_role_details(roles_url)
+        df.at[i, 'most_recent_term_id'] = roles['most_recent_term_id']
+        df.at[i, 'offices_roles_as_mp'] = roles['offices_roles_as_mp']
+        df.at[i, 'committees'] = roles['committees']
+        df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
 
 
 def scrape():
+    """
+    Entry point for scraper. Begins by collecting details directly from House of Commons
+    website MP roster (get_mp_basic_details), then collects details from each MP's
+    individual HoC page (get_mp_fine_details). Data is stored in a dataframe, which
+    is accessible globally.
+    """
     get_mp_basic_details()
     get_mp_fine_details()
 
@@ -163,11 +220,10 @@ if __name__ == '__main__':
 
     scrape()
 
-    print(df['email'])
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    # scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.insert_legislator_data_into_db(df.to_dict('records'))
 
     print('Complete!')

@@ -385,9 +385,8 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                     item.military_experience,
                     item.region,
                     item.offices_roles_as_mp,
-                    item.parl_assoc_interparl_groups
+                    json.dumps(item.parl_assoc_interparl_groups, default=utils.json_serial)
                 )
-                print(tup)
 
                 cur.execute(insert_legislator_query, tup)
 

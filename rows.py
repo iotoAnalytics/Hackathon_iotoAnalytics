@@ -11,6 +11,9 @@ class LegislationRow:
     """
     Data structure for housing data about each piece of legislation.
     """
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
     goverlytics_id: int = None
     source_id: str = ''
     bill_name: str = ''
