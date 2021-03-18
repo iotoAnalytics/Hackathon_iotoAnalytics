@@ -319,7 +319,7 @@ class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
 
 class CadFedLegislationScraperUtils(LegislationScraperUtils):
     def __init__(self, database_table_name='cad_fed_legislation', legislator_table_name='cad_fed_legislators'):
-        super().__init('cad', database_table_name, legislator_table_name, CadLegislationRow())
+        super().__init__('cad', database_table_name, legislator_table_name, CadLegislationRow())
 
     def insert_legislation_data_into_db(self, data) -> None:
         """
@@ -430,9 +430,9 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                 print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
 
-class CadProvinceTerrLegislationScraperUtils(USFedLegislationScraperUtils):
+class CadProvinceTerrLegislationScraperUtils(CadFedLegislationScraperUtils):
     def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislation', legislator_table_name='cad_provterr_legislators'):
-        super().__init__(database_table_name, legislator_table_name, legislator_table_name)
+        super().__init__(database_table_name, legislator_table_name)
         self.province_territory = prov_terr_abbreviation
         self.province_territory_id = int(self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
 
