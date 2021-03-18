@@ -42,6 +42,7 @@ scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_tabl
 
 base_url = 'https://www.ilga.gov'
 
+
 def get_urls():
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
@@ -58,7 +59,7 @@ def get_urls():
 
     for li in table.findAll('li'):
         urls.append(li.a['href'])
-    
+
     return urls
 
 
@@ -77,7 +78,7 @@ def scrape(url):
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
     '''
-    
+
     row = scraper_utils.initialize_row()
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
@@ -110,8 +111,8 @@ def scrape(url):
         chamber_origin = 'House'
         bill_type = 'Bill'
     # elif ...:
-        # Check for other types like SB (senate bills), HRes (House Resolutions), etc.
-        # For now we're only work with HB bills so we'll keep it simple
+    # Check for other types like SB (senate bills), HRes (House Resolutions), etc.
+    # For now we're only work with HB bills so we'll keep it simple
 
     row.chamber_origin = chamber_origin
     row.bill_type = bill_type
@@ -180,7 +181,9 @@ def scrape(url):
     row.sponsors_id = sponsors_id
 
     # Get actions
-    actions_table = soup.findAll('table', {'width': '600', 'cellspacing': '0', 'cellpadding': '2', 'bordercolor': 'black', 'border':'1'})[1]
+    actions_table = soup.findAll('table',
+                                 {'width': '600', 'cellspacing': '0', 'cellpadding': '2', 'bordercolor': 'black',
+                                  'border': '1'})[1]
 
     action_date = ''
     action_by = ''
@@ -200,13 +203,13 @@ def scrape(url):
         if mod == 2:
             action_description = td.text.strip()
             actions.append(dict(date=action_date, action_by=action_by, description=action_description))
-    
+
     # We can get the date introduced from the first action, and the current status from
     # the most recent action.
     date_introduced = None
     current_status = ''
     if len(actions) > 0:
-        date_introduced=datetime.datetime.strptime(actions[0]['date'], '%m/%d/%Y')
+        date_introduced = datetime.datetime.strptime(actions[0]['date'], '%m/%d/%Y')
         current_status = actions[-1]['description']
 
     row.actions = actions
@@ -216,6 +219,7 @@ def scrape(url):
     # There's more data on other pages we can colelct, but we have enough data for this demo!
 
     return row
+
 
 if __name__ == '__main__':
     print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\

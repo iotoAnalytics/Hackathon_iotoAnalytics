@@ -198,13 +198,13 @@ def collect_vote_info(link):
         legislator = name
         vote = "aye"
         goverlytics_id = ""
-        nothing = ""
+        first = ""
+        if "." in name:
+            name = name.split(".")[1].strip()
+            first = name.split(".")[0].strip()
 
-
-
-        gov_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', nothing,
-                                                                 name_last=legislator)
-
+        gov_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first,
+                                                             name_last=name)
 
         if gov_id is not None:
             goverlytics_id = gov_id
@@ -217,10 +217,14 @@ def collect_vote_info(link):
         legislator = name
         vote = "noe"
         goverlytics_id = ""
-        nothing = ""
+        first = ""
+        if "." in name:
+            name = name.split(".")[1].strip()
+            first = name.split(".")[0].strip()
 
-        gov_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', nothing,
-                                                             name_last=legislator)
+
+        gov_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first,
+                                                             name_last=name)
 
         if gov_id is not None:
             goverlytics_id = gov_id
@@ -291,16 +295,25 @@ def collect_bill_details(bill_url):
                     aTags = lefttag.findAll("a")
                     ps = aTags[len(aTags) - 1]
                     principal_sponsor = ps.text
+                    if "." in principal_sponsor:
+                        principal_sponsor = principal_sponsor.split(".")[1].strip()
                     # get the url for the principal sponsor so we can merge on it to get their goverlytics id
                     psurl = "https://www.ncleg.gov" + ps["href"]
-                    psid = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last',
-                                                                       principal_sponsor, source_url=psurl)
+                    search_for = dict(source_url=psurl)
+
+                    psid = scraper_utils.get_legislator_id(**search_for)
+                    # psid = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last',
+                    #                                                    principal_sponsor, source_url=psurl)
                     if psid is not None:
                         principal_sponsor_id = psid
 
             primsponList.append(sponsoraList)
             for sponsora in sponsoraList:
-                sponsors.append(sponsora.text)
+                if "." in sponsora.text:
+                    name = sponsora.text.split(".")[1]
+                else:
+                    name = sponsora.text
+                sponsors.append(name)
                 psurl = "https://www.ncleg.gov" + sponsora["href"]
                 sponsor_urls.append(psurl)
 
@@ -329,13 +342,20 @@ def collect_bill_details(bill_url):
         name_last = sponsors[index]
         hn = HumanName(name_last)
         if "." not in name_last:
-            sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last', name_last,
-                                                                 source_url=su)
+            # sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_last', name_last,
+            #                                                      source_url=su)
+            search_for = dict(source_url=su)
+
+            sponsor_id = scraper_utils.get_legislator_id(**search_for)
         else:
             first_initial = name_last.split(".")[0]
             last = name_last.split(".")[1].strip()
-            sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first_initial,
-                                                                     name_last=last)
+            # sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first_initial,
+            #                                                          name_last=last)
+            search_for = dict(source_url=su)
+
+            sponsor_id = scraper_utils.get_legislator_id(**search_for)
+
 
 
 
@@ -350,6 +370,7 @@ def collect_bill_details(bill_url):
         # exactly, including case and diacritics.
         if sponsor_id is not None:
             sponsors_id.append(sponsor_id)
+
 
     # get actions
     actions = []
@@ -481,7 +502,7 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         # #
-        bill_data = pool.map(func=collect_bill_details, iterable=links)
+        bill_data = pool.map(func=collect_bill_details, iterable=lessLinks)
     # #
     maindf = pd.DataFrame(bill_data)
 
@@ -502,8 +523,8 @@ if __name__ == '__main__':
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
-    print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
-
-    print('Complete!')
+    # print('Writing data to database...')
+    # scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    #
+    # print('Complete!')
 
