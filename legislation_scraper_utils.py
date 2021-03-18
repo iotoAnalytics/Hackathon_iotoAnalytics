@@ -1,3 +1,12 @@
+"""
+A collection of classes and function used to fasciliate the collection of legislation
+data. Classes are designed to be extended to help collect data for other countries
+and jurisdictions.
+Author: Justin Tendeck
+"""
+
+# TODO continue documentation. Continue after __init__
+
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
@@ -13,33 +22,33 @@ import copy
 import utils
 from datetime import date, datetime
 
-# TODO Add country parameter
-# TODO test scrapers
-# TODO add documentation
-
-
-"""
-Contains utilities and data structures meant to help resolve common issues
-that occur with data collection. These can be used with your legislation
-date collectors.
-"""
 
 class LegislationScraperUtils:
     """
-    Utilities to help with collecting and storing legislation data.
+    Base class containing common methods and attributes that can be used by all
+    legislation scrapers.
     """
-    def __init__(self, country, database_table_name, legislator_table_name, row_type):
+
+    def __init__(self, country : str, database_table_name : str, legislator_table_name : str, row_type : LegislationRow):
         """
-        The state_abbreviation, database_table_name, and legislator_table_name come from
-        the config.cfg file and must be updated to work properly with your legislation
-        data collector.
+        Stores arguments as instance variables. Instantiates a database object and establishes
+        database connection pool. Pulls country, legislator, and division (ie: states, provinces,
+        etc.) tables from database and creates dataframes, which are used by other methods in
+        this class.
+
+        Args:
+            country: Country this scraper is used for
+            database_table_name: Database table where the data will be stored
+            legislation_table_name: Name of table containing legislator data that will
+                be used in various methods in this class
+            row_type: The type of row that this scraper will generate.
         """
 
         self.database_table_name = database_table_name
         self.legislator_table_name = legislator_table_name
 
         Database.initialise()
-        # atexit.register(self.db.close_all_connections)
+        atexit.register(Database.close_all_connections)
         
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -257,7 +266,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                     session = excluded.session,
                     state = excluded.state,
                     state_id = excluded.state_id,
-                    site_topic = excluded.site_topic,
+                    site_topic = excluded.source_topic,
                     votes = excluded.votes,
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
@@ -287,7 +296,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                 row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
                 json.dumps(row.actions, default=utils.json_serial),
                 json.dumps(row.votes, default=utils.json_serial),
-                row.site_topic, row.topic, row.country_id, row.country)
+                row.source_topic, row.topic, row.country_id, row.country)
 
                 try:
                     cur.execute(insert_legislator_query, tup)
@@ -384,7 +393,7 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                     session = excluded.session,
                     province_territory = excluded.state,
                     province_territory_id = excluded.state_id,
-                    site_topic = excluded.site_topic,
+                    site_topic = excluded.source_topic,
                     votes = excluded.votes,
                     goverlytics_id = excluded.goverlytics_id,
                     bill_state_id = excluded.bill_state_id,
@@ -412,7 +421,7 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                 row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
                 json.dumps(row.actions, default=utils.json_serial),
                 json.dumps(row.votes, default=utils.json_serial),
-                row.site_topic, row.topic, row.country_id, row.country)
+                row.source_topic, row.topic, row.country_id, row.country)
 
             try:
                 cur.execute(insert_legislator_query, tup)

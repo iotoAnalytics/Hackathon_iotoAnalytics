@@ -159,7 +159,7 @@ def scrape_bills(chamber, bills_url, bill_type):
             fields.bill_name = row['Bill']
             fields.bill_summary = row['Unnamed: 7']
             fields.date_collected = datetime.datetime.now()
-            fields.site_topic = row['Subject']
+            fields.source_topic = row['Subject']
             fields.current_status = row['Status']
             fields.chamber_origin = chamber
             fields.principal_sponsor = row['Sponsor'].split(' ')[0].split('(')[0]

@@ -50,6 +50,7 @@ import json
 scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 
 
+
 # def get_urls(myurl):
 #     '''
 #     Insert logic here to get all URLs you will need to scrape from the page.
@@ -83,6 +84,7 @@ scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 #     return biographyLinks
 
 
+
 # def scrape(url):
 #     '''
 #     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -104,7 +106,7 @@ scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 #     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
 #     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
 #     # like so:
-#     row.source_url = url
+
 
 #     # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
 #     # the party name from the website, then get the party_id from scraper_utils
@@ -125,6 +127,7 @@ def isNaN(num):
 
 
 def collect_legislator_biography_urls(myurl):
+
     uClient = uReq(myurl)
     page_html = uClient.read()
     uClient.close()
@@ -144,13 +147,13 @@ def collect_legislator_biography_urls(myurl):
 
     return biographyLinks
 
-
 def collect_legislator_committees(biographyUrl):
     myurl = biographyUrl
     uClient = uReq(myurl)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
+    
     page_soup = soup(page_html, "html.parser")
 
     cmtees = page_soup.findAll("div", {"class": "row h-100"})
@@ -163,8 +166,6 @@ def collect_legislator_committees(biographyUrl):
     newurl = acom["href"]
     full = "https://www.ncleg.gov/" + newurl
 
-    # read committee page url
-
     uClient = uReq(full)
     page_html = uClient.read()
     uClient.close()
@@ -172,6 +173,7 @@ def collect_legislator_committees(biographyUrl):
     page_soup = soup(page_html, "html.parser")
     comDiv = page_soup.findAll("div", {"class": "col-9"})
     roleDiv = page_soup.findAll("div", {"class": "col-3 text-right"})
+
     # list of committees
     committees = []
     if len(comDiv) > 0:
@@ -182,11 +184,12 @@ def collect_legislator_committees(biographyUrl):
         # iterate through committees, add them to our list
 
         for com in comDiv:
+
+
             c = com.text
             # get correspoding role for specific committee
             roleIndex = comDiv.index(com)
             role = roleDiv[roleIndex].text
-
             c = c.strip()
             role = role.strip()
 
@@ -195,8 +198,8 @@ def collect_legislator_committees(biographyUrl):
 
     return committees
 
-
 def find_wiki_data(role, repLink):
+
     try:
         uClient = uReq(repLink)
         page_html = uClient.read()
@@ -218,7 +221,7 @@ def find_wiki_data(role, repLink):
 
 
     except:
-        # couldn't find birthday in side box
+        #couldn't find birthday in side box
         birthday = None
 
     # get years_active, based off of "assumed office"
@@ -274,6 +277,7 @@ def find_wiki_data(role, repLink):
         # years_active_lst.append(years_active_i)
 
     # get education
+
     education = []
     lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
 
@@ -298,7 +302,7 @@ def find_wiki_data(role, repLink):
                 for aline in alines:
                     if "University" in aline.text or "College" in aline.text or "School" in aline.text:
                         school = aline.text
-                        # this is most likely a school
+                        #this is most likely a school
                         level = ""
                         try:
                             lineIndex = alines.index(aline) + 1
@@ -386,6 +390,7 @@ def find_wiki_data(role, repLink):
 
 
 def scrape_wiki_bio_Links(wikiUrl, role):
+
     uClient = uReq(wikiUrl)
     page_html = uClient.read()
     uClient.close()
@@ -410,6 +415,7 @@ def scrape_wiki_bio_Links(wikiUrl, role):
             #     try:
             #         repLink = "https://en.wikipedia.org" + rep.a["href"]
             #
+
             repLinks.append(repLink)
         except:
             repLinks.append("")
@@ -425,6 +431,7 @@ def scrape_wiki_bio_Links(wikiUrl, role):
 
 
 def collect_legislator_details(biographyUrl):
+
     myurl = biographyUrl
     uClient = uReq(myurl)
     page_html = uClient.read()
@@ -453,6 +460,7 @@ def collect_legislator_details(biographyUrl):
     distText = distH.text
 
     # regions
+
     regions = distDiv.findAll("a")
     region = regions[0]
     last = regions[len(regions) - 1]
@@ -461,6 +469,7 @@ def collect_legislator_details(biographyUrl):
     # phone numbers found on the left side of the page: only on representative's pages
     if last.text.replace("-", "").replace(" ", "").isnumeric():
         # implies that it's a phone number
+
         phone_number = last.text
         regions.remove(last)
         if role == "Representative":
@@ -472,7 +481,6 @@ def collect_legislator_details(biographyUrl):
         # if no phone number
         phone_number = ""
 
-    # phone numbers found on the right side of the page: Main Phone for reps, Office for Senators
     try:
         rightPhoneDiv = page_soup.find("div", {"class": "col-12 col-md-7 col-lg-9 col-xl-6 text-nowrap"})
         rightPhone = rightPhoneDiv.p.a.text
@@ -495,6 +503,7 @@ def collect_legislator_details(biographyUrl):
         areas_served.append(region.text)
 
     # get occupation, only available for representatives
+
     if role == "Representative":
         occupation = []
         occ = page_soup.findAll("div", {"class": "col-12 col-md-7 col-lg-9 col-xl-6"})
@@ -506,11 +515,13 @@ def collect_legislator_details(biographyUrl):
 
 
     # get occupation and military service from wikipedia for senators, leave blank in here
+
     elif role == "Senator":
         occupation = []
         military_experience = ""
 
     # email
+
     em = page_soup.findAll("div", {"class": "col-12 col-md-7 col-lg-9 col-xl-6 text-nowrap"})
 
     try:
@@ -518,6 +529,7 @@ def collect_legislator_details(biographyUrl):
     except:
         # if they don't have an email
         email = ""
+
 
     if "(Dem)" in nameAndParty:
         party = "Democrat"
@@ -539,6 +551,7 @@ def collect_legislator_details(biographyUrl):
         try:
             milexp = page_soup.find("div", {
                 "class": "col-12 col-md-7 col-lg-9 col-xl-6 d-none-text-nowrap d-lg-block-text-nowrap"})
+
             military_experience = milexp.p.text
         except:
             military_experience = ""
@@ -546,6 +559,7 @@ def collect_legislator_details(biographyUrl):
     # addresses
     bio_left_column = page_soup.find("div", {
         "class": "col-12 col-sm-7 col-md-8 col-lg-9 col-xl-3 order-2 align-self-center align-self-xl-start mt-3 mt-sm-0"})
+
     left_column_tags = bio_left_column.findAll()
     lefttag = left_column_tags[0]
     addresses = []
@@ -561,7 +575,7 @@ def collect_legislator_details(biographyUrl):
             addressText = left_column_tags[index + 1].text + ", " + left_column_tags[index + 2].text
             mailAddr = {'location': 'Mailing Address', 'address': addressText}
             addresses.append(mailAddr)
-
+            
     committees = collect_legislator_committees(biographyUrl)
 
     legDict = {'state_url': biographyUrl, 'name_full': fullname, 'name_first': name_first, 'name_last': hn.last,
@@ -571,7 +585,7 @@ def collect_legislator_details(biographyUrl):
                'occupation': occupation, 'email': email, 'military_experience': military_experience,
                'addresses': addresses, 'committees': committees, 'most_recent_term_id': session}
 
-    # print(legDict)
+
     return legDict
 
 
@@ -592,6 +606,7 @@ def collect_legislator_details(biographyUrl):
 #     print('Complete!')
 
 if __name__ == '__main__':
+
     # representative data
     bioLinks = collect_legislator_biography_urls('https://www.ncleg.gov/Members/MemberList/H')
 
@@ -609,6 +624,7 @@ if __name__ == '__main__':
         "Representative")
 
     with Pool() as pool:
+
         role = 'Representative'
         func = partial(find_wiki_data, role)
         wikiData = pool.map(func=func, iterable=wikiLinks)
@@ -660,6 +676,7 @@ if __name__ == '__main__':
     sample_row = scraper_utils.initialize_row()
     print(sample_row)
     #
+
 
     big_df['state'] = sample_row.state
     big_df['state_id'] = sample_row.state_id

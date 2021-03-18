@@ -214,7 +214,7 @@ def scrape(data_dict):
     row.goverlytics_id = goverlytics_id
     # row.url = f'/us/{state_abbreviation}/legislation/{goverlytics_id}'
     row.bill_name = bill_name
-    row.site_topic = data_dict['Site Topic']
+    row.source_topic = data_dict['Site Topic']
     # row.principal_sponsor = p_sponsor
     row.source_url = url
     row.cosponsors = cosponsors['total']
