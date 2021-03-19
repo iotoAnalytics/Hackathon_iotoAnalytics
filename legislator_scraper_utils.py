@@ -326,6 +326,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -487,6 +488,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -629,7 +631,7 @@ class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-                        DROP TABLE IF EXISTS {table}
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -742,6 +744,5 @@ class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
                     item.military_experience,
                     item.region
                 )
-
 
                 cur.execute(insert_legislator_query, tup)
