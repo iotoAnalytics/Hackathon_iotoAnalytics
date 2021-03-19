@@ -25,8 +25,6 @@ class LegislatorScraperUtils():
     def __init__(self, country, database_table_name, row_type):
 
         Database.initialise()
-        # self.db = Database()
-        # atexit.register(self.db.close_all_connections)
         atexit.register(Database.close_all_connections)
 
         with CursorFromConnectionFromPool() as cur:
