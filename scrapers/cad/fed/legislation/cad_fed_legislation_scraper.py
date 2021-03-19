@@ -1,12 +1,3 @@
-'''
-Before beginning, be sure to update values in the config file.
-
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
 import sys, os
 from pathlib import Path
 
@@ -15,228 +6,165 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
 from bs4 import BeautifulSoup
+from legislator_scraper_utils import CadFedLegislationScraperUtils
 import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
-import boto3
-
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
-
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
-
-scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
-
-base_url = 'https://www.ilga.gov'
+import xml.etree.ElementTree as ET
+from datetime import datetime, date
+import csv
+import psycopg2
+import json
 
 
-def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
-    urls = []
+from testytester import yo
+yo()
 
-    # Logic goes here! Some sample code:
-    path = '/legislation/grplist.asp?num1=64&num2=3933&DocTypeID=HB&GA=101&SessionId=109&SpecSess=1'
-    scrape_url = base_url + path
-    page = requests.get(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+base_url = 'https://www.parl.ca'
+xml_url_csv = 'xml_urls.csv'
+table_name = 'cdn_federal_legislation'
 
-    table = soup.find('table', {'width': '490', 'border': '0', 'align': 'left'})
-
-    for li in table.findAll('li'):
-        urls.append(li.a['href'])
-
-    return urls
+scraper_utils = CadFedLegislationScraperUtils()
 
 
-def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
 
-    Do not worry about collecting the date_collected, state, and state_id values,
-    as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
+def get_soup(url, parser='lxml'):
+    page = requests.get(url)
+    return BeautifulSoup(page.content, parser)
 
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
 
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
+def get_xml_urls():
+    url = f'{base_url}/legisinfo'
+    soup = get_soup(url)
 
-    row = scraper_utils.initialize_row()
+    try:
+        session_div = soup.find('div', {'id': 'ctl00_PageContentSection_BillListingControl_BillFacetSearch_'
+                                              'SessionSelector1_pnlSessions'})
+        return [f'{base_url}{a.get("href")}&Language=E&download=xml' for a in session_div.find_all('a')]
+    except AttributeError:
+        return []
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
-    # like so:
-    state_url = f'{base_url}{url}'
-    row.source_url = state_url
 
-    # Get useful query string parameters from URL
-    parsed = urlparse.urlparse(url)
-    url_qsp = parse_qs(parsed.query)
+def get_english_title(terms):
+    titles = terms.findall('Title')
 
-    doc_type = url_qsp['DocTypeID'][0]
-    doc_num = url_qsp['DocNum'][0]
-    session = url_qsp['SessionID'][0]
+    for title in titles:
+        if title.attrib['language'] == 'en':
+            return title.text
 
-    bill_name = f'{doc_type}{doc_num.zfill(4)}'
+    return ''
 
-    goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-    url = f'us/{state_abbreviation}/legislation/{goverlytics_id}'
 
-    row.goverlytics_id = goverlytics_id
-    row.bill_name = bill_name
-    row.session = session
-    row.url = url
+def get_event_details(event):
+    chamber = event.attrib['chamber']
+    date = datetime.strptime(event.attrib['date'], '%Y-%m-%d')
+    meeting_num = event.attrib['meetingNumber']
 
-    chamber_origin = ''
-    bill_type = ''
-    if 'HB' == doc_type:
-        chamber_origin = 'House'
-        bill_type = 'Bill'
-    # elif ...:
-    # Check for other types like SB (senate bills), HRes (House Resolutions), etc.
-    # For now we're only work with HB bills so we'll keep it simple
+    committee_xml = event.find('Committee')
+    committee_acr = ''
+    committee_full = ''
 
-    row.chamber_origin = chamber_origin
-    row.bill_type = bill_type
+    if committee_xml:
+        committee_acr = committee_xml.attrib['accronym'] if 'accronym' in committee_xml.attrib else ''
+        committee_full = get_english_title(committee_xml)
 
-    # Begin scraping page
-    page = requests.get(state_url)
-    soup = BeautifulSoup(page.content, 'lxml')
+    committee = dict(committee=committee_full, committee_acronym=committee_acr)
 
-    # The Illinois state legislation website has their data stored in a weird way...
-    # everything is stored in spans so we're gonna try pulling the data we need from
-    # those. Your implementations will probably look quite a bit different than this.
+    status = get_english_title(event.find('Status'))
 
-    # Get bill description and summary
-    bill_description = ''
-    bill_summary = ''
-    spans = soup.findAll('span')
-    for idx, span in enumerate(spans):
-        txt = span.text
-        if 'Short Description:' in txt:
-            bill_description = spans[idx + 1].text
-        if 'Synopsis As Introduced' in txt:
-            bill_summary = spans[idx + 1].text.strip()
-    row.bill_description = bill_description
-    row.bill_summary = bill_summary
+    return dict(chamber=chamber, date=date, meeting_number=meeting_num, committee=committee, status=status)
 
-    # Get bill sponsors
-    table = soup.find('table', {'width': '440', 'border': '0', 'align': 'left'})
-    table_td = table.find('td', {'width': '100%'})
 
-    a_tag = table_td.findAll('a', href=True)
-    sponsors = []
-    for a in a_tag:
-        if '/house/Rep.asp' in a['href'] or '/senate/Senator.asp' in a['href']:
-            sponsors.append(a.text)
+def parse_xml_data(xml_url):
+    page = requests.get(xml_url)
+    root = ET.fromstring(page.content)
 
-    # # We'll now try to get the legislator goverlytics ID. Fortunately for us, this
-    # # site provides a unique identifier for each legislator. Normally we would do
-    # # the following:
-    # sponsor_id = scraper_utils.get_legislator_id(state_member_id=legislator_id)
-    # # However, since this is often not the case, we will search for the id using the
-    # # legislator name. We are given the legislator's full name, but if you are given
-    # # only the legislator initials and last name, which is more often the case, be sure to
-    # # use the legislators_search_startswith() method, which might look something like this:
-    # sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first_initial, name_last=name_last)
+    bill_lst = []
+    for bill in root.findall('Bill'):
+        bill_id = bill.attrib['id']
+        introduced_date = datetime.strptime(bill.find('BillIntroducedDate').text, '%Y-%m-%dT%H:%M:%S')
 
-    sponsors_id = []
-    for sponsor in sponsors:
-        hn = HumanName(sponsor)
-        name_first = hn.first
-        name_middle = hn.middle
-        name_last = hn.last
-        name_suffix = hn.suffix
+        parl_session = bill.find('ParliamentSession')
+        session = f'{parl_session.attrib["parliamentNumber"]}-{parl_session.attrib["sessionNumber"]}'
 
-        search_for = dict(name_first=name_first, name_middle=name_middle, name_last=name_last, name_suffix=name_suffix)
+        bill_number = bill.find('BillNumber')
+        bill_number = f'{bill_number.attrib["prefix"]}-{bill_number.attrib["number"]}'
 
-        sponsor_id = scraper_utils.get_legislator_id(**search_for)
+        bill_title = get_english_title(bill.find('BillTitle'))
+        bill_title_short = get_english_title(bill.find('ShortTitle'))
 
-        # Some sponsor IDs weren't found, so we won't include these.
-        # If you are unable to find legislators based on the provided search criteria, be
-        # sure to investigate. Check the database and make sure things like names match
-        # exactly, including case and diacritics.
-        if sponsor_id is not None:
-            sponsors_id.append(sponsor_id)
+        bill_type = get_english_title(bill.find('BillType'))
 
-    row.sponsors = sponsors
-    row.sponsors_id = sponsors_id
+        affiliation = bill.find('SponsorAffiliation')
+        sponsor_affiliation = get_english_title(affiliation)
 
-    # Get actions
-    actions_table = soup.findAll('table',
-                                 {'width': '600', 'cellspacing': '0', 'cellpadding': '2', 'bordercolor': 'black',
-                                  'border': '1'})[1]
+        sponsor_details = affiliation.find('Person')
+        full_name = sponsor_details.find('FullName').text
+        first_name = sponsor_details.find('FirstName').text
+        middle_name = sponsor_details.find('MiddleName').text if sponsor_details.find('MiddleName').text else ''
+        last_name = sponsor_details.find('LastName').text
+        sponsor_gender = sponsor_details.attrib['Gender']
+        sponsor_id = sponsor_details.attrib['id']
+        party = get_english_title(affiliation.find('PoliticalParty'))
+        party_abbreviation = get_english_title(affiliation.find('PoliticalParty').find('abbreviation'))
 
-    action_date = ''
-    action_by = ''
-    action_description = ''
-    actions = []
-    number_of_columns = 3
-    # Skip the header row
-    for idx, td in enumerate(actions_table.findAll('td')[3:]):
-        # With this type of method, normally you would search by 'tr' and then grab the value
-        # from each 'td' in the row, but for some reason, beautiful soup wasn't able to find
-        # the 'tr' so I had to get the value using a different, less intuitive method.
-        mod = idx % number_of_columns
-        if mod == 0:
-            action_date = td.text.strip()
-        if mod == 1:
-            action_by = td.text.strip()
-        if mod == 2:
-            action_description = td.text.strip()
-            actions.append(dict(date=action_date, action_by=action_by, description=action_description))
+        pm_details = bill.find('PrimeMinister')
+        pm_full_name = pm_details.find('Person').find('FullName').text
+        pm_party = get_english_title(pm_details.find('PoliticalParty'))
+        pm_party_abbreviation = get_english_title(pm_details.find('PoliticalParty').find('abbreviation'))
 
-    # We can get the date introduced from the first action, and the current status from
-    # the most recent action.
-    date_introduced = None
-    current_status = ''
-    if len(actions) > 0:
-        date_introduced = datetime.datetime.strptime(actions[0]['date'], '%m/%d/%Y')
-        current_status = actions[-1]['description']
+        statute = bill.find('Statute')
+        statute_year = statute.find('Year').text
+        statute_chapter = statute.find('Chapter').text
 
-    row.actions = actions
-    row.current_status = current_status
-    row.date_introduced = date_introduced
+        publications = bill.find('Publications')
+        publication_lst = []
+        for pub in publications.findall('Publication'):
+            publication_lst.append(get_english_title(pub))
 
-    # There's more data on other pages we can colelct, but we have enough data for this demo!
+        events = bill.find('Events')
 
-    return row
+        last_major_event_xml = events.find('LastMajorStageEvent')
+        last_major_event = get_event_details(last_major_event_xml.find('Event'))
+
+        progress = last_major_event_xml.find('Progress').text
+
+        legislative_events_xml = events.find('LegislativeEvents')
+        legislative_events = [get_event_details(event) for event in legislative_events_xml.findall('Event')]
+
+        bill_lst.append(dict(bill_number=bill_number, bill_id=bill_id, introduction_date=introduced_date,
+                             session=session, bill_title=bill_title, bill_title_short=bill_title_short,
+                             bill_type=bill_type, sponsor_affiliation=sponsor_affiliation, sponsor_id=sponsor_id,
+                             sponsor_full_name=full_name, sponsor_first_name=first_name, sponsor_middle_name=middle_name,
+                             sponsor_last_name=last_name, sponsor_gender=sponsor_gender, sponsor_party=party,
+                             sponsor_party_abbr=party_abbreviation, pm_full_name=pm_full_name, pm_party=pm_party,
+                             pm_party_abbreviation=pm_party_abbreviation, statute_year=statute_year,
+                             statute_chapter=statute_chapter, publications=publication_lst,
+                             last_major_event=last_major_event, progress=progress,
+                             legislative_events=legislative_events))
+
+    return bill_lst
 
 
 if __name__ == '__main__':
-    print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
-If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
-like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
-    # First we'll get the URLs we wish to scrape:
-    urls = get_urls()
+    xml_urls = []
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    try:
+        with open(xml_url_csv) as f:
+            reader = csv.reader(f)
+            xml_urls = list(reader)[0]
+    except FileNotFoundError:
+        print(f'{xml_url_csv} does not exist. Scraping urls...')
 
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+        xml_urls = get_xml_urls()
+        with open(xml_url_csv, 'w') as result_file:
+            wr = csv.writer(result_file)
+            wr.writerow(xml_urls)
 
-    print('Complete!')
+    xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
+
+    xml_data = [parse_xml_data(xml_url) for xml_url in xml_urls]
+    xml_data = [item for sublist in xml_data for item in sublist]
+
+    if len(xml_data) > 0:
+        scraper_utils.insert_legislation_data_into_db(xml_data)

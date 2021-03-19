@@ -57,7 +57,7 @@ class CadLegislationRow(LegislationRow):
 
 
 #########################################################
-#       LEGISLATOR ROWS                                #
+#       LEGISLATOR ROWS                                 #
 #########################################################
 @dataclass
 class LegislatorRow:

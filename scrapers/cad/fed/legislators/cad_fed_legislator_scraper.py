@@ -6,9 +6,13 @@ Notes:
         a swath of historical data we can come back for. It would be especially useful for
         time series analysis. Eg: https://www.ourcommons.ca/members/en/wayne-easter(43)/roles
         (that can be accessed by clicking the link under "All Roles" on an MP's page).
-'''
 
-# TODO share info about converting appending rows directly to pandas dataframes
+Known Issues:
+    Everything seemed to be working fine when ran the first time but I tried running it the
+        next day and received an error from psycopg2 saying the cursor had already been 
+        closed when trying to insert the data. Breaking the data into chunks of 100 or
+        so datapoints seemed to remedy the issue.
+'''
 
 
 import sys, os
@@ -123,7 +127,7 @@ def get_contact_details(contact_url):
         contact['addresses'].append({'location': 'House of Commons', 'address': hill_address})
         contact['phone_number'].append({'location': 'House of Commons', 'number': hill_phone})
 
-        # Get constituency contac details. MP may have multiple constituency offices
+        # Get constituency contact details. MP may have multiple constituency offices.
         con_containers = container.findAll('div', {'class': 'ce-mip-contact-constituency-office'})
         for con_container in con_containers:
             office_name = con_container.strong.extract().get_text()
@@ -136,7 +140,8 @@ def get_contact_details(contact_url):
             con_phone = '' if len(con_phone_txt_lst) < 3 else con_phone_txt_lst[2]
             
             contact['addresses'].append({'location': office_name, 'address': con_address})
-            contact['phone_number'].append({'location': office_name, 'number': con_phone})
+            if con_phone:
+                contact['phone_number'].append({'location': office_name, 'number': con_phone})
     except Exception:
         print('An error occurred extracting contact information.')
         print(f'Problem URL: {contact_url}')
@@ -189,11 +194,10 @@ def get_mp_fine_details():
     global df
 
     for i, row in df.iterrows():
+        
         contact_url = f"{row['source_url']}#contact"
         contact = get_contact_details(contact_url)
-
-        # df.at[i, 'email'] = contact['email']
-        df.at[i, df.columns.get_loc()] = contact['email']
+        df.at[i, 'email'] = contact['email']
         df.at[i, 'addresses'] = contact['addresses']
         df.at[i, 'phone_number'] = contact['phone_number']
 
