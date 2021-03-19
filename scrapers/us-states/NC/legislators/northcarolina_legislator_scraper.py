@@ -670,12 +670,13 @@ if __name__ == '__main__':
     big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
     big_df['seniority'] = 0
-    big_df['source_id'] = big_df['state_id']
+    big_df['source_id'] = big_df['state_member_id']
     print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)
 
     print('Writing data to database...')
+
 
     scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
 
