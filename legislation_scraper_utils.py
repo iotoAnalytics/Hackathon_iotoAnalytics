@@ -423,11 +423,11 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                 json.dumps(row.votes, default=utils.json_serial),
                 row.source_topic, row.topic, row.country_id, row.country)
 
-            try:
-                cur.execute(insert_legislator_query, tup)
+                try:
+                    cur.execute(insert_legislator_query, tup)
 
-            except Exception as e:
-                print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                except Exception as e:
+                    print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
 
 class CadProvinceTerrLegislationScraperUtils(CadFedLegislationScraperUtils):
