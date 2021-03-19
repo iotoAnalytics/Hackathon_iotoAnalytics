@@ -52,6 +52,7 @@ current_year = '2021'
 bill_dict = {
     'DC': {'chamber_origin': '', 'type': ''},
     'GM': {'chamber_origin': '', 'type': ''},
+    'MC': {'chamber_origin':'' ,'type': ''},
     'HB': {'chamber_origin': 'House', 'type': 'Bill'},
     'HCR': {'chamber_origin': 'House', 'type': 'Concurrent Resolution'},
     'HR': {'chamber_origin': 'House', 'type': 'Resolution'},
@@ -83,7 +84,11 @@ def make_bill_urls(lst):
     for item in lst:
         url = 'https://capitol.hawaii.gov/measure_indiv.aspx?billtype=' + item['billtype'] + '&billnumber=' + item[
             'billnumber'] + '&year' + current_year
-        bill_info = bill_dict[item['billtype']]
+        try:
+            bill_info = bill_dict[item['billtype']]
+        except KeyError as e:
+            print("Can't find bill info for:" + url)
+            bill_info = {'chamber_origin':'' ,'type': ''}
         bill_urls.append({'url': url, 'bill_name': item['billtype'] + item['billnumber'], 'pdf': item['pdf_link'],
                           'bill_info': bill_info})
 
