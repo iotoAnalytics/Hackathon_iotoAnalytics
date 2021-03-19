@@ -29,7 +29,7 @@ class LegislationScraperUtils:
     legislation scrapers.
     """
 
-    def __init__(self, country : str, database_table_name : str, legislator_table_name : str, row_type : LegislationRow):
+    def __init__(self, country: str, database_table_name: str, legislator_table_name: str, row_type: LegislationRow):
         """
         Stores arguments as instance variables. Instantiates a database object and establishes
         database connection pool. Pulls country, legislator, and division (ie: states, provinces,
@@ -49,7 +49,7 @@ class LegislationScraperUtils:
 
         Database.initialise()
         atexit.register(Database.close_all_connections)
-        
+
         with CursorFromConnectionFromPool() as cur:
             try:
                 query = f'SELECT * FROM {country}_divisions'
@@ -73,9 +73,8 @@ class LegislationScraperUtils:
 
         self.country = self.countries.loc[self.countries['abbreviation'] == country]['country'].values[0]
         self.country_id = int(self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
-        
-        self.row_type = row_type
 
+        self.row_type = row_type
 
     def _convert_to_int(self, value):
         """
@@ -88,7 +87,6 @@ class LegislationScraperUtils:
         except ValueError:
             pass
         return value
-    
 
     def _convert_value_to_column_type(self, column, value):
         str_columns = ['source_id']
@@ -98,7 +96,6 @@ class LegislationScraperUtils:
         else:
             return self._convert_to_int(value)
 
-    
     def initialize_row(self):
         '''
         Factory method for creating a legislation row. This gets sent back to the scrape() function
@@ -120,7 +117,7 @@ class LegislationScraperUtils:
 
             # Certain fields may be converted to int while they need to stay as strings
             v = self._convert_value_to_column_type(k, v)
-                
+
             if isinstance(v, int):
                 q = f'{k}=={v}'
             elif isinstance(v, str):
@@ -164,20 +161,21 @@ class LegislationScraperUtils:
         things like the Goverlytics ID when given only the first initial and last name of a legislator.
         """
         val = None
-        
+
         if not kwargs:
             print('Must include kwargs when using legislators_search_startswith!')
             return val
 
         df = self.search_for_legislators(**kwargs)
-        
+
         startswith = self._convert_value_to_column_type(column_to_search, startswith)
 
         if df is not None:
             try:
                 val = df.loc[df[column_to_search].str.startswith(startswith)][column_val_to_return].values[0]
             except IndexError:
-                print(f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
+                print(
+                    f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
             except KeyError:
                 print(f"'{column_to_search}' is not a valid column name in the legislator data frame!")
             except AttributeError:
@@ -187,12 +185,12 @@ class LegislationScraperUtils:
         if isinstance(val, numpy.int64):
             val = int(val)
         return val
-    
+
+
 class USFedLegislationScraperUtils(LegislationScraperUtils):
 
     def __init__(self, database_table_name='us_fed_legislation', legislator_table_name='us_fed_legislators'):
         super().__init__('us', database_table_name, legislator_table_name, USLegislationRow())
-
 
     def insert_legislation_data_into_db(self, data) -> None:
         """
@@ -230,7 +228,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                         bill_summary text,
                         actions jsonb,
                         votes jsonb,
-                        site_topic text,
+                        source_topic text,
                         topic text,
                         country_id int,
                         country text
@@ -266,7 +264,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                     session = excluded.session,
                     state = excluded.state,
                     state_id = excluded.state_id,
-                    site_topic = excluded.source_topic,
+                    source_topic = excluded.source_topic,
                     votes = excluded.votes,
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
@@ -289,14 +287,14 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                     row = utils.DotDict(row)
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
-                row.session, row.date_introduced, row.source_url, row.chamber_origin,
-                json.dumps(row.committees, default=utils.json_serial), 
-                row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
-                row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                json.dumps(row.actions, default=utils.json_serial),
-                json.dumps(row.votes, default=utils.json_serial),
-                row.source_topic, row.topic, row.country_id, row.country)
+                       row.session, row.date_introduced, row.source_url, row.chamber_origin,
+                       json.dumps(row.committees, default=utils.json_serial),
+                       row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
+                       row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                       row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                       json.dumps(row.actions, default=utils.json_serial),
+                       json.dumps(row.votes, default=utils.json_serial),
+                       row.source_topic, row.topic, row.country_id, row.country)
 
                 try:
                     cur.execute(insert_legislator_query, tup)
@@ -304,8 +302,10 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                 except Exception as e:
                     print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
+
 class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
-    def __init__(self, state_abbreviation, database_table_name='us_state_legislation', legislator_table_name='us_state_legislators'):
+    def __init__(self, state_abbreviation, database_table_name='us_state_legislation',
+                 legislator_table_name='us_state_legislators'):
         super().__init__(database_table_name, legislator_table_name)
         self.state = state_abbreviation
         self.state_id = int(self.divisions.loc[self.divisions['abbreviation'] == state_abbreviation]['id'].values[0])
@@ -331,6 +331,8 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                  
+
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id text PRIMARY KEY,
                         source_id text,
@@ -357,7 +359,7 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                         bill_summary text,
                         actions jsonb,
                         votes jsonb,
-                        site_topic text,
+                        source_topic text,
                         topic text,
                         country_id int,
                         country text
@@ -393,10 +395,10 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                     session = excluded.session,
                     province_territory = excluded.province_territory,
                     province_territory_id = excluded.province_territory_id,
-                    site_topic = excluded.source_topic,
+                    source_topic = excluded.source_topic,
                     votes = excluded.votes,
                     goverlytics_id = excluded.goverlytics_id,
-                    bill_state_id = excluded.bill_state_id,
+                    source_id = excluded.source_id,
                     committees = excluded.committees,
                     cosponsors = excluded.sponsors,
                     cosponsors_id = excluded.cosponsors_id,
@@ -413,15 +415,17 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
             for row in data:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
-                row.session, row.date_introduced, row.source_url, row.chamber_origin,
-                json.dumps(row.committees, default=utils.json_serial),
-                row.province_territory_id, row.province_territory, row.bill_type, row.bill_title, row.current_status,
-                row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                json.dumps(row.actions, default=utils.json_serial),
-                json.dumps(row.votes, default=utils.json_serial),
-                row.source_topic, row.topic, row.country_id, row.country)
+                       row.session, row.date_introduced, row.source_url, row.chamber_origin,
+                       json.dumps(row.committees, default=utils.json_serial),
+                       row.province_territory_id, row.province_territory, row.bill_type, row.bill_title,
+                       row.current_status,
+                       row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                       row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                       json.dumps(row.actions, default=utils.json_serial),
+                       json.dumps(row.votes, default=utils.json_serial),
+                       row.source_topic, row.topic, row.country_id, row.country)
 
                 try:
                     cur.execute(insert_legislator_query, tup)
@@ -431,10 +435,12 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
 
 
 class CadProvinceTerrLegislationScraperUtils(CadFedLegislationScraperUtils):
-    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislation', legislator_table_name='cad_provterr_legislators'):
+    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislation',
+                 legislator_table_name='cad_provterr_legislators'):
         super().__init__(database_table_name, legislator_table_name)
         self.province_territory = prov_terr_abbreviation
-        self.province_territory_id = int(self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
+        self.province_territory_id = int(
+            self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
 
     def initialize_row(self):
         row = super().initialize_row()
