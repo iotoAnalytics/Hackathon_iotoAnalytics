@@ -254,134 +254,135 @@ def get_wiki_people(link):
     return people_links
 
 
-def get_wiki_data(repLink):
-    most_recent_term_id = 0
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-        repBirth = reps.find("span", {"class": "bday"}).text
-
-        b = datetime.datetime.strptime(repBirth, "%Y-%m-%d").date()
-
-        birthday = b
-        # print(b)
-
-
-
-
-    except:
-        # couldn't find birthday in side box
-        birthday = None
-
-    # get education
-    education = []
-    lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
-
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-        # repsAlmaMater = reps.find("th", {"scope:" "row"})
-        left_column_tags = reps.findAll()
-        lefttag = left_column_tags[0]
-        for lefttag in left_column_tags:
-            if lefttag.text == "Alma mater" or lefttag.text == "Education":
-                index = left_column_tags.index(lefttag) + 1
-                next = left_column_tags[index]
-                alines = next.findAll()
-                for aline in alines:
-                    if "University" in aline.text or "College" in aline.text or "School" in aline.text:
-                        school = aline.text
-                        # this is most likely a school
-                        level = ""
-                        try:
-                            lineIndex = alines.index(aline) + 1
-                            nextLine = alines[lineIndex].text
-                            if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
-                                level = nextLine
-                        except:
-                            pass
-
-                    edinfo = {'level': level, 'field': "", 'school': school}
-
-                    if edinfo not in education:
-                        education.append(edinfo)
-
-    except Exception as ex:
-
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-
-        message = template.format(type(ex).__name__, ex.args)
-
-        # print(message)
-
-    # get full name
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        head = page_soup.find("h1", {"id": "firstHeading"})
-        name = head.text
-        name = name.replace(" (politician)", "")
-        name = name.replace(" (Canadian politician)", "")
-        name = name.replace(" (Quebec politician)", "")
-
-
-    except:
-        name = ""
-    name = unidecode.unidecode(name)
-
-    hN = HumanName(name)
-
-    # get occupation
-    occupation = []
-
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-
-        left_column_tags = reps.findAll()
-        lefttag = left_column_tags[0]
-        for lefttag in left_column_tags:
-            if lefttag.text == "Occupation":
-                index = left_column_tags.index(lefttag) + 1
-                occ = left_column_tags[index].text
-                if occ != "Occupation":
-                    occupation.append(occ)
-
-    except:
-        pass
-
-    info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
-            'education': education, 'occupation': occupation}
-
-    # print(info)
-    return info
+#
+# def get_wiki_data(repLink):
+#     most_recent_term_id = 0
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#         repBirth = reps.find("span", {"class": "bday"}).text
+#
+#         b = datetime.datetime.strptime(repBirth, "%Y-%m-%d").date()
+#
+#         birthday = b
+#         # print(b)
+#
+#
+#
+#
+#     except:
+#         # couldn't find birthday in side box
+#         birthday = None
+#
+#     # get education
+#     education = []
+#     lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
+#
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#         # repsAlmaMater = reps.find("th", {"scope:" "row"})
+#         left_column_tags = reps.findAll()
+#         lefttag = left_column_tags[0]
+#         for lefttag in left_column_tags:
+#             if lefttag.text == "Alma mater" or lefttag.text == "Education":
+#                 index = left_column_tags.index(lefttag) + 1
+#                 next = left_column_tags[index]
+#                 alines = next.findAll()
+#                 for aline in alines:
+#                     if "University" in aline.text or "College" in aline.text or "School" in aline.text:
+#                         school = aline.text
+#                         # this is most likely a school
+#                         level = ""
+#                         try:
+#                             lineIndex = alines.index(aline) + 1
+#                             nextLine = alines[lineIndex].text
+#                             if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
+#                                 level = nextLine
+#                         except:
+#                             pass
+#
+#                     edinfo = {'level': level, 'field': "", 'school': school}
+#
+#                     if edinfo not in education:
+#                         education.append(edinfo)
+#
+#     except Exception as ex:
+#
+#         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+#
+#         message = template.format(type(ex).__name__, ex.args)
+#
+#         # print(message)
+#
+#     # get full name
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         head = page_soup.find("h1", {"id": "firstHeading"})
+#         name = head.text
+#         name = name.replace(" (politician)", "")
+#         name = name.replace(" (Canadian politician)", "")
+#         name = name.replace(" (Quebec politician)", "")
+#
+#
+#     except:
+#         name = ""
+#     name = unidecode.unidecode(name)
+#
+#     hN = HumanName(name)
+#
+#     # get occupation
+#     occupation = []
+#
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#
+#         left_column_tags = reps.findAll()
+#         lefttag = left_column_tags[0]
+#         for lefttag in left_column_tags:
+#             if lefttag.text == "Occupation":
+#                 index = left_column_tags.index(lefttag) + 1
+#                 occ = left_column_tags[index].text
+#                 if occ != "Occupation":
+#                     occupation.append(occ)
+#
+#     except:
+#         pass
+#
+#     info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+#             'education': education, 'occupation': occupation}
+#
+#     # print(info)
+#     return info
 
 
 if __name__ == '__main__':
@@ -412,13 +413,12 @@ if __name__ == '__main__':
     wiki_people = get_wiki_people(general_election_link)
 
     with Pool() as pool:
-        wiki_data = pool.map(get_wiki_data, wiki_people)
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
 
-    wiki_df = pd.DataFrame(wiki_data)
-
+    wiki_df = pd.DataFrame(wiki_data)[['occupation', 'education', 'birthday', 'name_first', 'name_last']]
+    # print(wiki_df)
 
     mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=["name_first", "name_last"])
-
 
     mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
     mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
@@ -426,7 +426,8 @@ if __name__ == '__main__':
 
     big_df = mergedRepsData
     big_list_of_dicts = big_df.to_dict('records')
-    print(big_list_of_dicts)
+    print(big_df)
+    # print(big_list_of_dicts)
 
     print('Writing data to database...')
 
