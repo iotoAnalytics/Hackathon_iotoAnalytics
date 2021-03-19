@@ -53,6 +53,9 @@ def get_name(soup):
     f_name = temp_name[0]
     l_name = temp_name[-1].title().strip()
     m_name = name.replace(f_name, '').replace(l_name, '').strip()
+    if l_name == 'Jr.':
+        l_name = m_name
+        m_name = ''
     return [name, f_name, l_name, m_name]
 
 
