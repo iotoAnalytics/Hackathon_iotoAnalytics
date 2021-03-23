@@ -1,6 +1,7 @@
 import psycopg2
 from psycopg2 import sql
 from psycopg2.extras import RealDictCursor
+# import datetime
 from datetime import date, datetime
 import json
 import sys
@@ -12,6 +13,11 @@ from rows import *
 import copy
 import atexit
 import utils
+from urllib.request import urlopen as uReq
+import re
+import unidecode
+from bs4 import BeautifulSoup as soup
+from nameparser import HumanName
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -69,7 +75,7 @@ class LegislatorScraperUtils():
             df = self.parties
         if table_name == 'division':
             df = self.divisions
-        
+
         val = df.loc[df[column_to_search] == value][attribute].values[0]
         try:
             return int(val)
@@ -81,6 +87,218 @@ class LegislatorScraperUtils():
         Used for getting the party ID number.
         """
         return self.get_attribute('party', 'party', party_name)
+
+    def scrape_wiki_bio(self, wiki_link):
+        """
+        Used for getting missing legislator fields from their wikipedia bios.
+        """
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # #
+            # # #grabs each product
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+            repBirth = reps.find("span", {"class": "bday"}).text
+
+            b = datetime.strptime(repBirth, "%Y-%m-%d").date()
+
+            birthday = b
+            # print(b)
+
+        except:
+            # couldn't find birthday in side box
+            birthday = None
+        # get birthday another way
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Born":
+                    index = left_column_tags.index(lefttag) + 1
+                    born = left_column_tags[index].text
+
+                    if born != "Born":
+                        b = datetime.strptime(born, "%Y-%m-%d").date()
+
+                        birthday = b
+                        print(b)
+
+        except Exception as ex:
+
+            pass
+
+        # get years_active, based off of "assumed office"
+        years_active = []
+        year_started = ""
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            table = page_soup.find("table", {"class": "infobox vcard"})
+
+            tds = table.findAll("td", {"colspan": "2"})
+            td = tds[0]
+
+            for td in tds:
+                asof = (td.find("span", {"class": "nowrap"}))
+                if asof != None:
+                    if (asof.b.text) == "Assumed office":
+
+                        asofbr = td.find("br")
+
+                        year_started = (asofbr.nextSibling)
+
+                        year_started = year_started.split('[')[0]
+                        if "," in year_started:
+                            year_started = year_started.split(',')[1]
+                        year_started = (year_started.replace(" ", ""))
+                        year_started = re.sub('[^0-9]', '', year_started)
+                        if year_started.startswith("12"):
+                            year_started = year_started.substring(1)
+                    else:
+                        pass
+
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            # print(message)
+
+        if year_started != "":
+            years_active = list(range(int(year_started), 2021))
+            # years_active_lst.append(years_active_i)
+        else:
+            years_active = []
+            # years_active_i = []
+            # years_active_i.append(years_active)
+            # years_active_lst.append(years_active_i)
+
+        # get education
+        education = []
+        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
+
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # #
+            # # #grabs each product
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+            # repsAlmaMater = reps.find("th", {"scope:" "row"})
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Alma mater" or lefttag.text == "Education":
+                    index = left_column_tags.index(lefttag) + 1
+                    next = left_column_tags[index]
+                    alines = next.findAll()
+                    for aline in alines:
+                        if "University" in aline.text or "College" in aline.text or "School" in aline.text:
+                            school = aline.text
+                            # this is most likely a school
+                            level = ""
+                            try:
+                                lineIndex = alines.index(aline) + 1
+                                nextLine = alines[lineIndex].text
+                                if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
+                                    level = nextLine
+                            except:
+                                pass
+
+                        edinfo = {'level': level, 'field': "", 'school': school}
+
+                        if edinfo not in education:
+                            education.append(edinfo)
+
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+
+            message = template.format(type(ex).__name__, ex.args)
+
+            # print(message)
+
+        # get full name
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # # #grabs each product
+            head = page_soup.find("h1", {"id": "firstHeading"})
+            name = head.text
+            name = name.split("(")[0].strip()
+            # name = name.replace(" (Canadian politician)", "")
+            # name = name.replace(" (Quebec politician)", "")
+
+        except:
+            name = ""
+        name = unidecode.unidecode(name)
+
+        hN = HumanName(name)
+
+        # get occupation
+        occupation = []
+
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Occupation":
+                    index = left_column_tags.index(lefttag) + 1
+                    occ = left_column_tags[index].text
+                    if occ != "Occupation":
+                        occupation.append(occ)
+
+        except:
+            pass
+
+        most_recent_term_id = ""
+        try:
+            most_recent_term_id = (years_active[len(years_active) - 1])
+
+        except:
+            pass
+
+        info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+                'education': education, 'occupation': occupation, 'years_active': years_active,
+                'most_recent_term_id': str(most_recent_term_id)}
+
+        """
+            returns dictionary with the following fields, if available
+            choose the ones that you weren't able to find from the gov website
+            merge the resulting data with the data you scraped from the gov website
+      
+        """
+        return info
 
 
 class USFedLegislatorScraperUtils(LegislatorScraperUtils):
@@ -108,6 +326,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -145,7 +364,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
-            
+
             except Exception as e:
                 print(f'An exception occurred executing a query:\n{e}')
 
@@ -237,6 +456,7 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
         row.state_id = self.state_id
         return row
 
+
 class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
@@ -258,7 +478,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
 
     def get_prov_terr_abbrev(self, prov_terr):
         return self.get_attribute('division', 'division', prov_terr, 'abbreviation')
-    
+
     def insert_legislator_data_into_db(self, data):
         """
         """
@@ -268,6 +488,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -410,6 +631,7 @@ class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -451,6 +673,7 @@ class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
                 print(f'An exception occurred executing a query:\n{e}')
 
             insert_legislator_query = sql.SQL("""
+                    
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                     INSERT INTO {table}
                     VALUES (
@@ -521,6 +744,5 @@ class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
                     item.military_experience,
                     item.region
                 )
-                print(tup)
 
                 cur.execute(insert_legislator_query, tup)

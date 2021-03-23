@@ -249,194 +249,194 @@ def get_wiki_people(repLink):
     return bio_lnks
 
 
-def find_wiki_data(repLink):
-    most_recent_term_id = 0
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-        repBirth = reps.find("span", {"class": "bday"}).text
-
-        b = datetime.datetime.strptime(repBirth, "%Y-%m-%d").date()
-
-        birthday = b
-        # print(b)
-
-
-
-
-    except:
-        # couldn't find birthday in side box
-        birthday = None
-
-    # get years_active, based off of "assumed office"
-    years_active = []
-    year_started = ""
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        table = page_soup.find("table", {"class": "infobox vcard"})
-
-        tds = table.findAll("td", {"colspan": "2"})
-        td = tds[0]
-
-        for td in tds:
-            asof = (td.find("span", {"class": "nowrap"}))
-            if asof != None:
-                if (asof.b.text) == "Assumed office":
-
-                    asofbr = td.find("br")
-
-                    year_started = (asofbr.nextSibling)
-
-                    year_started = year_started.split('[')[0]
-                    if "," in year_started:
-                        year_started = year_started.split(',')[1]
-                    year_started = (year_started.replace(" ", ""))
-                    year_started = re.sub('[^0-9]', '', year_started)
-                    if year_started.startswith("12"):
-                        year_started = year_started.substring(1)
-
-
-
-                else:
-                    pass
-
-    except Exception as ex:
-
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-        message = template.format(type(ex).__name__, ex.args)
-        # print(message)
-
-    if year_started != "":
-        years_active = list(range(int(year_started), 2021))
-        # years_active_lst.append(years_active_i)
-    else:
-        years_active = []
-        # years_active_i = []
-        # years_active_i.append(years_active)
-        # years_active_lst.append(years_active_i)
-
-    # get education
-    education = []
-    lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
-
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-        # repsAlmaMater = reps.find("th", {"scope:" "row"})
-        left_column_tags = reps.findAll()
-        lefttag = left_column_tags[0]
-        for lefttag in left_column_tags:
-            if lefttag.text == "Alma mater" or lefttag.text == "Education":
-                index = left_column_tags.index(lefttag) + 1
-                next = left_column_tags[index]
-                alines = next.findAll()
-                for aline in alines:
-                    if "University" in aline.text or "College" in aline.text or "School" in aline.text:
-                        school = aline.text
-                        # this is most likely a school
-                        level = ""
-                        try:
-                            lineIndex = alines.index(aline) + 1
-                            nextLine = alines[lineIndex].text
-                            if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
-                                level = nextLine
-                        except:
-                            pass
-
-                    edinfo = {'level': level, 'field': "", 'school': school}
-
-                    if edinfo not in education:
-                        education.append(edinfo)
-
-    except Exception as ex:
-
-        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-
-        message = template.format(type(ex).__name__, ex.args)
-
-        # print(message)
-
-    # get full name
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        head = page_soup.find("h1", {"id": "firstHeading"})
-        name = head.text
-        name = name.replace(" (politician)", "")
-        name = name.replace(" (Canadian politician)", "")
-        name = name.replace(" (Quebec politician)", "")
-
-
-    except:
-        name = ""
-    name = unidecode.unidecode(name)
-
-    hN = HumanName(name)
-
-    # get occupation
-    occupation = []
-
-    try:
-        uClient = uReq(repLink)
-        page_html = uClient.read()
-        uClient.close()
-        # # html parsing
-        page_soup = soup(page_html, "html.parser")
-
-        # #
-        # # #grabs each product
-        reps = page_soup.find("div", {"class": "mw-parser-output"})
-
-        left_column_tags = reps.findAll()
-        lefttag = left_column_tags[0]
-        for lefttag in left_column_tags:
-            if lefttag.text == "Occupation":
-                index = left_column_tags.index(lefttag) + 1
-                occ = left_column_tags[index].text
-                if occ != "Occupation":
-                    occupation.append(occ)
-
-    except:
-        pass
-
-    most_recent_term_id = ""
-    try:
-        most_recent_term_id = (years_active[len(years_active) - 1])
-
-    except:
-        pass
-
-    info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
-            'education': education, 'occupation': occupation, 'years_active': years_active,
-            'most_recent_term_id': str(most_recent_term_id), 'seniority': 0}
-
-    # print(info)
-    return info
+# def find_wiki_data(repLink):
+#     most_recent_term_id = 0
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#         repBirth = reps.find("span", {"class": "bday"}).text
+#
+#         b = datetime.datetime.strptime(repBirth, "%Y-%m-%d").date()
+#
+#         birthday = b
+#         # print(b)
+#
+#
+#
+#
+#     except:
+#         # couldn't find birthday in side box
+#         birthday = None
+#
+#     # get years_active, based off of "assumed office"
+#     years_active = []
+#     year_started = ""
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         table = page_soup.find("table", {"class": "infobox vcard"})
+#
+#         tds = table.findAll("td", {"colspan": "2"})
+#         td = tds[0]
+#
+#         for td in tds:
+#             asof = (td.find("span", {"class": "nowrap"}))
+#             if asof != None:
+#                 if (asof.b.text) == "Assumed office":
+#
+#                     asofbr = td.find("br")
+#
+#                     year_started = (asofbr.nextSibling)
+#
+#                     year_started = year_started.split('[')[0]
+#                     if "," in year_started:
+#                         year_started = year_started.split(',')[1]
+#                     year_started = (year_started.replace(" ", ""))
+#                     year_started = re.sub('[^0-9]', '', year_started)
+#                     if year_started.startswith("12"):
+#                         year_started = year_started.substring(1)
+#
+#
+#
+#                 else:
+#                     pass
+#
+#     except Exception as ex:
+#
+#         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+#         message = template.format(type(ex).__name__, ex.args)
+#         # print(message)
+#
+#     if year_started != "":
+#         years_active = list(range(int(year_started), 2021))
+#         # years_active_lst.append(years_active_i)
+#     else:
+#         years_active = []
+#         # years_active_i = []
+#         # years_active_i.append(years_active)
+#         # years_active_lst.append(years_active_i)
+#
+#     # get education
+#     education = []
+#     lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
+#
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#         # repsAlmaMater = reps.find("th", {"scope:" "row"})
+#         left_column_tags = reps.findAll()
+#         lefttag = left_column_tags[0]
+#         for lefttag in left_column_tags:
+#             if lefttag.text == "Alma mater" or lefttag.text == "Education":
+#                 index = left_column_tags.index(lefttag) + 1
+#                 next = left_column_tags[index]
+#                 alines = next.findAll()
+#                 for aline in alines:
+#                     if "University" in aline.text or "College" in aline.text or "School" in aline.text:
+#                         school = aline.text
+#                         # this is most likely a school
+#                         level = ""
+#                         try:
+#                             lineIndex = alines.index(aline) + 1
+#                             nextLine = alines[lineIndex].text
+#                             if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
+#                                 level = nextLine
+#                         except:
+#                             pass
+#
+#                     edinfo = {'level': level, 'field': "", 'school': school}
+#
+#                     if edinfo not in education:
+#                         education.append(edinfo)
+#
+#     except Exception as ex:
+#
+#         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+#
+#         message = template.format(type(ex).__name__, ex.args)
+#
+#         # print(message)
+#
+#     # get full name
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         head = page_soup.find("h1", {"id": "firstHeading"})
+#         name = head.text
+#         name = name.replace(" (politician)", "")
+#         name = name.replace(" (Canadian politician)", "")
+#         name = name.replace(" (Quebec politician)", "")
+#
+#
+#     except:
+#         name = ""
+#     name = unidecode.unidecode(name)
+#
+#     hN = HumanName(name)
+#
+#     # get occupation
+#     occupation = []
+#
+#     try:
+#         uClient = uReq(repLink)
+#         page_html = uClient.read()
+#         uClient.close()
+#         # # html parsing
+#         page_soup = soup(page_html, "html.parser")
+#
+#         # #
+#         # # #grabs each product
+#         reps = page_soup.find("div", {"class": "mw-parser-output"})
+#
+#         left_column_tags = reps.findAll()
+#         lefttag = left_column_tags[0]
+#         for lefttag in left_column_tags:
+#             if lefttag.text == "Occupation":
+#                 index = left_column_tags.index(lefttag) + 1
+#                 occ = left_column_tags[index].text
+#                 if occ != "Occupation":
+#                     occupation.append(occ)
+#
+#     except:
+#         pass
+#
+#     most_recent_term_id = ""
+#     try:
+#         most_recent_term_id = (years_active[len(years_active) - 1])
+#
+#     except:
+#         pass
+#
+#     info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+#             'education': education, 'occupation': occupation, 'years_active': years_active,
+#             'most_recent_term_id': str(most_recent_term_id)}
+#
+#     # print(info)
+#     return info
 
 
 assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
@@ -457,9 +457,10 @@ if __name__ == '__main__':
     wiki_people = get_wiki_people(wiki_link)
 
     with Pool() as pool:
-        wiki_data = pool.map(func=find_wiki_data, iterable=wiki_people)
+        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wiki_df = pd.DataFrame(wiki_data)
-    # print(wiki_df)
+
+    print(wiki_df)
     mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
     mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({np.nan: None})
     mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({np.nan: None})
