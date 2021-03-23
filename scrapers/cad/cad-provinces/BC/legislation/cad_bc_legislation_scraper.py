@@ -30,6 +30,7 @@ from pprint import pprint
 import datetime
 import boto3
 from urllib.request import urlopen as uReq
+import urllib.parse
 from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import pandas as pd
@@ -96,7 +97,6 @@ def scrape(url):
     # data = r.json()
     # print(data)
 
-
     driver.get(url)
     timeout = 5
 
@@ -111,7 +111,6 @@ def scrape(url):
     html = driver.page_source
 
     page_soup = soup(html, 'html.parser')
-    print(page_soup)
 
     # try:
     #     expln = page_soup.find("div", {"class": "explannote"})
@@ -142,11 +141,8 @@ def scrape(url):
         bill_num = "m" + url.split("/m")[1]
     bill_num = bill_num.split("-")[0]
 
-
-
     row.bill_name = bill_num
     row.source_url = url
-
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
@@ -164,10 +160,48 @@ def scrape(url):
     row.goverlytics_id = "BC_" + session + "_" + bill_num
     if 'third-reading' in url:
         row.current_status = 'third reading'
+        # transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/3rd_read/' + bill_num + '-3.htm'
     elif 'first-reading' in url:
         row.current_status = 'first reading'
+        # transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/1st_read/' + bill_num + '-1.htm'
+
     elif 'amended' in url:
         row.current_status = 'amended'
+    #     transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/amended/' + bill_num + '-2.htm'
+    # transformed_url = urllib.parse.quote(transformed_url)
+    # transformed_url = 'https://' + transformed_url
+    iframe = page_soup.find('iframe', {'id': 'BCLASS-Legacy-Frame'})
+    url = iframe["src"]
+
+    transformed_url = url.replace(' ', '%20')
+    print(transformed_url)
+    try:
+        uClient = uReq(transformed_url)
+        page_html = uClient.read()
+        uClient.close()
+        # # # html parsing
+        page_soup = soup(page_html, "html.parser")
+        row.bill_text = " ".join(page_soup.text.split())
+
+
+    except:
+        print(transformed_url)
+    # driver.get(transformed_url)
+    # timeout = 5
+    #
+    # try:
+    #     element_present = EC.presence_of_element_located((By.CLASS_NAME, 'explannote'))
+    #     WebDriverWait(driver, timeout).until(element_present)
+    #
+    #
+    # except:
+    #     pass
+        # print(timeout)
+    # html = driver.page_source
+    #
+    # page_soup = soup(html, 'html.parser')
+    # print(page_soup)
+
     #
     # try:
     #     header = page_soup.find('div', {'id': 'BCLASS-Legacy-Wrapper'})
@@ -195,18 +229,15 @@ def scrape(url):
     #
     #     template = "An exception of type {0} occurred. Arguments:\n{1!r}"
     #     message = template.format(type(ex).__name__, ex.args)
-        #
-        # print(message)
-        # print(url)
+    #
+    # print(message)
+    # print(url)
     # titles pa= page_soup.findAll('p')
     # print(titles)
     # for title in titles:
     #     print(title.text)
-        # if "Explanatory Note" in title.text:
-        #     print(title.text)
-
-
-
+    # if "Explanatory Note" in title.text:
+    #     print(title.text)
 
     return row
 
@@ -230,16 +261,17 @@ if __name__ == '__main__':
 
     third_urls = pd.DataFrame(get_urls(third_reading_url))
 
-    url_df = pd.concat((ammendment_urls, first_urls)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
+    url_df = pd.concat((ammendment_urls, first_urls)).sort_index().drop_duplicates(
+        'bill_name')  # .reset_index(drop=True)
     url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
-
+    less_urls = url_df['source_url'][:2]
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls
     with Pool() as pool:
-        data = pool.map(scrape, url_df['source_url'])
+        data = pool.map(scrape, less_urls)
     print(*data, sep='\n')
 
     # Once we collect the data, we'll write it to the database.
