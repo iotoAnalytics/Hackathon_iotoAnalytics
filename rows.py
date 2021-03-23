@@ -56,6 +56,21 @@ class CadLegislationRow(LegislationRow):
     province_territory: str = ''
 
 
+class CadFedLegislationRow(CadLegislationRow):
+    """
+    Data structure for housing data about each piece of legislation.
+    """
+    sponsor_affiliation: str = ''
+    sponsor_gender: str = ''
+    pm_name_full: str = ''
+    pm_party: str = ''
+    pm_party_id: int = 0
+    statute_year: int = 0
+    statute_chapter: int = 0
+    publications: List[str] = field(default_factory=list)
+    last_major_event: dict = {}
+
+
 #########################################################
 #       LEGISLATOR ROWS                                 #
 #########################################################

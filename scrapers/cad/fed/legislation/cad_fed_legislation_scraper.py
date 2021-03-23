@@ -7,7 +7,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 sys.path.insert(0, str(p))
 
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import CadFedLegislationScraperUtils
+from legislation_scraper_utils import CadFedLegislationScraperUtils
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, date
@@ -15,17 +15,15 @@ import csv
 import psycopg2
 import json
 
-
-from testytester import yo
-yo()
-
 base_url = 'https://www.parl.ca'
 xml_url_csv = 'xml_urls.csv'
 table_name = 'cdn_federal_legislation'
 
 scraper_utils = CadFedLegislationScraperUtils()
-
-
+party_switcher = {
+    'NDP': 'New Democratic',
+    'Green Party': 'Green'
+}
 
 def get_soup(url, parser='lxml'):
     page = requests.get(url)
@@ -73,18 +71,37 @@ def get_event_details(event):
 
     return dict(chamber=chamber, date=date, meeting_number=meeting_num, committee=committee, status=status)
 
+def get_current_session_number():
+    session_page_url = f'{base_url}/LegisInfo/Home.aspx'
+    soup = get_soup(session_page_url)
+
+    session_container = soup.find('div', {'id': 'ctl00_PageContentSection_BillListingControl_BillFacetSearch_SessionSelector1_pnlSessions'})
+    current_session = session_container.find('div').get_text().strip()
+    return current_session.split('-')[0]
 
 def parse_xml_data(xml_url):
     page = requests.get(xml_url)
     root = ET.fromstring(page.content)
 
+    current_session_number = get_current_session_number()
+
     bill_lst = []
     for bill in root.findall('Bill'):
+
+        parl_session = bill.find('ParliamentSession')
+        parl_number = parl_session.attrib["parliamentNumber"]
+
+        if parl_number != current_session_number:
+            continue
+
+        print(f'CURRENT SESSION: {current_session_number} | CHECKING SESSION: {parl_number}')
+
+        row = scraper_utils.initialize_row()
+
         bill_id = bill.attrib['id']
         introduced_date = datetime.strptime(bill.find('BillIntroducedDate').text, '%Y-%m-%dT%H:%M:%S')
 
-        parl_session = bill.find('ParliamentSession')
-        session = f'{parl_session.attrib["parliamentNumber"]}-{parl_session.attrib["sessionNumber"]}'
+        session = f'{parl_number}-{parl_session.attrib["sessionNumber"]}'
 
         bill_number = bill.find('BillNumber')
         bill_number = f'{bill_number.attrib["prefix"]}-{bill_number.attrib["number"]}'
@@ -131,6 +148,39 @@ def parse_xml_data(xml_url):
         legislative_events_xml = events.find('LegislativeEvents')
         legislative_events = [get_event_details(event) for event in legislative_events_xml.findall('Event')]
 
+        
+        row.goverlytics_id = f'CADFED_{session}_{bill_number}'
+        row.source_id = bill_id
+        row.bill_name = bill_title
+        row.session = session
+        row.date_introduced = introduced_date
+        row.chamber_origin = bill_title[0]
+        row.bill_type = bill_type
+        row.bill_title = bill_title
+        row.current_status = progress
+        row.principal_sponsor_id = scraper_utils.get_legislator_id(name_full=full_name)
+        row.principal_sponsor = full_name
+        #row.bill_text = 
+        row.bill_description = bill_title_short
+        # row.bill_summary = 
+        row.actions = legislative_events
+        # row.votes = 
+        # row.source_topic = 
+        # row.topic = 
+        row.province_territory_id = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory')
+        row.province_territory = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory_id')
+        row.sponsor_affiliation = sponsor_gender
+        row.sponsor_gender = sponsor_gender
+        row.pm_name_full = sponsor_affiliation
+        row.pm_party = party_switcher[party] if party in party_switcher else party
+        row.pm_party_id = scraper_utils.get_attribute('party', 'party', row.pm_party)
+        row.statute_year = statute_year
+        row.statute_chapter = statute_chapter
+        row.publications = publications
+        row.last_major_event = last_major_event
+
+        bill_lst.append(row)
+
         bill_lst.append(dict(bill_number=bill_number, bill_id=bill_id, introduction_date=introduced_date,
                              session=session, bill_title=bill_title, bill_title_short=bill_title_short,
                              bill_type=bill_type, sponsor_affiliation=sponsor_affiliation, sponsor_id=sponsor_id,
@@ -166,5 +216,7 @@ if __name__ == '__main__':
     xml_data = [parse_xml_data(xml_url) for xml_url in xml_urls]
     xml_data = [item for sublist in xml_data for item in sublist]
 
-    if len(xml_data) > 0:
-        scraper_utils.insert_legislation_data_into_db(xml_data)
+    print(xml_data)
+
+    # if len(xml_data) > 0:
+    #     scraper_utils.insert_legislation_data_into_db(xml_data)

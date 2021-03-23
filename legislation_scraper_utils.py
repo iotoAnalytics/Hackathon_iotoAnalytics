@@ -61,6 +61,10 @@ class LegislationScraperUtils:
                 query = f'SELECT * FROM countries'
                 cur.execute(query)
                 country_results = cur.fetchall()
+
+                query = f'SELECT * FROM {country}_parties'
+                cur.execute(query)
+                party_results = cur.fetchall()
             except Exception as e:
                 sys.exit(f'An exception occurred retrieving either US parties or legislator table from database. \
                 \nHas the legislator data been collected for this state yet?\n{e}')
@@ -68,11 +72,32 @@ class LegislationScraperUtils:
         self.divisions = pd.DataFrame(division_results)
         self.legislators = pd.DataFrame(legislator_results)
         self.countries = pd.DataFrame(country_results)
+        self.parties = pd.DataFrame(party_results)
 
         self.country = self.countries.loc[self.countries['abbreviation'] == country]['country'].values[0]
         self.country_id = int(self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
 
         self.row_type = row_type
+
+    def get_attribute(self, table_name, column_to_search, value_to_search, attribute_to_return='id'):
+        accepted_tables = ['country', 'legislator', 'division', 'party']
+        if table_name not in accepted_tables:
+            raise Exception(f'Error: table must be one of the following: {accepted_tables}')
+
+        if table_name == 'country':
+            df = self.countries
+        if table_name == 'legislator':
+            df = self.legislators
+        if table_name == 'division':
+            df = self.divisions
+        if table_name == 'party':
+            df = self.parties
+        
+        val = df.loc[df[column_to_search] == value_to_search][attribute_to_return].values[0]
+        try:
+            return int(val)
+        except Exception:
+            return val
 
     def _convert_to_int(self, value):
         """
@@ -316,8 +341,150 @@ class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
 
 
 class CadFedLegislationScraperUtils(LegislationScraperUtils):
-    def __init__(self, database_table_name='cad_fed_legislation', legislator_table_name='cad_fed_legislators'):
-        super().__init__('cad', database_table_name, legislator_table_name, CadLegislationRow())
+    def __init__(self, database_table_name='cad_fed_legislation', legislator_table_name='cad_fed_legislators', row_type=CadFedLegislationRow()):
+        super().__init__('cad', database_table_name, legislator_table_name, row_type)
+
+    def insert_legislation_data_into_db(self, data) -> None:
+        """
+        Takes care of inserting legislation data into database.
+        """
+        if not isinstance(data, list):
+            raise TypeError('Data being written to database must be a list of USStateLegislationRows!')
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        goverlytics_id text PRIMARY KEY,
+                        source_id text,
+                        date_collected timestamp,
+                        bill_name text,
+                        session TEXT,
+                        date_introduced date,
+                        source_url text,
+                        chamber_origin text,
+                        committees jsonb,
+                        province_territory_id int,
+                        province_territory char(2),
+                        bill_type text,
+                        bill_title text,
+                        current_status text,
+                        principal_sponsor_id int,
+                        principal_sponsor text,
+                        sponsors text[],
+                        sponsors_id int[],
+                        cosponsors text[],
+                        cosponsors_id int[],
+                        bill_text text,
+                        bill_description text,
+                        bill_summary text,
+                        actions jsonb,
+                        votes jsonb,
+                        source_topic text,
+                        topic text,
+                        country_id int,
+                        country text,
+                        sponsor_affiliation text,
+                        sponsor_gender char(1),
+                        pm_name_full text,
+                        pm_party text,
+                        pm_party_id int,
+                        statute_year int,
+                        statute_chapter int,
+                        publications text[],
+                        last_major_event jsonb
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
+                    """).format(table=sql.Identifier(self.database_table_name))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+
+            except Exception as e:
+                print(f'An exception occurred creating {self.database_table_name}:\n{e}')
+
+            insert_legislator_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (source_url) DO UPDATE SET
+                    date_collected = excluded.date_collected,
+                    bill_title = excluded.bill_title,
+                    bill_name = excluded.bill_name,
+                    bill_type = excluded.bill_type,
+                    sponsors = excluded.sponsors,
+                    sponsors_id = excluded.sponsors_id,
+                    principal_sponsor_id = excluded.principal_sponsor_id,
+                    principal_sponsor = excluded.principal_sponsor,
+                    current_status = excluded.current_status,
+                    actions = excluded.actions,
+                    date_introduced = excluded.date_introduced,
+                    chamber_origin = excluded.chamber_origin,
+                    session = excluded.session,
+                    province_territory = excluded.province_territory,
+                    province_territory_id = excluded.province_territory_id,
+                    source_topic = excluded.source_topic,
+                    votes = excluded.votes,
+                    goverlytics_id = excluded.goverlytics_id,
+                    source_id = excluded.source_id,
+                    committees = excluded.committees,
+                    cosponsors = excluded.sponsors,
+                    cosponsors_id = excluded.cosponsors_id,
+                    topic = excluded.topic,
+                    bill_text = excluded.bill_text,
+                    bill_description = excluded.bill_description,
+                    bill_summary = excluded.bill_summary,
+                    country_id = excluded.country_id,
+                    country = excluded.country,
+                    statute_year = excluded.statute_year,
+                    statute_chapter = excluded.statute_chapter
+                    publications = excluded.publications
+                    last_major_event = excluded.last_major_event;
+                """).format(table=sql.Identifier(self.database_table_name))
+
+            date_collected = datetime.now()
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
+                       row.session, row.date_introduced, row.source_url, row.chamber_origin,
+                       json.dumps(row.committees, default=utils.json_serial),
+                       row.province_territory_id, row.province_territory, row.bill_type, row.bill_title,
+                       row.current_status,
+                       row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                       row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                       json.dumps(row.actions, default=utils.json_serial),
+                       json.dumps(row.votes, default=utils.json_serial),
+                       row.source_topic, row.topic, row.country_id, row.country,
+                       row.sponsor_affiliation, row.sponsor_gender, row.pm_name_full,
+                       row.pm_party, row.pm_party_id, row.statute_year, row.statute_chapter,
+                       row.publications, row.last_major_event)
+
+                try:
+                    cur.execute(insert_legislator_query, tup)
+
+                except Exception as e:
+                    print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+
+
+class CadProvinceTerrLegislationScraperUtils(CadFedLegislationScraperUtils):
+    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislation',
+                 legislator_table_name='cad_provterr_legislators'):
+        super().__init__(database_table_name, legislator_table_name, CadLegislationRow())
+        self.province_territory = prov_terr_abbreviation
+        self.province_territory_id = int(
+            self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
+
+    def initialize_row(self):
+        row = super().initialize_row()
+        row.province_territory = self.province_territory
+        row.province_territory_id = self.province_territory_id
+        return row
 
     def insert_legislation_data_into_db(self, data) -> None:
         """
@@ -429,18 +596,3 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
 
                 except Exception as e:
                     print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-
-
-class CadProvinceTerrLegislationScraperUtils(CadFedLegislationScraperUtils):
-    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislation',
-                 legislator_table_name='cad_provterr_legislators'):
-        super().__init__(database_table_name, legislator_table_name)
-        self.province_territory = prov_terr_abbreviation
-        self.province_territory_id = int(
-            self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
-
-    def initialize_row(self):
-        row = super().initialize_row()
-        row.province_territory = self.province_territory
-        row.province_territory_id = self.province_territory_id
-        return row

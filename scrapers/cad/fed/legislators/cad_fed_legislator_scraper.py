@@ -1,5 +1,7 @@
 '''
 Scraper for collecting Canadian federal legislator (ie: MP, or Member of Parliament) data.
+A Senator scraper has also been added. Switches have been added that enable you to choose
+whether you want to scrape either MPs, Senators, or both.
 Author: Justin Tendeck
 Notes:
     Currently, this scraper just collects the most recent data, but it looks like they have
@@ -14,6 +16,7 @@ Known Issues:
         so datapoints seemed to remedy the issue.
 '''
 
+# TODO continue collecting senate committee details
 
 import sys, os
 from pathlib import Path
@@ -36,25 +39,42 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import traceback
 
-
 scraper_utils = CadFedLegislatorScraperUtils()
-base_url = 'https://www.ourcommons.ca'
 
-df = pd.DataFrame()
+scrape_mps = False
+scrape_senators = True
+write_results_to_database = False
+
+mp_base_url = 'https://www.ourcommons.ca'
+sen_base_url = 'https://sencanada.ca'
+
+# Initialized in the get_mp_basic_details() method.
+mp_df = pd.DataFrame()
+# Initialized in the get_sen_basic_details() method.
+sen_df = pd.DataFrame()
 
 # Used to swap parties with database representation
-party_switcher = {
+mp_party_switcher = {
     'NDP': 'New Democratic',
     'Green Party': 'Green'
 }
 
+sen_party_switcher = {
+    'PSG': 'Progressive Senate Group', 
+    'C': 'Conservative',
+    'ISG': 'Independent Senators Group',
+    'CSG': 'Canadian Senators Group'
+}
+
+# region MP Scraper Functions
 def get_mp_basic_details():
     """
     Get details about MP tile card located at:
     https://www.ourcommons.ca/members/en/search
+    Also initializes the mp_df
     """
-    global df
-    mp_list_url = f'{base_url}/members/en/search'
+    global mp_df
+    mp_list_url = f'{mp_base_url}/members/en/search'
 
     page = requests.get(mp_list_url)
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -67,7 +87,7 @@ def get_mp_basic_details():
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
         
-        row.source_url = f'{base_url}{mp_url}'
+        row.source_url = f'{mp_base_url}{mp_url}'
         row.source_id = mp_url.split('(')[-1][:-1]
 
         name_suffix = tile.find('div', {'class': 'ce-mip-mp-honourable'}).text.strip()
@@ -80,7 +100,7 @@ def get_mp_basic_details():
         row.name_suffix = hn.suffix if hn.suffix else name_suffix
 
         party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
-        row.party = party_switcher[party] if party in party_switcher else party
+        row.party = mp_party_switcher[party] if party in mp_party_switcher else party
         row.party_id = scraper_utils.get_party_id(row.party)
 
         row.riding = tile.find('div', {'class': 'ce-mip-mp-constituency'}).text
@@ -93,10 +113,9 @@ def get_mp_basic_details():
 
         mp_data.append(row)
     
-    df = df.append(mp_data)
+    mp_df = pd.DataFrame(mp_data)
 
-
-def get_contact_details(contact_url):
+def get_mp_contact_details(contact_url):
     """
     Get contact details from each MP's contact page.
     Eg: https://www.ourcommons.ca/members/en/ziad-aboultaif(89156)#contact
@@ -150,7 +169,7 @@ def get_contact_details(contact_url):
     return contact
 
 
-def get_role_details(roles_url):
+def get_mp_role_details(roles_url):
     """
     Get details about MP's role, including most recent parliamentary session, offices/roles
     held as MP, committees, and Parliamentary associations and interparliamentary group roles.
@@ -191,25 +210,25 @@ def get_mp_fine_details():
     Get more specific details from each MP's profile page.
     Eg: https://www.ourcommons.ca/members/en/ziad-aboultaif(89156)
     """
-    global df
+    global mp_df
 
-    for i, row in df.iterrows():
+    for i, row in mp_df.iterrows():
         
         contact_url = f"{row['source_url']}#contact"
-        contact = get_contact_details(contact_url)
-        df.at[i, 'email'] = contact['email']
-        df.at[i, 'addresses'] = contact['addresses']
-        df.at[i, 'phone_number'] = contact['phone_number']
+        contact = get_mp_contact_details(contact_url)
+        mp_df.at[i, 'email'] = contact['email']
+        mp_df.at[i, 'addresses'] = contact['addresses']
+        mp_df.at[i, 'phone_number'] = contact['phone_number']
 
         roles_url = f"{row['source_url']}/xml"
-        roles = get_role_details(roles_url)
-        df.at[i, 'most_recent_term_id'] = roles['most_recent_term_id']
-        df.at[i, 'offices_roles_as_mp'] = roles['offices_roles_as_mp']
-        df.at[i, 'committees'] = roles['committees']
-        df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
+        roles = get_mp_role_details(roles_url)
+        mp_df.at[i, 'most_recent_term_id'] = roles['most_recent_term_id']
+        mp_df.at[i, 'offices_roles_as_mp'] = roles['offices_roles_as_mp']
+        mp_df.at[i, 'committees'] = roles['committees']
+        mp_df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
 
 
-def scrape():
+def mp_scrape():
     """
     Entry point for scraper. Begins by collecting details directly from House of Commons
     website MP roster (get_mp_basic_details), then collects details from each MP's
@@ -218,16 +237,120 @@ def scrape():
     """
     get_mp_basic_details()
     get_mp_fine_details()
+# endregion
 
+# region Senator Scraper Functions
+
+def get_sen_basic_details():
+    global sen_df
+    sen_page_url = f'{sen_base_url}/en/senators-list/'
+    page = requests.get(sen_page_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    sen_table = soup.find('table', {'id': 'senator-list-view-table'})
+    sen_tbody = sen_table.tbody
+
+    sen_data = []
+    for tr in sen_tbody.findAll('tr')[:5]:
+        row = scraper_utils.initialize_row()
+
+        tds = tr.findAll('td')
+
+        # Name details
+        name_full = tds[0].get_text().strip()
+        hn = HumanName(name_full)
+        row.name_full = hn
+        row.name_last = hn.last
+        row.name_first = hn.first
+        row.name_middle = hn.middle
+        row.name_suffix = hn.suffix
+
+        # Source url
+        source_url = f"{sen_base_url}{tds[0].a.get('href')}"
+        row.source_url = source_url
+        
+        # Party, party ID
+        party = tds[1].get_text().strip()
+        party = sen_party_switcher[party] if party in sen_party_switcher else party
+        row.party = party
+        row.party_id = scraper_utils.get_party_id(party)
+
+        # Province/Territory, ID
+        prov_terr = tds[2].get_text().strip()
+        prov_terr = scraper_utils.get_prov_terr_abbrev(prov_terr)
+        row.province_territory = prov_terr
+        row.province_territory_id = scraper_utils.get_prov_terr_id(prov_terr)
+
+        row.role = 'Senator'
+
+        sen_data.append(row)
+    sen_df = pd.DataFrame(sen_data)
+
+
+def get_individual_sen_page_details(sen_page_url):
+    page = requests.get(sen_page_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    sen_details = {'phone_number': [], 'email': '', 'committees': []}
+    
+    bio_card = soup.find('ul', {'class': 'biography_card_details'})
+
+    tele_con = bio_card.find('li', {'class': 'biography_card_details_telephone'})
+    tele_con.strong.extract()
+    telephone = tele_con.get_text().strip()
+    sen_details['phone_number'].append({'number': telephone, 'location': 'Senate'})
+
+    email_con = bio_card.find('li', {'class': 'biography_card_details_email'})
+    email_con.strong.extract()
+    email = email_con.get_text().strip()
+    sen_details['email'] = email
+
+    try:
+        news = soup.find('div', {'class': 'news section'})
+        committee_carousel = news.find('div', {'id': 'committee-senator-carousel-container'})
+        print(news.prettify())
+        if committee_carousel:
+            for car_item in committee_carousel.findAll('div', {'class': 'item'}):
+                role = car_item.find('div', {'class': 'media-box_date left'}).get_text().split()
+                committee = car_item.find('div', {'class': 'hidden-sm hidden-xs'}).get_text().split()
+                sen_details['committees'].append({'role': role, 'committee': committee})
+    except:
+        print('No committee data found!')
+
+    print(sen_details)
+    # con_container.strong.extract().get_text()
+
+def get_sen_fine_details():
+    global sen_df
+
+    for i, row in sen_df.iterrows():
+        # contact_url = f"{row['source_url']}#contact"
+        # contact = get_mp_contact_details(contact_url)
+        # mp_df.at[i, 'email'] = contact['email']
+        sen_details = get_individual_sen_page_details(row['source_url'])
+
+
+def senator_scrape():
+    get_sen_basic_details()
+    get_sen_fine_details()
+
+# endregion
 
 if __name__ == '__main__':
 
-    scrape()
+    if scrape_senators:
+        senator_scrape()
+    if scrape_mps:
+        mp_scrape()
+
 
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(df.to_dict('records'))
+    result = pd.concat([mp_df, sen_df])
+
+    if write_results_to_database and not result.empty:
+        scraper_utils.insert_legislator_data_into_db(result.to_dict('records'))
 
     print('Complete!')
