@@ -327,6 +327,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
             try:
                 create_table_query = sql.SQL("""
                         
+                        
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,

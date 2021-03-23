@@ -659,6 +659,7 @@ if __name__ == '__main__':
     big_df['state_id'] = sample_row.state_id
     #
     #
+    big_df['source_url'] = big_df['state_url']
     big_df['country'] = sample_row.country
     # # #
     big_df['country_id'] = sample_row.country_id
@@ -671,6 +672,7 @@ if __name__ == '__main__':
     big_df['education'] = big_df['education'].replace({np.nan: None})
     big_df['seniority'] = 0
     big_df['source_id'] = big_df['state_member_id']
+
     print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)

@@ -723,6 +723,29 @@ if __name__ == '__main__':
     mergedSensData['occupation'] = mergedSensData['occupation'].replace({np.nan: None})
     mergedSensData['birthday'] = mergedSensData['birthday'].replace({np.nan: None})
     mergedSensData['education'] = mergedSensData['education'].replace({np.nan: None})
+    sample_row = scraper_utils.initialize_row()
+    # print(sample_row)
+    #
+
+
 
     big_df = (mergedSensData.append(mergedRepsData, sort=True))
+    big_df['state'] = sample_row.state
+    big_df['state_id'] = sample_row.state_id
+    #
+    #
+    big_df['country'] = sample_row.country
+    # # #
+    big_df['country_id'] = sample_row.country_id
     print(big_df)
+    big_df['source_url'] = big_df['state_url']
+    big_df['source_id'] = big_df['state_member_id']
+
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+
+    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
