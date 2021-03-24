@@ -21,9 +21,8 @@ from multiprocessing import Pool
 from database import Database
 import configparser
 from pprint import pprint
-from nameparser import HumanName
 import re
-import PyPDF2
+# import PyPDF2
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 from pprint import pprint
@@ -35,7 +34,7 @@ from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
+# from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -54,7 +53,10 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                        legislator_table_name)
 
 chrome_options = webdriver.ChromeOptions()
+
 chrome_options.add_argument('--headless')
+chrome_options.add_argument('--disable-extensions')
+chrome_options.add_argument('--disable-gpu')
 
 driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
@@ -183,6 +185,9 @@ def scrape(url):
         page_soup = soup(page_html, "html.parser")
         row.bill_text = " ".join(page_soup.text.split())
 
+        explan = page_soup.find("div", {"class": "explannote"})
+        print(explan)
+
 
     except:
         print(transformed_url)
@@ -265,7 +270,7 @@ if __name__ == '__main__':
         'bill_name')  # .reset_index(drop=True)
     url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
-    less_urls = url_df['source_url'][:2]
+    less_urls = url_df['source_url'][:5]
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
@@ -274,7 +279,7 @@ if __name__ == '__main__':
         data = pool.map(scrape, less_urls)
     print(*data, sep='\n')
 
-    # Once we collect the data, we'll write it to the database.
+    # Once we collect the data, we'll  write it to the database.
     # scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')

@@ -523,8 +523,8 @@ if __name__ == '__main__':
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
-    # print('Writing data to database...')
-    # scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
-    #
-    # print('Complete!')
+    print('Writing data to database...')
+    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
 
