@@ -25,16 +25,16 @@ import numpy as np
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import CadProvTerrLegislatorScraperUtils
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
-scraper_utils = CadProvTerrLegislatorScraperUtils('BC', 'cad_bc_legislators')
+scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
 
 driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
-scraper_utils = CadProvTerrLegislatorScraperUtils('BC', 'cad_bc_legislators')
+scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 
 
 def get_urls(myurl):

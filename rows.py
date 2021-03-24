@@ -48,7 +48,7 @@ class USLegislationRow(LegislationRow):
     state_id: int = 0
     state: str = ''
 
-class CadLegislationRow(LegislationRow):
+class CALegislationRow(LegislationRow):
     """
     Data structure for housing data about each piece of legislation.
     """
@@ -56,7 +56,7 @@ class CadLegislationRow(LegislationRow):
     province_territory: str = ''
 
 
-class CadFedLegislationRow(CadLegislationRow):
+class CAFedLegislationRow(CALegislationRow):
     """
     Data structure for housing data about each piece of legislation.
     """
@@ -117,7 +117,7 @@ class USLegislatorRow(LegislatorRow):
 
 
 @dataclass
-class CadLegislatorRow(LegislatorRow):
+class CALegislatorRow(LegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
@@ -127,7 +127,7 @@ class CadLegislatorRow(LegislatorRow):
     region: str = ''
 
 @dataclass
-class CadFedLegislatorRow(CadLegislatorRow):
+class CAFedLegislatorRow(CALegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
