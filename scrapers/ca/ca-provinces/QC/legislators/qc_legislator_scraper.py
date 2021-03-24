@@ -20,10 +20,10 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import CadProvTerrLegislatorScraperUtils
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 
-scraper_utils = CadProvTerrLegislatorScraperUtils('QC', 'cad_qc_legislators')
+scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 
 def getAssemblyLinks(myurl):
     infos = []

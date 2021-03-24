@@ -7,7 +7,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 sys.path.insert(0, str(p))
 
 from bs4 import BeautifulSoup
-from legislation_scraper_utils import CadFedLegislationScraperUtils
+from legislation_scraper_utils import CAFedLegislationScraperUtils
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, date
@@ -15,12 +15,13 @@ import csv
 import psycopg2
 import json
 from nameparser import HumanName
+import io
 
 base_url = 'https://www.parl.ca'
 xml_url_csv = 'xml_urls.csv'
-table_name = 'cdn_federal_legislation'
+table_name = 'ca_federal_legislation'
 
-scraper_utils = CadFedLegislationScraperUtils()
+scraper_utils = CAFedLegislationScraperUtils()
 party_switcher = {
     'NDP': 'New Democratic',
     'Green Party': 'Green'
@@ -59,18 +60,14 @@ def get_event_details(event):
     meeting_num = event.attrib['meetingNumber']
 
     committee_xml = event.find('Committee')
-    committee_acr = ''
     committee_full = ''
 
     if committee_xml:
-        committee_acr = committee_xml.attrib['accronym'] if 'accronym' in committee_xml.attrib else ''
         committee_full = get_english_title(committee_xml)
-
-    committee = dict(committee=committee_full, committee_acronym=committee_acr)
 
     status = get_english_title(event.find('Status'))
 
-    return dict(chamber=chamber, date=date, meeting_number=meeting_num, committee=committee, status=status)
+    return dict(chamber=chamber, date=date, meeting_number=meeting_num, committee=committee_full, status=status)
 
 def get_current_session_number():
     session_page_url = f'{base_url}/LegisInfo/Home.aspx'
@@ -80,6 +77,29 @@ def get_current_session_number():
     current_session = session_container.find('div').get_text().strip()
     return current_session.split('-')[0]
 
+def get_tag_text(tag):
+    txt = ''
+    for childtxt in tag.itertext():
+        if childtxt:
+            txt += childtxt.strip() + ' '
+    return txt.strip()
+
+def get_bill_file_details(bill_file_url):
+    bill_data = {'bill_text': '', 'bill_summary': ''}
+    if not bill_file_url: return bill_data
+    
+    soup = get_soup(bill_file_url)
+    xml_url_path = soup.find('a', {'class': 'btn btn-export-xml hidden-xs'}).get('href')
+    xml_url = base_url + xml_url_path
+
+    page = requests.get(xml_url)
+    root = ET.fromstring(page.content)
+
+    bill_data['bill_summary'] = get_tag_text(root.find('Introduction').find('Summary'))
+    bill_data['bill_text'] = get_tag_text(root.find('Body'))
+
+    return bill_data
+
 def parse_xml_data(xml_url):
     page = requests.get(xml_url)
     root = ET.fromstring(page.content)
@@ -87,15 +107,13 @@ def parse_xml_data(xml_url):
     current_session_number = get_current_session_number()
 
     bill_lst = []
-    for bill in root.findall('Bill'):
+    for bill in root.findall('Bill')[250:300]:
 
         parl_session = bill.find('ParliamentSession')
         parl_number = parl_session.attrib["parliamentNumber"]
 
         if parl_number != current_session_number:
             continue
-
-        # print(f'CURRENT SESSION: {current_session_number} | CHECKING SESSION: {parl_number}')
 
         row = scraper_utils.initialize_row()
 
@@ -136,9 +154,20 @@ def parse_xml_data(xml_url):
         statute_chapter = statute.find('Chapter').text
 
         publications = bill.find('Publications')
+        all_publications =publications.findall('Publication')
         publication_lst = []
-        for pub in publications.findall('Publication'):
+        for pub in all_publications:
             publication_lst.append(get_english_title(pub))
+
+        bill_file_url = ''
+        if len(all_publications) > 0:
+            latest_publication = all_publications[-1]
+            publication_files = latest_publication.find('PublicationFiles').findall('PublicationFile')
+            
+            for pf in publication_files:
+                if pf.attrib['language'] == 'en':
+                    bill_file_url = f"https:{pf.attrib['relativePath']}"
+        bill_file_details = get_bill_file_details(bill_file_url)
 
         events = bill.find('Events')
 
@@ -149,25 +178,29 @@ def parse_xml_data(xml_url):
 
         legislative_events_xml = events.find('LegislativeEvents')
         legislative_events = [get_event_details(event) for event in legislative_events_xml.findall('Event')]
-        
-        row.goverlytics_id = f'CADFED_{session}_{bill_number}'
 
-        # print(row.goverlytics_id)
+        committees = []
+        for le in legislative_events:
+            if 'committee' in le and le['committee'] != '':
+                committees.append({'chamber': le['chamber'], 'committee': le['committee']})
 
+        row.committees = committees
+        row.goverlytics_id = f'CAFED_{session}_{bill_number}'
+        row.source_url = f'{base_url}/LegisInfo/BillDetails.aspx?Language=E&billId={bill_id}'
         row.source_id = bill_id
         row.bill_name = bill_number
         row.session = session
         row.date_introduced = introduced_date
         row.chamber_origin = bill_number[0]
         row.bill_type = bill_type
-        row.bill_title = bill_title
+        row.bill_title = bill_title_short if bill_title_short else ''
         row.current_status = progress
         ps_id = scraper_utils.get_legislator_id(name_last=last_name, name_first=first_name)
         row.principal_sponsor_id = ps_id
         row.principal_sponsor = full_name
-        #row.bill_text = 
-        row.bill_description = bill_title_short if bill_title_short else ''
-        # row.bill_summary = 
+        row.bill_text = bill_file_details['bill_text']
+        row.bill_description = bill_title
+        row.bill_summary = bill_file_details['bill_summary']
         row.actions = legislative_events
         # row.votes = 
         # row.source_topic = 
@@ -179,7 +212,6 @@ def parse_xml_data(xml_url):
             print(f'Could not find prov, terr data for: {full_name}')
             row.province_territory = None
             row.province_territory_id = None
-        # row.province_territory = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory')
         row.sponsor_affiliation = sponsor_affiliation
         row.sponsor_gender = sponsor_gender
         row.pm_name_full = pm_full_name

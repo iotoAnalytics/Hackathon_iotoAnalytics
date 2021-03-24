@@ -15,7 +15,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 import io
-from legislation_scraper_utils import CadProvinceTerrLegislationScraperUtils
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
 from database import Database
@@ -49,7 +49,7 @@ prov_terr_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviati
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = CadProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
+scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                        database_table_name,
                                                        legislator_table_name)
 

@@ -25,7 +25,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislator_scraper_utils import CadFedLegislatorScraperUtils
+from legislator_scraper_utils import CAFedLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -38,7 +38,7 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import traceback
 
-scraper_utils = CadFedLegislatorScraperUtils()
+scraper_utils = CAFedLegislatorScraperUtils()
 
 scrape_mps = False
 scrape_senators = True

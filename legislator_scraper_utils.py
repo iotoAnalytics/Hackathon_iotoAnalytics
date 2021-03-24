@@ -458,18 +458,18 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
         return row
 
 
-class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
+class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
     """
 
-    def __init__(self, database_table_name='cad_fed_legislators', row_type=CadFedLegislatorRow()):
+    def __init__(self, database_table_name='ca_fed_legislators', row_type=CAFedLegislatorRow()):
         """
         The state_abbreviation, database_table_name, and country come from
         the config.cfg file and must be updated to work properly with your legislation
         data collector.
         """
-        super().__init__('cad', database_table_name, row_type)
+        super().__init__('ca', database_table_name, row_type)
 
     def get_prov_terr_id(self, prov_terr_abbrev):
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
@@ -612,9 +612,9 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                 cur.execute(insert_legislator_query, tup)
 
 
-class CadProvTerrLegislatorScraperUtils(CadFedLegislatorScraperUtils):
-    def __init__(self, prov_terr_abbreviation, database_table_name='cad_provterr_legislators'):
-        super().__init__(database_table_name, CadLegislatorRow())
+class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
+    def __init__(self, prov_terr_abbreviation, database_table_name='ca_provterr_legislators'):
+        super().__init__(database_table_name, CALegislatorRow())
         self.province_territory = prov_terr_abbreviation
         self.province_territory_id = self.get_prov_terr_id(prov_terr_abbreviation)
 
