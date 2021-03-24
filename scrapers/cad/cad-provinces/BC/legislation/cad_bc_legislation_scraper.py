@@ -14,9 +14,8 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-
-from legislation_scraper_utils import USStateLegislationScraperUtils, USStateLegislationRow
-from bs4 import BeautifulSoup
+import io
+from legislation_scraper_utils import CadProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
 from database import Database
@@ -24,45 +23,101 @@ import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
+import PyPDF2
 import urllib.parse as urlparse
 from urllib.parse import parse_qs
 from pprint import pprint
 import datetime
 import boto3
+from urllib.request import urlopen as uReq
+import urllib.parse
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import pandas as pd
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 
-state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+prov_terr_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
-scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = CadProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
+                                                       database_table_name,
+                                                       legislator_table_name)
 
-base_url = 'https://www.ilga.gov'
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
 
-def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
-    urls = []
+driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
-    # Logic goes here! Some sample code:
-    path = '/legislation/grplist.asp?num1=64&num2=3933&DocTypeID=HB&GA=101&SessionId=109&SpecSess=1'
-    scrape_url = base_url + path
-    page = requests.get(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
 
-    table = soup.find('table', {'width': '490', 'border': '0', 'align': 'left'})
+def get_urls(myurl):
+    driver.get(myurl)
+    timeout = 5
 
-    for li in table.findAll('li'):
-        urls.append(li.a['href'])
-    
-    return urls
+    try:
+        element_present = EC.presence_of_element_located((By.CLASS_NAME, 'BCLASS-Hansard-List'))
+        WebDriverWait(driver, timeout).until(element_present)
+
+
+    except:
+        print("timeout")
+        pass
+
+    html = driver.page_source
+    page_soup = soup(html, 'html.parser')
+    url_infos = []
+    hansardlist = page_soup.find("ul", {"class": "BCLASS-Hansard-List"})
+    listings = hansardlist.findAll("li")
+    for li in listings:
+        url = (li.div.div.div.div.a["href"])
+
+        if "/gov" in url:
+            bill_num = "gov" + url.split("/gov")[1]
+        else:
+            bill_num = "m" + url.split("/m")[1]
+        bill_num = bill_num.split("-")[0]
+        info = {'source_url': url, 'bill_name': bill_num}
+        # print(info)
+        url_infos.append(info)
+
+    return url_infos
 
 
 def scrape(url):
+    # r = requests.get(url)
+    # data = r.json()
+    # print(data)
+
+    driver.get(url)
+    timeout = 5
+
+    try:
+        element_present = EC.presence_of_element_located((By.CLASS_NAME, 'explannote'))
+        WebDriverWait(driver, timeout).until(element_present)
+
+
+    except:
+        pass
+        # print(timeout)
+    html = driver.page_source
+
+    page_soup = soup(html, 'html.parser')
+
+    # try:
+    #     expln = page_soup.find("div", {"class": "explannote"})
+    #
+    # except:
+    #     pass
+
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
 
@@ -77,162 +132,149 @@ def scrape(url):
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
     '''
-    
+
     row = scraper_utils.initialize_row()
+
+    if "/gov" in url:
+        bill_num = "gov" + url.split("/gov")[1]
+    else:
+        bill_num = "m" + url.split("/m")[1]
+    bill_num = bill_num.split("-")[0]
+
+    row.bill_name = bill_num
+    row.source_url = url
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
     # keys are the columns in the data dictionary. For instance, we can insert the state_url,
     # like so:
-    state_url = f'{base_url}{url}'
-    row.source_url = state_url
-
-    # Get useful query string parameters from URL
-    parsed = urlparse.urlparse(url)
-    url_qsp = parse_qs(parsed.query)
-
-    doc_type = url_qsp['DocTypeID'][0]
-    doc_num = url_qsp['DocNum'][0]
-    session = url_qsp['SessionID'][0]
-
-    bill_name = f'{doc_type}{doc_num.zfill(4)}'
-
-    goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-    url = f'us/{state_abbreviation}/legislation/{goverlytics_id}'
-
-    row.goverlytics_id = goverlytics_id
-    row.bill_name = bill_name
+    session = url.split("-parliament")[0]
+    session = session.split("proceedings/")[1]
     row.session = session
-    row.url = url
 
-    chamber_origin = ''
-    bill_type = ''
-    if 'HB' == doc_type:
-        chamber_origin = 'House'
-        bill_type = 'Bill'
-    # elif ...:
-        # Check for other types like SB (senate bills), HRes (House Resolutions), etc.
-        # For now we're only work with HB bills so we'll keep it simple
+    page_title = page_soup.find("h1", {"class": "BCLASS-PageTitleBody"})
 
-    row.chamber_origin = chamber_origin
-    row.bill_type = bill_type
+    row.bill_title = page_title.span.text.strip()
+    row.chamber_origin = 'Legislative Assembly'
+    row.bill_type = 'Bill'
+    row.source_id = bill_num
+    row.goverlytics_id = "BC_" + session + "_" + bill_num
+    if 'third-reading' in url:
+        row.current_status = 'third reading'
+        # transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/3rd_read/' + bill_num + '-3.htm'
+    elif 'first-reading' in url:
+        row.current_status = 'first reading'
+        # transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/1st_read/' + bill_num + '-1.htm'
 
-    # Begin scraping page
-    page = requests.get(state_url)
-    soup = BeautifulSoup(page.content, 'lxml')
+    elif 'amended' in url:
+        row.current_status = 'amended'
+    #     transformed_url = 'www.leg.bc.ca/content/data-ldp/pages/42nd1st/amended/' + bill_num + '-2.htm'
+    # transformed_url = urllib.parse.quote(transformed_url)
+    # transformed_url = 'https://' + transformed_url
+    iframe = page_soup.find('iframe', {'id': 'BCLASS-Legacy-Frame'})
+    url = iframe["src"]
 
-    # The Illinois state legislation website has their data stored in a weird way...
-    # everything is stored in spans so we're gonna try pulling the data we need from
-    # those. Your implementations will probably look quite a bit different than this.
+    transformed_url = url.replace(' ', '%20')
+    print(transformed_url)
+    try:
+        uClient = uReq(transformed_url)
+        page_html = uClient.read()
+        uClient.close()
+        # # # html parsing
+        page_soup = soup(page_html, "html.parser")
+        row.bill_text = " ".join(page_soup.text.split())
 
-    # Get bill description and summary
-    bill_description = ''
-    bill_summary = ''
-    spans = soup.findAll('span')
-    for idx, span in enumerate(spans):
-        txt = span.text
-        if 'Short Description:' in txt:
-            bill_description = spans[idx + 1].text
-        if 'Synopsis As Introduced' in txt:
-            bill_summary = spans[idx + 1].text.strip()
-    row.bill_description = bill_description
-    row.bill_summary = bill_summary
 
-    # Get bill sponsors
-    table = soup.find('table', {'width': '440', 'border': '0', 'align': 'left'})
-    table_td = table.find('td', {'width': '100%'})
+    except:
+        print(transformed_url)
+    # driver.get(transformed_url)
+    # timeout = 5
+    #
+    # try:
+    #     element_present = EC.presence_of_element_located((By.CLASS_NAME, 'explannote'))
+    #     WebDriverWait(driver, timeout).until(element_present)
+    #
+    #
+    # except:
+    #     pass
+        # print(timeout)
+    # html = driver.page_source
+    #
+    # page_soup = soup(html, 'html.parser')
+    # print(page_soup)
 
-    a_tag = table_td.findAll('a', href=True)
-    sponsors = []
-    for a in a_tag:
-        if '/house/Rep.asp' in a['href'] or '/senate/Senator.asp' in a['href']:
-            sponsors.append(a.text)
-
-    # # We'll now try to get the legislator goverlytics ID. Fortunately for us, this
-    # # site provides a unique identifier for each legislator. Normally we would do
-    # # the following:
-    # sponsor_id = scraper_utils.get_legislator_id(state_member_id=legislator_id)
-    # # However, since this is often not the case, we will search for the id using the
-    # # legislator name. We are given the legislator's full name, but if you are given
-    # # only the legislator initials and last name, which is more often the case, be sure to
-    # # use the legislators_search_startswith() method, which might look something like this:
-    # sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first_initial, name_last=name_last)
-
-    sponsors_id = []
-    for sponsor in sponsors:
-        hn = HumanName(sponsor)
-        name_first = hn.first
-        name_middle = hn.middle
-        name_last = hn.last
-        name_suffix = hn.suffix
-
-        search_for = dict(name_first=name_first, name_middle=name_middle, name_last=name_last, name_suffix=name_suffix)
-
-        sponsor_id = scraper_utils.get_legislator_id(**search_for)
-
-        # Some sponsor IDs weren't found, so we won't include these.
-        # If you are unable to find legislators based on the provided search criteria, be
-        # sure to investigate. Check the database and make sure things like names match
-        # exactly, including case and diacritics.
-        if sponsor_id is not None:
-            sponsors_id.append(sponsor_id)
-
-    row.sponsors = sponsors
-    row.sponsors_id = sponsors_id
-
-    # Get actions
-    actions_table = soup.findAll('table', {'width': '600', 'cellspacing': '0', 'cellpadding': '2', 'bordercolor': 'black', 'border':'1'})[1]
-
-    action_date = ''
-    action_by = ''
-    action_description = ''
-    actions = []
-    number_of_columns = 3
-    # Skip the header row
-    for idx, td in enumerate(actions_table.findAll('td')[3:]):
-        # With this type of method, normally you would search by 'tr' and then grab the value
-        # from each 'td' in the row, but for some reason, beautiful soup wasn't able to find
-        # the 'tr' so I had to get the value using a different, less intuitive method.
-        mod = idx % number_of_columns
-        if mod == 0:
-            action_date = td.text.strip()
-        if mod == 1:
-            action_by = td.text.strip()
-        if mod == 2:
-            action_description = td.text.strip()
-            actions.append(dict(date=action_date, action_by=action_by, description=action_description))
-    
-    # We can get the date introduced from the first action, and the current status from
-    # the most recent action.
-    date_introduced = None
-    current_status = ''
-    if len(actions) > 0:
-        date_introduced=datetime.datetime.strptime(actions[0]['date'], '%m/%d/%Y')
-        current_status = actions[-1]['description']
-
-    row.actions = actions
-    row.current_status = current_status
-    row.date_introduced = date_introduced
-
-    # There's more data on other pages we can colelct, but we have enough data for this demo!
+    #
+    # try:
+    #     header = page_soup.find('div', {'id': 'BCLASS-Legacy-Wrapper'})
+    #     print(header)
+    #     # center = header.find('p', {'align': 'center'})
+    #     # print(center.text)
+    #
+    # except:
+    #     print(url)
+    # print(page_soup)
+    # try:
+    #     pdf_id = page_soup.find("div", {"id": "PrintPDF"})
+    #
+    #     pdf_link = pdf_id.a["href"]
+    #     # print(pdf_link)
+    #     r = requests.get(pdf_link)
+    #     f = io.BytesIO(r.content)
+    #     reader = PyPDF2.PdfFileReader(f, strict=False)
+    #     if reader.isEncrypted:
+    #         reader.decrypt('')
+    #
+    #     contents = reader.getPage(0).extractText()
+    #     # print(contents)
+    # except Exception as ex:
+    #
+    #     template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+    #     message = template.format(type(ex).__name__, ex.args)
+    #
+    # print(message)
+    # print(url)
+    # titles pa= page_soup.findAll('p')
+    # print(titles)
+    # for title in titles:
+    #     print(title.text)
+    # if "Explanatory Note" in title.text:
+    #     print(title.text)
 
     return row
 
+
 if __name__ == '__main__':
-    print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
-If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
-like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
-
+    first_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
+                        '/1st-session/bills/first-reading#Default={%22o%22:[{%22d%22:0,' \
+                        '%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
+    ammendement_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
+                      '/1st-session/bills/amended '
+    third_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
+                        '/1st-session/bills/third-reading#Default={%22o%22:[{%22d%22:0,' \
+                        '%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
+    pd.options.display.max_colwidth = 200
     # First we'll get the URLs we wish to scrape:
-    urls = get_urls()
+    first_urls = pd.DataFrame(get_urls(first_reading_url))
 
+    ammendment_urls = pd.DataFrame(get_urls(ammendement_url))
+
+    third_urls = pd.DataFrame(get_urls(third_reading_url))
+
+    url_df = pd.concat((ammendment_urls, first_urls)).sort_index().drop_duplicates(
+        'bill_name')  # .reset_index(drop=True)
+    url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
+    # print(url_df)
+    less_urls = url_df['source_url'][:2]
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls
     with Pool() as pool:
-        data = pool.map(scrape, urls)
+        data = pool.map(scrape, less_urls)
+    print(*data, sep='\n')
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    # scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')
