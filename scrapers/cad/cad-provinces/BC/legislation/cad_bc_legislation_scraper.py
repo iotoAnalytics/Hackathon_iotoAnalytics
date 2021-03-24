@@ -60,7 +60,7 @@ chrome_options.add_argument('--disable-gpu')
 
 driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
-
+ 
 def get_urls(myurl):
     driver.get(myurl)
     timeout = 5
