@@ -564,6 +564,7 @@ class CadFedLegislatorScraperUtils(LegislatorScraperUtils):
                         years_active = excluded.years_active,
                         offices_roles_as_mp = excluded.offices_roles_as_mp,
                         parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
+                        region = excluded.region,
                         seniority = excluded.seniority;
                     """).format(table=sql.Identifier(self.database_table_name))
 

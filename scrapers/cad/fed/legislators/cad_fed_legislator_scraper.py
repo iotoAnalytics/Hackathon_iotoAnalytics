@@ -16,7 +16,6 @@ Known Issues:
         so datapoints seemed to remedy the issue.
 '''
 
-# TODO continue collecting senate committee details
 
 import sys, os
 from pathlib import Path
@@ -43,7 +42,7 @@ scraper_utils = CadFedLegislatorScraperUtils()
 
 scrape_mps = False
 scrape_senators = True
-write_results_to_database = False
+write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
@@ -82,7 +81,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[300:]:
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -114,6 +113,7 @@ def get_mp_basic_details():
         mp_data.append(row)
     
     mp_df = pd.DataFrame(mp_data)
+
 
 def get_mp_contact_details(contact_url):
     """
@@ -213,7 +213,6 @@ def get_mp_fine_details():
     global mp_df
 
     for i, row in mp_df.iterrows():
-        
         contact_url = f"{row['source_url']}#contact"
         contact = get_mp_contact_details(contact_url)
         mp_df.at[i, 'email'] = contact['email']
@@ -226,6 +225,14 @@ def get_mp_fine_details():
         mp_df.at[i, 'offices_roles_as_mp'] = roles['offices_roles_as_mp']
         mp_df.at[i, 'committees'] = roles['committees']
         mp_df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
+
+        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
+        mp_df.at[i, 'birthday'] = wiki_data['birthday']
+        mp_df.at[i, 'education'] = wiki_data['education']
+        mp_df.at[i, 'occupation'] = wiki_data['occupation']
+        mp_df.at[i, 'years_active'] = wiki_data['years_active']
+        mp_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
 
 
 def mp_scrape():
@@ -242,6 +249,12 @@ def mp_scrape():
 # region Senator Scraper Functions
 
 def get_sen_basic_details():
+    """
+    Collects details about each senator from the Canada Senate roster.
+    Ie: https://sencanada.ca/en/senators-list/
+    Instantiates senator dataframe (sen_df) and populates it with 
+    senator data.
+    """
     global sen_df
     sen_page_url = f'{sen_base_url}/en/senators-list/'
     page = requests.get(sen_page_url)
@@ -251,7 +264,7 @@ def get_sen_basic_details():
     sen_tbody = sen_table.tbody
 
     sen_data = []
-    for tr in sen_tbody.findAll('tr')[:5]:
+    for tr in sen_tbody.findAll('tr'):
         row = scraper_utils.initialize_row()
 
         tds = tr.findAll('td')
@@ -259,7 +272,7 @@ def get_sen_basic_details():
         # Name details
         name_full = tds[0].get_text().strip()
         hn = HumanName(name_full)
-        row.name_full = hn
+        row.name_full = str(hn).replace(' P.C.', '')
         row.name_last = hn.last
         row.name_first = hn.first
         row.name_middle = hn.middle
@@ -280,14 +293,26 @@ def get_sen_basic_details():
         prov_terr = scraper_utils.get_prov_terr_abbrev(prov_terr)
         row.province_territory = prov_terr
         row.province_territory_id = scraper_utils.get_prov_terr_id(prov_terr)
+        row.region = scraper_utils.get_region(prov_terr)
 
         row.role = 'Senator'
+        row.offices_roles_as_mp = None
+        row.parl_assoc_interparl_groups = None
 
         sen_data.append(row)
     sen_df = pd.DataFrame(sen_data)
 
 
 def get_individual_sen_page_details(sen_page_url):
+    """
+    Collects details from individual senator pages. This includes senator
+    contact details (phone number, email) and committee information.
+    Args:
+        sen_page_url: URL for a given senator's page
+    Returns:
+        sen_details: Senator detail dictionary contacting phone_number,
+            email, and committees
+    """
     page = requests.get(sen_page_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -308,49 +333,67 @@ def get_individual_sen_page_details(sen_page_url):
     try:
         news = soup.find('div', {'class': 'news section'})
         committee_carousel = news.find('div', {'id': 'committee-senator-carousel-container'})
-        print(news.prettify())
         if committee_carousel:
-            for car_item in committee_carousel.findAll('div', {'class': 'item'}):
-                role = car_item.find('div', {'class': 'media-box_date left'}).get_text().split()
-                committee = car_item.find('div', {'class': 'hidden-sm hidden-xs'}).get_text().split()
+            for car_item in committee_carousel.findAll('div', {'class': 'home-carousel-item'}):
+                role = car_item.find('div', {'class': 'media-box_date'}).get_text().strip()
+                committee = car_item.find('div', {'class': 'hidden-sm'}).get_text().strip()
                 sen_details['committees'].append({'role': role, 'committee': committee})
     except:
-        print('No committee data found!')
+        pass
 
-    print(sen_details)
-    # con_container.strong.extract().get_text()
+    return sen_details
+
 
 def get_sen_fine_details():
+    """
+    Collects finer details for each senator from their individual pages.
+    """
     global sen_df
 
     for i, row in sen_df.iterrows():
-        # contact_url = f"{row['source_url']}#contact"
-        # contact = get_mp_contact_details(contact_url)
-        # mp_df.at[i, 'email'] = contact['email']
         sen_details = get_individual_sen_page_details(row['source_url'])
+        sen_df.at[i, 'phone_number'] = sen_details['phone_number']
+        sen_df.at[i, 'email'] = sen_details['email']
+        sen_df.at[i, 'committees'] = sen_details['committees']
+
+        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
+        sen_df.at[i, 'birthday'] = wiki_data['birthday']
+        sen_df.at[i, 'education'] = wiki_data['education']
+        sen_df.at[i, 'occupation'] = wiki_data['occupation']
+        sen_df.at[i, 'years_active'] = wiki_data['years_active']
+        sen_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
 
 
 def senator_scrape():
+    """
+    Entry point for senator page scraper.
+    """
     get_sen_basic_details()
     get_sen_fine_details()
 
 # endregion
 
 if __name__ == '__main__':
-
+    # Switches to determine what to scrape located at top of file.
     if scrape_senators:
+        print('Collecting senator data...')
         senator_scrape()
+    else:
+        print('scrape_senators switch is false. Skipping senator data collection...')
     if scrape_mps:
+        print('Collecting MP data...')
         mp_scrape()
+    else:
+        print('scrape_mps switch is false. Skipping MP data collection...')
 
-
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
-
-    # Once we collect the data, we'll write it to the database.
+    # Coalesce dataframes
     result = pd.concat([mp_df, sen_df])
 
     if write_results_to_database and not result.empty:
+        print('Writing data to database...')
         scraper_utils.insert_legislator_data_into_db(result.to_dict('records'))
+    else:
+        print('Either write to database switch set to false or no data collected. No data written to database.')
 
     print('Complete!')
