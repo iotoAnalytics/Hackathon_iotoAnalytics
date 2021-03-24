@@ -93,11 +93,14 @@ class LegislationScraperUtils:
         if table_name == 'party':
             df = self.parties
         
-        val = df.loc[df[column_to_search] == value_to_search][attribute_to_return].values[0]
-        try:
-            return int(val)
-        except Exception:
-            return val
+        val = df.loc[df[column_to_search] == value_to_search][attribute_to_return]
+        if val.any():
+            try:
+                return int(val.values[0])
+            except Exception:
+                return val.values[0]
+        else:
+            raise Exception(f'Could not locate value using following search parameters: table_name={table_name}, column_to_search={column_to_search}, value_to_search={value_to_search}, attribute_to_return={attribute_to_return}')
 
     def _convert_to_int(self, value):
         """
@@ -411,7 +414,7 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (source_url) DO UPDATE SET
+                ON CONFLICT (goverlytics_id) DO UPDATE SET
                     date_collected = excluded.date_collected,
                     bill_title = excluded.bill_title,
                     bill_name = excluded.bill_name,
@@ -441,30 +444,32 @@ class CadFedLegislationScraperUtils(LegislationScraperUtils):
                     country_id = excluded.country_id,
                     country = excluded.country,
                     statute_year = excluded.statute_year,
-                    statute_chapter = excluded.statute_chapter
-                    publications = excluded.publications
+                    statute_chapter = excluded.statute_chapter,
+                    publications = excluded.publications,
                     last_major_event = excluded.last_major_event;
                 """).format(table=sql.Identifier(self.database_table_name))
 
             date_collected = datetime.now()
 
             for row in data:
+
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
-                       row.session, row.date_introduced, row.source_url, row.chamber_origin,
-                       json.dumps(row.committees, default=utils.json_serial),
-                       row.province_territory_id, row.province_territory, row.bill_type, row.bill_title,
-                       row.current_status,
-                       row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                       row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                       json.dumps(row.actions, default=utils.json_serial),
-                       json.dumps(row.votes, default=utils.json_serial),
-                       row.source_topic, row.topic, row.country_id, row.country,
-                       row.sponsor_affiliation, row.sponsor_gender, row.pm_name_full,
-                       row.pm_party, row.pm_party_id, row.statute_year, row.statute_chapter,
-                       row.publications, row.last_major_event)
+                    row.session, row.date_introduced, row.source_url, row.chamber_origin,
+                    json.dumps(row.committees, default=utils.json_serial),
+                    row.province_territory_id, row.province_territory, row.bill_type, row.bill_title,
+                    row.current_status,
+                    row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                    row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                    json.dumps(row.actions, default=utils.json_serial),
+                    json.dumps(row.votes, default=utils.json_serial),
+                    row.source_topic, row.topic, row.country_id, row.country,
+                    row.sponsor_affiliation, row.sponsor_gender, row.pm_name_full,
+                    row.pm_party, row.pm_party_id, row.statute_year, row.statute_chapter,
+                    row.publications,
+                    json.dumps(row.last_major_event, default=utils.json_serial))
 
                 try:
                     cur.execute(insert_legislator_query, tup)

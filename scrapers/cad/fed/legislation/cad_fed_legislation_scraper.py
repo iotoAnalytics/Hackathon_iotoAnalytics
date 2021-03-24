@@ -14,6 +14,7 @@ from datetime import datetime, date
 import csv
 import psycopg2
 import json
+from nameparser import HumanName
 
 base_url = 'https://www.parl.ca'
 xml_url_csv = 'xml_urls.csv'
@@ -94,7 +95,7 @@ def parse_xml_data(xml_url):
         if parl_number != current_session_number:
             continue
 
-        print(f'CURRENT SESSION: {current_session_number} | CHECKING SESSION: {parl_number}')
+        # print(f'CURRENT SESSION: {current_session_number} | CHECKING SESSION: {parl_number}')
 
         row = scraper_utils.initialize_row()
 
@@ -116,9 +117,10 @@ def parse_xml_data(xml_url):
 
         sponsor_details = affiliation.find('Person')
         full_name = sponsor_details.find('FullName').text
-        first_name = sponsor_details.find('FirstName').text
-        middle_name = sponsor_details.find('MiddleName').text if sponsor_details.find('MiddleName').text else ''
-        last_name = sponsor_details.find('LastName').text
+        hn = HumanName(full_name)
+        first_name = hn.first
+        middle_name = hn.middle
+        last_name = hn.last
         sponsor_gender = sponsor_details.attrib['Gender']
         sponsor_id = sponsor_details.attrib['id']
         party = get_english_title(affiliation.find('PoliticalParty'))
@@ -147,50 +149,48 @@ def parse_xml_data(xml_url):
 
         legislative_events_xml = events.find('LegislativeEvents')
         legislative_events = [get_event_details(event) for event in legislative_events_xml.findall('Event')]
-
         
         row.goverlytics_id = f'CADFED_{session}_{bill_number}'
+
+        # print(row.goverlytics_id)
+
         row.source_id = bill_id
-        row.bill_name = bill_title
+        row.bill_name = bill_number
         row.session = session
         row.date_introduced = introduced_date
-        row.chamber_origin = bill_title[0]
+        row.chamber_origin = bill_number[0]
         row.bill_type = bill_type
         row.bill_title = bill_title
         row.current_status = progress
-        row.principal_sponsor_id = scraper_utils.get_legislator_id(name_full=full_name)
+        ps_id = scraper_utils.get_legislator_id(name_last=last_name, name_first=first_name)
+        row.principal_sponsor_id = ps_id
         row.principal_sponsor = full_name
         #row.bill_text = 
-        row.bill_description = bill_title_short
+        row.bill_description = bill_title_short if bill_title_short else ''
         # row.bill_summary = 
         row.actions = legislative_events
         # row.votes = 
         # row.source_topic = 
-        # row.topic = 
-        row.province_territory_id = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory')
-        row.province_territory = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory_id')
-        row.sponsor_affiliation = sponsor_gender
+        # row.topic =
+        try:
+            row.province_territory_id = scraper_utils.get_attribute('legislator', 'goverlytics_id', ps_id, 'province_territory_id')
+            row.province_territory = scraper_utils.get_attribute('legislator', 'goverlytics_id', ps_id, 'province_territory')
+        except:
+            print(f'Could not find prov, terr data for: {full_name}')
+            row.province_territory = None
+            row.province_territory_id = None
+        # row.province_territory = scraper_utils.get_attribute('legislator', 'name_full', full_name, 'province_territory')
+        row.sponsor_affiliation = sponsor_affiliation
         row.sponsor_gender = sponsor_gender
-        row.pm_name_full = sponsor_affiliation
+        row.pm_name_full = pm_full_name
         row.pm_party = party_switcher[party] if party in party_switcher else party
         row.pm_party_id = scraper_utils.get_attribute('party', 'party', row.pm_party)
         row.statute_year = statute_year
         row.statute_chapter = statute_chapter
-        row.publications = publications
+        row.publications = publication_lst
         row.last_major_event = last_major_event
 
         bill_lst.append(row)
-
-        bill_lst.append(dict(bill_number=bill_number, bill_id=bill_id, introduction_date=introduced_date,
-                             session=session, bill_title=bill_title, bill_title_short=bill_title_short,
-                             bill_type=bill_type, sponsor_affiliation=sponsor_affiliation, sponsor_id=sponsor_id,
-                             sponsor_full_name=full_name, sponsor_first_name=first_name, sponsor_middle_name=middle_name,
-                             sponsor_last_name=last_name, sponsor_gender=sponsor_gender, sponsor_party=party,
-                             sponsor_party_abbr=party_abbreviation, pm_full_name=pm_full_name, pm_party=pm_party,
-                             pm_party_abbreviation=pm_party_abbreviation, statute_year=statute_year,
-                             statute_chapter=statute_chapter, publications=publication_lst,
-                             last_major_event=last_major_event, progress=progress,
-                             legislative_events=legislative_events))
 
     return bill_lst
 
@@ -211,12 +211,13 @@ if __name__ == '__main__':
             wr = csv.writer(result_file)
             wr.writerow(xml_urls)
 
-    xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
+    # xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
+    xml_urls = xml_urls if len(xml_urls) > 0 else []
 
     xml_data = [parse_xml_data(xml_url) for xml_url in xml_urls]
     xml_data = [item for sublist in xml_data for item in sublist]
 
-    print(xml_data)
+    if len(xml_data) > 0:
+        scraper_utils.insert_legislation_data_into_db(xml_data)
 
-    # if len(xml_data) > 0:
-    #     scraper_utils.insert_legislation_data_into_db(xml_data)
+    print('Complete!')
