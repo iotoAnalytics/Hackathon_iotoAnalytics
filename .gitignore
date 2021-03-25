@@ -5,3 +5,4 @@ __pycache__/
 test_legislation/
 test_legislators/
 .idea
+test.*

@@ -19,7 +19,7 @@ class DotDict(dict):
     __delattr__ = dict.__delitem__
 
 
-def json_serial(self, obj):
+def json_serial(obj):
     """
     Serializes objects so they may be placed into JSON format.
 

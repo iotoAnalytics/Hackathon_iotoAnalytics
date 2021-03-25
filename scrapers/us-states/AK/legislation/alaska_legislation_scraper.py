@@ -88,26 +88,22 @@ def get_links(url_table):
         links.append(temp)
     return links
 
-
 def go_into_links(link):
-    idict = {"cosponsors": 'NONE', "bill summary": 'NONE'}
+    idict = {"cosponsors": 'NONE',"bill summary": 'NONE'}
     url_request = request_url.UrlRequest.make_request(link, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
-    url_summary = url_soup.find_all('div', attrs={'class': 'information-holder'})
+    url_summary = url_soup.find_all('div', attrs = {'class':'information-holder'})
     a = url_summary[1].text.split('\n')
     lst = [x for x in a if x]
     try:
-        if lst[2] == 'Title':
-            idict["cosponsors"] = lst[1]
-        else:
-            if 'Hearing' in lst[2]:
-                temp = lst[1]
-            else:
-                temp = lst[1] + ', ' + lst[2]
-            idict['cosponsors'] = temp
-        idict['bill summary'] = lst[-1].replace('"', '')
+        idict['bill summary'] = lst[-1].replace('"','')
     except IndexError:
         pass
+    for sum in url_summary:
+        for item in sum.find_all('li'):
+            if 'Sponsor(S)' in item.text:
+                cosponsors = item.text.replace('Sponsor(S)', '').replace('\n', '').strip()
+                idict['cosponsors']=cosponsors
     return idict
 
 
@@ -166,9 +162,6 @@ def split_cosponsors(page_info):
 
 
 def get_dictionaries():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
 
     gov_url = past_terms_url(base_url)
     url_table = get_html(gov_url)
@@ -185,20 +178,6 @@ def get_dictionaries():
 
 
 def scrape(data_dict):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the date_collected, state, and state_id values,
-    as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
 
     row = scraper_utils.initialize_row()
     url = data_dict['urls']
@@ -233,9 +212,9 @@ def scrape(data_dict):
     # find cosponsor ID:
     c_id = []
     for item in cosponsors['Representatives']:
-        c_id.append(scraper_utils.get_legislator_id(role='Representative', name_last=item))
+        c_id.append(scraper_utils.get_legislator_id(role='Representative', name_last=item.title())
     for item in cosponsors['Senators']:
-        c_id.append(scraper_utils.get_legislator_id(role='Senator', name_last=item))
+        c_id.append(scraper_utils.get_legislator_id(role='Senator', name_last=item.title())
     row.cosponsors_id = c_id
 
     return row

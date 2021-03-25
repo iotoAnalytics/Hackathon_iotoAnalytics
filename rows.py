@@ -48,12 +48,27 @@ class USLegislationRow(LegislationRow):
     state_id: int = 0
     state: str = ''
 
-class CadLegislationRow(LegislationRow):
+class CALegislationRow(LegislationRow):
     """
     Data structure for housing data about each piece of legislation.
     """
     province_territory_id: int = 0
     province_territory: str = ''
+
+
+class CAFedLegislationRow(CALegislationRow):
+    """
+    Data structure for housing data about each piece of legislation.
+    """
+    sponsor_affiliation: str = ''
+    sponsor_gender: str = ''
+    pm_name_full: str = ''
+    pm_party: str = ''
+    pm_party_id: int = 0
+    statute_year: int = 0
+    statute_chapter: int = 0
+    publications: List[str] = field(default_factory=list)
+    last_major_event: dict = {}
 
 
 #########################################################
@@ -102,7 +117,7 @@ class USLegislatorRow(LegislatorRow):
 
 
 @dataclass
-class CadLegislatorRow(LegislatorRow):
+class CALegislatorRow(LegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
@@ -112,7 +127,7 @@ class CadLegislatorRow(LegislatorRow):
     region: str = ''
 
 @dataclass
-class CadFedLegislatorRow(CadLegislatorRow):
+class CAFedLegislatorRow(CALegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
