@@ -62,6 +62,8 @@ def get_bill_info(myurl):
     success = 0
     tries = 0
     while success == 0:
+        if tries == 4:
+            success = 1
         tries = tries + 1
         try:
 
@@ -96,8 +98,7 @@ def get_bill_info(myurl):
                 state_url = myurl2
             except:
                 pass
-        if tries == 5:
-            success = 1
+
 
     ptext = page_soup.findAll("p")
     bill_description = ""
@@ -498,45 +499,45 @@ if __name__ == '__main__':
     #     except:
     #         failed = 1
 
+    #
+    # failed = 0
+    # i = 322
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
+    #
+    #
+    # failed = 0
+    # i = 395
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
 
-    failed = 0
-    i = 322
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-
-
-    failed = 0
-    i = 395
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-    failed = 0
-    i = 5001
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
+    # failed = 0
+    # i = 5001
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
     # failed = 0
     # i = 501
     # while failed == 0:
@@ -548,11 +549,11 @@ if __name__ == '__main__':
     #         i += 1
     #     except:
     #         failed = 1
-    #
+
     # failed = 0
     # i = 1097
     # while failed == 0:
-    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB' + str(i)
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB ' + str(i)
     #     try:
     #         bill_info = get_bill_info(bill_link)
     #         if bill_info not in bill_infos:
@@ -561,19 +562,21 @@ if __name__ == '__main__':
     #     except:
     #         if i > 1476:
     #             failed = 1
-    #
-    # failed = 0
-    # i = 501
-    # while failed == 0:
-    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SR' + str(i)
-    #     try:
-    #         bill_info = get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
     #         i += 1
-    #     except:
-    #         if i > 560:
-    #             failed = 1
+    #
+    failed = 0
+    i = 501
+    while failed == 0:
+        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SR' + str(i)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            if i > 558:
+                failed = 1
+            i += 1
 
 
 
@@ -593,9 +596,9 @@ if __name__ == '__main__':
     # big_df = topics.add_topics(bill_df)
     print(big_df)
 
-    print(big_df)
+    # print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
-    print(big_list_of_dicts)
+    # print(big_list_of_dicts)
 
     print('Writing data to database...')
     scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)

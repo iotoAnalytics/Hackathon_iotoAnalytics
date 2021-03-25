@@ -327,7 +327,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
             try:
                 create_table_query = sql.SQL("""
                         
-                        
+                       
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -370,6 +370,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                 print(f'An exception occurred executing a query:\n{e}')
 
             insert_legislator_query = sql.SQL("""
+            
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                     INSERT INTO {table}
                     VALUES (
