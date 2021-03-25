@@ -29,6 +29,8 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 import boto3
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -60,7 +62,16 @@ def get_urls():
 
     scrape_url = f'''https://www.arkleg.state.ar.us/Bills/Search?tbType=&ddBienniumSession=2015%2F2015R&bienniumAll=on&hdnSessions=on%2C{years}%2C&ddChamber=A&tbActNumber=&tbBillNumber=&ddSponsor=&ddCoSponsor=&tbAllWords=&tbExactPhrase=&tbOneWord=&tbWithoutWords=&ddExclusivity=Only
             '''
+    header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
+    options = Options()
+    options.headless = True
+    driver = webdriver.Chrome(executable_path=r'C:\\Users\\Avery\\Downloads\\chromedriver_win32\\chromedriver.exe', options=options)
 
+    driver.switch_to.default_content()
+    driver.get(scrape_url)
+    driver.maximize_window()
+    link = driver.find_element_by_tag_name('a')
+    print(link)
     
 
 
