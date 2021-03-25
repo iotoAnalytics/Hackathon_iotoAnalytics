@@ -372,131 +372,131 @@ def get_bill_info(myurl):
                  'cosponsors': [], 'cosponsors_id': [], 'goverlytics_id': goverlytics_id, 'url': url,
                  'committees': committees, 'site_topic': "", 'votes': vote_events, 'topic': "",
                  'country_id': scraper_utils.country_id, 'country': scraper_utils.country}
-    # print(bill_info)
+    print(bill_info)
     return bill_info
 
 
 if __name__ == '__main__':
     #
     bill_infos = []
-
-    failed = 0
-    i = 1735
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?211+sum+HB' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
     #
-    failed = 0
-    i = 270
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-
-    failed = 0
-    i = 272
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-
-    failed = 0
-    i = 275
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
+    # failed = 0
+    # i = 1735
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?211+sum+HB' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
     #
-    failed = 0
-    i = 285
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except Exception as ex:
-
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-
-            message = template.format(type(ex).__name__, ex.args)
-
-            # print(message)
-            failed = 1
-
-
-    failed = 0
-    i = 288
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-    failed = 0
-    i = 292
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
+    # failed = 0
+    # i = 270
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
     #
-    failed = 0
-    i = 308
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
+    #
+    # failed = 0
+    # i = 272
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
+    #
+    # failed = 0
+    # i = 275
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
+    # #
+    # failed = 0
+    # i = 285
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except Exception as ex:
+    #
+    #         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+    #
+    #         message = template.format(type(ex).__name__, ex.args)
+    #
+    #         # print(message)
+    #         failed = 1
+    #
+    #
+    # failed = 0
+    # i = 288
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
+    # failed = 0
+    # i = 292
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    # #
+    # failed = 0
+    # i = 308
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
 
-    failed = 0
-    i = 310
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
+    # failed = 0
+    # i = 310
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SJ' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
 
 
     failed = 0
@@ -537,43 +537,43 @@ if __name__ == '__main__':
         except:
             failed = 1
 
-    failed = 0
-    i = 501
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+HR' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            failed = 1
-
-    failed = 0
-    i = 1097
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            if i > 1476:
-                failed = 1
-
-    failed = 0
-    i = 501
-    while failed == 0:
-        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SR' + str(i)
-        try:
-            bill_info = get_bill_info(bill_link)
-            if bill_info not in bill_infos:
-                bill_infos.append(bill_info)
-            i += 1
-        except:
-            if i > 560:
-                failed = 1
+    # failed = 0
+    # i = 501
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+HR' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         failed = 1
+    #
+    # failed = 0
+    # i = 1097
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         if i > 1476:
+    #             failed = 1
+    #
+    # failed = 0
+    # i = 501
+    # while failed == 0:
+    #     bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SR' + str(i)
+    #     try:
+    #         bill_info = get_bill_info(bill_link)
+    #         if bill_info not in bill_infos:
+    #             bill_infos.append(bill_info)
+    #         i += 1
+    #     except:
+    #         if i > 560:
+    #             failed = 1
 
 
 
