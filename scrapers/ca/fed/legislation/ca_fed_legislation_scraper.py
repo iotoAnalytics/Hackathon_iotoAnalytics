@@ -1,3 +1,8 @@
+'''
+Scraper for collecting Canadian federal legislation data.
+Author: Justin Tendeck
+'''
+
 import sys, os
 from pathlib import Path
 
@@ -22,17 +27,32 @@ xml_url_csv = 'xml_urls.csv'
 table_name = 'ca_federal_legislation'
 
 scraper_utils = CAFedLegislationScraperUtils()
+
+# Used for switching website party to database representation
 party_switcher = {
     'NDP': 'New Democratic',
     'Green Party': 'Green'
 }
 
 def get_soup(url, parser='lxml'):
+    """
+    Used for getting BeautifulSup representation of webpage.
+    Args:
+        url: URL for webpage you wish to collect data from
+        parser: Type of BS parser to use.
+    Returns:
+        BeautifulSoup page representation
+    """
     page = requests.get(url)
     return BeautifulSoup(page.content, parser)
 
 
 def get_xml_urls():
+    """
+    Returns list of XML URLs containing basic information about every bill.
+    Returns:
+        XML URL list
+    """
     url = f'{base_url}/legisinfo'
     soup = get_soup(url)
 
@@ -45,6 +65,13 @@ def get_xml_urls():
 
 
 def get_english_title(terms):
+    """
+    Returns English title for a given term.
+    Args:
+        terms: term you wish to extract english title from
+    Returns:
+        String containing English term
+    """
     titles = terms.findall('Title')
 
     for title in titles:
@@ -55,6 +82,14 @@ def get_english_title(terms):
 
 
 def get_event_details(event):
+    """
+    Used for extract event details from a given event, including chamber,
+    meeting number, committee name, and status.
+    Args:
+        event: the event you wish to extract details from
+    Returns:
+        dictionary containg chamber, meeting, committee and status
+    """
     chamber = event.attrib['chamber']
     date = datetime.strptime(event.attrib['date'], '%Y-%m-%d')
     meeting_num = event.attrib['meetingNumber']
@@ -70,6 +105,10 @@ def get_event_details(event):
     return dict(chamber=chamber, date=date, meeting_number=meeting_num, committee=committee_full, status=status)
 
 def get_current_session_number():
+    """
+    Used for extracting the most recent parliamentary session.
+    Returns: Most recent parliamentary session number
+    """
     session_page_url = f'{base_url}/LegisInfo/Home.aspx'
     soup = get_soup(session_page_url)
 
@@ -78,13 +117,27 @@ def get_current_session_number():
     return current_session.split('-')[0]
 
 def get_tag_text(tag):
+    """
+    Returns all of the text from a given tag. Also includes text from all child/nested
+    tags.
+    Args:
+        tag: tag you wish to extract text from
+    Returns:
+        str: all text from a given tag
+    """
     txt = ''
     for childtxt in tag.itertext():
         if childtxt:
             txt += childtxt.strip() + ' '
     return txt.strip()
 
-def get_bill_file_details(bill_file_url):
+def get_bill_summary_and_text(bill_file_url):
+    """
+    Extracts bill summary and text from the webpage of a given bill URL.
+    Args:
+        bill_file_url: URL for the a given bill's parl.ca webpage
+    Returns: dict containing bill_summary and bill_text
+    """
     bill_data = {'bill_text': '', 'bill_summary': ''}
     if not bill_file_url: return bill_data
     
@@ -100,14 +153,25 @@ def get_bill_file_details(bill_file_url):
 
     return bill_data
 
-def parse_xml_data(xml_url):
+
+def scrape(xml_url):
+    """
+    Entry point for scraping. Bill data comes from an XML sheet that lists a set of 
+    bills along with basic information. Since some datapoints are missing from the main
+    XML sheet, additional data collection may occur, including data collection from an
+    individual bill's information page.
+    Args:
+        xml_url: XML URL containing information about a list of bill
+    Returns:
+        List of rows containing bill information
+    """
     page = requests.get(xml_url)
     root = ET.fromstring(page.content)
 
     current_session_number = get_current_session_number()
 
     bill_lst = []
-    for bill in root.findall('Bill')[250:300]:
+    for bill in root.findall('Bill'):
 
         parl_session = bill.find('ParliamentSession')
         parl_number = parl_session.attrib["parliamentNumber"]
@@ -167,7 +231,7 @@ def parse_xml_data(xml_url):
             for pf in publication_files:
                 if pf.attrib['language'] == 'en':
                     bill_file_url = f"https:{pf.attrib['relativePath']}"
-        bill_file_details = get_bill_file_details(bill_file_url)
+        bill_file_details = get_bill_summary_and_text(bill_file_url)
 
         events = bill.find('Events')
 
@@ -202,9 +266,6 @@ def parse_xml_data(xml_url):
         row.bill_description = bill_title
         row.bill_summary = bill_file_details['bill_summary']
         row.actions = legislative_events
-        # row.votes = 
-        # row.source_topic = 
-        # row.topic =
         try:
             row.province_territory_id = scraper_utils.get_attribute('legislator', 'goverlytics_id', ps_id, 'province_territory_id')
             row.province_territory = scraper_utils.get_attribute('legislator', 'goverlytics_id', ps_id, 'province_territory')
@@ -228,7 +289,6 @@ def parse_xml_data(xml_url):
 
 
 if __name__ == '__main__':
-
     xml_urls = []
 
     try:
@@ -237,7 +297,6 @@ if __name__ == '__main__':
             xml_urls = list(reader)[0]
     except FileNotFoundError:
         print(f'{xml_url_csv} does not exist. Scraping urls...')
-
         xml_urls = get_xml_urls()
         with open(xml_url_csv, 'w') as result_file:
             wr = csv.writer(result_file)
@@ -246,7 +305,8 @@ if __name__ == '__main__':
     # xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
     xml_urls = xml_urls if len(xml_urls) > 0 else []
 
-    xml_data = [parse_xml_data(xml_url) for xml_url in xml_urls]
+    xml_data = [scrape(xml_url) for xml_url in xml_urls]
+    # scrape() returns a list so we need to coalesce data into one large list
     xml_data = [item for sublist in xml_data for item in sublist]
 
     if len(xml_data) > 0:
