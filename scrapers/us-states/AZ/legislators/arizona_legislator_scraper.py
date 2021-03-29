@@ -192,7 +192,7 @@ def collect_leg_data(myurl):
                 'occupation': occupation,
                 'years_active': years_active, 'most_recent_term_id': most_recent_term_id, 'addresses': [],
                 'military_experience': ""}
-    print(leg_info)
+    # print(leg_info)
 
     return leg_info
 
