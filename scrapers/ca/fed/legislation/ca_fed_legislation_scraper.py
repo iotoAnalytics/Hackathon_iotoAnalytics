@@ -21,6 +21,7 @@ import psycopg2
 import json
 from nameparser import HumanName
 import io
+from tqdm import tqdm
 
 base_url = 'https://www.parl.ca'
 xml_url_csv = 'xml_urls.csv'
@@ -171,7 +172,7 @@ def scrape(xml_url):
     current_session_number = get_current_session_number()
 
     bill_lst = []
-    for bill in root.findall('Bill'):
+    for bill in tqdm(root.findall('Bill'), "Bill scrapin'"):
 
         parl_session = bill.find('ParliamentSession')
         parl_number = parl_session.attrib["parliamentNumber"]
@@ -309,7 +310,7 @@ if __name__ == '__main__':
     # scrape() returns a list so we need to coalesce data into one large list
     xml_data = [item for sublist in xml_data for item in sublist]
 
-    if len(xml_data) > 0:
-        scraper_utils.insert_legislation_data_into_db(xml_data)
+    # if len(xml_data) > 0:
+    #     scraper_utils.insert_legislation_data_into_db(xml_data)
 
     print('Complete!')

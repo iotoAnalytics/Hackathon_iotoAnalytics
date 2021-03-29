@@ -80,6 +80,26 @@ class LegislationScraperUtils:
         self.row_type = row_type
 
     def get_attribute(self, table_name, column_to_search, value_to_search, attribute_to_return='id'):
+        """
+        Essentially a dataframe search function. Specify the table you would like to search,
+        the column you want to search, the value you want to use as a search key, and the 
+        attribute to return. Tables come from the database and depend on the scraper type.
+        For example, if you have a US state scraper for North Carolina, searching 'legislator'
+        will search the US state legislator table for North Carolina. Note that this function
+        only returns the first value found.
+        Args:
+            table_name: The table to search. Must be either country, legislator, division,
+                or party, passed in as a string.
+            column_to_search: The column you want to search. If you wanted to find an attribute
+                by last name, for example, you would specify name_last
+            value_to_search: The search key. For example, you would enter 'Smith' if you wanted
+                to search for legislators with that last name.
+            attribute_to_return: The attribute you wanted to return from the search. You could
+                enter goverlytics_id if you wanted return the goverlytics_id when searching
+                for the last name Smith.
+        Returns:
+            Single value based on search parameters.
+        """
         accepted_tables = ['country', 'legislator', 'division', 'party']
         if table_name not in accepted_tables:
             raise Exception(f'Error: table must be one of the following: {accepted_tables}')
@@ -95,10 +115,7 @@ class LegislationScraperUtils:
         
         val = df.loc[df[column_to_search] == value_to_search][attribute_to_return]
         if val.any():
-            try:
-                return int(val.values[0])
-            except Exception:
-                return val.values[0]
+            return self._convert_value_to_column_type(column_to_search, val.values[0])
         else:
             raise Exception(f'Could not locate value using following search parameters: table_name={table_name}, column_to_search={column_to_search}, value_to_search={value_to_search}, attribute_to_return={attribute_to_return}')
 
@@ -107,6 +124,10 @@ class LegislationScraperUtils:
         Used to try and convert values into int. Functions like df.loc might return
         a numpy.int64 which is incompatible with the database, so this function must
         be used.
+        Args:
+            value: The value to convert to an int.
+        Return:
+            Value converted to an int.
         """
         try:
             value = int(value)
@@ -115,6 +136,14 @@ class LegislationScraperUtils:
         return value
 
     def _convert_value_to_column_type(self, column, value):
+        """
+        Used to convert columns to the appropriate datatype. Some columns such as source_id
+        must remain as a string, however they maybe they may inadvertently be converted to
+        something like an int.
+        Args:
+            column: The column that the value is being placed into
+            value: The value to convert
+        """
         str_columns = ['source_id']
 
         if column in str_columns:
@@ -124,8 +153,9 @@ class LegislationScraperUtils:
 
     def initialize_row(self):
         '''
-        Factory method for creating a legislation row. This gets sent back to the scrape() function
-        which then gets filled in with values collected from the website.
+        Used to create a row with the default values in place.
+        Returns:
+            row filled with default values.
         '''
         row = copy.deepcopy(self.row_type)
         row.country = self.country
@@ -135,6 +165,10 @@ class LegislationScraperUtils:
     def search_for_legislators(self, **kwargs) -> pd.DataFrame:
         """
         Returns a dataframe containing search results based on kwargs.
+        Args:
+            kwags: key-value pairs containing parameters to use for searching
+        Returns:
+            Dataframe containing search results
         """
 
         query_lst = []
@@ -173,7 +207,12 @@ class LegislationScraperUtils:
 
     def get_legislator_id(self, **kwargs) -> int:
         """
-        Method for getting the Goverlytics ID based on search parameters.
+        Method for getting the Goverlytics ID based on search parameters. Note that
+        this returns the first value found.
+        Args:
+            kwags: key-value pairs containing parameters to use for searching
+        Returns:
+            goverlytics_id based on search parameters.
         """
         df = self.search_for_legislators(**kwargs)
         if df is not None:
@@ -183,8 +222,18 @@ class LegislationScraperUtils:
 
     def legislators_search_startswith(self, column_val_to_return, column_to_search, startswith, **kwargs):
         """
-        Utilizes panda's .startswith method for finding information about legislators. Useful for finding
-        things like the Goverlytics ID when given only the first initial and last name of a legislator.
+        Utilizes panda's .startswith method for finding information about legislators.
+        Useful for finding  things like the Goverlytics ID when given only the first
+        initial and last name of a legislator.
+        Args:
+            column_val_to_return: The value to return. For example, the goverlytics_id.
+            column_to_search: The column you would like to search. For example, name_first.
+                Must be a valid column in the legislator database table.
+            startswith: The value to search using the startswith function. For example, if
+                searching "A. Smith", you would pass in "A".
+            kwargs: Additional parameters used for searching. Must be included.
+        Returns:
+            Val found based on search parameters
         """
         val = None
 
@@ -214,13 +263,17 @@ class LegislationScraperUtils:
 
 
 class USFedLegislationScraperUtils(LegislationScraperUtils):
-
+    """
+    Scraper used for collecting US Federal legislation data.
+    """
     def __init__(self, database_table_name='us_fed_legislation', legislator_table_name='us_fed_legislators'):
         super().__init__('us', database_table_name, legislator_table_name, USLegislationRow())
 
     def insert_legislation_data_into_db(self, data) -> None:
         """
-        Takes care of inserting legislation data into database.
+        Takes care of inserting legislation data into database. Must be a list of dot-accessible
+        data structures, such as a rows generated by the initialize_row() method. Dictionaries
+        are also acceptable.
         """
         if not isinstance(data, list):
             raise TypeError('Data being written to database must be a list of USStateLegislationRows!')
@@ -332,6 +385,9 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
 
 
 class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
+    """
+    Utilities for collecting US state legislation.
+    """
     def __init__(self, state_abbreviation, database_table_name='us_state_legislation',
                  legislator_table_name='us_state_legislators'):
         super().__init__(database_table_name, legislator_table_name)

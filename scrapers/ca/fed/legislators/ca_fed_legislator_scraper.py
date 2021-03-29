@@ -37,12 +37,13 @@ import re
 import pandas as pd
 import xml.etree.ElementTree as ET
 import traceback
+from tqdm import tqdm
 
 scraper_utils = CAFedLegislatorScraperUtils()
 
-scrape_mps = False
-scrape_senators = True
-write_results_to_database = True
+scrape_mps = True
+scrape_senators = False
+write_results_to_database = False
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
@@ -81,7 +82,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[300:]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:50]:
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -212,7 +213,7 @@ def get_mp_fine_details():
     """
     global mp_df
 
-    for i, row in mp_df.iterrows():
+    for i, row in tqdm(mp_df.iterrows()):
         contact_url = f"{row['source_url']}#contact"
         contact = get_mp_contact_details(contact_url)
         mp_df.at[i, 'email'] = contact['email']
