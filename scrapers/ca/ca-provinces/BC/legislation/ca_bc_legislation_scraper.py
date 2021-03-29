@@ -58,7 +58,8 @@ chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-extensions')
 chrome_options.add_argument('--disable-gpu')
 
-driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+                          chrome_options=chrome_options)
 
  
 def get_urls(myurl):
@@ -192,7 +193,7 @@ def scrape(url):
         date = date.split(" ")
         # date = date[:5]
         # date = " ".join(date)
-        print(date)
+        # print(date)
 
 
         #
@@ -201,7 +202,8 @@ def scrape(url):
 
 
     except:
-        print(transformed_url)
+        pass
+        # print(transformed_url)
     # driver.get(transformed_url)
     # timeout = 5
     #
@@ -281,13 +283,14 @@ if __name__ == '__main__':
         'bill_name')  # .reset_index(drop=True)
     url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
-    less_urls = url_df['source_url'][:11]
+    less_urls = url_df['source_url'][:6]
+    urls = url_df['source_url']
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls
     with Pool() as pool:
-        data = pool.map(scrape, less_urls)
+        data = pool.map(scrape, urls)
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.

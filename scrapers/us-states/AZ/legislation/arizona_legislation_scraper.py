@@ -52,7 +52,11 @@ legislator_table_name = 'us_az_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
 
-
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+                          chrome_options=chrome_options)
+wait = WebDriverWait(driver, 10)
 
 def find_bill_links(myurl):
     bill_links = []
@@ -115,13 +119,12 @@ def collect_bill_data(myurl):
     #
     #     try:
     #         tries += 1
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')
-    driver = webdriver.Chrome('chromedriver.exe', chrome_options=chrome_options)
-    wait = WebDriverWait(driver, 10)
 
-    driver.get(myurl)
-    driver.switch_to.default_content()
+    #
+    # driver.get(myurl)
+    # driver.switch_to.default_content()
+    #         divs = driver.find_elements_by_id('billStatusSearchDiv')
+    #         divs = driver.find_elements_by_id('billStatusSearchDiv')
     #         divs = driver.find_elements_by_id('billStatusSearchDiv')
     #         bill_html = divs[0].get_attribute('innerHTML')
     #         bill_soup = soup(bill_html, 'lxml')
@@ -149,10 +152,12 @@ def collect_bill_data(myurl):
     #         # print(myurl)
     #         tries += 1
 
-    driver.get(myurl)
-    timeout = 5
-
     try:
+
+
+        driver.get(myurl)
+        timeout = 5
+
         element_present = EC.presence_of_element_located((By.CLASS_NAME, 'row content-large'))
         WebDriverWait(driver, timeout).until(element_present)
 
@@ -160,54 +165,15 @@ def collect_bill_data(myurl):
     except:
         # print("timeout")
         return {'source_url': myurl, 'bill_title': "",
-                 'current_status': "", 'state': 'AZ', 'state_id': 4, 'topic': "",
-                 'date_introduced': None, 'actions': [], 'committees': [],
-                 'bill_description': "", 'bill_summary': "", 'votes': []}
+                'current_status': "", 'state': 'AZ', 'state_id': 4, 'topic': "",
+                'date_introduced': None, 'actions': [], 'committees': [],
+                'bill_description': "", 'bill_summary': "", 'votes': []}
+    print('successful')
 
     html = driver.page_source
     bill_soup = soup(html, 'html.parser')
+    print(bill_soup)
 
-
-
-    #     if sponsor in dbwork.pslastnames:
-    #         suindex = dbwork.pslastnames.index(sponsor)
-    #         # print(sponsor)
-    #         if dbwork.psids[suindex] not in cosponsors_id:
-    #             cosponsors_id.append(dbwork.psids[suindex])
-    # for sponsor in cosponsors:
-    #     if sponsor in dbwork.psfullnames:
-    #         # print(sponsor)
-    #         suindex = dbwork.psfullnames.index(sponsor)
-    #         if dbwork.psids[suindex] not in cosponsors_id:
-    #             cosponsors_id.append(dbwork.psids[suindex])
-    #
-    # for sponsor in sponsors:
-    #     if sponsor in dbwork.pslastnames:
-    #         # print(sponsor)
-    #         suindex = dbwork.pslastnames.index(sponsor)
-    #         if dbwork.psids[suindex] not in sponsors_id:
-    #             sponsors_id.append(dbwork.psids[suindex])
-    #
-    # for sponsor in sponsors:
-    #     if sponsor in dbwork.psfullnames:
-    #         # print(sponsor)
-    #         suindex = dbwork.psfullnames.index(sponsor)
-    #         if dbwork.psids[suindex] not in sponsors_id:
-    #             sponsors_id.append(dbwork.psids[suindex])
-    #
-    # if principal_sponsor in dbwork.pslastnames:
-    #     # print(principal_sponsor)
-    #     suindex = dbwork.pslastnames.index(principal_sponsor)
-    #     principal_sponsor_id = int(dbwork.psids[suindex])
-    # elif principal_sponsor in dbwork.psfullnames:
-    #     # print(principal_sponsor)
-    #     suindex = dbwork.psfullnames.index(principal_sponsor)
-    #     principal_sponsor_id = int(dbwork.psids[suindex])
-    # else:
-    #     principal_sponsor_id = None
-
-    # print(principal_sponsor_id)
-    # print(cosponsors_id)
     bill_title = ""
     try:
         short_title = bill_soup.find("label", {"class": "col-md-8"})
@@ -483,7 +449,6 @@ def collect_bill_texts(bill_id):
     except:
         principal_sponsor_id = 0
 
-
     # root = ET.fromstring(str(response).encode("utf-8"))
 
     # print(root)
@@ -493,7 +458,7 @@ def collect_bill_texts(bill_id):
                  'cosponsors': cosponsors, 'cosponsors_id': cosponsors_id,
                  'sponsors': sponsors, 'sponsors_id': sponsors_id, 'country_id': scraper_utils.country_id,
                  'country': scraper_utils.country}
-    # print(bill_info)
+    print(bill_info)
     return bill_info
 
 

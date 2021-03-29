@@ -32,7 +32,8 @@ scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
 
-driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+                          chrome_options=chrome_options)
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 
@@ -52,7 +53,7 @@ def get_urls(myurl):
 
     html = driver.page_source
     page_soup = soup(html, 'html.parser')
-    # print(page_soup)
+    print(page_soup)
     urls = []
 
     # print(page_soup)
