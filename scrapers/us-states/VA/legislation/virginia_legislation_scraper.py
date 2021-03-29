@@ -6,6 +6,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
+import numpy as np
 from multiprocessing import Pool
 import pandas as pd
 from database import Database
@@ -62,6 +63,8 @@ def get_bill_info(myurl):
     success = 0
     tries = 0
     while success == 0:
+        if tries == 4:
+            success = 1
         tries = tries + 1
         try:
 
@@ -96,8 +99,7 @@ def get_bill_info(myurl):
                 state_url = myurl2
             except:
                 pass
-        if tries == 5:
-            success = 1
+
 
     ptext = page_soup.findAll("p")
     bill_description = ""
@@ -318,9 +320,12 @@ def get_bill_info(myurl):
     pshn = HumanName(principal_sponsor)
     principal_sponsor_id = 0
     principal_sponsor = pshn.last
-    search_for = dict(name_last=pshn.last, name_first=pshn.first)
+    try:
+        search_for = dict(name_last=pshn.last, name_first=pshn.first)
 
-    principal_sponsor_id = scraper_utils.get_legislator_id(**search_for)
+        principal_sponsor_id = scraper_utils.get_legislator_id(**search_for)
+    except:
+        pass
 
 
     all_patrons = marg_section.findAll("a")[1]
@@ -362,8 +367,8 @@ def get_bill_info(myurl):
     goverlytics_id = "VA_2019-2020_" + bill_name
     url = "/us/VA/legislation/" + goverlytics_id
 
-    bill_info = {'state_url': state_url, 'bill_name': bill_name, 'bill_type': bill_type,
-                 'chamber_origin': chamber_origin, 'state': 'VA', 'state_id': 51, 'bill_state_id': "",
+    bill_info = {'source_url': state_url, 'bill_name': bill_name, 'bill_type': bill_type,
+                 'chamber_origin': chamber_origin, 'state': 'VA', 'state_id': 51, 'source_id': "",
                  'bill_title': bill_title,
                  'bill_description': bill_description.strip(), 'bill_summary': bill_summary.strip(),
                  'bill_text': bill_text, 'actions': actions, 'date_introduced': date_introduced,
@@ -372,14 +377,14 @@ def get_bill_info(myurl):
                  'cosponsors': [], 'cosponsors_id': [], 'goverlytics_id': goverlytics_id, 'url': url,
                  'committees': committees, 'site_topic': "", 'votes': vote_events, 'topic': "",
                  'country_id': scraper_utils.country_id, 'country': scraper_utils.country}
-    # print(bill_info)
+    print(bill_info)
     return bill_info
 
 
 if __name__ == '__main__':
     #
     bill_infos = []
-
+    #
     failed = 0
     i = 1735
     while failed == 0:
@@ -391,7 +396,7 @@ if __name__ == '__main__':
             i += 1
         except:
             failed = 1
-    #
+
     failed = 0
     i = 270
     while failed == 0:
@@ -550,7 +555,21 @@ if __name__ == '__main__':
             failed = 1
 
     failed = 0
-    i = 1097
+    i = 1115
+    while failed == 0:
+        bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB' + str(i)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            if i > 1200:
+                failed = 1
+            i += 1
+
+    failed = 0
+    i = 1200
     while failed == 0:
         bill_link = 'https://lis.virginia.gov/cgi-bin/legp604.exe?212+sum+SB' + str(i)
         try:
@@ -561,6 +580,7 @@ if __name__ == '__main__':
         except:
             if i > 1476:
                 failed = 1
+            i += 1
 
     failed = 0
     i = 501
@@ -572,8 +592,9 @@ if __name__ == '__main__':
                 bill_infos.append(bill_info)
             i += 1
         except:
-            if i > 560:
+            if i > 558:
                 failed = 1
+            i += 1
 
 
 
@@ -585,17 +606,18 @@ if __name__ == '__main__':
     #     bill_data = pool.map(func=app.get_bill_info, iterable=all_links)
 
     big_df = pd.DataFrame(bill_infos)
+    print(big_df)
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
-    big_df['source_url'] = big_df['state_url']
-    big_df['source_id'] = big_df['bill_state_id']
-
+    # big_df['source_url'] = big_df['state_url']
+    # big_df['source_id'] = big_df['bill_state_id']
+    big_df['principal_sponsor_id'] = big_df['principal_sponsor_id'].replace({np.nan: None})
     # big_df = topics.add_topics(bill_df)
     print(big_df)
 
-    print(big_df)
+    # print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
-    print(big_list_of_dicts)
+    # print(big_list_of_dicts)
 
     print('Writing data to database...')
     scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)

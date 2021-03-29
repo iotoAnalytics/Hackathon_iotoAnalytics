@@ -60,7 +60,7 @@ chrome_options.add_argument('--disable-gpu')
 
 driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
-
+ 
 def get_urls(myurl):
     driver.get(myurl)
     timeout = 5
@@ -176,17 +176,28 @@ def scrape(url):
     url = iframe["src"]
 
     transformed_url = url.replace(' ', '%20')
-    print(transformed_url)
+    # print(transformed_url)
     try:
         uClient = uReq(transformed_url)
         page_html = uClient.read()
         uClient.close()
         # # # html parsing
         page_soup = soup(page_html, "html.parser")
+        # print(page_soup)
         row.bill_text = " ".join(page_soup.text.split())
 
-        explan = page_soup.find("div", {"class": "explannote"})
-        print(explan)
+        center = page_soup.find("p", {"align": "center"})
+        date = center.text.split("on the")[1]
+        date = date.replace("day of", "").strip()
+        date = date.split(" ")
+        # date = date[:5]
+        # date = " ".join(date)
+        print(date)
+
+
+        #
+        # explan = page_soup.find("div", {"class": "explannote"})
+        # print(explan)
 
 
     except:
@@ -270,7 +281,7 @@ if __name__ == '__main__':
         'bill_name')  # .reset_index(drop=True)
     url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
-    less_urls = url_df['source_url'][:5]
+    less_urls = url_df['source_url'][:11]
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
@@ -280,6 +291,6 @@ if __name__ == '__main__':
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    # scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')
