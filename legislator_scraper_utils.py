@@ -180,7 +180,7 @@ class LegislatorScraperUtils():
             # print(message)
 
         if year_started != "":
-            years_active = list(range(int(year_started), 2021))
+            years_active = list(range(int(year_started), 2022))
             # years_active_lst.append(years_active_i)
         else:
             years_active = []
@@ -327,7 +327,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
             try:
                 create_table_query = sql.SQL("""
                         
-                       
+                       DROP TABLE IF EXISTS {table};
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,

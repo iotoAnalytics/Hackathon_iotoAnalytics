@@ -924,7 +924,7 @@ def get_committee_info(myurl):
     except:
         pass
 
-    print(committee_info)
+    # print(committee_info)
 
     return committee_info
 
@@ -968,7 +968,7 @@ if __name__ == '__main__':
     # get committee info
     committee_url = 'https://committees.senate.michigan.gov/'
     committees = get_committee_urls(committee_url)
-    print(committees)
+    # print(committees)
 
     with Pool() as pool:
 
@@ -1023,7 +1023,7 @@ if __name__ == '__main__':
     wikidf = wikidf.rename(columns={'years_active': 'years_active_wiki'})
 
     mergedSensData = pd.merge(sendf, wikidf, how='left', on=["name_first", "name_last"])
-    print(mergedSensData)
+    # print(mergedSensData)
 
     mergedSensData['years_active'] = np.where(mergedSensData['years_active'] == 0, mergedSensData['years_active_wiki'],
                                               mergedSensData['years_active'])
@@ -1034,7 +1034,7 @@ if __name__ == '__main__':
     mergedSensData['most_recent_term_id'] = mergedSensData['most_recent_term_id'].replace({np.nan: None})
     mergedSensData['years_active'] = mergedSensData['years_active'].replace({np.nan: None})
     mergedSensData['education'] = mergedSensData['education'].replace({np.nan: None})
-    print(mergedSensData)
+    # print(mergedSensData)
 
     rep_bio = get_rep_bio(house_page)
     rep_bio_df = pd.DataFrame(rep_bio)
@@ -1084,7 +1084,7 @@ if __name__ == '__main__':
 
     rep_wiki_link = 'https://en.wikipedia.org/wiki/Michigan_House_of_Representatives'
     wiki_links_areas = get_rep_wiki_links(rep_wiki_link)
-    print(wiki_links_areas)
+    # print(wiki_links_areas)
     # wla_rep_df = pd.DataFrame(wiki_links_areas)
     # wiki_links = wla_rep_df['wiki_url']
     # wla_rep_df['seniority'] = 0
@@ -1094,7 +1094,7 @@ if __name__ == '__main__':
     with Pool() as pool:
         rep_data = pool.map(func=wiki_rep_areas, iterable=wiki_links_areas)
     wiki_df = pd.DataFrame(rep_data)
-    print(wiki_df)
+    # print(wiki_df)
 
 
     mergedRepsData = pd.merge(rep_df, wiki_df, how='left', on=["name_first", "name_last"])
@@ -1112,7 +1112,7 @@ if __name__ == '__main__':
     mergedRepsData["source_id"] = ""
 
 
-    print(mergedRepsData)
+    # print(mergedRepsData)
 
     big_df = (mergedSensData.append(mergedRepsData, sort=True))
     big_df['seniority'] = None
@@ -1127,5 +1127,14 @@ if __name__ == '__main__':
     big_df['country'] = sample_row.country
     # # #
     big_df['country_id'] = sample_row.country_id
-
+    big_df = big_df[big_df['party_id'] != 0]
     print(big_df)
+
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+
+    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
