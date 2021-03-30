@@ -52,7 +52,13 @@ state_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation')
 database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
 country = str(configParser.get('scraperConfig', 'country'))
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
+scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
+
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--headless')
+
+driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+                          chrome_options=chrome_options)
 
 
 def collect_rep_bio_info(myurl):
@@ -62,15 +68,15 @@ def collect_rep_bio_info(myurl):
     # uClient.close()
     # # # html parsing
     # page_soup = soup(page_html, "html.parser")
-    chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')
 
-    driver = webdriver.Chrome('chromedriver', chrome_options=chrome_options)
 
-    driver.get(myurl)
-    timeout = 5
+
 
     try:
+
+        driver.get(myurl)
+        timeout = 5
+
         element_present = EC.presence_of_element_located((By.CLASS_NAME, 'table table-striped sortable memberList'))
         WebDriverWait(driver, timeout).until(element_present)
 
