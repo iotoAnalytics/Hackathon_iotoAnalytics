@@ -88,6 +88,7 @@ def get_links(url_table):
         links.append(temp)
     return links
 
+
 def go_into_links(link):
     idict = {"cosponsors": 'NONE',"bill summary": 'NONE'}
     url_request = request_url.UrlRequest.make_request(link, header)
@@ -162,6 +163,9 @@ def split_cosponsors(page_info):
 
 
 def get_dictionaries():
+    '''
+    Insert logic here to get all URLs you will need to scrape from the page.
+    '''
 
     gov_url = past_terms_url(base_url)
     url_table = get_html(gov_url)
@@ -212,17 +216,19 @@ def scrape(data_dict):
     # find cosponsor ID:
     c_id = []
     for item in cosponsors['Representatives']:
-        c_id.append(scraper_utils.get_legislator_id(role='Representative', name_last=item.title())
+        c_id.append(scraper_utils.get_legislator_id(role='Representative', name_last=item.title()))
     for item in cosponsors['Senators']:
-        c_id.append(scraper_utils.get_legislator_id(role='Senator', name_last=item.title())
+        c_id.append(scraper_utils.get_legislator_id(role='Senator', name_last=item.title()))
     row.cosponsors_id = c_id
 
+    print("done row for: " + row.bill_name)
     return row
 
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
-    dictionaries = get_dictionaries()
+    dictionaries = get_dictionaries()[0:5]
+    print('grabbed dictionaries')
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
@@ -230,6 +236,7 @@ if __name__ == '__main__':
     # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, dictionaries)
+    print('done scrapping')
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.insert_legislation_data_into_db(data)

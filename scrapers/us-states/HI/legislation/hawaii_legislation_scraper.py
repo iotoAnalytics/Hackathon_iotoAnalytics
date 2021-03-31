@@ -182,20 +182,6 @@ def get_site_topic(soup):
 
 
 def scrape(bill_item):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the date_collected, state, and state_id values,
-    as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
     try:
         row = scraper_utils.initialize_row()
 

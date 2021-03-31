@@ -26,9 +26,8 @@ from database import Database
 import re
 from pprint import pprint
 
-
 state_abbreviation = 'AK'
-database_table_name = 'us_ak_legislators'
+database_table_name = 'us_ak_legislators_test'
 
 scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
 
@@ -339,13 +338,13 @@ def scrape_gov(data_dict):
     row.years_active = find_years(url)
 
     if data_dict['Party'] == 'Democrat' or data_dict['Party'] == 'Republican' or data_dict['Party'] == 'Independent':
-      party = data_dict['Party']
+        party = data_dict['Party']
     else:
-      party = 'No Affiliation'
-      
+        party = 'No Affiliation'
+
     row.party = party
     row.party_id = scraper_utils.get_party_id(party)
-                 
+
     # wiki info
     get_wiki_links(data_dict)
     if data_dict['wiki'] is not None:
@@ -353,12 +352,12 @@ def scrape_gov(data_dict):
         row.occupation = get_occ(data_dict['wiki'])
         row.education = get_education(data_dict['wiki'])
 
-    #print('hit')
+    print('hit')
     return row
 
 
 if __name__ == '__main__':
-    dict_lst = get_gov_dicts()
+    dict_lst = get_gov_dicts()[0:5]
 
     with Pool() as pool:
         data = pool.map(scrape_gov, dict_lst)
