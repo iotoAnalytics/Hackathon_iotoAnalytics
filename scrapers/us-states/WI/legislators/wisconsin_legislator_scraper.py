@@ -452,7 +452,7 @@ leg_info_df = (house_info_df.append(senate_info_df, sort=True))
 sen_detail_links = senate_info_df["state_url"]
 house_detail_links = house_info_df["state_url"]
 leg_detail_links = leg_info_df["state_url"]
-leg_detail_links = leg_detail_links[:15]
+# leg_detail_links = leg_detail_links[:15]
 
 # print(sen_detail_links)
 # print(house_detail_links)

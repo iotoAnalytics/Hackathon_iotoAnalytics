@@ -326,8 +326,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-                        
-                       DROP TABLE IF EXISTS {table};
+            
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
