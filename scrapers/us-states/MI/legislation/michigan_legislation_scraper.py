@@ -105,11 +105,22 @@ def get_bill_info(link):
         sl = sponsorList.findAll("a", {"class": "personPopupTrigger"})
         if len(sl) > 0:
             for s in sl:
-                sponsor = s.text
-                sponsors.append(sponsor.replace("\xa0", " "))
+
+                sponsor = s.text.replace("\xa0", " ")
+                sponsor_full = HumanName(sponsor)
+
+                sponsors.append(sponsor_full.last)
                 sponurl = s["href"]
 
-                sponurls.append(sponurl)
+                search_for = dict(name_last=sponsor_full.last, source_url=sponurl)
+                try:
+
+                    s_id = scraper_utils.get_legislator_id(**search_for)
+                    s_id = int(s_id)
+
+                    sponsors_id.append(s_id)
+                except:
+                    pass
 
             # for sponsor in sponsors:
             #     if sponsor in dbwork.psfullnames:
@@ -268,89 +279,89 @@ if __name__ == '__main__':
 
     bill_infos = []
     #
-    # failed = 0
-    # i = 1
-    # while failed == 0:
-    #     leadingZeros = (4 - len(str(i))) * "0"
-    #     stringi = leadingZeros + str(i)
+    failed = 0
+    i = 1
+    while failed == 0:
+        leadingZeros = (4 - len(str(i))) * "0"
+        stringi = leadingZeros + str(i)
 
-    #     bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SB-'\
-    #                 + stringi + '&query=on'
-    #     print(bill_link)
-    #     try:
-    #         bill_info = app.get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #         i += 1
-    #     except:
-    #         failed = 1
+        bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SB-'\
+                    + stringi + '&query=on'
+        print(bill_link)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            failed = 1
 
-    # failed = 0
-    # i = 4001
-    # while failed == 0:
-    #
-    #     bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-HB-'\
-    #                 + str(i) + '&query=on'
-    #     print(bill_link)
-    #     try:
-    #         bill_info = app.get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #         i += 1
-    #     except:
-    #         failed = 1
+    failed = 0
+    i = 4001
+    while failed == 0:
 
-    # failed = 0
-    # i = 1
-    # while failed == 0:
-    #     leadingZeros = (4 - len(str(i))) * "0"
-    #     stringi = leadingZeros + str(i)
-    #
-    #     bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-HR-' \
-    #                 + stringi + '&query=on'
-    #     print(bill_link)
-    #     try:
-    #         bill_info = app.get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #         i += 1
-    #     except:
-    #         failed = 1
+        bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-HB-'\
+                    + str(i) + '&query=on'
+        print(bill_link)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            failed = 1
 
-    # failed = 0
-    # i = 1
-    # while failed == 0:
-    #     leadingZeros = (4 - len(str(i))) * "0"
-    #     stringi = leadingZeros + str(i)
-    #
-    #     bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SR-' \
-    #                 + stringi + '&query=on'
-    #     print(bill_link)
-    #     try:
-    #         bill_info = app.get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #         i += 1
-    #     except:
-    #         failed = 1
+    failed = 0
+    i = 1
+    while failed == 0:
+        leadingZeros = (4 - len(str(i))) * "0"
+        stringi = leadingZeros + str(i)
 
-    # failed = 0
-    # i = 0
-    # while failed == 0:
-    #
-    #     stringi = ascii_uppercase[i]
-    #     print(stringi)
-    #
-    #     bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SJR-' \
-    #                 + stringi + '&query=on'
-    #     print(bill_link)
-    #     try:
-    #         bill_info = app.get_bill_info(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #         i += 1
-    #     except:
-    #         failed = 1
+        bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-HR-' \
+                    + stringi + '&query=on'
+        print(bill_link)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            failed = 1
+
+    failed = 0
+    i = 1
+    while failed == 0:
+        leadingZeros = (4 - len(str(i))) * "0"
+        stringi = leadingZeros + str(i)
+
+        bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SR-' \
+                    + stringi + '&query=on'
+        print(bill_link)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            failed = 1
+
+    failed = 0
+    i = 0
+    while failed == 0:
+
+        stringi = ascii_uppercase[i]
+        print(stringi)
+
+        bill_link = 'https://www.legislature.mi.gov/(S(mpcg5ujzjedicorlgbeczyf0))/mileg.aspx?page=getobject&objectname=2021-SJR-' \
+                    + stringi + '&query=on'
+        print(bill_link)
+        try:
+            bill_info = get_bill_info(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+            i += 1
+        except:
+            failed = 1
 
     failed = 0
     i = 0
@@ -376,5 +387,27 @@ if __name__ == '__main__':
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     # big_df = topics.add_topics(big_df)
+    big_df['source_url'] = big_df['state_url']
+    big_df['source_id'] = big_df['bill_state_id']
+    big_df['source_topic'] = big_df['site_topic']
+
+    sample_row = scraper_utils.initialize_row()
+    # print(sample_row)
+    #
+
+    big_df['state'] = sample_row.state
+    big_df['state_id'] = sample_row.state_id
+
+    big_df['country'] = sample_row.country
+    # # #
+    big_df['country_id'] = sample_row.country_id
 
     print(big_df)
+
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
