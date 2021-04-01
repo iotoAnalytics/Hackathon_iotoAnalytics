@@ -206,8 +206,9 @@ def get_senate_wiki_links(repLink):
     people = tables[4].findAll("tr")
     for person in people[1:]:
         try:
-            info = person.find("td")
-            biolink = "https://en.wikipedia.org" + (info.a["href"])
+            info = person.findAll("td")
+            info = info[1]
+            biolink = "https://en.wikipedia.org" + (info.span.span.span.a["href"])
 
             bio_links.append(biolink)
             # print(biolink)
@@ -464,14 +465,14 @@ if __name__ == '__main__':
 
     leg_df = pd.merge(leg_df, leg_info_df, how='left', on=['state_url'])
 
-    # print(leg_df)
+    print(leg_df)
 
     senate_wiki = 'https://en.wikipedia.org/wiki/Wisconsin_State_Senate'
     senate_wiki_links = get_senate_wiki_links(senate_wiki)
     house_wiki = 'https://en.wikipedia.org/wiki/Wisconsin_State_Assembly'
     house_wiki_links = get_house_wiki_links(house_wiki)
     # print(len(house_wiki_links))
-    # print(len(senate_wiki_links))
+    # print(senate_wiki_links)
 
     leg_wiki_links = house_wiki_links
     for swl in senate_wiki_links:
@@ -480,10 +481,10 @@ if __name__ == '__main__':
     # print(len(leg_wiki_links))
 
     with Pool() as pool:
-        rep_data = pool.map(func=find_wiki_data, iterable=leg_wiki_links)
+        rep_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=leg_wiki_links)
     wiki_df = pd.DataFrame(rep_data)
     # print(wiki_df)
-
+    #
     mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
     mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({np.nan: None})
     mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({np.nan: None})
@@ -505,6 +506,7 @@ if __name__ == '__main__':
     big_df['military_experience'] = ""
     big_df['source_url'] = big_df['state_url']
     big_df['source_id'] = big_df['state_member_id']
+    big_df['seniority'] = 0
     print(big_df)
 
     big_list_of_dicts = big_df.to_dict('records')
