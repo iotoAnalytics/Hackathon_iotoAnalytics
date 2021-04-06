@@ -88,7 +88,7 @@ class LegislatorScraperUtils():
         """
         return self.get_attribute('party', 'party', party_name)
 
-    def scrape__bio(self, wiki_link):
+    def scrape_wiki_bio(self, wiki_link):
         """
         Used for getting missing legislator fields from their wikipedia bios.
         """

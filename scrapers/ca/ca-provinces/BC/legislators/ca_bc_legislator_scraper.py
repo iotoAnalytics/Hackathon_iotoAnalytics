@@ -391,7 +391,7 @@ if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls(members_link)
     less_urls = urls[:4]
-    print(urls)
+
     # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)

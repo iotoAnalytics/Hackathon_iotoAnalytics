@@ -28,13 +28,6 @@ from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
 
 
-# chrome_options = webdriver.ChromeOptions()
-# chrome_options.add_argument('--headless')
-#
-# driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
-#                           chrome_options=chrome_options)
-
-
 def scrape_members_link(link):
     mem_bios = []
     uClient = uReq(link)
@@ -206,12 +199,60 @@ def collect_mla_data(link):
     return row
 
 
+def scrape_wiki(link):
+    wiki_bios = []
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    # # html parsing
+    page_soup = soup(page_html, "html.parser")
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    rows = table.findAll("tr")[1:]
+
+    for row in rows:
+        url_tail = row.span.span.span.a["href"]
+        wiki_link = 'https://en.wikipedia.org' + url_tail
+
+        wiki_bios.append(wiki_link)
+
+    return wiki_bios
+
+
 if __name__ == '__main__':
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
     members_link = 'https://www.assembly.ab.ca/members/members-of-the-legislative-assembly/chamber-seating-plan'
     mla_links = scrape_members_link(members_link)
     # print(mla_links)
-    mla_links = mla_links[:40]
+    # mla_links = mla_links[:40]
 
     with Pool() as pool:
         data = pool.map(func=collect_mla_data, iterable=mla_links)
-    print(*data, sep='\n')
+    leg_df = pd.DataFrame(data)
+    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
+    # print(leg_df)
+
+    wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
+    wiki_people = scrape_wiki(wiki_link)
+    with Pool() as pool:
+        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+    wikidf = pd.DataFrame(wiki_data)[['birthday', 'education', 'name_first', 'name_last', 'occupation']]
+    # print(wikidf)
+    big_df = pd.merge(leg_df, wikidf, how='left', on=["name_first", "name_last"])
+
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
+    print(big_df)
+
+    print(big_df)
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+
+    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
