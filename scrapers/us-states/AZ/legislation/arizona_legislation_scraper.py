@@ -56,6 +56,7 @@ chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
 driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
                           chrome_options=chrome_options)
+print("driver found")
 wait = WebDriverWait(driver, 10)
 
 def find_bill_links(myurl):
@@ -479,7 +480,7 @@ if __name__ == '__main__':
     bill_df = pd.DataFrame(bill_data)
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_columns', None)
+
 
     bill_df = pd.merge(bill_df, links_name_df, how='left', on=['source_url'])
     # print(bill_df)
