@@ -17,7 +17,21 @@ Known Issues:
 '''
 
 
-import sys, os
+from tqdm import tqdm
+import traceback
+import xml.etree.ElementTree as ET
+import pandas as pd
+import re
+from nameparser import HumanName
+from pprint import pprint
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from bs4 import BeautifulSoup
+from legislator_scraper_utils import CAFedLegislatorScraperUtils
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
@@ -25,19 +39,6 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from legislator_scraper_utils import CAFedLegislatorScraperUtils
-from bs4 import BeautifulSoup
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
-import pandas as pd
-import xml.etree.ElementTree as ET
-import traceback
-from tqdm import tqdm
 
 scraper_utils = CAFedLegislatorScraperUtils()
 
@@ -60,13 +61,15 @@ mp_party_switcher = {
 }
 
 sen_party_switcher = {
-    'PSG': 'Progressive Senate Group', 
+    'PSG': 'Progressive Senate Group',
     'C': 'Conservative',
     'ISG': 'Independent Senators Group',
     'CSG': 'Canadian Senators Group'
 }
 
 # region MP Scraper Functions
+
+
 def get_mp_basic_details():
     """
     Get details about MP tile card located at:
@@ -86,11 +89,12 @@ def get_mp_basic_details():
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
-        
+
         row.source_url = f'{mp_base_url}{mp_url}'
         row.source_id = mp_url.split('(')[-1][:-1]
 
-        name_suffix = tile.find('div', {'class': 'ce-mip-mp-honourable'}).text.strip()
+        name_suffix = tile.find(
+            'div', {'class': 'ce-mip-mp-honourable'}).text.strip()
         name_suffix = 'Hon.' if name_suffix == 'The Honourable' else name_suffix
         row.name_full = tile.find('div', {'class': 'ce-mip-mp-name'}).text
         hn = HumanName(row.name_full)
@@ -104,15 +108,18 @@ def get_mp_basic_details():
         row.party_id = scraper_utils.get_party_id(row.party)
 
         row.riding = tile.find('div', {'class': 'ce-mip-mp-constituency'}).text
-        province_territory = tile.find('div', {'class': 'ce-mip-mp-province'}).text
-        row.province_territory = scraper_utils.get_prov_terr_abbrev(province_territory)
-        row.province_territory_id = scraper_utils.get_prov_terr_id(row.province_territory)
+        province_territory = tile.find(
+            'div', {'class': 'ce-mip-mp-province'}).text
+        row.province_territory = scraper_utils.get_prov_terr_abbrev(
+            province_territory)
+        row.province_territory_id = scraper_utils.get_prov_terr_id(
+            row.province_territory)
         row.region = scraper_utils.get_region(row.province_territory)
 
         row.role = 'MP'
 
         mp_data.append(row)
-    
+
     mp_df = pd.DataFrame(mp_data)
 
 
@@ -141,27 +148,35 @@ def get_mp_contact_details(contact_url):
         # Get House of Commons contact details
         hill_container = container.find('div', {'class': 'col-md-3'})
         hill_ptags = hill_container.findAll('p')
-        hill_address = hill_ptags[0].get_text(separator=", ").strip().replace('*,', '-').replace(',,', ',')
-        hill_phone = hill_ptags[1].get_text(separator=" ").strip().split(' ')[1]
-        
-        contact['addresses'].append({'location': 'House of Commons', 'address': hill_address})
-        contact['phone_number'].append({'location': 'House of Commons', 'number': hill_phone})
+        hill_address = hill_ptags[0].get_text(
+            separator=", ").strip().replace('*,', '-').replace(',,', ',')
+        hill_phone = hill_ptags[1].get_text(
+            separator=" ").strip().split(' ')[1]
+
+        contact['addresses'].append(
+            {'location': 'House of Commons', 'address': hill_address})
+        contact['phone_number'].append(
+            {'location': 'House of Commons', 'number': hill_phone})
 
         # Get constituency contact details. MP may have multiple constituency offices.
-        con_containers = container.findAll('div', {'class': 'ce-mip-contact-constituency-office'})
+        con_containers = container.findAll(
+            'div', {'class': 'ce-mip-contact-constituency-office'})
         for con_container in con_containers:
             office_name = con_container.strong.extract().get_text()
             office_name = ' '.join(office_name.split())
             con_ptags = con_container.findAll('p')
             con_address = con_ptags[0].get_text().strip()
             con_address = ' '.join(con_address.split())
-            
+
             con_phone_txt_lst = con_ptags[1].get_text().strip().split(' ')
-            con_phone = '' if len(con_phone_txt_lst) < 3 else con_phone_txt_lst[2]
-            
-            contact['addresses'].append({'location': office_name, 'address': con_address})
+            con_phone = '' if len(
+                con_phone_txt_lst) < 3 else con_phone_txt_lst[2]
+
+            contact['addresses'].append(
+                {'location': office_name, 'address': con_address})
             if con_phone:
-                contact['phone_number'].append({'location': office_name, 'number': con_phone})
+                contact['phone_number'].append(
+                    {'location': office_name, 'number': con_phone})
     except Exception:
         print('An error occurred extracting contact information.')
         print(f'Problem URL: {contact_url}')
@@ -183,10 +198,10 @@ def get_mp_role_details(roles_url):
     tree = ET.fromstring(page.content)
 
     roles = {'most_recent_term_id': '', 'offices_roles_as_mp': [],
-    'committees': [], 'parl_assoc_interparl_groups': []}
+             'committees': [], 'parl_assoc_interparl_groups': []}
 
     roles['most_recent_term_id'] = tree.find('CaucusMemberRoles').find('CaucusMemberRole') \
-    .find('ParliamentNumber').text
+        .find('ParliamentNumber').text
 
     for parl_pos_role in tree.find('ParliamentaryPositionRoles').findall('ParliamentaryPositionRole'):
         roles['offices_roles_as_mp'].append(parl_pos_role.find('Title').text)
@@ -197,11 +212,12 @@ def get_mp_role_details(roles_url):
         roles['committees'].append({'role': role, 'committee': com})
 
     for paigr in tree.find('ParliamentaryAssociationsandInterparliamentaryGroupRoles') \
-    .findall('ParliamentaryAssociationsandInterparliamentaryGroupRole'):
+            .findall('ParliamentaryAssociationsandInterparliamentaryGroupRole'):
         role = paigr.find('AssociationMemberRoleType').text
         title = paigr.find('Title').text if paigr.find('Title').text else ''
         organization = paigr.find('Organization').text
-        roles['parl_assoc_interparl_groups'].append({'role': role, 'title': title, 'organzation': organization})
+        roles['parl_assoc_interparl_groups'].append(
+            {'role': role, 'title': title, 'organzation': organization})
 
     return roles
 
@@ -249,6 +265,7 @@ def mp_scrape():
 
 # region Senator Scraper Functions
 
+
 def get_sen_basic_details():
     """
     Collects details about each senator from the Canada Senate roster.
@@ -282,7 +299,7 @@ def get_sen_basic_details():
         # Source url
         source_url = f"{sen_base_url}{tds[0].a.get('href')}"
         row.source_url = source_url
-        
+
         # Party, party ID
         party = tds[1].get_text().strip()
         party = sen_party_switcher[party] if party in sen_party_switcher else party
@@ -318,13 +335,15 @@ def get_individual_sen_page_details(sen_page_url):
     soup = BeautifulSoup(page.content, 'html.parser')
 
     sen_details = {'phone_number': [], 'email': '', 'committees': []}
-    
+
     bio_card = soup.find('ul', {'class': 'biography_card_details'})
 
-    tele_con = bio_card.find('li', {'class': 'biography_card_details_telephone'})
+    tele_con = bio_card.find(
+        'li', {'class': 'biography_card_details_telephone'})
     tele_con.strong.extract()
     telephone = tele_con.get_text().strip()
-    sen_details['phone_number'].append({'number': telephone, 'location': 'Senate'})
+    sen_details['phone_number'].append(
+        {'number': telephone, 'location': 'Senate'})
 
     email_con = bio_card.find('li', {'class': 'biography_card_details_email'})
     email_con.strong.extract()
@@ -333,12 +352,16 @@ def get_individual_sen_page_details(sen_page_url):
 
     try:
         news = soup.find('div', {'class': 'news section'})
-        committee_carousel = news.find('div', {'id': 'committee-senator-carousel-container'})
+        committee_carousel = news.find(
+            'div', {'id': 'committee-senator-carousel-container'})
         if committee_carousel:
             for car_item in committee_carousel.findAll('div', {'class': 'home-carousel-item'}):
-                role = car_item.find('div', {'class': 'media-box_date'}).get_text().strip()
-                committee = car_item.find('div', {'class': 'hidden-sm'}).get_text().strip()
-                sen_details['committees'].append({'role': role, 'committee': committee})
+                role = car_item.find(
+                    'div', {'class': 'media-box_date'}).get_text().strip()
+                committee = car_item.find(
+                    'div', {'class': 'hidden-sm'}).get_text().strip()
+                sen_details['committees'].append(
+                    {'role': role, 'committee': committee})
     except:
         pass
 
@@ -374,6 +397,7 @@ def senator_scrape():
     get_sen_fine_details()
 
 # endregion
+
 
 if __name__ == '__main__':
     # Switches to determine what to scrape located at top of file.
