@@ -484,25 +484,14 @@ if __name__ == '__main__':
 
     # print(billinfos)
     links = [d['source_url'] for d in billinfos]
-    lessLinks = links[:100]
+    lessLinks = links[:10]
     link = links[0]
 
-    #
-    # billLink = billinfos[1]["url"]
-    # print(billLink)
 
-    # bill_data = []
-    # for billLink in lessLinks:
-    #     try:
-    #         (app.collect_bill_details(billLink))
-    #     except:
-    #         print("Exception")
-    #
-    # (app.collect_bill_details(link))
 
     with Pool() as pool:
         # #
-        bill_data = pool.map(func=collect_bill_details, iterable=lessLinks)
+        bill_data = pool.map(func=collect_bill_details, iterable=links)
     # #
     maindf = pd.DataFrame(bill_data)
 
