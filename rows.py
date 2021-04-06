@@ -11,6 +11,7 @@ class LegislationRow:
     """
     Data structure for housing data about each piece of legislation.
     """
+
     def __iter__(self):
         for attr, value in self.__dict__.items():
             yield attr, value
@@ -22,7 +23,7 @@ class LegislationRow:
     source_url: str = ''
     chamber_origin: str = ''
     committees: List[dict] = field(default_factory=list)
-    bill_type: str =  ''
+    bill_type: str = ''
     bill_title: str = ''
     country_id: int = 0
     country: str = ''
@@ -34,13 +35,15 @@ class LegislationRow:
     cosponsors: List[str] = field(default_factory=list)
     cosponsors_id: List[int] = field(default_factory=list)
     bill_text: str = ''
-    bill_description: str =''
-    bill_summary:str = ''
+    bill_description: str = ''
+    bill_summary: str = ''
     actions: List[dict] = field(default_factory=list)
     votes: List[dict] = field(default_factory=list)
     source_topic: str = ''
     topic: str = ''
 
+
+@dataclass
 class USLegislationRow(LegislationRow):
     """
     Data structure for housing data about each piece of legislation.
@@ -48,6 +51,8 @@ class USLegislationRow(LegislationRow):
     state_id: int = 0
     state: str = ''
 
+
+@dataclass
 class CALegislationRow(LegislationRow):
     """
     Data structure for housing data about each piece of legislation.
@@ -56,6 +61,7 @@ class CALegislationRow(LegislationRow):
     province_territory: str = ''
 
 
+@dataclass
 class CAFedLegislationRow(CALegislationRow):
     """
     Data structure for housing data about each piece of legislation.
@@ -68,7 +74,7 @@ class CAFedLegislationRow(CALegislationRow):
     statute_year: int = 0
     statute_chapter: int = 0
     publications: List[str] = field(default_factory=list)
-    last_major_event: dict = {}
+    last_major_event: dict = field(default_factory=dict)
 
 
 #########################################################
@@ -125,6 +131,7 @@ class CALegislatorRow(LegislatorRow):
     province_territory: str = ''
     riding: str = ''
     region: str = ''
+
 
 @dataclass
 class CAFedLegislatorRow(CALegislatorRow):

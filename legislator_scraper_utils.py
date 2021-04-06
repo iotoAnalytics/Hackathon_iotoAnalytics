@@ -25,7 +25,7 @@ that occur with data collection. These can be used with your legislator
 date collectors.
 """
 
-
+# region Base Scraper Utils
 class LegislatorScraperUtils():
 
     def __init__(self, country, database_table_name, row_type):
@@ -299,8 +299,9 @@ class LegislatorScraperUtils():
       
         """
         return info
+# endregion
 
-
+# region US Scraper Utils
 class USFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
@@ -326,8 +327,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-                        
-                       DROP TABLE IF EXISTS {table};
+            
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -457,8 +457,9 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
         row.state = self.state
         row.state_id = self.state_id
         return row
+# endregion
 
-
+# region Canadian Scraper Utils
 class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
@@ -618,11 +619,13 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
         super().__init__(database_table_name, CALegislatorRow())
         self.province_territory = prov_terr_abbreviation
         self.province_territory_id = self.get_prov_terr_id(prov_terr_abbreviation)
+        self.region = self.get_region(prov_terr_abbreviation)
 
     def initialize_row(self):
         row = super().initialize_row()
         row.province_territory = self.province_territory
         row.province_territory_id = self.province_territory_id
+        row.region = self.region
         return row
 
     def insert_legislator_data_into_db(self, data):
@@ -749,3 +752,4 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
                 )
 
                 cur.execute(insert_legislator_query, tup)
+# endregion

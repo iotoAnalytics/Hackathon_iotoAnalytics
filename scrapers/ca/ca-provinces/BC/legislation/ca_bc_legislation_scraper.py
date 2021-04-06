@@ -58,8 +58,9 @@ chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-extensions')
 chrome_options.add_argument('--disable-gpu')
 
-driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
                           chrome_options=chrome_options)
+print("driver found")
 
  
 def get_urls(myurl):
@@ -290,10 +291,10 @@ if __name__ == '__main__':
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls
     with Pool() as pool:
-        data = pool.map(scrape, urls)
+        data = pool.map(scrape, less_urls)
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    # scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')

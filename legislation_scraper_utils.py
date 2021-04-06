@@ -20,7 +20,7 @@ import copy
 import utils
 from datetime import date, datetime
 
-
+# region Base Scraper Utils
 class LegislationScraperUtils:
     """
     Base class containing common methods and attributes that can be used by all
@@ -260,8 +260,9 @@ class LegislationScraperUtils:
         if isinstance(val, numpy.int64):
             val = int(val)
         return val
+# endregion
 
-
+# region US Scraper Utils
 class USFedLegislationScraperUtils(LegislationScraperUtils):
     """
     Scraper used for collecting US Federal legislation data.
@@ -281,7 +282,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-                   
+                   DROP TABLE IF EXISTS {table};
                    
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id text PRIMARY KEY,
@@ -399,8 +400,9 @@ class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
         row.state = self.state
         row.state_id = self.state_id
         return row
+# endregion
 
-
+# region Canadian Scraper Utils
 class CAFedLegislationScraperUtils(LegislationScraperUtils):
     def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators', row_type=CAFedLegislationRow()):
         super().__init__('ca', database_table_name, legislator_table_name, row_type)
@@ -660,3 +662,4 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
 
                 except Exception as e:
                     print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+# endregion
