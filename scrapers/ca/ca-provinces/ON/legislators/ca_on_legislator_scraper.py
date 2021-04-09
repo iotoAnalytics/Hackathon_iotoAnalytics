@@ -99,7 +99,8 @@ def get_info(soup):
                     else:
                         com_lst.append({'role': com[0], 'committee': ' '.join(com[1:])})
             elif item.find('h2').text == 'Current party':
-                party = item.find('div', {'class': 'field-content'}).text.split('of')[0].strip()
+                temp = item.find('div', {'class': 'field-content'}).text.split('of')[0].strip()
+                party = temp.replace('party', '').replace('Party', '').strip()
 
     date_lst = sorted(list(dict.fromkeys(date_lst)))
     return [com_lst, party, address_lst, phone_lst, date_lst, current_term]
