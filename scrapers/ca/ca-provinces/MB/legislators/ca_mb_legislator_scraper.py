@@ -176,20 +176,26 @@ def collect_mla_data(link_party):
 
     row.phone_number = phone_number
 
-
-
-
-
-
-
-
-
-
-
-
-
-
     return row
+
+
+def scrape_main_wiki(link):
+    wiki_urls = []
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    # # html parsing
+    page_soup = soup(page_html, "html.parser")
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    table = table.findAll("tr")[1:]
+    for tr in table:
+        td = tr.findAll("td")[1]
+        url = 'https://en.wikipedia.org' + (td.span.span.span.a["href"])
+        # print(url)
+        wiki_urls.append(url)
+
+    return wiki_urls
 
 
 
@@ -204,4 +210,29 @@ if __name__ == '__main__':
 
         data = pool.map(func=collect_mla_data, iterable=member_bios)
     leg_df = pd.DataFrame(data)
-    print(leg_df)
+
+    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
+
+    wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba'
+    wiki_bios = scrape_main_wiki(wiki_link)
+    with Pool() as pool:
+        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_bios)
+    wiki_df = pd.DataFrame(wiki_data)
+
+
+    big_df = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
+    print(big_df)
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
+    big_df['most_recent_term_id'] = big_df['most_recent_term_id'].replace({np.nan: None})
+
+    big_list_of_dicts = big_df.to_dict('records')
+    # print(big_list_of_dicts)
+
+    print('Writing data to database...')
+
+    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
