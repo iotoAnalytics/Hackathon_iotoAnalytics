@@ -117,18 +117,72 @@ def collect_bill_data(info):
     row.bill_title = info['bill_title']
     row.committees = info['committees']
     row.goverlytics_id = row.province_territory + '_' + row.session + '_' + row.bill_name
+
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    # # html parsing
+    page_soup = soup(page_html, "html.parser")
+    try:
+        xnote = page_soup.find("table", {"class": "xnote"})
+        explan = xnote.findAll("p")[1]
+        explan = explan.text.strip()
+        explan = explan.replace('\n', "")
+        row.bill_description = explan
+        # print(row.bill_description)
+    except:
+        # print(link)
+        pass
+    row.chamber_origin = 'Legislative Assembly'
+    row.bill_type = 'Bill'
+    centers = page_soup.find("table", {"class": "centers"})
+    center = centers.find("td", {"class": "center"})
+    pdf_link = 'https://web2.gov.mb.ca/bills/42-3/' + (center.a["href"])
+    bill_text = ""
+
+    try:
+        r = requests.get(pdf_link)
+        f = io.BytesIO(r.content)
+        reader = PyPDF2.PdfFileReader(f, strict=False)
+        if reader.isEncrypted:
+            reader.decrypt('')
+        page_done = 0
+        i = 0
+        while page_done == 0:
+            try:
+                contents = reader.getPage(i).extractText()
+                bill_text = bill_text + " " + contents
+
+            except:
+                page_done = 1
+            i = i+1
+        bill_text = bill_text.replace("\n", "")
+
+    except:
+
+        pass
+    row.bill_text = bill_text
+
     return row
 
 
 if __name__ == '__main__':
     bills_main = 'https://web2.gov.mb.ca/bills/42-3/index.php'
     bill_infos = scrape_bill_links(bills_main)
-    # less_infos = bill_infos[:10]
+    less_infos = bill_infos[:70]
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     with Pool() as pool:
-
         data = pool.map(func=collect_bill_data, iterable=bill_infos)
     bill_df = pd.DataFrame(data)
     print(bill_df)
+
+    big_list_of_dicts = bill_df.to_dict('records')
+    print(*big_list_of_dicts, sep="\n")
+
+    print('Writing data to database...')
+    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+
+    print('Complete!')
+
 
