@@ -130,14 +130,23 @@ def scrape_bills(link):
         if reader.isEncrypted:
             reader.decrypt('')
 
-        contents = reader.getPage(0).extractText()
-        bill_text = contents
+        page_done = 0
+        i = 0
+        while page_done == 0:
+            try:
+                contents = reader.getPage(i).extractText()
+                bill_text = bill_text + " " + contents
+
+            except:
+                page_done = 1
+            i = i + 1
         bill_text = bill_text.replace("\n", "")
 
     except:
 
         pass
     row.bill_text = bill_text
+    # print(bill_text)
 
 
     bill_entries = page_soup.find("div", {"class": "bill-entries"})
