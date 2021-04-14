@@ -244,127 +244,127 @@ if __name__ == '__main__':
         except:
             failed = 1
         i += 1
-    #
-    # failed = 0
-    # i = 190
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
-    #
-    # failed = 0
-    # i = 390
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
 
-    # failed = 0
-    # i = 396
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
-    #
-    # failed = 0
-    # i = 490
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
+    failed = 0
+    i = 190
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
 
-    # failed = 0
-    # i = 495
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
-    #
-    # #
-    # failed = 0
-    # i = 590
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
+    failed = 0
+    i = 390
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
 
-    # failed = 0
-    # i = 594
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
-    # #
-    # failed = 0
-    # i = 690
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
+    failed = 0
+    i = 396
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
 
-    # failed = 0
-    # i = 695
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
+    failed = 0
+    i = 490
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+
+    failed = 0
+    i = 495
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+
     #
-    # failed = 0
-    # i = 698
-    # while failed == 0:
-    #     bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
-    #     try:
-    #         bill_info = scrape_bill_link(bill_link)
-    #         if bill_info not in bill_infos:
-    #             bill_infos.append(bill_info)
-    #     except:
-    #         failed = 1
-    #     i += 1
+    failed = 0
+    i = 590
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+
+    failed = 0
+    i = 594
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+    #
+    failed = 0
+    i = 690
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+
+    failed = 0
+    i = 695
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
+
+    failed = 0
+    i = 698
+    while failed == 0:
+        bill_link = 'http://www.assnat.qc.ca/en/travaux-parlementaires/projets-loi/projet-loi-' + str(i) + '-42-1.html'
+        try:
+            bill_info = scrape_bill_link(bill_link)
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
+        except:
+            failed = 1
+        i += 1
 
     bill_info_df = pd.DataFrame(bill_infos)
     pd.set_option('display.max_rows', None)
