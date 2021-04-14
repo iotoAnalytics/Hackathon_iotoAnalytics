@@ -244,10 +244,18 @@ def get_bill_info(link):
             if reader.isEncrypted:
                 reader.decrypt('')
 
-            contents = reader.getPage(0).extractText()
-            bill_text = contents
+            page_done = 0
+            i = 0
+            while page_done == 0:
+                try:
+                    contents = reader.getPage(i).extractText()
+                    bill_text = bill_text + " " + contents
+
+                except:
+                    page_done = 1
+                i = i + 1
             bill_text = bill_text.replace("\n", "")
-            # print(bill_text)
+            print(bill_text)
         except:
             # print("issue or no pdf")
             # print(link)
@@ -271,14 +279,14 @@ def get_bill_info(link):
                  'bill_summary': bill_summary, 'topic': "", 'bill_state_id': "", 'actions': actions,
                  'current_status': current_status, 'date_introduced': date_introduced, 'bill_text': bill_text,
                  'bill_description': "", 'bill_state_id': "", 'bill_title': "", 'votes': votes}
-    print(bill_info)
+    # print(bill_info)
     return bill_info
 
 
 if __name__ == '__main__':
 
     bill_infos = []
-    #
+
     failed = 0
     i = 1
     while failed == 0:
@@ -310,7 +318,7 @@ if __name__ == '__main__':
             i += 1
         except:
             failed = 1
-
+    #
     failed = 0
     i = 1
     while failed == 0:
