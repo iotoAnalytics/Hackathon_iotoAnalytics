@@ -283,7 +283,6 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
             try:
                 create_table_query = sql.SQL("""
                   
-                   
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id text PRIMARY KEY,
                         source_id text,

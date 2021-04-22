@@ -1,11 +1,5 @@
 '''
-Before beginning, be sure to update values in the config file.
-
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
+Due to changes in the website, this scraper currently doesn't fully work
 '''
 import sys, os
 from pathlib import Path

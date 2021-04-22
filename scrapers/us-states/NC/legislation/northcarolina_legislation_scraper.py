@@ -417,8 +417,18 @@ def collect_bill_details(bill_url):
     f = io.BytesIO(r.content)
     reader = PyPDF2.PdfFileReader(f)
 
-    contents = reader.getPage(0).extractText()
-    bill_text = contents
+    page_done = 0
+    i = 0
+    while page_done == 0:
+        try:
+            contents = reader.getPage(i).extractText()
+            bill_text = bill_text + " " + contents
+
+        except:
+            page_done = 1
+        i = i + 1
+    bill_text = bill_text.replace("\n", "")
+    # print(bill_text)
 
     # except Exception as ex:
     #
