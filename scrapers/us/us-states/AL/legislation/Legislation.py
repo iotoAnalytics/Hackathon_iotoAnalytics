@@ -35,6 +35,16 @@ Notes on how the website works: (ASP.NET)
     send the POST request and you should be able to access that page. Example of a POST request can be found in set_session()   
 
 """
+import sys
+import os
+from pathlib import Path
+
+from requests.models import parse_header_links
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 import numpy
 import datetime
@@ -46,16 +56,7 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import requests
 import configparser
-import sys
-import os
-from pathlib import Path
 
-from requests.models import parse_header_links
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 # Testing imports
 # from pprint import pprint
@@ -93,7 +94,7 @@ legislator_table_name = 'us_al_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
-
+crawl_delay = scraper_utils.get_crawl_delay(select_session_url)
 # default sess_column scrapes current year only
 
 

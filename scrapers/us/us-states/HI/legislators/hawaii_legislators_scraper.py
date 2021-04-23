@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import boto3
 import re
 from nameparser import HumanName
@@ -18,14 +27,7 @@ import request_url
 import requests
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # # Initialize config parser and get variables from config file
@@ -45,6 +47,7 @@ base_url = 'https://www.capitol.hawaii.gov/members/legislators.aspx?chamber=all'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                   'Chrome/87.0.4280.88 Safari/537.36'}
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_name(soup):
@@ -103,6 +106,7 @@ def get_sen_wikilink(soup):
     for item in sen_table:
         if get_name(soup)[1] and get_name(soup)[2] in item.text:
             url = 'https://en.wikipedia.org' + item.get('href')
+    scraper_utils.crawl_delay(crawl_delay)
     return url
 
 
@@ -111,6 +115,7 @@ def get_education(url):
     dict_list = []
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     url_table = url_soup.find('table', attrs={'class': 'infobox vcard'})
     test_lst = url_table.find_all('tr')
     for item in test_lst:
@@ -167,6 +172,7 @@ def scrape_wiki(link):
                 [x for x in range(years_active[-1] + 1, current_year + 1)]
         except IndexError:
             pass
+    scraper_utils.crawl_delay(crawl_delay)
     return [bday, years_active, job, education]
 
 
@@ -187,6 +193,7 @@ def get_com(soup, name):
                 item.find('a').get('href')
             link_request = request_url.UrlRequest.make_request(link, header)
             link_soup = BeautifulSoup(link_request.content, 'lxml')
+            scraper_utils.crawl_delay(crawl_delay)
             chair = link_soup.find(
                 'a', {'id': 'ctl00_ContentPlaceHolderCol1_HyperLinkChair'}).text.strip()
             vice_chair = link_soup.find(
@@ -207,6 +214,7 @@ def get_dicts(url):
     links = []
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     url_tr = url_soup.find(
         'table', {'id': 'ctl00_ContentPlaceHolderCol1_GridView1'}).find_all('tr')
     for item in url_tr:
@@ -253,6 +261,7 @@ def scrape(lst_item):
     row.areas_served = lst_item['areas']
 
     soup_req = request_url.UrlRequest.make_request(url, header)
+    scraper_utils.crawl_delay(crawl_delay)
     soup = BeautifulSoup(soup_req.content, 'lxml')
 
     name = get_name(soup)

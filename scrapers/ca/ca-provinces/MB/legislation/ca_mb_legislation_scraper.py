@@ -1,33 +1,32 @@
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-import io
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
-import PyPDF2
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
-import boto3
-from urllib.request import urlopen as uReq
-from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import pandas as pd
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+import pandas as pd
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import boto3
+import datetime
+from urllib.parse import parse_qs
+import urllib.parse as urlparse
+import PyPDF2
+import re
+from nameparser import HumanName
+from pprint import pprint
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import io
+
+
 
 prov_terr_abbreviation = 'MB'
 database_table_name = 'ca_mb_legislation'
@@ -36,7 +35,7 @@ legislator_table_name = 'ca_mb_legislators'
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
-
+crawl_delay = scraper_utils.get_crawl_delay('https://web2.gov.mb.ca/')
 
 def scrape_bill_links(link):
     bill_infos = []
@@ -60,7 +59,6 @@ def scrape_bill_links(link):
             sponsor = sponsor.split(".")
             comm = sponsor[len(sponsor) - 1]
 
-
             sponsor = sponsor[len(sponsor) - 1]
             sponsor = sponsor.split("Minister")[0]
             comm = comm.split(sponsor)[1]
@@ -69,11 +67,13 @@ def scrape_bill_links(link):
             committees = []
             if "of" in comm:
                 committee = comm.split("of")[1].strip()
-                com_info = {'chamber': 'Legislative Assembly', 'committee': committee}
+                com_info = {'chamber': 'Legislative Assembly',
+                            'committee': committee}
                 committees.append(com_info)
             elif "for the" in comm:
                 committee = comm.split("for the")[1].strip()
-                com_info = {'chamber': 'Legislative Assembly', 'committee': committee}
+                com_info = {'chamber': 'Legislative Assembly',
+                            'committee': committee}
                 committees.append(com_info)
 
             search_for = dict(name_last=sponsor)
@@ -95,7 +95,7 @@ def scrape_bill_links(link):
                     'principal_sponsor_id': principal_sponsor_id, 'bill_title': title, 'committees': committees}
 
             bill_infos.append(info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return bill_infos
 
 
@@ -116,7 +116,8 @@ def collect_bill_data(info):
     row.principal_sponsor_id = info['principal_sponsor_id']
     row.bill_title = info['bill_title']
     row.committees = info['committees']
-    row.goverlytics_id = row.province_territory + '_' + row.session + '_' + row.bill_name
+    row.goverlytics_id = row.province_territory + \
+        '_' + row.session + '_' + row.bill_name
 
     uClient = uReq(link)
     page_html = uClient.read()
@@ -141,7 +142,7 @@ def collect_bill_data(info):
     bill_text = ""
 
     try:
-        r = requests.get(pdf_link)
+        r = scraper_utils.request(pdf_link)
         f = io.BytesIO(r.content)
         reader = PyPDF2.PdfFileReader(f, strict=False)
         if reader.isEncrypted:
@@ -162,7 +163,7 @@ def collect_bill_data(info):
 
         pass
     row.bill_text = bill_text
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -184,5 +185,3 @@ if __name__ == '__main__':
     scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
 
     print('Complete!')
-
-

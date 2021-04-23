@@ -1,3 +1,12 @@
+import sys, os
+from pathlib import Path
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
+
 import pandas as pd
 import bs4
 from urllib.request import urlopen as uReq
@@ -14,18 +23,12 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys, os
-from pathlib import Path
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
-
-sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('ON', 'ca_on_legislators')
 url = 'https://www.ola.org/en/members/current'
 base_url = 'https://www.ola.org'
+crawl_delay = scraper_utils.get_crawl_delay(url)
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Ontario'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
@@ -42,6 +45,7 @@ def get_links(url):
         if 'members' in link:
             links.append(base_url + link)
     #print("number of members: " + str(len(links)))
+    scraper_utils.crawl_delay(crawl_delay)
     return links
 
 
@@ -161,6 +165,7 @@ def scrape(diction):
             row.occupation = wiki_info['occupation']
 
     print('Done row for '+ name_full)
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 

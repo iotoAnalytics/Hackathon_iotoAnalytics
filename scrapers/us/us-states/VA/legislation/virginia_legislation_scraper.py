@@ -7,27 +7,27 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import io
-import requests
-import PyPDF2
-import unidecode
-import datefinder
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-import pandas as pd
-from multiprocessing import Pool
 import numpy as np
+from multiprocessing import Pool
+import pandas as pd
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from legislation_scraper_utils import USStateLegislationScraperUtils
+import datefinder
+import unidecode
+import PyPDF2
+import requests
+import io
 
 
 
@@ -44,6 +44,7 @@ legislator_table_name = 'us_va_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://lis.virginia.gov/')
 
 
 def get_bill_info(myurl):
@@ -71,6 +72,7 @@ def get_bill_info(myurl):
         try:
 
             uClient = uReq(myurl)
+            scraper_utils.crawl_delay(crawl_delay)
             page_html = uClient.read()
             uClient.close()
             # # html parsing
@@ -87,6 +89,7 @@ def get_bill_info(myurl):
             myurl2 = myurl.lower().replace('202+sum+', 'ses=202&typ=bil&val=')
             try:
                 uClient = uReq(myurl2)
+                scraper_utils.crawl_delay(crawl_delay)
                 page_html = uClient.read()
                 uClient.close()
                 # # html parsing
@@ -127,7 +130,8 @@ def get_bill_info(myurl):
             pdf_link = 'https://lis.virginia.gov/' + pl["href"]
             try:
 
-                r = requests.get(pdf_link)
+                r = scraper_utils.request(pdf_link)
+                scraper_utils.crawl_delay(crawl_delay)
                 f = io.BytesIO(r.content)
                 reader = PyPDF2.PdfFileReader(f)
 
@@ -180,6 +184,7 @@ def get_bill_info(myurl):
             try:
                 vote_link = 'https://lis.virginia.gov/' + (event.a["href"])
                 uClient = uReq(vote_link)
+                scraper_utils.crawl_delay(crawl_delay)
                 page_html = uClient.read()
                 uClient.close()
                 # # html parsing
@@ -346,6 +351,7 @@ def get_bill_info(myurl):
     sponsors_id = []
     try:
         uClient = uReq(patrons_link)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -532,7 +538,6 @@ if __name__ == '__main__':
             i += 1
         except:
             failed = 1
-
 
     #
     failed = 0

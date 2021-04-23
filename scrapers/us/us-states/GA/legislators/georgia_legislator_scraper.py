@@ -1,6 +1,15 @@
 '''
 Due to changes in the website, this scraper currently doesn't fully work
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -29,14 +38,6 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup as soup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # Initialize config parser and get variables from config file
@@ -51,6 +52,8 @@ country = str(configParser.get('scraperConfig', 'country'))
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
+
+crawl_delay = scraper_utils.get_crawl_delay('https://www.legis.ga.gov')
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
@@ -288,7 +291,7 @@ def scrape_wiki_rep_Links(wikiUrl):
     #     except:
     #         repLinks.append("")
     # print(repLinks)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return repLinks
 
     # titlemain = page_soup.find("main", {"class": "col-12 body-content ncga-container-gutters"})
@@ -461,7 +464,7 @@ def find_wiki_data(repLink):
             'education': education}
 
     # print(info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return info
 
 

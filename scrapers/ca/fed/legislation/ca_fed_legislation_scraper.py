@@ -11,17 +11,17 @@ p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
 
-from tqdm import tqdm
-import io
-from nameparser import HumanName
-import json
-import psycopg2
-import csv
-from datetime import datetime, date
-import xml.etree.ElementTree as ET
-import requests
-from legislation_scraper_utils import CAFedLegislationScraperUtils
 from bs4 import BeautifulSoup
+from legislation_scraper_utils import CAFedLegislationScraperUtils
+import requests
+import xml.etree.ElementTree as ET
+from datetime import datetime, date
+import csv
+import psycopg2
+import json
+from nameparser import HumanName
+import io
+from tqdm import tqdm
 
 
 
@@ -30,6 +30,7 @@ xml_url_csv = 'xml_urls.csv'
 table_name = 'ca_federal_legislation'
 
 scraper_utils = CAFedLegislationScraperUtils()
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 # Used for switching website party to database representation
 party_switcher = {
@@ -47,7 +48,7 @@ def get_soup(url, parser='lxml'):
     Returns:
         BeautifulSoup page representation
     """
-    page = requests.get(url)
+    page = scraper_utils.request(url)
     return BeautifulSoup(page.content, parser)
 
 
@@ -155,7 +156,7 @@ def get_bill_summary_and_text(bill_file_url):
         'a', {'class': 'btn btn-export-xml hidden-xs'}).get('href')
     xml_url = base_url + xml_url_path
 
-    page = requests.get(xml_url)
+    page = scraper_utils.request(xml_url)
     root = ET.fromstring(page.content)
 
     bill_data['bill_summary'] = get_tag_text(
@@ -176,7 +177,7 @@ def scrape(xml_url):
     Returns:
         List of rows containing bill information
     """
-    page = requests.get(xml_url)
+    page = scraper_utils.request(xml_url)
     root = ET.fromstring(page.content)
 
     current_session_number = get_current_session_number()
@@ -338,5 +339,3 @@ if __name__ == '__main__':
         scraper_utils.insert_legislation_data_into_db(xml_data)
 
     print('Complete!')
-
-

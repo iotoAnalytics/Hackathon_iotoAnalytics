@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from sklearn import linear_model
 from joblib import dump, load
 from nltk.stem import WordNetLemmatizer
@@ -33,14 +42,7 @@ import configparser
 from database import Database
 import pandas as pd
 from multiprocessing import Pool
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # from selenium import webdriver
@@ -59,11 +61,13 @@ legislator_table_name = 'us_nc_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://www.ncleg.gov')
 
 
 def collect_bill_urls(myurl):
     link = ""
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -93,6 +97,7 @@ def collect_bill_urls(myurl):
 
 def collect_vote_info(link):
     uClient = uReq(link)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -252,6 +257,7 @@ def collect_bill_details(bill_url):
 
     # try:
     uClient = uReq(bill_url)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -408,7 +414,8 @@ def collect_bill_details(bill_url):
         "div", {"class": "col-8 col-sm-9 col-xl-10 text-left scroll-column"})
     site_topic = keywordsdiv[1].text
 
-    r = requests.get(bill_link)
+    r = scraper_utils.request(bill_link)
+    scraper_utils.crawl_delay(crawl_delay)
     f = io.BytesIO(r.content)
     reader = PyPDF2.PdfFileReader(f)
 

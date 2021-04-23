@@ -28,6 +28,7 @@ sys.path.insert(0, str(p))
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
@@ -67,6 +68,7 @@ def get_urls(myurl):
             urls.append(mem_link)
         except:
             print(mem)
+    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
@@ -228,6 +230,7 @@ def scrape(url):
              'party': party, 'party_id': party_id, 'riding': riding, 'role': 'Member of the Legislative Assembly (MLA)',
              'most_recent_term_id': most_recent_term_id, 'seniority': 0, 'email': email, 'addresses': addresses,
              'committees': committees, 'phone_number': phone_number}
+    scraper_utils.crawl_delay(crawl_delay)
     # print(infos)
     return infos
 
@@ -253,7 +256,7 @@ def get_wiki_people(link):
                         # print(link)
                 except:
                     pass
-
+    scraper_utils.crawl_delay(crawl_delay)
     return people_links
 
 

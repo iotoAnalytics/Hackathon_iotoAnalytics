@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import re
 import datetime
 from multiprocessing import Pool
@@ -16,22 +25,17 @@ import gzip
 import numpy as np
 import pickle
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 scraper_utils = USStateLegislatorScraperUtils('VA', 'us_va_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://virginiageneralassembly.gov')
 
 
 def get_delegate_links(myurl):
     delegate_infos = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -82,6 +86,7 @@ def get_delegate_links(myurl):
 
 def scrape_rep_bio_page(myurl):
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -200,6 +205,7 @@ def scrape_rep_bio_page(myurl):
 def get_house_wiki_bios(myurl):
     repLinks = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
 
@@ -222,6 +228,7 @@ def get_house_wiki_bios(myurl):
 def find_wiki_rep_data(repLink):
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -246,6 +253,7 @@ def find_wiki_rep_data(repLink):
     year_started = ""
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -294,6 +302,7 @@ def find_wiki_rep_data(repLink):
     # get full name
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -329,6 +338,7 @@ def find_wiki_rep_data(repLink):
 def find_senate_bio_links(myurl):
     senate_infos = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -377,6 +387,7 @@ def find_senate_bio_links(myurl):
 
 def find_senate_info(myurl):
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -461,6 +472,7 @@ def find_senate_info(myurl):
 def get_senate_wiki_bios(myurl):
     senLinks = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
 
@@ -484,6 +496,7 @@ def get_senate_wiki_bios(myurl):
 def find_wiki_sen_data(repLink):
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -508,6 +521,7 @@ def find_wiki_sen_data(repLink):
     year_started = ""
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -560,6 +574,7 @@ def find_wiki_sen_data(repLink):
 
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -605,6 +620,7 @@ def find_wiki_sen_data(repLink):
     # get full name
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -629,6 +645,7 @@ def find_wiki_sen_data(repLink):
 
     try:
         uClient = uReq(repLink)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing

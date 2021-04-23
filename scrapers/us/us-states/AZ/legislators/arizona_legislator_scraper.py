@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import re
 import datetime
 from multiprocessing import Pool
@@ -17,18 +26,10 @@ import gzip
 import numpy as np
 import pickle
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 scraper_utils = USStateLegislatorScraperUtils('AZ', 'us_az_legislators')
-
+crawl_delay = scraper_utils.get_crawl_delay('https://www.azleg.gov')
 
 def get_leg_bios(myurl):
     leg_bio = []
@@ -128,7 +129,7 @@ def get_leg_bios(myurl):
                     'district': district, 'party': party, 'party_id': party_id, 'email': email,
                     'phone_number': phns, 'role': 'Senator'}
         leg_bio.append(leg_info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return leg_bio
 
 
@@ -195,7 +196,7 @@ def collect_leg_data(myurl):
                 'years_active': years_active, 'most_recent_term_id': most_recent_term_id, 'addresses': [],
                 'military_experience': ""}
     # print(leg_info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return leg_info
 
 

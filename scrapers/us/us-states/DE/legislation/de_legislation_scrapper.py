@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -19,12 +28,14 @@ state_abbreviation = 'DE'
 database_table_name = 'us_de_legislation'
 legislator_table_name = 'us_de_legislators'
 scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
-
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 url = 'https://legis.delaware.gov/AllLegislation'
 base_url = 'https://legis.delaware.gov'
 sleep_time = 1.5
+
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
 
 # PATH = "C:\Program Files (x86)\chromedriver.exe"
 # driver = webdriver.Chrome(PATH)
@@ -55,6 +66,7 @@ def get_html(url):
     url_request = UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_summary = url_soup.find('div', {'class': 'content col-xs-24 col-sm-18 col-sm-push-6 col-sm-height col-top'})
+    scraper_utils.crawl_delay(crawl_delay)
     return url_summary
 
 
@@ -78,6 +90,7 @@ def get_text(url):
     url_request = UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_divs = url_soup.find_all('div')
+    scraper_utils.crawl_delay(crawl_delay)
     return ''.join(url_divs[2].text.split('\n'))
 
 

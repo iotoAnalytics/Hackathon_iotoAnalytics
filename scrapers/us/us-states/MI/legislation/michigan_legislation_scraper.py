@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from legislation_scraper_utils import USStateLegislationScraperUtils
 import io
 import requests
@@ -23,14 +32,7 @@ import numpy as np
 import pickle
 import os
 import json
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 state_abbreviation = 'MI'
@@ -39,6 +41,7 @@ legislator_table_name = 'us_mi_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://www.legislature.mi.gov')
 
 
 def get_bill_info(link):
@@ -52,6 +55,7 @@ def get_bill_info(link):
 
     try:
         uClient = uReq(link)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -247,7 +251,8 @@ def get_bill_info(link):
             if ".pdf" in doc_link:
                 pdf_link = doc_link
         try:
-            r = requests.get(pdf_link)
+            r = scraper_utils.request(pdf_link)
+            scraper_utils.crawl_delay(crawl_delay)
             f = io.BytesIO(r.content)
             reader = PyPDF2.PdfFileReader(f, strict=False)
             if reader.isEncrypted:

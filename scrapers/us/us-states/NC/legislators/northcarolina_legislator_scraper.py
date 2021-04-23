@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import json
 from datetime import datetime
 from psycopg2 import sql
@@ -29,14 +38,7 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup as soup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # # Initialize config parser and get variables from config file
@@ -48,6 +50,7 @@ sys.path.insert(0, str(p))
 # country = str(configParser.get('scraperConfig', 'country'))
 
 scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.ncleg.gov')
 
 
 # def get_urls(myurl):
@@ -59,7 +62,7 @@ scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 # #     base_url = 'https://webscraper.io'
 # #     path = '/test-sites/e-commerce/allinone'
 # #     scrape_url = base_url + path
-# #     page = requests.get(scrape_url)
+# #     page = scraper_utils.request(scrape_url)
 # #     soup = BeautifulSoup(page.content, 'html.parser')
 # #     urls = [base_url + prod_path['href'] for prod_path in soup.findAll('a', {'class': 'title'})]
 

@@ -26,6 +26,7 @@ sys.path.insert(0, str(p))
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('MB', 'ca_mb_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.gov.mb.ca/')
 
 def scrape_main_page(link):
     members = []
@@ -54,7 +55,7 @@ def scrape_main_page(link):
 
 
         members.append(main_info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return members
 
 
@@ -175,7 +176,7 @@ def collect_mla_data(link_party):
     row.addresses = addresses
 
     row.phone_number = phone_number
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -194,7 +195,7 @@ def scrape_main_wiki(link):
         url = 'https://en.wikipedia.org' + (td.span.span.span.a["href"])
         # print(url)
         wiki_urls.append(url)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
 
 

@@ -29,7 +29,7 @@ p = Path(os.path.abspath(__file__)).parents[4]
 sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('SK', 'ca_sk_legislators')
-
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 def get_legislator_links(url):
     links = []
@@ -118,6 +118,7 @@ def scrape(info_dict):
             row.most_recent_term_id = wiki_info['most_recent_term_id']
 
     print('Done row for: '+name_full)
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 

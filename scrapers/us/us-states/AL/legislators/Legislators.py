@@ -6,6 +6,15 @@ Issues:
     - names with only Initials (J.B.) has J as first name and B as middle name
     - birthdays on wikipedia that don't have class='bday' only get the years scraped
 """
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from pprint import pprint
 from legislator_scraper_utils import USStateLegislatorScraperUtils
 import re
@@ -19,14 +28,7 @@ import pandas as pd
 import request_url
 from bs4 import BeautifulSoup
 import requests
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # from database import Database
@@ -96,7 +98,7 @@ def get_legislator_links(base_url, is_senate, pic_url):
         member_url = member_url + '?' + name + '&' + \
             oid_sponsor + '&' + oid_person + '&' + session
         links[member_url] = {'session': session, 'oid_sponsor': oid_sponsor}
-
+    scraper_utils.crawl_delay(crawl_delay)
     return links
 
 
@@ -194,6 +196,7 @@ def scrape_legislator(links):
         fields.email = nan(email if email == email else district_table[1][10])
 
         legislators[fields.district] = fields
+        scraper_utils.crawl_delay(crawl_delay)
     return legislators
 
 
@@ -214,7 +217,7 @@ def get_wiki_links(link):
             continue
 
         links[district] = (wikipedia_link + page_url_end['href'])
-
+    scraper_utils.crawl_delay(crawl_delay)
     return links
 
 
@@ -329,6 +332,7 @@ def scrape_wiki(links):
         except Exception as e:
             print(str(e))
             pass
+        scraper_utils.crawl_delay(crawl_delay)
     # pprint(missing_fields)
 
     return missing_fields
@@ -367,7 +371,7 @@ def dict_to_list(dictionary):
 
 # init_database()
 scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
-
+crawl_delay = scraper_utils.get_crawl_delay('http://www.legislature.state.al.us')
 # house scraper
 house_wiki_links = get_wiki_links(wikipedia_house_url)
 house_wiki = scrape_wiki(house_wiki_links)

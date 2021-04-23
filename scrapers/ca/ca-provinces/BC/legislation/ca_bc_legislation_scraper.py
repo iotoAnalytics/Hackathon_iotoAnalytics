@@ -7,50 +7,56 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-import io
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-import re
-# import PyPDF2
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
-import boto3
-from urllib.request import urlopen as uReq
-import urllib.parse
-from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import pandas as pd
-from selenium import webdriver
-# from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium import webdriver
+import pandas as pd
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+import urllib.parse
+from urllib.request import urlopen as uReq
+import boto3
+import datetime
+from urllib.parse import parse_qs
+import urllib.parse as urlparse
+import re
+from pprint import pprint
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import io
+
+# import PyPDF2
+# from selenium.common.exceptions import TimeoutException
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 
-prov_terr_abbreviation = str(configParser.get('scraperConfig', 'state_abbreviation'))
+prov_terr_abbreviation = str(configParser.get(
+    'scraperConfig', 'state_abbreviation'))
 
-database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
+database_table_name = str(configParser.get(
+    'scraperConfig', 'database_table_name'))
+legislator_table_name = str(configParser.get(
+    'scraperConfig', 'legislator_table_name'))
 
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
-                                                       database_table_name,
-                                                       legislator_table_name)
+                                                      database_table_name,
+                                                      legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
 
 chrome_options = webdriver.ChromeOptions()
 
@@ -62,15 +68,15 @@ driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chrom
                           chrome_options=chrome_options)
 print("driver found")
 
- 
+
 def get_urls(myurl):
     driver.get(myurl)
     timeout = 5
 
     try:
-        element_present = EC.presence_of_element_located((By.CLASS_NAME, 'BCLASS-Hansard-List'))
+        element_present = EC.presence_of_element_located(
+            (By.CLASS_NAME, 'BCLASS-Hansard-List'))
         WebDriverWait(driver, timeout).until(element_present)
-
 
     except:
         print("timeout")
@@ -92,12 +98,12 @@ def get_urls(myurl):
         info = {'source_url': url, 'bill_name': bill_num}
         # print(info)
         url_infos.append(info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return url_infos
 
 
 def scrape(url):
-    # r = requests.get(url)
+    # r = scraper_utils.request(url)
     # data = r.json()
     # print(data)
 
@@ -105,9 +111,9 @@ def scrape(url):
     timeout = 5
 
     try:
-        element_present = EC.presence_of_element_located((By.CLASS_NAME, 'explannote'))
+        element_present = EC.presence_of_element_located(
+            (By.CLASS_NAME, 'explannote'))
         WebDriverWait(driver, timeout).until(element_present)
-
 
     except:
         pass
@@ -196,11 +202,9 @@ def scrape(url):
         # date = " ".join(date)
         # print(date)
 
-
         #
         # explan = page_soup.find("div", {"class": "explannote"})
         # print(explan)
-
 
     except:
         pass
@@ -236,7 +240,7 @@ def scrape(url):
     #
     #     pdf_link = pdf_id.a["href"]
     #     # print(pdf_link)
-    #     r = requests.get(pdf_link)
+    #     r = scraper_utils.request(pdf_link)
     #     f = io.BytesIO(r.content)
     #     reader = PyPDF2.PdfFileReader(f, strict=False)
     #     if reader.isEncrypted:
@@ -257,7 +261,7 @@ def scrape(url):
     #     print(title.text)
     # if "Explanatory Note" in title.text:
     #     print(title.text)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -282,7 +286,8 @@ if __name__ == '__main__':
 
     url_df = pd.concat((ammendment_urls, first_urls)).sort_index().drop_duplicates(
         'bill_name')  # .reset_index(drop=True)
-    url_df = pd.concat((third_urls, url_df)).sort_index().drop_duplicates('bill_name')  # .reset_index(drop=True)
+    url_df = pd.concat((third_urls, url_df)).sort_index(
+    ).drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
     less_urls = url_df['source_url'][:6]
     urls = url_df['source_url']

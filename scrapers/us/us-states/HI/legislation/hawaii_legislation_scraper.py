@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import boto3
 import datetime
 from urllib.parse import parse_qs
@@ -24,14 +33,7 @@ import request_url
 import requests
 from bs4 import BeautifulSoup
 from legislation_scraper_utils import USStateLegislationScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # # Initialize config parser and get variables from config file
@@ -49,6 +51,9 @@ pdf_url = 'https://www.capitol.hawaii.gov/session2021/bills/'
 bill_url = 'capitol.hawaii.gov/measure_indiv.aspx?billtype=HB&billnumber=1000&year=2021'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
+
+crawl_delay = scraper_utils.get_crawl_delay(pdf_url)
+
 current_year = '2021'
 bill_dict = {
     'DC': {'chamber_origin': '', 'type': ''},
@@ -77,6 +82,7 @@ def get_bill_params(url):
             url = 'https://www.capitol.hawaii.gov' + item.get('href')
             link_lst.append(
                 {'billtype': bill, 'billnumber': num, 'pdf_link': url})
+    scraper_utils.crawl_delay(crawl_delay)
     return link_lst
 
 
@@ -134,7 +140,7 @@ def get_actions(soup):
 
 def get_billtext(pdf_link):
     try:
-        response = requests.get(pdf_link, stream=True)
+        response = requests.get(pdf_link, stream=True, headers=scraper_utils.request_headers)
         pdf = pdfplumber.open(io.BytesIO(response.content))
         bill_txt = ''
         for _ in range(0, len(pdf.pages)):
@@ -196,6 +202,7 @@ def scrape(bill_item):
         bill_info = bill_item['bill_info']
 
         url_request = request_url.UrlRequest.make_request(link, header)
+        scraper_utils.crawl_delay(crawl_delay)
         soup = BeautifulSoup(url_request.content, 'lxml')
 
         # Now you can begin collecting data and fill in the row. The row is a dictionary where the

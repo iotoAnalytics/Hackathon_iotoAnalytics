@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import os
+import sys
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from pprint import pprint
 import re
 from database import Database
@@ -16,14 +25,6 @@ import requests
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
 import pandas as pd
-import os
-import sys
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 state_abbreviation = 'AK'
@@ -36,7 +37,7 @@ house_url = "http://akleg.gov/house.php"
 senate_url = "http://akleg.gov/senate.php"
 header = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
                         'Chrome/87.0.4280.88 Safari/537.36'}
-
+crawl_delay = scraper_utils.get_crawl_delay(house_url)
 # variables to find committee information for current/last terms; change as necessary
 current_term = '32nd'
 last_term = '31st'
@@ -47,6 +48,7 @@ current_year = 2021
 def get_html(url):
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     url_table = url_soup.find_all('ul', attrs={'class': 'people-holder'})
     return url_table[1]
 
@@ -117,6 +119,7 @@ def find_phone(link):
     lst = []
     url_request = request_url.UrlRequest.make_request(link, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     url_summary = url_soup.find('div', attrs={'class': 'tab-content'})
 
     contact_1 = url_summary.find_all('div', attrs={'class': 'bioleft'})
@@ -152,6 +155,7 @@ def find_years(link):
             lst = lst + \
                 [t for t in range(int(item[0]), int(item[1]))] + [int(item[1])]
     lst = [t for t in lst if t <= current_year]
+    scraper_utils.crawl_delay(crawl_delay)
     return sorted(lst)
 
 
@@ -171,6 +175,7 @@ def get_com_info(url):
             com_dict = {
                 'role': dict_items[0], 'committee': dict_items[1] + ' ' + dict_items[2]}
             lst.append(com_dict)
+    scraper_utils.crawl_delay(crawl_delay)
     return lst
 
 
@@ -190,6 +195,7 @@ def find_com(link):
             com_link = split_url[0] + last_term.replace(
                 re.search('[a-z]{2}', last_term).group(), '') + split_url[1]
             lst = lst + get_com_info(com_link)
+    scraper_utils.crawl_delay(crawl_delay)
     return lst
 
 
@@ -197,10 +203,12 @@ def find_com(link):
 def get_wiki_links(data_dict_item):
     url = 'https://en.wikipedia.org/wiki/Alaska_House_of_Representatives'
     url_request = request_url.UrlRequest.make_request(url, header)
+    scraper_utils.crawl_delay(crawl_delay)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_table = url_soup.find_all('span', attrs={'class': 'fn'})
     url2 = 'https://en.wikipedia.org/wiki/Alaska_Senate'
     url_request2 = request_url.UrlRequest.make_request(url2, header)
+    scraper_utils.crawl_delay(crawl_delay)
     url_soup2 = BeautifulSoup(url_request2.content, 'lxml')
     url_table2 = url_soup2.find_all('span', attrs={'class': 'fn'})
     for item in url_table + url_table2:
@@ -223,6 +231,7 @@ def get_occ(url):
                     # print('code runs here')
         except:
             pass
+    scraper_utils.crawl_delay(crawl_delay)
     return occ_lst
 
 
@@ -242,6 +251,7 @@ def get_birthday(url):
                     bday = bday[0]
         except:
             pass
+    scraper_utils.crawl_delay(crawl_delay)
     return bday
 
 
@@ -277,6 +287,7 @@ def get_education(url):
             dict_list.append({"level": "", "field": "", "school": uni[_]})
     else:
         dict_list.append({"level": "", "field": "", "school": ""})
+    scraper_utils.crawl_delay(crawl_delay)
     return dict_list
 
 

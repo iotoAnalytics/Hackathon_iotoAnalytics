@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from requests import get
 from geotext import GeoText
 import re
@@ -19,18 +28,12 @@ import gzip
 import numpy as np
 import pickle
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 # import html.parser
 
 scraper_utils = USStateLegislatorScraperUtils('MI', 'us_mi_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.house.mi.gov')
 
 
 def decodeEmail(e):
@@ -46,6 +49,7 @@ def decodeEmail(e):
 def get_sen_bio(myurl):
     links = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     senator_data = []
@@ -115,6 +119,7 @@ def get_sen_bio(myurl):
 def get_rep_bio(myurl):
     rep_bios = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -187,6 +192,7 @@ def collect_sen_data(myurl):
         if "senatedems" in myurl:
             years_active = []
             uClient = uReq(myurl)
+            scraper_utils.crawl_delay(crawl_delay)
             page_html = uClient.read()
             uClient.close()
             # # html parsing
@@ -246,6 +252,7 @@ def collect_sen_data(myurl):
             req = Request(myurl,
                           headers={'User-Agent': 'Mozilla/5.0'})
             webpage = uReq(req).read()
+            scraper_utils.crawl_delay(crawl_delay)
 
             uReq(req).close()
 
@@ -376,6 +383,7 @@ def collect_rep_data(myurl):
 def get_house_committee_info(myurl):
     committee_info = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -419,6 +427,7 @@ def get_house_committee_info(myurl):
 def get_rep_wiki_links(repLink):
     wiki_info = []
     uClient = uReq(repLink)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -827,6 +836,7 @@ def get_rep_wiki_links(repLink):
 def scrape_wiki_bio_Links(wikiUrl):
     repLinks = []
     uClient = uReq(wikiUrl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -851,6 +861,7 @@ def scrape_wiki_bio_Links(wikiUrl):
 def get_committee_urls(myurl):
     committee_urls = []
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -883,6 +894,7 @@ def get_committee_info(myurl):
     committee_info = []
     try:
         uClient = uReq(myurl)
+        scraper_utils.crawl_delay(crawl_delay)
         page_html = uClient.read()
         uClient.close()
         # # html parsing

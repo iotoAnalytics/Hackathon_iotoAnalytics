@@ -24,6 +24,7 @@ from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
 
 def getAssemblyLinks(myurl):
     infos = []
@@ -40,6 +41,7 @@ def getAssemblyLinks(myurl):
     for tr in trs:
         link = "http://www.assnat.qc.ca/" + tr.td.a["href"]
         infos.append(link)
+    scraper_utils.crawl_delay(crawl_delay)
     return infos
 
 
@@ -219,6 +221,8 @@ def collect_leg_data(myurl):
             'name_first': hn.first, 'name_last': hn.last, 'name_suffix': hn.suffix, 'name_middle': hn.middle,
             'riding': riding, 'party': party, 'party_id': party_id, 'email': email, 'committees': committees,
             'phone_number': phone_number, 'addresses': addresses, 'military_experience': ""}
+    
+    scraper_utils.crawl_delay(crawl_delay)
     return info
 
 
@@ -245,7 +249,7 @@ def get_wiki_people(repLink):
         i += 1
     # print(bio_lnks)
     # print(len(bio_lnks))
-
+    scraper_utils.crawl_delay(crawl_delay)
     return bio_lnks
 
 

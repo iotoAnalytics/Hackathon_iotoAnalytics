@@ -15,6 +15,11 @@ import numpy as np
 from datetime import datetime
 import sys, os
 from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
 from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
 
 url = 'https://www.ola.org/en/legislative-business/bills/current'
@@ -28,7 +33,7 @@ legislator_table_name = 'ca_on_legislators'
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
-
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 def month_to_num(short_month):
     return {
@@ -102,7 +107,7 @@ def get_bill_links(url):
         actions = table[0]
         committees = table[1]
         link_dict.append({'url': link, 'sponsors': sponsors, 'actions': actions, 'committees': committees})
-
+    scraper_utils.crawl_delay(crawl_delay)
     return link_dict
 
 
@@ -148,7 +153,7 @@ def scrape(dict_item):
     row.current_status = current_status
     row.bill_summary = bill_summary
     row.bill_text = bill_text
-
+    scraper_utils.crawl_delay(crawl_delay)
     print('Done row for: '+bill_name)
     return row
 

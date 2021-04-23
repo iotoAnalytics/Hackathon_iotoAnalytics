@@ -1,29 +1,31 @@
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
-import io
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
-import PyPDF2
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
-import boto3
-from urllib.request import urlopen as uReq
-from urllib.request import Request
-from bs4 import BeautifulSoup as soup
+
 import pandas as pd
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import boto3
+import datetime
+from urllib.parse import parse_qs
+import urllib.parse as urlparse
+import PyPDF2
+import re
+from nameparser import HumanName
+from pprint import pprint
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import io
+
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -36,6 +38,8 @@ legislator_table_name = 'ca_ab_legislators'
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
+
+crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca/')
 
 
 def scrape_bill_links(link):
@@ -61,6 +65,8 @@ def scrape_bill_links(link):
         url = 'https://www.assembly.ab.ca/' + bi.div.a["href"]
 
         bill_links.append(url)
+
+    scraper_utils.crawl_delay(crawl_delay)
     return bill_links
 
 
@@ -93,7 +99,8 @@ def scrape_bills(link):
     session = session_details[1].text
     row.session = session.split(",")[1].strip()
 
-    row.goverlytics_id = "AB_" + row.session.replace(" ", "") + '_' + row.bill_name
+    row.goverlytics_id = "AB_" + \
+        row.session.replace(" ", "") + '_' + row.bill_name
 
     sponsor_details = (details[3]).findAll("div")
     prin_sponsor = sponsor_details[1].text
@@ -124,7 +131,7 @@ def scrape_bills(link):
     bill_text = ""
 
     try:
-        r = requests.get(bill_pdf)
+        r = scraper_utils.request(bill_pdf)
         f = io.BytesIO(r.content)
         reader = PyPDF2.PdfFileReader(f, strict=False)
         if reader.isEncrypted:
@@ -147,7 +154,6 @@ def scrape_bills(link):
         pass
     row.bill_text = bill_text
     # print(bill_text)
-
 
     bill_entries = page_soup.find("div", {"class": "bill-entries"})
     first = page_soup.find("div", {"class": "b_entry"})
@@ -181,7 +187,8 @@ def scrape_bills(link):
 
             except:
                 ad = None
-            action = {'date': ad, 'action_by': 'Legislative Assembly', 'description': description.replace('\n', " ")}
+            action = {'date': ad, 'action_by': 'Legislative Assembly',
+                      'description': description.replace('\n', " ")}
             # print(action)
             actions.append(action)
     # print(actions)
@@ -192,22 +199,8 @@ def scrape_bills(link):
     row.current_status = current_status
     # print(row.actions)
 
-
-
-
-
-
-
     # for div in bill_entries:
-
-
-
-
-
-
-
-
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -230,4 +223,3 @@ if __name__ == '__main__':
     scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
 
     print('Complete!')
-

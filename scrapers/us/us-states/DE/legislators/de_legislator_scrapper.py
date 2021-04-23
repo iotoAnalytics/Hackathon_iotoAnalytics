@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import boto3
 import re
 from nameparser import HumanName
@@ -18,14 +27,6 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # Initialize config parser and get variables from config file
@@ -50,6 +51,9 @@ url_sen = 'https://legis.delaware.gov/Chambers/Senate/SenateDistrict'
 
 url_base = 'https://legis.delaware.gov'
 wiki_link = 'https://en.wikipedia.org/wiki/Delaware_General_Assembly'
+
+crawl_delay = scraper_utils.get_crawl_delay(url_base)
+
 
 current_year = 2021
 

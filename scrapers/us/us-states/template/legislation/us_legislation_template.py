@@ -8,6 +8,16 @@ Note that the functions in the scraper_utils.py and database_tables.py file shou
 have to change. Please extend the classes in these files if you need to modify them.
 '''
 
+from legislation_scraper_utils import USStateLegislationScraperUtils
+from bs4 import BeautifulSoup
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
 import sys
 import os
 from pathlib import Path
@@ -18,21 +28,11 @@ p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 # Other import statements
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
-from bs4 import BeautifulSoup
-from legislation_scraper_utils import USStateLegislationScraperUtils
 
 
-state_abbreviation='IL'
-database_table_name='legislation_template_test'
-legislator_table_name='us_il_legislators'
+state_abbreviation = 'IL'
+database_table_name = 'legislation_template_test'
+legislator_table_name = 'us_il_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
@@ -49,10 +49,10 @@ def get_urls():
     urls = []
 
     # Logic goes here! Some sample code:
-    
+
     path = '/test-sites/e-commerce/allinone'
     scrape_url = base_url + path
-    page = requests.get(scrape_url)
+    page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
     urls = [base_url + prod_path['href']
             for prod_path in soup.findAll('a', {'class': 'title'})]
@@ -140,7 +140,7 @@ def scrape(url):
     # goverlytics_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'party', party, name_last=name_last)
 
     # Other than that, you can replace this statement with the rest of your scraper logic.
-    
+
     # Delay so we don't overburden web servers
     scraper_utils.crawl_delay(crawl_delay)
 

@@ -26,7 +26,7 @@ sys.path.insert(0, str(p))
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
-
+crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
 
 def scrape_members_link(link):
     mem_bios = []
@@ -44,6 +44,7 @@ def scrape_members_link(link):
                 mem_bios.append(mem_bio)
         except Exception:
             pass
+    scraper_utils.crawl_delay(crawl_delay)
     return mem_bios
 
 
@@ -195,7 +196,7 @@ def collect_mla_data(link):
         committees.append(com_info)
 
     row.committees = committees
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -215,7 +216,7 @@ def scrape_wiki(link):
         wiki_link = 'https://en.wikipedia.org' + url_tail
 
         wiki_bios.append(wiki_link)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return wiki_bios
 
 

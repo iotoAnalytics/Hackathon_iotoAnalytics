@@ -15,7 +15,14 @@ Known Issues:
         closed when trying to insert the data. Breaking the data into chunks of 100 or
         so datapoints seemed to remedy the issue.
 '''
+import sys
+import os
+from pathlib import Path
 
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
 
 from tqdm import tqdm
 import traceback
@@ -30,17 +37,10 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import CAFedLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
-
-sys.path.insert(0, str(p))
 
 
 scraper_utils = CAFedLegislatorScraperUtils()
+
 
 scrape_mps = True
 scrape_senators = False
@@ -48,6 +48,9 @@ write_results_to_database = False
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
+
+# Both have sen and MP will have the same scraper delay
+crawl_delay = scraper_utils.get_crawl_delay(mp_base_url)
 
 # Initialized in the get_mp_basic_details() method.
 mp_df = pd.DataFrame()
@@ -79,7 +82,7 @@ def get_mp_basic_details():
     global mp_df
     mp_list_url = f'{mp_base_url}/members/en/search'
 
-    page = requests.get(mp_list_url)
+    page = scraper_utils.request(mp_list_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
@@ -119,7 +122,7 @@ def get_mp_basic_details():
         row.role = 'MP'
 
         mp_data.append(row)
-
+    scraper_utils.crawl_delay(crawl_delay)
     mp_df = pd.DataFrame(mp_data)
 
 
@@ -133,7 +136,7 @@ def get_mp_contact_details(contact_url):
         contact: dictionary containing contact details, including phone_numbers,
             addresses, and email.
     """
-    page = requests.get(contact_url)
+    page = scraper_utils.request(contact_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     container = soup.find('div', {'id': 'contact'})
@@ -181,7 +184,7 @@ def get_mp_contact_details(contact_url):
         print('An error occurred extracting contact information.')
         print(f'Problem URL: {contact_url}')
         print(traceback.format_exc())
-
+    scraper_utils.crawl_delay(crawl_delay)
     return contact
 
 
@@ -194,7 +197,7 @@ def get_mp_role_details(roles_url):
     Returns:
         roles: dictionary container MP role details
     """
-    page = requests.get(roles_url)
+    page = scraper_utils.request(roles_url)
     tree = ET.fromstring(page.content)
 
     roles = {'most_recent_term_id': '', 'offices_roles_as_mp': [],
@@ -218,7 +221,7 @@ def get_mp_role_details(roles_url):
         organization = paigr.find('Organization').text
         roles['parl_assoc_interparl_groups'].append(
             {'role': role, 'title': title, 'organzation': organization})
-
+    scraper_utils.crawl_delay(crawl_delay)
     return roles
 
 
@@ -275,7 +278,7 @@ def get_sen_basic_details():
     """
     global sen_df
     sen_page_url = f'{sen_base_url}/en/senators-list/'
-    page = requests.get(sen_page_url)
+    page = scraper_utils.request(sen_page_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     sen_table = soup.find('table', {'id': 'senator-list-view-table'})
@@ -318,6 +321,7 @@ def get_sen_basic_details():
         row.parl_assoc_interparl_groups = None
 
         sen_data.append(row)
+    scraper_utils.crawl_delay(crawl_delay)
     sen_df = pd.DataFrame(sen_data)
 
 
@@ -331,7 +335,7 @@ def get_individual_sen_page_details(sen_page_url):
         sen_details: Senator detail dictionary contacting phone_number,
             email, and committees
     """
-    page = requests.get(sen_page_url)
+    page = scraper_utils.request(sen_page_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     sen_details = {'phone_number': [], 'email': '', 'committees': []}
@@ -364,7 +368,7 @@ def get_individual_sen_page_details(sen_page_url):
                     {'role': role, 'committee': committee})
     except:
         pass
-
+    scraper_utils.crawl_delay(crawl_delay)
     return sen_details
 
 

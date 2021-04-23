@@ -3,8 +3,8 @@ This website will block your IP if too many requests are sent
 
 The data for 2021 session hasn't fully been added to the database because I got blocked from their website..
 '''
-
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
@@ -12,34 +12,32 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import numpy as np
-from multiprocessing import Pool
-import pandas as pd
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
-import boto3
-from urllib.request import urlopen as uReq
-from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import psycopg2
-from nameparser import HumanName
-from legislation_scraper_utils import USStateLegislationScraperUtils
-
-import datefinder
+import io
+import requests
+import PyPDF2
 import unidecode
+import datefinder
+from legislation_scraper_utils import USStateLegislationScraperUtils
+import psycopg2
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import boto3
+import datetime
+from urllib.parse import parse_qs
+import urllib.parse as urlparse
+import re
+from nameparser import HumanName
+from pprint import pprint
+import configparser
+from database import Database
+import pandas as pd
+from multiprocessing import Pool
+import numpy as np
+
 
 # from selenium import webdriver
 
-import PyPDF2
-import requests
-import io
 
 # # Initialize config parser and get variables from config file
 # configParser = configparser.RawConfigParser()
@@ -49,7 +47,9 @@ state_abbreviation = 'WI'
 database_table_name = 'us_wi_legislation'
 legislator_table_name = 'us_wi_legislators'
 
-scraper_utils = USStateLegislationScraperUtils(state_abbreviation, database_table_name, legislator_table_name)
+scraper_utils = USStateLegislationScraperUtils(
+    state_abbreviation, database_table_name, legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://docs.legis.wisconsin.gov/')
 
 
 def get_assembly_bills(myurl):
@@ -64,6 +64,7 @@ def get_assembly_bills(myurl):
     webpage = uReq(req).read()
 
     uReq(req).close()
+    scraper_utils.crawl_delay(crawl_delay)
 
     page_soup = soup(webpage, "html.parser")
     li_odd = page_soup.findAll("li", {"class": "odd"})
@@ -75,7 +76,6 @@ def get_assembly_bills(myurl):
     for li in li_even:
         link = 'https://docs.legis.wisconsin.gov/' + (li.div.div.a["href"])
         bill_links.append(link)
-
 
     return bill_links
 
@@ -99,6 +99,7 @@ def get_assembly_bills(myurl):
 
 def collect_bill_data(myurl):
     uClient = uReq(myurl)
+    scraper_utils.crawl_delay(crawl_delay)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
@@ -134,7 +135,8 @@ def collect_bill_data(myurl):
         event_info = event.findAll("td")
         date_house = (event_info[0].text)
         date = date_house.split(" ")[0]
-        date = datetime.datetime.strptime(date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        date = datetime.datetime.strptime(
+            date, "%m/%d/%Y").strftime("%Y-%m-%d")
         house_abbrev = date_house.split(" ")[1]
         if house_abbrev == "Asm.":
             action_by = "Assembly"
@@ -154,7 +156,8 @@ def collect_bill_data(myurl):
         if "cosponsor" in event_info[1].text.lower():
             cosponsors_string = (event_info[1].text.split("osponsor")[1])
             if "epresentatives" in cosponsors_string:
-                cosponsors_string = cosponsors_string.split("epresentatives")[1].strip()
+                cosponsors_string = cosponsors_string.split("epresentatives")[
+                    1].strip()
                 cosponsors_string = cosponsors_string.replace(" and ", ";")
                 cos = re.split(', |;', cosponsors_string)
                 for co in cos:
@@ -162,7 +165,8 @@ def collect_bill_data(myurl):
                         cosponsors.append(co)
 
             elif "enators" in cosponsors_string:
-                cosponsors_string = cosponsors_string.split("enators")[1].strip()
+                cosponsors_string = cosponsors_string.split("enators")[
+                    1].strip()
                 cosponsors_string = cosponsors_string.replace(" and ", ";")
                 cos = re.split(', |;', cosponsors_string)
                 for co in cos:
@@ -201,14 +205,13 @@ def collect_bill_data(myurl):
 
         # print(votes)
 
-
-        action = {'date': date, 'action_by': action_by, 'description': description}
+        action = {'date': date, 'action_by': action_by,
+                  'description': description}
 
         actions.append(action)
     date_introduced = actions[0]["date"]
 
     actions.reverse()
-
 
     box_content = page_soup.find("div", {"class": "box-content"})
     box_p = box_content.find("p").text
@@ -216,12 +219,12 @@ def collect_bill_data(myurl):
     bill_description = box_p
     votes.reverse()
 
-
     haspdflink = page_soup.find("span", {"class": "hasPdfLink"})
     pdf_link = "https://docs.legis.wisconsin.gov" + (haspdflink.span.a["href"])
 
     try:
-        r = requests.get(pdf_link)
+        r = scraper_utils.request(pdf_link)
+        scraper_utils.crawl_delay(crawl_delay)
         f = io.BytesIO(r.content)
         reader = PyPDF2.PdfFileReader(f, strict=False)
         if reader.isEncrypted:
@@ -252,7 +255,6 @@ def collect_bill_data(myurl):
     # print(cosponsors)
     # print(cosponsors_id)
 
-
     info = {'state_url': myurl, 'chamber_origin': chamber_origin, 'bill_type': bill_type, 'state': 'WI', 'state_id': 55,
             'bill_name': bill_name, 'current_status': current_status, 'actions': actions,
             'bill_description': bill_description, 'committees': committees, 'cosponsors': cosponsors,
@@ -264,9 +266,6 @@ def collect_bill_data(myurl):
             'country': scraper_utils.country}
     print(info)
     return info
-
-
-
 
 
 if __name__ == '__main__':

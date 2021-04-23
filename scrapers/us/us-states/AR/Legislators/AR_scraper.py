@@ -11,6 +11,15 @@ Notes:
 - Missing years served, could be scraped from within a paragraph on the individual house and senate sites, but since this would rely on 
     the paragraph word structure, it is highly subject to error in the future.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import pandas as pd
 import requests
 import boto3
@@ -23,14 +32,7 @@ from database import Database
 from multiprocessing.dummy import Pool
 from bs4 import BeautifulSoup
 from legislator_scraper_utils import USStateLegislatorScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # Initialize config parser and get variables from config file
@@ -43,6 +45,7 @@ configParser.read('config.cfg')
 
 # scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 scraper_utils = USStateLegislatorScraperUtils('AR', 'us_ar_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.arkleg.state.ar.us')
 session_id = ''
 
 
@@ -55,7 +58,7 @@ def get_urls():
     # Logic goes here! Some sample code:
     scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
     base_url = 'https://www.arkleg.state.ar.us'
-    page = requests.get(scrape_url)
+    page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
     chambers = soup.find_all(
         'div', class_='col-sm-2 col-md-2 d-none d-md-block d-lg-block d-xl-block')
@@ -78,7 +81,7 @@ def get_urls():
 def get_wiki_links(link, chamber):
     wikipedia_link = 'https://en.wikipedia.org'
 
-    member_request = requests.get(link)
+    member_request = scraper_utils.request(link)
     member_soup = BeautifulSoup(member_request.content, 'html.parser')
     members = member_soup.find('table', class_='wikitable sortable')
     members = members.find_all('tr')[1:]
@@ -92,12 +95,12 @@ def get_wiki_links(link, chamber):
         member_url = elements[1].find('a')['href']
 
         links[(chamber, district)] = (wikipedia_link + member_url)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return links
 
 
 def scrape_wiki(url, row):
-    member_request = requests.get(url)
+    member_request = scraper_utils.request(url)
     member_soup = BeautifulSoup(member_request.content, 'html.parser')
     table = member_soup.find('table', class_='infobox vcard')
     if table is None:
@@ -195,7 +198,7 @@ def scrape_wiki(url, row):
                         row.education = edinfo
     except Exception as e:
         pass
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
@@ -218,7 +221,7 @@ def scrape(urls):
 
     row = scraper_utils.initialize_row()
 
-    page = requests.get(url)
+    page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'html.parser')
     row.source_url = url
     title = soup.find('h1')
@@ -303,14 +306,15 @@ def scrape(urls):
         row.committees.append({'role:': role, 'committee:': group})
 
     scrape_wiki(urls[1], row)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
 
 def set_session_id():
     scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
-    page = requests.get(scrape_url)
+    page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
+    scraper_utils.crawl_delay(crawl_delay)
     return(soup.find('div', class_='siteBienniumSessionName').text.split('-')[1].strip())
 
 

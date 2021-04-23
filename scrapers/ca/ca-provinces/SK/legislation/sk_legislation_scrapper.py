@@ -13,7 +13,8 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys, os
+import sys
+import os
 from pathlib import Path
 from io import BytesIO
 import pdfx
@@ -27,10 +28,10 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
 pdf_link = 'https://www.legassembly.sk.ca/media/1398/progress-of-bills.pdf'
-
+crawl_delay = scraper_utils.get_crawl_delay(pdf_link)
 
 def get_bill_info(link):
-    response = requests.get(link, stream=True)
+    response = requests.get(link, stream=True, headers=scraper_utils.request_headers)
     pdf = pdfplumber.open(BytesIO(response.content))
     item_lst = []
     for _ in range(0, len(pdf.pages)):
@@ -49,6 +50,7 @@ def get_bill_info(link):
                     item_lst.append(item_dict)
             except Exception:
                 pass
+    scraper_utils.crawl_delay(crawl_delay)
     return item_lst
 
 
@@ -56,7 +58,7 @@ def get_bill_dict(list):
     bill_dict_lst = []
     for _ in range(0, len(list)):
         url = list[_]
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, headers=scraper_utils.request_headers)
         pdf = pdfplumber.open(BytesIO(response.content))
         title = ''
         sponsor = ''
@@ -77,7 +79,8 @@ def get_bill_dict(list):
                     sponsor = sponsor.replace('Mr.', '').strip()
         bill_text = ' '.join(bill_text.split('\n'))
         #         bill_text.replace('\n', ' ')
-        bill_dict = {'title': title, 'sponsor': sponsor, 'bill_text': bill_text, 'url': url}
+        bill_dict = {'title': title, 'sponsor': sponsor,
+                     'bill_text': bill_text, 'url': url}
         bill_dict_lst.append(bill_dict)
     return bill_dict_lst
 
@@ -157,22 +160,26 @@ def append_other_dicts(lst, s):
                     {'date': lst[1], 'action_by': '', 'description': '3rd Reading'}]
         elif len(lst) == 3:
             return [{'date': lst[0], 'action_by': '', 'description': '2nd Reading'},
-                    {'date': lst[1], 'action_by': '', 'description': '3rd Reading'},
+                    {'date': lst[1], 'action_by': '',
+                        'description': '3rd Reading'},
                     {'date': lst[2], 'action_by': '', 'description': 'Royal Assent'}]
 
 
 # need to make function that makes other action dicts
 def actions_list(lst):
     action_dict_lst = []
-    action_dict = {'date': lst[0], 'action-by': "", 'description': '1st Reading'}
+    action_dict = {'date': lst[0], 'action-by': "",
+                   'description': '1st Reading'}
     action_dict_lst.append(action_dict)
     s = 0
     if len(lst) > 1:
         if date_diff(lst[0], lst[1]):
-            second_dict = {'date': lst[1], 'action-by': '', 'description': 'Royal Rec.'}
+            second_dict = {
+                'date': lst[1], 'action-by': '', 'description': 'Royal Rec.'}
             action_dict_lst.append(second_dict)
         else:
-            second_dict = {'date': lst[1], 'action-by': '', 'description': '2nd Reading'}
+            second_dict = {
+                'date': lst[1], 'action-by': '', 'description': '2nd Reading'}
             action_dict_lst.append(second_dict)
             s = 1
         for item in append_other_dicts(lst[2:], s):
@@ -197,9 +204,11 @@ def match_lst(bill_dict, bill_info_lst):
                 if re.search('[A-Z]{2}', dates):
                     key = re.search('[A-Z]{2}', dates).group()
                     com = com_dict(key)
-                dates_lst = re.findall('[A-Z][a-z]{2}\s[0-9]{2}\,\s[0-9]{4}', dates)
+                dates_lst = re.findall(
+                    '[A-Z][a-z]{2}\s[0-9]{2}\,\s[0-9]{4}', dates)
                 if re.search('[A-Z][a-z]{2}\s[0-9]{2}\,\s\sA', dates):
-                    missing = re.search('[A-Z][a-z]{2}\s[0-9]{2}\,\s\sA', dates).group()
+                    missing = re.search(
+                        '[A-Z][a-z]{2}\s[0-9]{2}\,\s\sA', dates).group()
                     dates_lst.append(missing.replace(' A', '') + str(2020))
                 dates_lst = fix_dates(dates_lst)
                 actions = actions_list(dates_lst)
@@ -213,7 +222,8 @@ def make_row(bill_el):
     sponsor = bill_el['sponsor']
     names = sponsor.split()
     row.principal_sponsor = sponsor
-    row.principal_sponsor_id = scraper_utils.get_legislator_id(name_first=names[0], name_last=names[1])
+    row.principal_sponsor_id = scraper_utils.get_legislator_id(
+        name_first=names[0], name_last=names[1])
     row.actions = bill_el['actions']
     row.source_url = bill_el['url']
     row.bill_text = bill_el['bill_text']

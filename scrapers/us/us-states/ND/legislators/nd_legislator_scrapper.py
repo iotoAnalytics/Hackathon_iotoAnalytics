@@ -7,6 +7,17 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
+sys.path.append("..")
+
 import boto3
 from legislator_scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
@@ -18,16 +29,7 @@ from datetime import date, datetime
 from nameparser import HumanName
 from pprint import pprint
 import configparser
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
-sys.path.append("..")
 
 
 # # Initialize config parser and get variables from config file
@@ -42,14 +44,17 @@ sys.path.append("..")
 
 scraper_utils = USStateLegislatorScraperUtils(
     'ND', 'us_nd_legislators')
+crawl_delay = scraper_utils.get_crawl_delay('https://www.legis.nd.gov')
+
 
 POLITICAL_PARTIES = ['Republican', 'Democrat',
                      "Libertarian", 'Green', 'Consitituion']
 
 
 def request_find(base_url, t, att, filter_all=False):
-    url_request = requests.get(base_url)
+    url_request = scraper_utils.request(base_url)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     if filter_all:
         return url_soup.find_all(t, att)
     return url_soup.find(t, att)
@@ -335,7 +340,8 @@ def scrape(url):
     row.source_url = url
     row.most_recent_term_id = retrieve_current_term()
 
-    page = requests.get(url)
+    page = scraper_utils.request(url)
+    scraper_utils.crawl_delay(crawl_delay)
     soup = BeautifulSoup(page.content, 'html.parser')
     name_info_dict = retrieve_name_info(soup)
     # Let scraper_utils.insert_legislator_data_into_db enter default values for empty columns

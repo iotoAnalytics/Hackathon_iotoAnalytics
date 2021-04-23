@@ -7,6 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import time
 from multiprocessing import Pool
 import pandas as pd
@@ -17,14 +26,7 @@ import re
 import configparser
 from database import Database
 from legislation_scraper_utils import USStateLegislationScraperUtils
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 header = {
@@ -42,13 +44,14 @@ scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, 'us_ak_legislation', 'us_ak_legislators')
 
 base_url = 'http://www.akleg.gov/basis/Home/BillsandLaws'
-
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 def past_terms_url(url):
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     href = url_soup.find('div', {'id': 'fullpage'}).find_all('li')[
         1].find('a').get('href')
+    scraper_utils.crawl_delay(crawl_delay)
     return 'http://www.akleg.gov' + href
 
 
@@ -57,6 +60,7 @@ def get_session(url):
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_text = url_soup.find('em', {'class': 'date'}).text
     session = re.findall("\d{4}-\d{4}", url_text)[0]
+    scraper_utils.crawl_delay(crawl_delay)
     return session
 
 
@@ -64,6 +68,7 @@ def get_html(url):
     url_request = request_url.UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_table = url_soup.find('table')
+    scraper_utils.crawl_delay(crawl_delay)
     return url_table
 
 
@@ -110,6 +115,7 @@ def go_into_links(link):
                 cosponsors = item.text.replace(
                     'Sponsor(S)', '').replace('\n', '').strip()
                 idict['cosponsors'] = cosponsors
+    scraper_utils.crawl_delay(crawl_delay)
     return idict
 
 
@@ -130,11 +136,13 @@ def get_bill_text(url):
     try:
         url_request = request_url.UrlRequest.make_request(url, header)
         url_soup = BeautifulSoup(url_request.content, 'lxml')
+        scraper_utils.crawl_delay(crawl_delay)
         bill_url = url_soup.find(
             'td', {'data-label': 'Version'}).find('a').get('href')
         bill_url = 'http://www.akleg.gov' + bill_url
 
         url_request = request_url.UrlRequest.make_request(bill_url, header)
+        scraper_utils.crawl_delay(crawl_delay)
         url_soup = BeautifulSoup(url_request.content, 'lxml')
         url_sum = url_soup.find('div', {'id': 'draftOverlay'}).text
         text = url_sum.replace('\n', '').split('\r')

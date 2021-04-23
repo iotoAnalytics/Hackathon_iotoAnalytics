@@ -1,3 +1,12 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from legislation_scraper_utils import USStateLegislationScraperUtils
 import xml.etree.ElementTree as ET
 import io
@@ -33,14 +42,7 @@ import numpy as np
 import pickle
 import os
 import json
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 # import dbwork
 # import xmltodict
 
@@ -50,6 +52,7 @@ legislator_table_name = 'us_az_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
+crawl_delay = scraper_utils.get_crawl_delay('https://apps.azleg.gov')
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
@@ -103,7 +106,7 @@ def find_bill_links(myurl):
                     'source_id': bill_state_id, 'session': session}
             # print(info)
             bill_links.append(info)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return bill_links
 
 
@@ -319,7 +322,7 @@ def collect_bill_texts(bill_id):
                 pdflink = r.replace('"HtmlPath":"', "")
                 pdflink = pdflink.replace('.htm"', '.pdf')
 
-        r = requests.get(pdflink)
+        r = scraper_utils.request(pdflink)
         f = io.BytesIO(r.content)
         reader = PyPDF2.PdfFileReader(f, strict=False)
         if reader.isEncrypted:
