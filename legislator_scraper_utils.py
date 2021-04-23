@@ -15,9 +15,16 @@ import atexit
 import utils
 from urllib.request import urlopen as uReq
 import re
+import requests
 import unidecode
 from bs4 import BeautifulSoup as soup
 from nameparser import HumanName
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
+from bs4 import BeautifulSoup
+import time
+import random
+
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -26,7 +33,10 @@ date collectors.
 """
 
 # region Base Scraper Utils
+
+
 class LegislatorScraperUtils():
+    """Base scraper class. Contains methods common to all legislator scrapers."""
 
     def __init__(self, country, database_table_name, row_type):
 
@@ -47,27 +57,62 @@ class LegislatorScraperUtils():
                 cur.execute(query)
                 division_results = cur.fetchall()
             except Exception as e:
-                sys.exit(f'An exception occurred retrieving tables from database:\n{e}')
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
 
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
         self.divisions = pd.DataFrame(division_results)
 
-        self.country = self.countries.loc[self.countries['abbreviation'] == country]['country'].values[0]
-        self.country_id = int(self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
+        self.country = self.countries.loc[self.countries['abbreviation']
+                                          == country]['country'].values[0]
+        self.country_id = int(
+            self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
         self.database_table_name = database_table_name
         self.row_type = row_type
+        self.request_headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'
+        }
+
+    def request(self, url, headers=None):
+        """Send request using default scraper util header. Header can be overridden by passing in your own."""
+        header = self.request_headers
+        if headers:
+            header = headers
+        return requests.get(url, headers=header)
+
+    def get_crawl_delay(self, url, user_agent=None):
+        """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
+        user_agent = user_agent if user_agent else self.request_headers.get(
+            'User-Agent')
+        o = urlparse(url)
+        scheme = 'https' if o.scheme == '' else o.scheme
+        robots_url = f'{scheme}://{o.netloc}/robots.txt'
+        rp = RobotFileParser()
+        rp.set_url(robots_url)
+        rp.read()
+        crawl_delay = rp.crawl_delay(user_agent if user_agent else '*')
+        if crawl_delay:
+            return crawl_delay
+        return 2
+
+    def crawl_delay(self, min_seconds):
+        """Add delay. Should be called after making request to website so as to not overburden web server."""
+        time.sleep(random.uniform(1, 1.1) * min_seconds)
 
     def initialize_row(self):
+        """Instantiates a Row object filled with default values."""
         row = copy.deepcopy(self.row_type)
         row.country_id = self.country_id
         row.country = self.country
         return row
 
     def get_attribute(self, table_name, column_to_search, value, attribute='id'):
+        """Returns a given attribute from the specified table. This is a helper used by other functions but it’s available if you require attributes from one of the valid tables. Valid table names include country, party, and division."""
         accepted_tables = ['country', 'party', 'division']
         if table_name not in accepted_tables:
-            raise Exception(f'Error: table must be one of the following: {accepted_tables}')
+            raise Exception(
+                f'Error: table must be one of the following: {accepted_tables}')
 
         if table_name == 'country':
             df = self.countries
@@ -84,13 +129,13 @@ class LegislatorScraperUtils():
 
     def get_party_id(self, party_name):
         """
-        Used for getting the party ID number.
+        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
         """
         return self.get_attribute('party', 'party', party_name)
 
     def scrape_wiki_bio(self, wiki_link):
         """
-        Used for getting missing legislator fields from their wikipedia bios.
+        Used for getting missing legislator fields from their wikipedia bios. Useful for getting things like a legislator's birthday or education.
         """
         try:
             uClient = uReq(wiki_link)
@@ -190,7 +235,8 @@ class LegislatorScraperUtils():
 
         # get education
         education = []
-        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
+        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
+                "DDS", "MS", "BS", "MBA", "MS", "MD"]
 
         try:
             uClient = uReq(wiki_link)
@@ -223,7 +269,8 @@ class LegislatorScraperUtils():
                             except:
                                 pass
 
-                        edinfo = {'level': level, 'field': "", 'school': school}
+                        edinfo = {'level': level,
+                                  'field': "", 'school': school}
 
                         if edinfo not in education:
                             education.append(edinfo)
@@ -302,27 +349,31 @@ class LegislatorScraperUtils():
 # endregion
 
 # region US Scraper Utils
+
+
 class USFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
-    Utilities to help with collecting and storing legislator data.
+    Utilities to help with collecting and storing American federal legislator data.
     """
 
     def __init__(self, database_table_name='us_fed_legislators'):
-        """
-        The state_abbreviation, database_table_name, and country come from
-        the config.cfg file and must be updated to work properly with your legislation
-        data collector.
-        """
         super().__init__('us', database_table_name, USLegislatorRow())
 
     def get_state_id(self, state_abbreviation):
+        """Returns state ID based on a given state abbreviation."""
         return self.get_attribute('division', 'abbreviation', state_abbreviation)
 
-    def insert_legislator_data_into_db(self, data):
+    def insert_legislator_data_into_db(self, data, database_table=None):
         """
+        Inserts legislator data into database table. Data must be either a list of Row objects or dictionaries.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        table = self.database_table_name
+        if database_table:
+            table = database_table
 
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -361,7 +412,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
-                        """).format(table=sql.Identifier(self.database_table_name))
+                        """).format(table=sql.Identifier(table))
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
@@ -403,7 +454,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
                         seniority = excluded.seniority;
-                    """).format(table=sql.Identifier(self.database_table_name))
+                    """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 
@@ -447,12 +498,17 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
 
 
 class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
+    """
+    Scraper utilities for collecting US state legislator data.
+    """
+
     def __init__(self, state_abbreviation, database_table_name='us_state_legislators'):
         super().__init__(database_table_name)
         self.state = state_abbreviation
         self.state_id = self.get_state_id(state_abbreviation)
 
     def initialize_row(self):
+        """Create a Row object filled with default values."""
         row = super().initialize_row()
         row.state = self.state
         row.state_id = self.state_id
@@ -460,6 +516,8 @@ class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
 # endregion
 
 # region Canadian Scraper Utils
+
+
 class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
     """
     Utilities to help with collecting and storing legislator data.
@@ -474,19 +532,28 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         super().__init__('ca', database_table_name, row_type)
 
     def get_prov_terr_id(self, prov_terr_abbrev):
+        """Returns the province/territory ID for a given province/territory abbreviation."""
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
 
     def get_region(self, prov_terr_abbrev):
+        """Returns the region for a given province/territory abbreviation."""
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev, 'region')
 
     def get_prov_terr_abbrev(self, prov_terr):
+        """Returns the province/territory abbreviation given the full name of a given province/territory."""
         return self.get_attribute('division', 'division', prov_terr, 'abbreviation')
 
-    def insert_legislator_data_into_db(self, data):
+    def insert_legislator_data_into_db(self, data, database_table=None):
         """
+        Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        table = self.database_table_name
+        if database_table:
+            table = database_table
 
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -527,7 +594,7 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
-                        """).format(table=sql.Identifier(self.database_table_name))
+                        """).format(table=sql.Identifier(table))
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
@@ -569,7 +636,7 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
                         parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
                         region = excluded.region,
                         seniority = excluded.seniority;
-                    """).format(table=sql.Identifier(self.database_table_name))
+                    """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 
@@ -608,7 +675,8 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
                     item.military_experience,
                     item.region,
                     item.offices_roles_as_mp,
-                    json.dumps(item.parl_assoc_interparl_groups, default=utils.json_serial)
+                    json.dumps(item.parl_assoc_interparl_groups,
+                               default=utils.json_serial)
                 )
 
                 cur.execute(insert_legislator_query, tup)
@@ -616,23 +684,34 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
 
 class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
     def __init__(self, prov_terr_abbreviation, database_table_name='ca_provterr_legislators'):
+        """
+        Create a ScraperUtils for collection Canadian province and territory legislator data.
+        """
         super().__init__(database_table_name, CALegislatorRow())
         self.province_territory = prov_terr_abbreviation
-        self.province_territory_id = self.get_prov_terr_id(prov_terr_abbreviation)
+        self.province_territory_id = self.get_prov_terr_id(
+            prov_terr_abbreviation)
         self.region = self.get_region(prov_terr_abbreviation)
 
     def initialize_row(self):
+        """Create a Row object filled with default values."""
         row = super().initialize_row()
         row.province_territory = self.province_territory
         row.province_territory_id = self.province_territory_id
         row.region = self.region
         return row
 
-    def insert_legislator_data_into_db(self, data):
+    def insert_legislator_data_into_db(self, data, database_table=None):
         """
+        Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        table = self.database_table_name
+        if database_table:
+            table = database_table
 
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -671,7 +750,7 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
-                        """).format(table=sql.Identifier(self.database_table_name))
+                        """).format(table=sql.Identifier(table))
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
@@ -711,7 +790,7 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
                         seniority = excluded.seniority;
-                    """).format(table=sql.Identifier(self.database_table_name))
+                    """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 

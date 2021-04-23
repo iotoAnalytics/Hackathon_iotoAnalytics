@@ -59,6 +59,7 @@ class CALegislationRow(LegislationRow):
     """
     province_territory_id: int = 0
     province_territory: str = ''
+    region: str = ''
 
 
 @dataclass
