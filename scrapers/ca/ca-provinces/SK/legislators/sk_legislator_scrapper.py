@@ -14,7 +14,8 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys, os
+import sys
+import os
 from pathlib import Path
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
@@ -24,12 +25,13 @@ url = 'https://www.legassembly.sk.ca/mlas/'
 base_url = 'https://www.legassembly.sk.ca'
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Saskatchewan'
 wiki_base = 'https://en.wikipedia.org'
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('SK', 'ca_sk_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
 
 def get_legislator_links(url):
     links = []
@@ -64,7 +66,8 @@ def scrape(info_dict):
     url = info_dict['url']
     url_request = UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
-    url_header = url_soup.find('div', {'class': 'mla-header'}).text.replace('\xa0', ' ').replace('\n', ' ').split('-')
+    url_header = url_soup.find('div', {
+                               'class': 'mla-header'}).text.replace('\xa0', ' ').replace('\n', ' ').split('-')
 
     row = scraper_utils.initialize_row()
 
@@ -73,8 +76,10 @@ def scrape(info_dict):
     name_first = name.first
     name_last = name.last
     party = url_header[1].strip()
-    url_riding = url_soup.find('div', {'class': 'mla-constituency-cell'}).text.replace('\n', '')
-    div_lst = url_soup.find('div', {'class': 'row'}).find_all('div', {'class': 'col-md-4'})
+    url_riding = url_soup.find(
+        'div', {'class': 'mla-constituency-cell'}).text.replace('\n', '')
+    div_lst = url_soup.find('div', {'class': 'row'}).find_all(
+        'div', {'class': 'col-md-4'})
     addresses = []
     email = ''
     phone = []
@@ -86,7 +91,8 @@ def scrape(info_dict):
             for el in lst:
                 if 'Phone' in el.text:
                     if el.find('span').text != '':
-                        phone_dict = {'office': lst[0].text, 'number': el.find('span').text}
+                        phone_dict = {
+                            'office': lst[0].text, 'number': el.find('span').text}
                         phone.append(phone_dict)
         elif 'Online' in item.text:
             lst = item.find_all('div')

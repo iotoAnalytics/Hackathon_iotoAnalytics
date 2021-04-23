@@ -7,36 +7,36 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import io
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+import urllib.parse
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 import sys
 import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium import webdriver
-import pandas as pd
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-import urllib.parse
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
-import io
 
 # import PyPDF2
 # from selenium.common.exceptions import TimeoutException

@@ -1,4 +1,6 @@
-import sys, os
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+import sys
+import os
 from pathlib import Path
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
@@ -20,13 +22,13 @@ import pandas as pd
 import unidecode
 import numpy as np
 
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('MB', 'ca_mb_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.gov.mb.ca/')
+
 
 def scrape_main_page(link):
     members = []
@@ -41,7 +43,8 @@ def scrape_main_page(link):
     for ti in table_items:
         ti_info = ti.findAll("td")
 
-        url = 'https://www.gov.mb.ca/legislature/members/' + (ti_info[1].a["href"])
+        url = 'https://www.gov.mb.ca/legislature/members/' + \
+            (ti_info[1].a["href"])
         party_abbrev = ti_info[2].text
         if party_abbrev == 'PC':
             party = 'Progressive Conservative Party of Manitoba'
@@ -52,7 +55,6 @@ def scrape_main_page(link):
         party_id = scraper_utils.get_party_id(party)
 
         main_info = {'source_url': url, 'party': party, 'party_id': party_id}
-
 
         members.append(main_info)
     scraper_utils.crawl_delay(crawl_delay)
@@ -140,7 +142,8 @@ def collect_mla_data(link_party):
             phone_info = {'office': address_location, 'phone_number': phone}
             phone_number.append(phone_info)
             stop = 1
-    addr_info = {'location': address_location, 'address': address.replace('\xa0', "").strip()}
+    addr_info = {'location': address_location,
+                 'address': address.replace('\xa0', "").strip()}
     # print(addr_info)
     addresses.append(addr_info)
 
@@ -164,13 +167,15 @@ def collect_mla_data(link_party):
 
                 phone = phone.replace("(", "")
                 phone = phone.replace(")", "-")
-                phone_info = {'office': address_location, 'phone_number': phone}
+                phone_info = {'office': address_location,
+                              'phone_number': phone}
                 phone_number.append(phone_info)
 
             except:
                 pass
             stop = 1
-    addr_info = {'location': address_location, 'address': address.replace('\xa0', "").strip()}
+    addr_info = {'location': address_location,
+                 'address': address.replace('\xa0', "").strip()}
 
     addresses.append(addr_info)
     row.addresses = addresses
@@ -199,7 +204,6 @@ def scrape_main_wiki(link):
     return wiki_urls
 
 
-
 if __name__ == '__main__':
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
@@ -212,22 +216,25 @@ if __name__ == '__main__':
         data = pool.map(func=collect_mla_data, iterable=member_bios)
     leg_df = pd.DataFrame(data)
 
-    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
+    leg_df = leg_df.drop(columns=[
+                         'birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
 
     wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba'
     wiki_bios = scrape_main_wiki(wiki_link)
     with Pool() as pool:
-        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_bios)
+        wiki_data = pool.map(
+            func=scraper_utils.scrape_wiki_bio, iterable=wiki_bios)
     wiki_df = pd.DataFrame(wiki_data)
 
-
-    big_df = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_first", "name_last"])
     print(big_df)
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
-    big_df['most_recent_term_id'] = big_df['most_recent_term_id'].replace({np.nan: None})
+    big_df['most_recent_term_id'] = big_df['most_recent_term_id'].replace({
+                                                                          np.nan: None})
 
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)

@@ -1,31 +1,29 @@
+import io
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import PyPDF2
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import pandas as pd
 import sys
 import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-import pandas as pd
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import PyPDF2
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
-import io
-
 
 
 prov_terr_abbreviation = 'MB'
@@ -36,6 +34,7 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
 crawl_delay = scraper_utils.get_crawl_delay('https://web2.gov.mb.ca/')
+
 
 def scrape_bill_links(link):
     bill_infos = []

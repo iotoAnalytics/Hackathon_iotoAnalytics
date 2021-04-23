@@ -2,27 +2,25 @@
 Scraper for collecting Canadian federal legislation data.
 Author: Justin Tendeck
 '''
+from tqdm import tqdm
+import io
+from nameparser import HumanName
+import json
+import psycopg2
+import csv
+from datetime import datetime, date
+import xml.etree.ElementTree as ET
+import requests
+from legislation_scraper_utils import CAFedLegislationScraperUtils
+from bs4 import BeautifulSoup
 import sys
 import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-from bs4 import BeautifulSoup
-from legislation_scraper_utils import CAFedLegislationScraperUtils
-import requests
-import xml.etree.ElementTree as ET
-from datetime import datetime, date
-import csv
-import psycopg2
-import json
-from nameparser import HumanName
-import io
-from tqdm import tqdm
-
 
 
 base_url = 'https://www.parl.ca'

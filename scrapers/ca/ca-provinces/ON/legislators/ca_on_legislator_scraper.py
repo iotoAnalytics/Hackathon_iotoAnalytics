@@ -1,28 +1,28 @@
-import sys, os
+from datetime import datetime
+import numpy as np
+import re
+import datetime
+from multiprocessing import Pool
+import unidecode
+import datefinder
+import requests
+from request_url import UrlRequest
+from nameparser import HumanName
+import psycopg2
+from bs4 import BeautifulSoup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import bs4
+import pandas as pd
+import sys
+import os
 from pathlib import Path
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-import pandas as pd
-import bs4
-from urllib.request import urlopen as uReq
-from urllib.request import Request
-from bs4 import BeautifulSoup
-import psycopg2
-from nameparser import HumanName
-from request_url import UrlRequest
-import requests
-import datefinder
-import unidecode
-from multiprocessing import Pool
-import datetime
-import re
-import numpy as np
-from datetime import datetime
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('ON', 'ca_on_legislators')
@@ -57,7 +57,8 @@ def get_wiki_links(url):
     url_table = url_soup.find('table', {'class': 'wikitable sortable'})
     for item in url_table.find_all('tr'):
         try:
-            wiki_links.append(base_wiki + item.find('span', {'class': 'fn'}).find('a').get('href'))
+            wiki_links.append(base_wiki + item.find('span',
+                              {'class': 'fn'}).find('a').get('href'))
         except Exception:
             pass
     return wiki_links
@@ -87,8 +88,10 @@ def get_info(soup):
         address_lst.append(
             {'location': content[_].find('h3').text, 'address': content[_].find('p').text.replace('\n', ' ')})
         try:
-            phone = content[_].text.split('Tel.')[1].split('Fax')[0].replace('\n', '').strip()
-            phone_lst.append({'office': content[_].find('h3').text, 'number': phone})
+            phone = content[_].text.split('Tel.')[1].split('Fax')[
+                0].replace('\n', '').strip()
+            phone_lst.append(
+                {'office': content[_].find('h3').text, 'number': phone})
         except:
             pass
     for item in div_lst:
@@ -99,11 +102,14 @@ def get_info(soup):
                     if len(com) == 1:
                         com_lst.append({'role': com[0], 'committee': ''})
                     elif len(com) == 2:
-                        com_lst.append({'role': com[0], 'committee': com[1].strip()})
+                        com_lst.append(
+                            {'role': com[0], 'committee': com[1].strip()})
                     else:
-                        com_lst.append({'role': com[0], 'committee': ' '.join(com[1:])})
+                        com_lst.append(
+                            {'role': com[0], 'committee': ' '.join(com[1:])})
             elif item.find('h2').text == 'Current party':
-                temp = item.find('div', {'class': 'field-content'}).text.split('of')[0].strip()
+                temp = item.find(
+                    'div', {'class': 'field-content'}).text.split('of')[0].strip()
                 party = temp.replace('party', '').replace('Party', '').strip()
 
     date_lst = sorted(list(dict.fromkeys(date_lst)))
@@ -123,7 +129,8 @@ def scrape(diction):
 
     url_request = UrlRequest.make_request(diction['url'], header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
-    first_content = url_soup.find('h1', {'class': 'field-content'}).text.split('(')
+    first_content = url_soup.find(
+        'h1', {'class': 'field-content'}).text.split('(')
     info = get_info(url_soup)
     if len(first_content) == 2:
         name_full = ' '.join(first_content[0].split())
@@ -164,7 +171,7 @@ def scrape(diction):
             row.birthday = wiki_info['birthday']
             row.occupation = wiki_info['occupation']
 
-    print('Done row for '+ name_full)
+    print('Done row for ' + name_full)
     scraper_utils.crawl_delay(crawl_delay)
     return row
 

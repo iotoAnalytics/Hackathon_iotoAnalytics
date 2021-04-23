@@ -1,5 +1,8 @@
 import sys, os
 from pathlib import Path
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
+
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import requests
@@ -20,9 +23,6 @@ import pandas as pd
 import unidecode
 import numpy as np
 
-p = Path(os.path.abspath(__file__)).parents[4]
-
-sys.path.insert(0, str(p))
 from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')

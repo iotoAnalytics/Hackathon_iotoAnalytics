@@ -15,28 +15,27 @@ Known Issues:
         closed when trying to insert the data. Breaking the data into chunks of 100 or
         so datapoints seemed to remedy the issue.
 '''
+from legislator_scraper_utils import CAFedLegislatorScraperUtils
+from bs4 import BeautifulSoup
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import pandas as pd
+import xml.etree.ElementTree as ET
+import traceback
+from tqdm import tqdm
 import sys
 import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-from tqdm import tqdm
-import traceback
-import xml.etree.ElementTree as ET
-import pandas as pd
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
-from bs4 import BeautifulSoup
-from legislator_scraper_utils import CAFedLegislatorScraperUtils
 
 
 scraper_utils = CAFedLegislatorScraperUtils()

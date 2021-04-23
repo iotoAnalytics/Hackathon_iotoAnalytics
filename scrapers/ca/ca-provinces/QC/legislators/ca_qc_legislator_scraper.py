@@ -1,3 +1,4 @@
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 import pandas as pd
 import bs4
 from urllib.request import urlopen as uReq
@@ -13,18 +14,19 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+
 
 def getAssemblyLinks(myurl):
     infos = []
@@ -97,7 +99,8 @@ def collect_leg_data(myurl):
             if "since" in committee:
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
-            com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
+            com_info = {'role': role, 'committee': committee,
+                        'house': 'National Assembly'}
 
             committees.append(com_info)
         elif " to the " in co:
@@ -110,7 +113,8 @@ def collect_leg_data(myurl):
 
             committee = committee.replace("Minister of", "").strip()
 
-            com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
+            com_info = {'role': role, 'committee': committee,
+                        'house': 'National Assembly'}
 
             committees.append(com_info)
         elif " for " in co:
@@ -120,7 +124,8 @@ def collect_leg_data(myurl):
             if "since" in committee:
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
-            com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
+            com_info = {'role': role, 'committee': committee,
+                        'house': 'National Assembly'}
             committees.append(com_info)
 
         elif " of " in co:
@@ -130,7 +135,8 @@ def collect_leg_data(myurl):
             if "since" in committee:
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
-            com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
+            com_info = {'role': role, 'committee': committee,
+                        'house': 'National Assembly'}
 
             committees.append(com_info)
         elif " on the " in co:
@@ -140,11 +146,10 @@ def collect_leg_data(myurl):
             if "since" in committee:
                 committee = co[1].split("since")[0].strip()
             committee = committee.split("from")[0].strip()
-            com_info = {'role': role, 'committee': committee, 'house': 'National Assembly'}
+            com_info = {'role': role, 'committee': committee,
+                        'house': 'National Assembly'}
 
             committees.append(com_info)
-
-
 
     contact_link = myurl.replace("index", "coordonnees")
 
@@ -168,12 +173,10 @@ def collect_leg_data(myurl):
             addr_list = []
             for a in alist:
 
-
                 if "Telephone: " in a:
                     tele = 1
                     number = a.replace("Telephone: ", "").strip()
                     number = number.split(" ")[0]
-
 
                     if number not in numbers:
                         numbers.append(number)
@@ -197,7 +200,6 @@ def collect_leg_data(myurl):
         except:
             pass
 
-
     email = ""
     try:
         email = (address_info[2].address.a["href"]).replace("mailto:", "")
@@ -207,7 +209,8 @@ def collect_leg_data(myurl):
             email = (address_info[0].address.a["href"]).replace("mailto:", "")
         except:
             try:
-                email = (address_info[1].address.a["href"]).replace("mailto:", "")
+                email = (address_info[1].address.a["href"]
+                         ).replace("mailto:", "")
             except:
                 pass
     capitalized_party = party.title()
@@ -221,7 +224,7 @@ def collect_leg_data(myurl):
             'name_first': hn.first, 'name_last': hn.last, 'name_suffix': hn.suffix, 'name_middle': hn.middle,
             'riding': riding, 'party': party, 'party_id': party_id, 'email': email, 'committees': committees,
             'phone_number': phone_number, 'addresses': addresses, 'military_experience': ""}
-    
+
     scraper_utils.crawl_delay(crawl_delay)
     return info
 
@@ -240,7 +243,8 @@ def get_wiki_people(repLink):
         try:
             info = person.findAll("td")
 
-            biolink = "https://en.wikipedia.org/" + (info[1].span.span.span.a["href"])
+            biolink = "https://en.wikipedia.org/" + \
+                (info[1].span.span.span.a["href"])
 
             bio_lnks.append(biolink)
 
@@ -461,20 +465,25 @@ if __name__ == '__main__':
     wiki_people = get_wiki_people(wiki_link)
 
     with Pool() as pool:
-        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+        wiki_data = pool.map(
+            func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wiki_df = pd.DataFrame(wiki_data)
 
     print(wiki_df)
-    mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
-    mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({np.nan: None})
-    mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({np.nan: None})
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
+    mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=[
+                              "name_first", "name_last"])
+    mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({
+                                                                                          np.nan: None})
+    mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({
+                                                                            np.nan: None})
+    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({
+                                                                        np.nan: None})
+    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({
+                                                                    np.nan: None})
+    mergedRepsData['education'] = mergedRepsData['education'].replace({
+                                                                      np.nan: None})
     big_df = mergedRepsData
     big_df['seniority'] = 0
-
-
 
     sample_row = scraper_utils.initialize_row()
 
@@ -501,4 +510,3 @@ if __name__ == '__main__':
     scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
 
     print('Complete!')
-

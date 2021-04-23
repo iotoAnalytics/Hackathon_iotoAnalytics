@@ -1,6 +1,8 @@
 '''
 '''
-import sys, os
+from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+import sys
+import os
 from pathlib import Path
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
@@ -22,10 +24,9 @@ import pandas as pd
 import unidecode
 import numpy as np
 
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
@@ -46,9 +47,9 @@ def get_urls(myurl):
     timeout = 5
 
     try:
-        element_present = EC.presence_of_element_located((By.CLASS_NAME, 'BCLASS-Members-List'))
+        element_present = EC.presence_of_element_located(
+            (By.CLASS_NAME, 'BCLASS-Members-List'))
         WebDriverWait(driver, timeout).until(element_present)
-
 
     except:
         print("timeout")
@@ -148,9 +149,11 @@ def scrape(url):
     email = email_class[1].a.text
 
     addresses = []
-    office_info = page_soup.find("div", {"class": "BCLASS-Member-Info BCLASS-Hide-For-Vacant"})
+    office_info = page_soup.find(
+        "div", {"class": "BCLASS-Member-Info BCLASS-Hide-For-Vacant"})
     office = " ".join(office_info.text.split())
-    addr_info = {'location': office.split(":")[0].strip(), 'address': office.split(":")[1].strip()}
+    addr_info = {'location': office.split(
+        ":")[0].strip(), 'address': office.split(":")[1].strip()}
     addresses.append(addr_info)
 
     member_info = page_soup.findAll("div", {"class": "BCLASS-Constituency"})
@@ -168,7 +171,8 @@ def scrape(url):
     committees = []
     committee_info = page_soup.find("div", {"class": "BCLASS-member-cmts"})
     if committee_info is None:
-        committee_info = page_soup.find("ul", {"class": "BCLASS-Members-Cmt-List"})
+        committee_info = page_soup.find(
+            "ul", {"class": "BCLASS-Members-Cmt-List"})
     try:
         coms = committee_info.findAll("li")
         for com in coms:
@@ -182,7 +186,8 @@ def scrape(url):
         message = template.format(type(ex).__name__, ex.args)
 
     phone_number = []
-    contact = page_soup.find("div", {"class": "BCLASS-Member-Info BCLASS-Contact"})
+    contact = page_soup.find(
+        "div", {"class": "BCLASS-Member-Info BCLASS-Contact"})
     contacts = contact.text.split('\n')
     opn = contacts[2].replace("(", "").strip()
     opn = opn.replace(") ", "-")
@@ -290,14 +295,19 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
 
-    wiki_df = pd.DataFrame(wiki_data)[['occupation', 'education', 'birthday', 'name_first', 'name_last']]
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['occupation', 'education', 'birthday', 'name_first', 'name_last']]
     # print(wiki_df)
 
-    mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=["name_first", "name_last"])
+    mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
+                              "name_first", "name_last"])
 
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
+    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({
+                                                                        np.nan: None})
+    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({
+                                                                    np.nan: None})
+    mergedRepsData['education'] = mergedRepsData['education'].replace({
+                                                                      np.nan: None})
 
     big_df = mergedRepsData
     big_list_of_dicts = big_df.to_dict('records')

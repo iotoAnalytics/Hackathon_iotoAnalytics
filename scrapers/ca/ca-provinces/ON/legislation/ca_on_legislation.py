@@ -1,3 +1,4 @@
+from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
 import pandas as pd
 import bs4
 from urllib.request import Request
@@ -13,14 +14,14 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[4]
+p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
 
 url = 'https://www.ola.org/en/legislative-business/bills/current'
 base_url = 'https://www.ola.org'
@@ -34,6 +35,7 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
                                                       legislator_table_name)
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
 
 def month_to_num(short_month):
     return {
@@ -82,7 +84,8 @@ def edit_table(lst):
         description = item['Bill stage']
         coms = {'chamber': '', 'committee': action_by}
         committees.append(coms)
-        diction = {'date': date, 'action_by': action_by, 'description': description}
+        diction = {'date': date, 'action_by': action_by,
+                   'description': description}
         return_lst.append(diction)
     return [return_lst, coms]
 
@@ -106,7 +109,8 @@ def get_bill_links(url):
         table = edit_table(pd_table.to_dict('records'))
         actions = table[0]
         committees = table[1]
-        link_dict.append({'url': link, 'sponsors': sponsors, 'actions': actions, 'committees': committees})
+        link_dict.append({'url': link, 'sponsors': sponsors,
+                         'actions': actions, 'committees': committees})
     scraper_utils.crawl_delay(crawl_delay)
     return link_dict
 
@@ -127,22 +131,26 @@ def scrape(dict_item):
     if len(sponsors) == 1:
         row.principal_sponsor = sponsors[0]
         names = sponsors[0].split(' ')
-        row.principal_sponsor_id = scraper_utils.get_legislator_id(name_first=names[0], name_last=names[1])
+        row.principal_sponsor_id = scraper_utils.get_legislator_id(
+            name_first=names[0], name_last=names[1])
     else:
         row.sponsors = sponsors
         sponsor_id_lst = []
         for sponsor in sponsors:
             names = sponsor.split(' ')
-            sponsor_id = scraper_utils.get_legislator_id(name_first=names[0], name_last=names[1])
+            sponsor_id = scraper_utils.get_legislator_id(
+                name_first=names[0], name_last=names[1])
             sponsor_id_lst.append(sponsor_id)
         row.sponsors_id = sponsor_id_lst
 
-    bold_header = url_soup.find('div', {'class': 'view-header'}).text.replace('\n', '').split(',')
+    bold_header = url_soup.find(
+        'div', {'class': 'view-header'}).text.replace('\n', '').split(',')
     bill_name = bold_header[0].replace(' ', '').strip()
     bill_title = bold_header[1].strip()
     current_status = url_soup.find('div', {'class': 'list-inline-item nav-item'}).text.replace('Current status: ',
                                                                                                '').replace('\n', '')
-    bill_summary = url_soup.find('p', {'class': 'section'}).text.replace('\r', ' ').replace('\n', ' ')
+    bill_summary = url_soup.find('p', {'class': 'section'}).text.replace(
+        '\r', ' ').replace('\n', ' ')
     bill_text = url_soup.find('div', {'class': 'WordSection1'}).text.replace('\n', ' ').replace('\r', ' ').replace(
         '\xa0', '').strip()
     goverlytics_id = f'{prov_terr_abbreviation}_{session}_{bill_name}'
