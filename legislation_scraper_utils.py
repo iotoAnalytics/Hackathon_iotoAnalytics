@@ -105,7 +105,7 @@ class LegislationScraperUtils:
         header = self.request_headers
         if headers:
             header = headers
-        return scraper_utils.request(url, headers=header)
+        return request.get(url, headers=header)
 
     def add_topics(self, df):
         """
