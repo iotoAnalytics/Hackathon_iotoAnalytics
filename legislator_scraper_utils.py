@@ -79,7 +79,7 @@ class LegislatorScraperUtils():
         header = self.request_headers
         if headers:
             header = headers
-        return scraper_utils.request(url, headers=header)
+        return requests.get(url, headers=header)
 
     def get_crawl_delay(self, url, user_agent=None):
         """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
