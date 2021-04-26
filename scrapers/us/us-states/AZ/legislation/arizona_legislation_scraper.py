@@ -32,8 +32,7 @@ from sklearn.decomposition import PCA
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
-from numpy.linalg import norm
-import matplotlib.pyplot as plt
+
 import unicodedata
 import time
 import argparse

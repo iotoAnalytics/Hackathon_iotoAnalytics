@@ -105,7 +105,7 @@ class LegislationScraperUtils:
         header = self.request_headers
         if headers:
             header = headers
-        return request.get(url, headers=header)
+        return requests.get(url, headers=header)
 
     def add_topics(self, df):
         """
@@ -118,10 +118,15 @@ class LegislationScraperUtils:
         print('Loading model...')
         s3 = boto3.client('s3')
 
+
         with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
             s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
             mlmodel = f.name
             print(mlmodel)
+
+        #
+        print('Model loaded.')
+
 
         df = pd.DataFrame(df)
 
@@ -198,24 +203,20 @@ class LegislationScraperUtils:
             with torch.no_grad():
                 outputs = model(**inputs)
 
+
             # loss = outputs[0]
             logits = outputs[1]
             # loss_val_total += loss.item()
 
             logits = logits.detach().cpu().numpy()
-            # label_ids = inputs['labels'].cpu().numpy()
-            predictions.append(logits)
-            # true_vals.append(label_ids)
 
-        # loss_val_avg = loss_val_total / len(dataloader_val)
+            predictions.append(logits)
+
 
         predictions = np.concatenate(predictions, axis=0)
-        # predictions = evaluate(dataloader_validation, mlmodel)
+
         i = 0
-        labels = []
-        result_df = []
-        processed_text = []
-        # print(predictions)
+
         for pred in predictions:
             print('text:')
             txt = eval_texts[i]
@@ -225,15 +226,13 @@ class LegislationScraperUtils:
             pred_label = (possible_labels[np.argmax(pred)])
             print(pred_label)
 
+            df['topic'][i] = pred_label
+            #
             i = i + 1
-            entry = {'bill_text': txt,
-                     'topic': pred_label}
-            result_df.append(entry)
-            processed_text.append(pred_label)
 
-        # accuracy_per_class(predictions, true_vals)
-        result_df = pd.DataFrame(result_df)
-        return result_df
+            # df = df.drop(columns=['label'])
+
+        return df
 
     def get_crawl_delay(self, url, user_agent=None):
         """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
