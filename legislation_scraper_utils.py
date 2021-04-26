@@ -25,6 +25,14 @@ from urllib.robotparser import RobotFileParser
 from bs4 import BeautifulSoup
 import time
 import random
+import boto3
+import tempfile
+import torch
+from transformers import BertTokenizer
+from torch.utils.data import TensorDataset
+import numpy as np
+from transformers import BertForSequenceClassification
+from torch.utils.data import DataLoader, SequentialSampler
 
 # region Base Scraper Utils
 
@@ -98,6 +106,134 @@ class LegislationScraperUtils:
         if headers:
             header = headers
         return scraper_utils.request(url, headers=header)
+
+    def add_topics(self, df):
+        """
+          Pulls a model from an S3 bucket as a temporary file
+          Uses the model to classify the bill text
+          Returns the dataframe with the topics filled in
+          If you want a different model just upload it to the S3
+          and change the code in this function to implement that model instead
+          """
+        print('Loading model...')
+        s3 = boto3.client('s3')
+
+        with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
+            s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
+            mlmodel = f.name
+            print(mlmodel)
+
+        df = pd.DataFrame(df)
+
+        possible_labels = ['government operations', 'health', 'education', 'macroeconomics', 'informal',
+                           'international affairs', 'civil rights', 'social welfare', 'public lands',
+                           'defense', 'domestic commerce', 'law and crime', 'culture', 'transportation',
+                           'environment', 'labor', 'housing', 'technology', 'immigration', 'energy',
+                           'agriculture', 'foreign trade']
+
+        label_dict = {'government operations': 0, 'health': 1, 'education': 2, 'macroeconomics': 3, 'informal': 4,
+                      'international affairs': 5, 'civil rights': 6, 'social welfare': 7, 'public lands': 8,
+                      'defense': 9,
+                      'domestic commerce': 10, 'law and crime': 11, 'culture': 12, 'transportation': 13,
+                      'environment': 14,
+                      'labor': 15, 'housing': 16, 'technology': 17, 'immigration': 18, 'energy': 19, 'agriculture': 20,
+                      'foreign trade': 21}
+        for index, possible_label in enumerate(possible_labels):
+            label_dict[possible_label] = index
+
+        # default initial value
+        df = df.assign(topic="informal")
+        l = df.topic.replace(label_dict)
+
+        df = df.assign(label=l)
+
+        # print(df)
+        eval_texts = df.bill_text.values
+
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
+
+        encoded_data_val = tokenizer.batch_encode_plus(
+            eval_texts,
+            add_special_tokens=True,
+            return_attention_mask=True,
+            padding=True,
+            truncation=True,
+            max_length=256,
+            return_tensors='pt'
+        )
+
+        input_ids_val = encoded_data_val['input_ids']
+        attention_masks_val = encoded_data_val['attention_mask']
+        labels_val = torch.tensor(df.label.values)
+
+        dataset_val = TensorDataset(input_ids_val, attention_masks_val, labels_val)
+
+        dataloader_validation = DataLoader(dataset_val,
+                                           sampler=SequentialSampler(dataset_val),
+                                           batch_size=1,
+                                           )
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = BertForSequenceClassification.from_pretrained("bert-base-uncased",
+                                                              num_labels=len(label_dict),
+                                                              output_attentions=False,
+                                                              output_hidden_states=False)
+        model.to(device)
+
+        model.load_state_dict(torch.load(mlmodel, map_location=torch.device('cpu')))
+
+        model.eval()
+
+        loss_val_total = 0
+        predictions, true_vals = [], []
+
+        for batch in dataloader_validation:
+            batch = tuple(b.to(device) for b in batch)
+
+            inputs = {'input_ids': batch[0],
+                      'attention_mask': batch[1],
+                      'labels': batch[2],
+                      }
+
+            with torch.no_grad():
+                outputs = model(**inputs)
+
+            # loss = outputs[0]
+            logits = outputs[1]
+            # loss_val_total += loss.item()
+
+            logits = logits.detach().cpu().numpy()
+            # label_ids = inputs['labels'].cpu().numpy()
+            predictions.append(logits)
+            # true_vals.append(label_ids)
+
+        # loss_val_avg = loss_val_total / len(dataloader_val)
+
+        predictions = np.concatenate(predictions, axis=0)
+        # predictions = evaluate(dataloader_validation, mlmodel)
+        i = 0
+        labels = []
+        result_df = []
+        processed_text = []
+        # print(predictions)
+        for pred in predictions:
+            print('text:')
+            txt = eval_texts[i]
+            # txt = df.loc[['text'], [i]]
+            print(txt)
+            print("predicted label:")
+            pred_label = (possible_labels[np.argmax(pred)])
+            print(pred_label)
+
+            i = i + 1
+            entry = {'bill_text': txt,
+                     'topic': pred_label}
+            result_df.append(entry)
+            processed_text.append(pred_label)
+
+        # accuracy_per_class(predictions, true_vals)
+        result_df = pd.DataFrame(result_df)
+        return result_df
 
     def get_crawl_delay(self, url, user_agent=None):
         """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
