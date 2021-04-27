@@ -1,7 +1,12 @@
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 import sys
 import os
 from pathlib import Path
+
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import requests
@@ -22,9 +27,6 @@ import pandas as pd
 import unidecode
 import numpy as np
 
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('MB', 'ca_mb_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.gov.mb.ca/')
@@ -115,7 +117,7 @@ def collect_mla_data(link_party):
             print(link)
 
     # get addresses, phone numbers
-    phone_number = []
+    phone_numbers = []
     addresses = []
     ps = member.findAll("p")
     # print(len(ps))
@@ -139,8 +141,8 @@ def collect_mla_data(link_party):
             phone = a.split("Phone: ")[1].strip()
             phone = phone.replace("(", "")
             phone = phone.replace(") ", "-")
-            phone_info = {'office': address_location, 'phone_number': phone}
-            phone_number.append(phone_info)
+            phone_info = {'office': address_location, 'phone_numbers': phone}
+            phone_numbers.append(phone_info)
             stop = 1
     addr_info = {'location': address_location,
                  'address': address.replace('\xa0', "").strip()}
@@ -168,8 +170,8 @@ def collect_mla_data(link_party):
                 phone = phone.replace("(", "")
                 phone = phone.replace(")", "-")
                 phone_info = {'office': address_location,
-                              'phone_number': phone}
-                phone_number.append(phone_info)
+                              'phone_numbers': phone}
+                phone_numbers.append(phone_info)
 
             except:
                 pass
@@ -180,7 +182,7 @@ def collect_mla_data(link_party):
     addresses.append(addr_info)
     row.addresses = addresses
 
-    row.phone_number = phone_number
+    row.phone_numbers = phone_numbers
     scraper_utils.crawl_delay(crawl_delay)
     return row
 
@@ -241,6 +243,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

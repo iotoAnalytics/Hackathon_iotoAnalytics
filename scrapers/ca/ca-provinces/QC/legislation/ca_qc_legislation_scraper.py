@@ -1,5 +1,14 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import io
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
 from database import Database
@@ -16,14 +25,6 @@ from urllib.request import urlopen as uReq
 from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import pandas as pd
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # Initialize config parser and get variables from config file
@@ -394,5 +395,5 @@ if __name__ == '__main__':
     # print(*big_list_of_dicts, sep="\n")
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
     print("Complete!")

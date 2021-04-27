@@ -1,4 +1,6 @@
 from datetime import date, datetime
+import json
+
 
 """
 Assorted utility functions and classes used by Legislation and Legislator scraper utils.

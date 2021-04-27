@@ -7,29 +7,30 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import re
-import datetime
-from multiprocessing import Pool
-import unidecode
-import datefinder
-import requests
-from nameparser import HumanName
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import bs4
-import pandas as pd
-import time
-import argparse
-import gzip
-import numpy as np
+from scraper_utils import USStateLegislatorScraperUtils
 import pickle
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import numpy as np
+import gzip
+import argparse
+import time
+import pandas as pd
+import bs4
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import requests
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
 
 
 scraper_utils = USStateLegislatorScraperUtils('AZ', 'us_az_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.azleg.gov')
+
 
 def get_leg_bios(myurl):
     leg_bio = []
@@ -77,16 +78,16 @@ def get_leg_bios(myurl):
         phone = phone.replace("(", "")
         phone = phone.replace(") ", "-")
         phns = []
-        phone_number = {'office': '', 'number': phone}
+        phone_numbers = {'office': '', 'number': phone}
         if phone != "":
-            phns.append(phone_number)
+            phns.append(phone_numbers)
 
         party_id = scraper_utils.get_party_id(party)
 
         leg_info = {'state_url': person_link, 'state_member_id': state_member_id, 'name_full': name_full,
                     'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle, 'name_suffix': hn.suffix,
                     'district': district, 'party': party, 'party_id': party_id, 'email': email,
-                    'phone_number': phns, 'role': 'Representative'}
+                    'phone_numbers': phns, 'role': 'Representative'}
         leg_bio.append(leg_info)
 
     for hp in senate_people[1:]:
@@ -120,14 +121,14 @@ def get_leg_bios(myurl):
         phone = phone.replace("(", "")
         phone = phone.replace(") ", "-")
         phns = []
-        phone_number = {'office': '', 'number': phone}
+        phone_numbers = {'office': '', 'number': phone}
         if phone != "":
-            phns.append(phone_number)
+            phns.append(phone_numbers)
 
         leg_info = {'state_url': person_link, 'state_member_id': state_member_id, 'name_full': name_full,
                     'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle, 'name_suffix': hn.suffix,
                     'district': district, 'party': party, 'party_id': party_id, 'email': email,
-                    'phone_number': phns, 'role': 'Senator'}
+                    'phone_numbers': phns, 'role': 'Senator'}
         leg_bio.append(leg_info)
     scraper_utils.crawl_delay(crawl_delay)
     return leg_bio
@@ -403,6 +404,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

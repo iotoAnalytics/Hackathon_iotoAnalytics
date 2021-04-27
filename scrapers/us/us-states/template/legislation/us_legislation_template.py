@@ -7,8 +7,15 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
 
-from legislation_scraper_utils import USStateLegislationScraperUtils
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
@@ -18,14 +25,7 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 import boto3
-import sys
-import os
-from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 # Other import statements
 
@@ -159,6 +159,6 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

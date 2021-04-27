@@ -7,27 +7,27 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from requests import get
-from geotext import GeoText
-import re
-import datetime
-from multiprocessing import Pool
-import unidecode
-import datefinder
-import requests
-from nameparser import HumanName
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import bs4
-import pandas as pd
-import time
-import argparse
-import gzip
-import numpy as np
+from scraper_utils import USStateLegislatorScraperUtils
 import pickle
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import numpy as np
+import gzip
+import argparse
+import time
+import pandas as pd
+import bs4
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import requests
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
+from geotext import GeoText
+from requests import get
 
 
 # import html.parser
@@ -81,7 +81,7 @@ def get_sen_bio(myurl):
             party_id = 0
 
         das = si.findAll("a")
-        phone_number = []
+        phone_numbers = []
         for da in das:
             # find district
             if "District" in da.text:
@@ -94,7 +94,7 @@ def get_sen_bio(myurl):
             if "Phone" in da.text:
                 number = (da.text).replace("Phone: ", "")
                 pn = {'office': "", 'number': number}
-                phone_number.append(pn)
+                phone_numbers.append(pn)
 
         # get addresses
         addresses = []
@@ -109,7 +109,7 @@ def get_sen_bio(myurl):
 
         sd = {'source_url': str(url).strip(), 'name_full': str(hN), 'name_first': hN.first, 'name_last': hN.last,
               'name_middle': hN.middle, 'name_suffix': hN.suffix, 'party': party, 'party_id': party_id,
-              'district': district, 'role': 'Senator', 'phone_number': phone_number, 'addresses': addresses}
+              'district': district, 'role': 'Senator', 'phone_numbers': phone_numbers, 'addresses': addresses}
         print(sd)
         senator_data.append(sd)
 
@@ -162,7 +162,7 @@ def get_rep_bio(myurl):
             phone = link.text
             phone = phone.replace("517373", "517-373-")
 
-            phone_number = {"office": '', 'number': phone}
+            phone_numbers = {"office": '', 'number': phone}
             # print(phone_number)
 
         if i % 7 == 0:
@@ -170,7 +170,7 @@ def get_rep_bio(myurl):
             email = link.a["href"]
             bio_info = {'source_url': state_url, 'district': district, 'name_full': name_full, 'name_first': hn.first,
                         'name_last': hn.last, 'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party,
-                        'party_id': party_id, 'phone_number': phone_number, 'email': email.replace("mailto:", ""),
+                        'party_id': party_id, 'phone_numbers': phone_numbers, 'email': email.replace("mailto:", ""),
                         'role': 'Representative',
                         'state': 'MI', 'state_id': 26, 'country': 'United States of America', 'country_id': 1}
             print(bio_info)
@@ -1157,6 +1157,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

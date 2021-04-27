@@ -15,20 +15,19 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from pprint import pprint
-from legislator_scraper_utils import USStateLegislatorScraperUtils
-import re
-import html
-from nameparser.config import CONSTANTS
-from nameparser import HumanName
-import datetime
-import json
-from psycopg2 import sql
-import pandas as pd
-import request_url
-from bs4 import BeautifulSoup
 import requests
-
+from bs4 import BeautifulSoup
+import request_url
+import pandas as pd
+from psycopg2 import sql
+import json
+import datetime
+from nameparser import HumanName
+from nameparser.config import CONSTANTS
+import html
+import re
+from scraper_utils import USStateLegislatorScraperUtils
+from pprint import pprint
 
 
 # from database import Database
@@ -179,7 +178,7 @@ def scrape_legislator(links):
             temp.append(
                 {'number': legislature_table[1][3], 'office': 'Capitol Office'})
 
-        fields.phone_number = temp
+        fields.phone_numbers = temp
 
         temp = []
         # This just puts all the address components together, nan turns nan values to ''
@@ -371,7 +370,8 @@ def dict_to_list(dictionary):
 
 # init_database()
 scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('http://www.legislature.state.al.us')
+crawl_delay = scraper_utils.get_crawl_delay(
+    'http://www.legislature.state.al.us')
 # house scraper
 house_wiki_links = get_wiki_links(wikipedia_house_url)
 house_wiki = scrape_wiki(house_wiki_links)
@@ -391,7 +391,7 @@ senate = dict_to_list(senate)
 
 senate_house_data_lst = house + senate
 
-# scraper_utils.insert_legislator_data_into_db(senate_house_data_lst)
+# scraper_utils.write_data(senate_house_data_lst)
 
 for d in senate_house_data_lst[:10]:
     print(d)

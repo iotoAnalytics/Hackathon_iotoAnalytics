@@ -1,9 +1,14 @@
 '''
 '''
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
 import sys
 import os
 from pathlib import Path
+
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import requests
@@ -24,9 +29,7 @@ import pandas as pd
 import unidecode
 import numpy as np
 
-p = Path(os.path.abspath(__file__)).parents[5]
 
-sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
@@ -185,19 +188,19 @@ def scrape(url):
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(ex).__name__, ex.args)
 
-    phone_number = []
+    phone_numbers = []
     contact = page_soup.find(
         "div", {"class": "BCLASS-Member-Info BCLASS-Contact"})
     contacts = contact.text.split('\n')
     opn = contacts[2].replace("(", "").strip()
     opn = opn.replace(") ", "-")
     office_phone = {'location': 'office phone', 'number': opn}
-    phone_number.append(office_phone)
+    phone_numbers.append(office_phone)
     if contacts[6] != "":
         ofn = contacts[6].replace("(", "").strip()
         ofn = ofn.replace(") ", "-")
         office_fax = {'location': 'office fax', 'number': ofn}
-        phone_number.append(office_fax)
+        phone_numbers.append(office_fax)
 
     const_info = page_soup.findAll("div", {"class": "col-xs-12 col-sm-6"})
     const_info = const_info[1].text
@@ -208,7 +211,7 @@ def scrape(url):
         cp_num = cp_num.replace("(", "")
         cp_num = cp_num.replace(") ", "-")
         cp = {'location': 'constituency phone', 'number': cp_num}
-        phone_number.append(cp)
+        phone_numbers.append(cp)
 
     c_fax = (const_info[6]).strip()
     if c_fax != "":
@@ -216,7 +219,7 @@ def scrape(url):
         c_fax = c_fax.replace(") ", "-")
         cf = {'location': 'constituency fax', 'number': c_fax}
 
-        phone_number.append(cf)
+        phone_numbers.append(cf)
 
     ctf_num = (const_info[10]).strip()
     if ctf_num != "" and "Constituency" not in ctf_num:
@@ -225,16 +228,16 @@ def scrape(url):
         ctf_num = ctf_num.replace(") ", "-")
         ctf = {'location': 'constituency toll free', 'number': ctf_num}
         # print(ctf)
-        phone_number.append(ctf)
+        phone_numbers.append(ctf)
 
     #
-    # print(phone_number)
+    # print(phone_numbers)
 
     infos = {'name_full': name_full, 'name_last': name_last, 'name_first': name_first, 'name_middle': name_middle,
              'name_suffix': name_suffix, 'source_url': url, 'source_id': "", 'years_active': years_active,
              'party': party, 'party_id': party_id, 'riding': riding, 'role': 'Member of the Legislative Assembly (MLA)',
              'most_recent_term_id': most_recent_term_id, 'seniority': 0, 'email': email, 'addresses': addresses,
-             'committees': committees, 'phone_number': phone_number}
+             'committees': committees, 'phone_numbers': phone_numbers}
     scraper_utils.crawl_delay(crawl_delay)
     # print(infos)
     return infos
@@ -316,6 +319,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

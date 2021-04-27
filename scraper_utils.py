@@ -1,0 +1,874 @@
+import psycopg2
+from psycopg2 import sql
+from psycopg2.extras import RealDictCursor
+# import datetime
+from datetime import date, datetime
+import json
+import sys
+import pandas as pd
+from database import Database, CursorFromConnectionFromPool, Persistence
+from dataclasses import dataclass, field
+from typing import List
+from rows import *
+import copy
+import atexit
+import utils
+from urllib.request import urlopen as uReq
+import re
+import requests
+import unidecode
+from bs4 import BeautifulSoup as soup
+from nameparser import HumanName
+from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
+from bs4 import BeautifulSoup
+import time
+import random
+from collections import namedtuple
+import exceptions
+from pandas.core.computation.ops import UndefinedVariableError
+import numpy
+
+
+"""
+Contains utilities and data structures meant to help resolve common issues
+that occur with data collection. These can be used with your legislator
+date collectors.
+"""
+
+# region Base Scraper Utils
+##########################################
+# BASE CLASSES
+##########################################
+
+
+class ScraperUtils:
+    """Bases class containing methods universal to all ScraperUtils"""
+
+    class Robots:
+        """Inner class for keeping track of robots.txt for a given URL"""
+
+        def __init__(self, url, user_agent):
+            self.url = url
+            self.user_agent = user_agent
+
+            self.robots_url = url + '/robots.txt'
+            self.rp = RobotFileParser(self.robots_url)
+            self.rp.read()
+
+            self.crawl_delay = self.get_crawl_delay()
+            self.request_rate = self.get_request_rate()
+
+        def get_crawl_delay(self, user_agent=None):
+            """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
+            ua = user_agent if user_agent else self.user_agent
+            return self.rp.crawl_delay(ua)
+            # crawl_delay = self.rp.crawl_delay(ua)
+            # if crawl_delay:
+            #     return crawl_delay
+            # return 2
+
+        def get_request_rate(self, user_agent=None):
+            """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
+            ua = user_agent if user_agent else self.user_agent
+            return self.rp.request_rate(ua)
+            # rr = self.rp.request_rate(ua)
+            # if rr:
+            #     return rr
+            # RR = namedtuple('RequestRate', ['requests', 'seconds'])
+            # return RR(1, 2)
+
+        def can_fetch(self, url, user_agent=None):
+            """Determine whether data from a given URL can be collected."""
+            ua = user_agent if user_agent else self.user_agent
+            return self.rp.can_fetch(ua, url)
+
+    def __init__(self, country, database_table_name, row_type):
+
+        Database.initialise()
+        atexit.register(Database.close_all_connections)
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM countries'
+                cur.execute(query)
+                countries_results = cur.fetchall()
+
+                query = f'SELECT * FROM {country}_parties'
+                cur.execute(query)
+                parties_results = cur.fetchall()
+
+                query = f'SELECT * FROM {country}_divisions'
+                cur.execute(query)
+                division_results = cur.fetchall()
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.countries = pd.DataFrame(countries_results)
+        self.parties = pd.DataFrame(parties_results)
+        self.divisions = pd.DataFrame(division_results)
+
+        self.country = self.countries.loc[self.countries['abbreviation']
+                                          == country]['country'].values[0]
+        self.country_id = int(
+            self.countries.loc[self.countries['abbreviation'] == country]['id'].values[0])
+        self.database_table_name = database_table_name
+        self.row_type = row_type
+        self._request_headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'
+        }
+        self._robots = {}
+
+    def get_base_url(self, url):
+        """Parse the base URL for a given url."""
+        o = urlparse(url)
+        scheme = 'https' if o.scheme == '' else o.scheme
+        return f'{scheme}://{o.netloc}'
+
+    def add_robot(self, url, user_agent=None):
+        """Adds the robots.txt information for a given URL."""
+        ua = user_agent if user_agent else self._request_headers.get(
+            'User-Agent', '*')
+        bu = self.get_base_url(url)
+        self._robots[bu] = self.Robots(bu, ua)
+
+    def _auto_add_robot(self, base_url, url, auto_add_enabled):
+        """Called for methods that have an auto_add_robot parameter."""
+        if not self._robots.get(base_url) and auto_add_enabled:
+            self.add_robot(base_url)
+        elif not self._robots.get(base_url) and not auto_add_enabled:
+            raise exceptions.NoRobotsConfiguredException(
+                self.request, url, self._robots.keys())
+
+    def request(self, url, **kwargs):
+        """More polite version of the requests.get function.
+        Valid kwargs:
+            headers : dict
+                Headers to use for the request. Uses ScraperUtils _request_headers by default
+            auto_add_robot : bool
+                Automatically configure robots.txt for the given url. True by default.
+        Raises:
+            RobotsBlockedException
+                Raised if website blocks web scrapers."""
+        headers = kwargs.get('headers', self._request_headers)
+        auto_add_robot = kwargs.get('auto_add_robot', True)
+
+        bu = self.get_base_url(url)
+
+        self._auto_add_robot(bu, url, auto_add_robot)
+
+        r = self._robots.get(bu)
+        ua = headers.get('User-Agent', '*')
+        can_fetch = r.can_fetch(ua, url)
+        if can_fetch:
+            return requests.get(url, headers=headers)
+        raise exceptions.RobotsBlockedException(url, ua)
+
+    def get_crawl_delay(self, url, **kwargs):
+        """
+        Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or the Crawl-delay or Request-rate cannot be parsed, a default value will be returned.
+        kwargs:
+            auto_add_robot : bool
+                Automatically configure robots.txt for the given url. True by default.
+            user_agent : str
+                User-Agent for the given request. Uses default User-Agent if none is provided.
+        """
+        DEFAULT_CRAWL_RATE = 2
+        bu = self.get_base_url(url)
+
+        auto_add_robot = kwargs.get('auto_add_robot', True)
+        user_agent = kwargs.get('user_agent')
+
+        self._auto_add_robot(bu, url, auto_add_robot)
+
+        r = self._robots.get(bu)
+
+        crawl_delay = r.crawl_delay
+        request_rate = r.request_rate
+        if user_agent:
+            crawl_delay = r.get_crawl_delay(user_agent)
+            request_rate = r.get_request_rate(user_agent)
+
+        if crawl_delay and request_rate:
+            return min(crawl_delay, request_rate.seconds / request_rate.requests)
+        elif crawl_delay:
+            return crawl_delay
+        elif request_rate:
+            return request_rate
+        return DEFAULT_CRAWL_RATE
+
+    def crawl_delay(self, min_seconds):
+        """Add delay. Should be called after making request to website so as to not overburden web server."""
+        time.sleep(random.uniform(1, 1.1) * min_seconds)
+
+    def initialize_row(self):
+        """Instantiates a Row object filled with default values."""
+        row = copy.deepcopy(self.row_type)
+        row.country_id = self.country_id
+        row.country = self.country
+        return row
+
+
+class LegislatorScraperUtils(ScraperUtils):
+    """Base scraper class. Contains methods common to all legislator scrapers."""
+
+    def __init__(self, country, database_table_name, row_type):
+        super().__init__(country, database_table_name, row_type)
+
+    def get_attribute(self, table_name, column_to_search, value, attribute='id'):
+        """Returns a given attribute from the specified table. This is a helper used by other functions but it’s available if you require attributes from one of the valid tables. Valid table names include country, party, and division."""
+        accepted_tables = ['country', 'party', 'division']
+        if table_name not in accepted_tables:
+            raise Exception(
+                f'Error: table must be one of the following: {accepted_tables}')
+
+        if table_name == 'country':
+            df = self.countries
+        if table_name == 'party':
+            df = self.parties
+        if table_name == 'division':
+            df = self.divisions
+
+        val = df.loc[df[column_to_search] == value][attribute].values[0]
+        try:
+            return int(val)
+        except Exception:
+            return val
+
+    def get_party_id(self, party_name):
+        """
+        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
+        """
+        return self.get_attribute('party', 'party', party_name)
+
+    def scrape_wiki_bio(self, wiki_link):
+        """
+        Used for getting missing legislator fields from their wikipedia bios. Useful for getting things like a legislator's birthday or education.
+        """
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # #
+            # # #grabs each product
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+            repBirth = reps.find("span", {"class": "bday"}).text
+
+            b = datetime.strptime(repBirth, "%Y-%m-%d").date()
+
+            birthday = b
+            # print(b)
+
+        except:
+            # couldn't find birthday in side box
+            birthday = None
+        # get birthday another way
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Born":
+                    index = left_column_tags.index(lefttag) + 1
+                    born = left_column_tags[index].text
+
+                    if born != "Born":
+                        b = datetime.strptime(born, "%Y-%m-%d").date()
+
+                        birthday = b
+                        print(b)
+
+        except Exception as ex:
+
+            pass
+
+        # get years_active, based off of "assumed office"
+        years_active = []
+        year_started = ""
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            table = page_soup.find("table", {"class": "infobox vcard"})
+
+            tds = table.findAll("td", {"colspan": "2"})
+            td = tds[0]
+
+            for td in tds:
+                asof = (td.find("span", {"class": "nowrap"}))
+                if asof != None:
+                    if (asof.b.text) == "Assumed office":
+
+                        asofbr = td.find("br")
+
+                        year_started = (asofbr.nextSibling)
+
+                        year_started = year_started.split('[')[0]
+                        if "," in year_started:
+                            year_started = year_started.split(',')[1]
+                        year_started = (year_started.replace(" ", ""))
+                        year_started = re.sub('[^0-9]', '', year_started)
+                        if year_started.startswith("12"):
+                            year_started = year_started.substring(1)
+                    else:
+                        pass
+
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+            # print(message)
+
+        if year_started != "":
+            years_active = list(range(int(year_started), 2022))
+            # years_active_lst.append(years_active_i)
+        else:
+            years_active = []
+            # years_active_i = []
+            # years_active_i.append(years_active)
+            # years_active_lst.append(years_active_i)
+
+        # get education
+        education = []
+        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
+                "DDS", "MS", "BS", "MBA", "MS", "MD"]
+
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # #
+            # # #grabs each product
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+            # repsAlmaMater = reps.find("th", {"scope:" "row"})
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Alma mater" or lefttag.text == "Education":
+                    index = left_column_tags.index(lefttag) + 1
+                    next = left_column_tags[index]
+                    alines = next.findAll()
+                    for aline in alines:
+                        if "University" in aline.text or "College" in aline.text or "School" in aline.text:
+                            school = aline.text
+                            # this is most likely a school
+                            level = ""
+                            try:
+                                lineIndex = alines.index(aline) + 1
+                                nextLine = alines[lineIndex].text
+                                if re.sub('[^a-zA-Z]+', "", nextLine) in lvls:
+                                    level = nextLine
+                            except:
+                                pass
+
+                        edinfo = {'level': level,
+                                  'field': "", 'school': school}
+
+                        if edinfo not in education:
+                            education.append(edinfo)
+
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+
+            message = template.format(type(ex).__name__, ex.args)
+
+            # print(message)
+
+        # get full name
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # # #grabs each product
+            head = page_soup.find("h1", {"id": "firstHeading"})
+            name = head.text
+            name = name.split("(")[0].strip()
+            # name = name.replace(" (Canadian politician)", "")
+            # name = name.replace(" (Quebec politician)", "")
+
+        except:
+            name = ""
+        name = unidecode.unidecode(name)
+
+        hN = HumanName(name)
+
+        # get occupation
+        occupation = []
+
+        try:
+            uClient = uReq(wiki_link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            reps = page_soup.find("div", {"class": "mw-parser-output"})
+
+            left_column_tags = reps.findAll()
+            lefttag = left_column_tags[0]
+            for lefttag in left_column_tags:
+                if lefttag.text == "Occupation":
+                    index = left_column_tags.index(lefttag) + 1
+                    occ = left_column_tags[index].text
+                    if occ != "Occupation":
+                        occupation.append(occ)
+
+        except:
+            pass
+
+        most_recent_term_id = ""
+        try:
+            most_recent_term_id = (years_active[len(years_active) - 1])
+
+        except:
+            pass
+
+        info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+                'education': education, 'occupation': occupation, 'years_active': years_active,
+                'most_recent_term_id': str(most_recent_term_id)}
+
+        """
+            returns dictionary with the following fields, if available
+            choose the ones that you weren't able to find from the gov website
+            merge the resulting data with the data you scraped from the gov website
+      
+        """
+        return info
+
+
+class LegislationScraperUtils(ScraperUtils):
+    """
+    Base class containing common methods and attributes used by all
+    legislation scrapers.
+    """
+
+    def __init__(self, country: str, database_table_name: str, legislator_table_name: str, row_type: LegislationRow):
+        """
+        Stores arguments as instance variables. Instantiates a database object and establishes
+        database connection pool. Pulls country, legislator, and division (ie: states, provinces,
+        etc.) tables from database and creates dataframes, which are used by other methods in
+        this class.
+
+        Args:
+            country: Country this scraper is used for
+            database_table_name: Database table where the data will be stored
+            legislation_table_name: Name of table containing legislator data that will
+                be used in various methods in this class
+            row_type: The type of row that this scraper will generate.
+        """
+        super().__init__(country, database_table_name, row_type)
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = f'SELECT * FROM {legislator_table_name}'
+                cur.execute(query)
+                legislator_results = cur.fetchall()
+            except Exception as e:
+                sys.exit(f'An exception occurred retrieving legislator table from database. \
+                \nHas the legislator data been collected for this state yet?\n{e}')
+
+        self.legislators = pd.DataFrame(legislator_results)
+
+    def get_attribute(self, table_name, column_to_search, value_to_search, attribute_to_return='id'):
+        """
+        Essentially a dataframe search function. Specify the table you would like to search,
+        the column you want to search, the value you want to use as a search key, and the 
+        attribute to return. Tables come from the database and depend on the scraper type.
+        For example, if you have a US state scraper for North Carolina, searching 'legislator'
+        will search the US state legislator table for North Carolina. Note that this function
+        only returns the first value found.
+        Args:
+            table_name: The table to search. Must be either country, legislator, division,
+                or party, passed in as a string.
+            column_to_search: The column you want to search. If you wanted to find an attribute
+                by last name, for example, you would specify name_last
+            value_to_search: The search key. For example, you would enter 'Smith' if you wanted
+                to search for legislators with that last name.
+            attribute_to_return: The attribute you wanted to return from the search. You could
+                enter goverlytics_id if you wanted return the goverlytics_id when searching
+                for the last name Smith.
+        Returns:
+            Single value based on search parameters.
+        """
+        accepted_tables = ['country', 'legislator', 'division', 'party']
+        if table_name not in accepted_tables:
+            raise Exception(
+                f'Error: table must be one of the following: {accepted_tables}')
+
+        if table_name == 'country':
+            df = self.countries
+        if table_name == 'legislator':
+            df = self.legislators
+        if table_name == 'division':
+            df = self.divisions
+        if table_name == 'party':
+            df = self.parties
+
+        val = df.loc[df[column_to_search] ==
+                     value_to_search][attribute_to_return]
+        if val.any():
+            return self._convert_value_to_column_type(column_to_search, val.values[0])
+        else:
+            raise Exception(
+                f'Could not locate value using following search parameters: table_name={table_name}, column_to_search={column_to_search}, value_to_search={value_to_search}, attribute_to_return={attribute_to_return}')
+
+    def _convert_to_int(self, value):
+        """
+        Used to convert values into int. Functions like df.loc might return
+        a numpy.int64 which is incompatible with the database, so this function must
+        be used.
+        Args:
+            value: The value to convert to an int.
+        Return:
+            Value converted to an int.
+        """
+        try:
+            value = int(value)
+        except ValueError:
+            pass
+        return value
+
+    def _convert_value_to_column_type(self, column, value):
+        """
+        Used to convert columns to the appropriate datatype. Some columns such as source_id
+        must remain as a string, however they may inadvertently be converted to
+        something like an int.
+        Args:
+            column: The column that the value is being placed into
+            value: The value to convert
+        """
+        str_columns = {'source_id'}
+
+        if column in str_columns:
+            return str(value)
+        else:
+            return self._convert_to_int(value)
+
+    def initialize_row(self):
+        '''
+        Used to create a row with the default values in place.
+        Returns:
+            row filled with default values.
+        '''
+        row = copy.deepcopy(self.row_type)
+        row.country = self.country
+        row.country_id = self.country_id
+        return row
+
+    def search_for_legislators(self, **kwargs) -> pd.DataFrame:
+        """
+        Returns a dataframe containing search results based on kwargs.
+        Args:
+            kwags: key-value pairs containing parameters to use for searching
+        Returns:
+            Dataframe containing search results
+        """
+
+        query_lst = []
+        for k, v in kwargs.items():
+            q = ''
+
+            # Certain fields may be converted to int while they need to stay as strings
+            v = self._convert_value_to_column_type(k, v)
+
+            if isinstance(v, int):
+                q = f'{k}=={v}'
+            elif isinstance(v, str):
+                q = f'{k}=="{v}"'
+            else:
+                print(
+                    f'Unable to use {k}: {v} as search parameter. Must search by either a text or int column.')
+                continue
+            query_lst.append(q)
+
+        query = ' & '.join(query_lst)
+        try:
+            df = self.legislators.query(query)
+        except UndefinedVariableError as e:
+            print(f'Column not found: {e}')
+            return None
+        except Exception as e:
+            print(f'An error occurred finding legislator: {e}')
+            return None
+
+        if len(df) > 1:
+            print(
+                f'WARNING: More than one legislator found using {kwargs} search parameter.')
+        if len(df) == 0:
+            print(f'WARNING: No legislators found while searching {kwargs}!')
+            return None
+
+        return df
+
+    def get_legislator_id(self, **kwargs) -> int:
+        """
+        Method for getting the Goverlytics ID based on search parameters. Note that
+        this returns the first value found.
+        Args:
+            kwags: key-value pairs containing parameters to use for searching
+        Returns:
+            goverlytics_id based on search parameters.
+        """
+        df = self.search_for_legislators(**kwargs)
+        if df is not None:
+            return self._convert_to_int(df.iloc[0]['goverlytics_id'])
+        else:
+            return None
+
+    def legislators_search_startswith(self, column_val_to_return, column_to_search, startswith, **kwargs):
+        """
+        Utilizes panda's .startswith method for finding information about legislators.
+        Useful for finding things like the Goverlytics ID when given only the first
+        initial and last name of a legislator.
+        Args:
+            column_val_to_return: The value to return. For example, the goverlytics_id.
+            column_to_search: The column you would like to search using startswith. For example, name_first.
+                Must be a valid column in the legislator database table.
+            startswith: The value to search using the startswith function. For example, if
+                searching "A. Smith", you would pass in "A".
+            kwargs: Additional parameters used for searching. Must be included.
+        Returns:
+            Val found based on search parameters
+        """
+        val = None
+
+        if not kwargs:
+            print('Must include kwargs when using legislators_search_startswith!')
+            return val
+
+        df = self.search_for_legislators(**kwargs)
+
+        startswith = self._convert_value_to_column_type(
+            column_to_search, startswith)
+
+        if df is not None:
+            try:
+                val = df.loc[df[column_to_search].str.startswith(
+                    startswith)][column_val_to_return].values[0]
+            except IndexError:
+                print(
+                    f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
+            except KeyError:
+                print(
+                    f"'{column_to_search}' is not a valid column name in the legislator data frame!")
+            except AttributeError:
+                print(
+                    'Can only search columns of type str/text when using legislators_search_startswith!')
+            except Exception as e:
+                print('An exception occurred: {e}')
+        if isinstance(val, numpy.int64):
+            val = int(val)
+        return val
+# endregion
+
+# region US Scraper Utils
+##########################################
+# US SCRAPER UTILS
+##########################################
+
+
+class USFedLegislatorScraperUtils(LegislatorScraperUtils):
+    """
+    Utilities to help with collecting and storing American federal legislator data.
+    """
+
+    def __init__(self, database_table_name='us_fed_legislators'):
+        super().__init__('us', database_table_name, USLegislatorRow())
+
+    def get_state_id(self, state_abbreviation):
+        """Returns state ID based on a given state abbreviation."""
+        return self.get_attribute('division', 'abbreviation', state_abbreviation)
+
+    def write_data(self, data, database_table=None):
+        """
+        Inserts legislator data into database table. Data must be either a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_us_fed_legislators(data, table)
+
+
+class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
+    """
+    Scraper utilities for collecting US state legislator data.
+    """
+
+    def __init__(self, state_abbreviation, database_table_name='us_state_legislators'):
+        super().__init__(database_table_name)
+        self.state = state_abbreviation
+        self.state_id = self.get_state_id(state_abbreviation)
+
+    def initialize_row(self):
+        """Create a Row object filled with default values."""
+        row = super().initialize_row()
+        row.state = self.state
+        row.state_id = self.state_id
+        return row
+
+
+class USFedLegislationScraperUtils(LegislationScraperUtils):
+    """
+    Scraper used for collecting US Federal legislation data.
+    """
+
+    def __init__(self, database_table_name='us_fed_legislation', legislator_table_name='us_fed_legislators'):
+        super().__init__('us', database_table_name,
+                         legislator_table_name, USLegislationRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_us_fed_legislation(data, table)
+
+
+class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
+    """
+    Utilities for collecting US state legislation.
+    """
+
+    def __init__(self, state_abbreviation, database_table_name='us_state_legislation',
+                 legislator_table_name='us_state_legislators'):
+        super().__init__(database_table_name, legislator_table_name)
+        self.state = state_abbreviation
+        self.state_id = int(
+            self.divisions.loc[self.divisions['abbreviation'] == state_abbreviation]['id'].values[0])
+
+    def initialize_row(self):
+        """Creates a Row object with default values in place."""
+        row = super().initialize_row()
+        row.state = self.state
+        row.state_id = self.state_id
+        return row
+# endregion
+
+# region Canadian Scraper Utils
+##########################################
+# CANADIAN SCRAPER UTILS
+##########################################
+
+
+class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
+    """
+    Utilities to help with collecting and storing legislator data.
+    """
+
+    def __init__(self, database_table_name='ca_fed_legislators', row_type=CAFedLegislatorRow()):
+        """
+        The state_abbreviation, database_table_name, and country come from
+        the config.cfg file and must be updated to work properly with your legislation
+        data collector.
+        """
+        super().__init__('ca', database_table_name, row_type)
+
+    def get_prov_terr_id(self, prov_terr_abbrev):
+        """Returns the province/territory ID for a given province/territory abbreviation."""
+        return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
+
+    def get_region(self, prov_terr_abbrev):
+        """Returns the region for a given province/territory abbreviation."""
+        return self.get_attribute('division', 'abbreviation', prov_terr_abbrev, 'region')
+
+    def get_prov_terr_abbrev(self, prov_terr):
+        """Returns the province/territory abbreviation given the full name of a given province/territory."""
+        return self.get_attribute('division', 'division', prov_terr, 'abbreviation')
+
+    def write_data(self, data, database_table=None):
+        """
+        Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_ca_fed_legislators(data, table)
+
+
+class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
+    def __init__(self, prov_terr_abbreviation, database_table_name='ca_provterr_legislators'):
+        """
+        Create a ScraperUtils for collection Canadian province and territory legislator data.
+        """
+        super().__init__(database_table_name, CALegislatorRow())
+        self.province_territory = prov_terr_abbreviation
+        self.province_territory_id = self.get_prov_terr_id(
+            prov_terr_abbreviation)
+        self.region = self.get_region(prov_terr_abbreviation)
+
+    def initialize_row(self):
+        """Create a Row object filled with default values."""
+        row = super().initialize_row()
+        row.province_territory = self.province_territory
+        row.province_territory_id = self.province_territory_id
+        row.region = self.region
+        return row
+
+    def write_data(self, data, database_table=None):
+        """
+        Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_ca_prov_terr_legislators(data, table)
+
+
+class CAFedLegislationScraperUtils(LegislationScraperUtils):
+    def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators', row_type=CAFedLegislationRow()):
+        super().__init__('ca', database_table_name, legislator_table_name, row_type)
+
+    def get_region(self, prov_terr_abbrev):
+        """Returns the province/territory region based on a given province/territory abbreviation."""
+        return self.get_attribute('division', 'abbreviation', prov_terr_abbrev, 'region')
+
+    def get_prov_terr_abbrev(self, prov_terr):
+        """Returns province/territory abbreviation based on the full name of a given province or territory"""
+        return self.get_attribute('division', 'division', prov_terr, 'abbreviation')
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting legislation data into database. Data must be either a list or Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_ca_fed_legislation(data, table)
+
+
+class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
+    """Scraper for helping collect Canadian provincial or territorial legislation."""
+
+    def __init__(self, prov_terr_abbreviation, database_table_name='ca_provterr_legislation',
+                 legislator_table_name='ca_provterr_legislators'):
+        super().__init__(database_table_name, legislator_table_name, CALegislationRow())
+        self.province_territory = prov_terr_abbreviation
+        self.province_territory_id = int(
+            self.divisions.loc[self.divisions['abbreviation'] == prov_terr_abbreviation]['id'].values[0])
+
+    def initialize_row(self):
+        row = super().initialize_row()
+        row.province_territory = self.province_territory
+        row.province_territory_id = self.province_territory_id
+        return row
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_ca_prov_terr_legislation(data, table)
+# endregion

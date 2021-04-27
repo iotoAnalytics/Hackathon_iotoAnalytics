@@ -1,4 +1,13 @@
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import pandas as pd
 import bs4
 from urllib.request import Request
@@ -14,14 +23,6 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 url = 'https://www.ola.org/en/legislative-business/bills/current'
 base_url = 'https://www.ola.org'
@@ -172,5 +173,5 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, link_dicts)
     print('Done scraping!')
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
     print('Complete!')

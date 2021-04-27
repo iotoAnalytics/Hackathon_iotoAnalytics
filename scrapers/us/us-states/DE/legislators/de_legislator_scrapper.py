@@ -16,17 +16,17 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from request_url import UrlRequest
-from multiprocessing import Pool
-import requests
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import requests
+from multiprocessing import Pool
+from request_url import UrlRequest
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
 
 
 # Initialize config parser and get variables from config file
@@ -298,6 +298,6 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, legis_info[0:5])
     print('done scraping!')
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

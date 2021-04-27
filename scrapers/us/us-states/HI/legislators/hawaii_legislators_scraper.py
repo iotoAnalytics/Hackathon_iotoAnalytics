@@ -16,17 +16,17 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import request_url
-import requests
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import requests
+import request_url
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
 
 
 
@@ -282,7 +282,7 @@ def scrape(lst_item):
     row.education = wiki_info[3]
     row.email = get_email(soup)
     row.district = get_district(soup)
-    row.phone_number = get_phone(soup)
+    row.phone_numbers = get_phone(soup)
     row.committees = get_com(soup, name[0])
     print('done row for: ' + name[0])
     return row
@@ -298,6 +298,6 @@ if __name__ == '__main__':
     print('done scraping!')
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

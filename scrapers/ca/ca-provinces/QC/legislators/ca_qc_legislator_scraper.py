@@ -1,4 +1,13 @@
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 import pandas as pd
 import bs4
 from urllib.request import urlopen as uReq
@@ -14,14 +23,6 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
@@ -161,7 +162,7 @@ def collect_leg_data(myurl):
 
     contact_soup = soup(webpage, "html.parser")
     address_info = contact_soup.findAll("div", {"class": "blockAdresseDepute"})
-    phone_number = []
+    phone_numbers = []
     numbers = []
     addresses = []
 
@@ -181,7 +182,7 @@ def collect_leg_data(myurl):
                     if number not in numbers:
                         numbers.append(number)
                         num_info = {'office': office, 'number': number}
-                        phone_number.append(num_info)
+                        phone_numbers.append(num_info)
                 elif "Fax" in a:
                     tele = 1
                 elif "Toll" in a:
@@ -223,7 +224,7 @@ def collect_leg_data(myurl):
     info = {'province_url': myurl, 'member_id': member_id, 'role': 'Member of National Assembly', 'name_full': name,
             'name_first': hn.first, 'name_last': hn.last, 'name_suffix': hn.suffix, 'name_middle': hn.middle,
             'riding': riding, 'party': party, 'party_id': party_id, 'email': email, 'committees': committees,
-            'phone_number': phone_number, 'addresses': addresses, 'military_experience': ""}
+            'phone_numbers': phone_numbers, 'addresses': addresses, 'military_experience': ""}
 
     scraper_utils.crawl_delay(crawl_delay)
     return info
@@ -507,6 +508,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
