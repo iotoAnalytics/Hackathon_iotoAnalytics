@@ -7,6 +7,39 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
+from legislation_scraper_utils import USStateLegislationScraperUtils
+import xml.etree.ElementTree as ET
+import io
+import PyPDF2
+from selenium.webdriver.common.keys import Keys
+from selenium import webdriver
+import selenium
+import re
+import datetime
+from multiprocessing import Pool
+import unidecode
+import datefinder
+import requests
+from nameparser import HumanName
+import psycopg2
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import bs4
+import pandas as pd
+import utils
+from sklearn.decomposition import PCA
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
+
+import unicodedata
+import time
+import argparse
+import gzip
+import numpy as np
+import pickle
+import os
 import json
 import pickle
 import numpy as np

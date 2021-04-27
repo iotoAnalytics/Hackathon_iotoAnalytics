@@ -491,8 +491,8 @@ if __name__ == '__main__':
     # this is only 50 urls right now?
     billinfos = collect_bill_urls(
         'https://www.ncleg.gov/Legislation/Bills/ByKeyword/2021/All')
-    billinfos = billinfos[:100]
-    smalldf = pd.DataFrame(billinfos[:100])
+    # billinfos = billinfos[:100]
+    smalldf = pd.DataFrame(billinfos[:10])
 
     # print(billinfos)
     links = [d['source_url'] for d in billinfos]
@@ -501,7 +501,7 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         # #
-        bill_data = pool.map(func=collect_bill_details, iterable=links)
+        bill_data = pool.map(func=collect_bill_details, iterable=lessLinks)
     # #
     maindf = pd.DataFrame(bill_data)
 
