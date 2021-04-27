@@ -133,13 +133,11 @@ class ScraperUtils:
         bu = self.get_base_url(url)
         self._robots[bu] = self.Robots(bu, ua)
 
-    def _auto_add_robot(self, base_url, url, auto_add_enabled):
+    def _auto_add_robot(self, base_url, auto_add_enabled):
         """Called for methods that have an auto_add_robot parameter."""
         if not self._robots.get(base_url) and auto_add_enabled:
             self.add_robot(base_url)
-        elif not self._robots.get(base_url) and not auto_add_enabled:
-            raise exceptions.NoRobotsConfiguredException(
-                self.request, url, self._robots.keys())
+
 
     def request(self, url, **kwargs):
         """More polite version of the requests.get function.
@@ -156,9 +154,12 @@ class ScraperUtils:
 
         bu = self.get_base_url(url)
 
-        self._auto_add_robot(bu, url, auto_add_robot)
+        self._auto_add_robot(bu, auto_add_robot)
 
         r = self._robots.get(bu)
+        if not r:
+            raise exceptions.NoRobotsConfiguredException(
+                self.request, url, list(self._robots.keys()))
         ua = headers.get('User-Agent', '*')
         can_fetch = r.can_fetch(ua, url)
         if can_fetch:
@@ -180,9 +181,12 @@ class ScraperUtils:
         auto_add_robot = kwargs.get('auto_add_robot', True)
         user_agent = kwargs.get('user_agent')
 
-        self._auto_add_robot(bu, url, auto_add_robot)
+        self._auto_add_robot(bu, auto_add_robot)
 
         r = self._robots.get(bu)
+        if not r:
+            raise exceptions.NoRobotsConfiguredException(
+                self.get_crawl_delay, url, list(self._robots.keys()))
 
         crawl_delay = r.crawl_delay
         request_rate = r.request_rate
