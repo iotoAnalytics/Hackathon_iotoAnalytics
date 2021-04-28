@@ -214,6 +214,7 @@ if __name__ == '__main__':
         bill_data = pool.map(func=scrape_bills, iterable=bill_links)
     bill_df = pd.DataFrame(bill_data)
     print(bill_df)
+    bill_df = scraper_utils.add_topics(bill_df)
 
     big_list_of_dicts = bill_df.to_dict('records')
     print(*big_list_of_dicts, sep="\n")

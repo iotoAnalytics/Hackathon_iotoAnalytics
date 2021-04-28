@@ -300,6 +300,6 @@ if __name__ == '__main__':
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    # scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.insert_legislation_data_into_db(data)
 
     print('Complete!')

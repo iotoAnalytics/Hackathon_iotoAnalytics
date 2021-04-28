@@ -34,6 +34,7 @@ import numpy as np
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
 
+
 # region Base Scraper Utils
 
 
@@ -118,7 +119,6 @@ class LegislationScraperUtils:
         print('Loading model...')
         s3 = boto3.client('s3')
 
-
         with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
             s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
             mlmodel = f.name
@@ -126,7 +126,6 @@ class LegislationScraperUtils:
 
         #
         print('Model loaded.')
-
 
         df = pd.DataFrame(df)
 
@@ -203,7 +202,6 @@ class LegislationScraperUtils:
             with torch.no_grad():
                 outputs = model(**inputs)
 
-
             # loss = outputs[0]
             logits = outputs[1]
             # loss_val_total += loss.item()
@@ -211,7 +209,6 @@ class LegislationScraperUtils:
             logits = logits.detach().cpu().numpy()
 
             predictions.append(logits)
-
 
         predictions = np.concatenate(predictions, axis=0)
 
@@ -230,7 +227,7 @@ class LegislationScraperUtils:
             #
             i = i + 1
 
-            # df = df.drop(columns=['label'])
+        df = df.drop(columns=['label'])
 
         return df
 
@@ -443,6 +440,8 @@ class LegislationScraperUtils:
         if isinstance(val, numpy.int64):
             val = int(val)
         return val
+
+
 # endregion
 
 # region US Scraper Utils
@@ -472,6 +471,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
+                   
                                       
                     CREATE TABLE IF NOT EXISTS {table} (
                         goverlytics_id text PRIMARY KEY,
@@ -594,13 +594,16 @@ class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
         row.state = self.state
         row.state_id = self.state_id
         return row
+
+
 # endregion
 
 # region Canadian Scraper Utils
 
 
 class CAFedLegislationScraperUtils(LegislationScraperUtils):
-    def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators', row_type=CAFedLegislationRow()):
+    def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators',
+                 row_type=CAFedLegislationRow()):
         super().__init__('ca', database_table_name, legislator_table_name, row_type)
 
     def get_region(self, prov_terr_abbrev):

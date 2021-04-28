@@ -506,6 +506,7 @@ if __name__ == '__main__':
     #
     # big_df = topics.add_topics(bill_df)
     print(bill_df)
+    bill_df = scraper_utils.add_topics(bill_df)
 
     big_list_of_dicts = bill_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")

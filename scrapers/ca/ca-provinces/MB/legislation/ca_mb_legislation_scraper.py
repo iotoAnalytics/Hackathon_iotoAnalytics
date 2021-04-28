@@ -175,6 +175,7 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(func=collect_bill_data, iterable=bill_infos)
     bill_df = pd.DataFrame(data)
+    bill_df = scraper_utils.add_topics(bill_df)
     print(bill_df)
 
     big_list_of_dicts = bill_df.to_dict('records')
