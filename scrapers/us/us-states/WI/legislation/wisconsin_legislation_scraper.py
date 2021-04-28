@@ -314,6 +314,7 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     bill_df['source_id'] = bill_df['bill_state_id']
     bill_df['source_url'] = bill_df['state_url']
+    bill_df = scraper_utils.add_topics(bill_df)
     print(bill_df)
 
     # print(big_df)
