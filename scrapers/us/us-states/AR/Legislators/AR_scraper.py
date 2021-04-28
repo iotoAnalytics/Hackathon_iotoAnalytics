@@ -10,6 +10,8 @@ Notes:
 
 - Missing years served, could be scraped from within a paragraph on the individual house and senate sites, but since this would rely on 
     the paragraph word structure, it is highly subject to error in the future.
+
+- Scrapes historical legislators by using full name as a key, will overwrite earlier legislators if they have the same name
 '''
 import sys
 import os
@@ -46,35 +48,62 @@ configParser.read('config.cfg')
 # scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 scraper_utils = USStateLegislatorScraperUtils('AR', 'us_ar_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.arkleg.state.ar.us')
-session_id = ''
+# session_id = ''
 
+def get_sessions(historical=False):
+    current_year = datetime.year
+    session_url = f'https://www.arkleg.state.ar.us/Acts/SearchByRange?startAct=1&endAct=1000&keywords=&ddBienniumSession={current_year}%2F{current_year}R#SearchResults'
 
-def get_urls():
+    page = scraper_utils.request(session_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    sessions = soup.find(
+        'select', id='ddBienniumSession').find_all('option')[1:]
+
+    if historical:
+        year, code = sessions[0]['value'].split('/')
+        return {'year': year, 'code' :code}
+
+    codes = []
+    for session in sessions:
+        year, code = session['value'].split('/')
+        codes.append({'year': year, 'code' :code})
+    return codes
+
+def get_urls(historical=False):
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
     '''
-    urls = {}
-
-    # Logic goes here! Some sample code:
-    scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
     base_url = 'https://www.arkleg.state.ar.us'
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    chambers = soup.find_all(
-        'div', class_='col-sm-2 col-md-2 d-none d-md-block d-lg-block d-xl-block')
-    districts = soup.find_all('div', {
-                              'class': 'col-md-2 col-md-2 d-none d-md-block d-lg-block d-xl-block', 'aria-colindex': 4})
+    scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
+    urls = {}
+    codes = get_sessions(historical)
 
-    divs = soup.find_all('div', class_='col-sm-6 col-md-6')
-    links = []
-    for div in divs:
-        links.append(div.find('a'))
+    
 
-    for index, path in enumerate(links):
-        chamber = chambers[index].text.split('\n')[2].strip()
-        district = districts[index].text.split('\n')[2].strip()
-        urls[(chamber, district)] = base_url + path['href']
+    for tuple in codes:
+        year = tuple['year']
+        code = tuple['code']
+        scrape_url += f'?ddBienniumSession={year}%2F{code}'
+        
+        
+        page = scraper_utils.request(scrape_url)
+        soup = BeautifulSoup(page.content, 'html.parser')
+        chambers = soup.find_all(
+            'div', class_='col-sm-2 col-md-2 d-none d-md-block d-lg-block d-xl-block')
+        districts = soup.find_all('div', {
+                                'class': 'col-md-2 col-md-2 d-none d-md-block d-lg-block d-xl-block', 'aria-colindex': 4})
 
+        divs = soup.find_all('div', class_='col-sm-6 col-md-6')
+        links = []
+        for div in divs:
+            links.append(div.find('a'))
+
+        for index, path in enumerate(links):
+            chamber = chambers[index].text.split('\n')[2].strip()
+            district = districts[index].text.split('\n')[2].strip()
+            if (chamber, district, path.text) not in urls.keys():
+                urls[(chamber, district, path.text)] = (base_url + path['href'], code)
+    print(urls)
     return urls
 
 
@@ -217,7 +246,7 @@ def scrape(urls):
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
     '''
-    url = urls[0]
+    url = urls[0][0]
 
     row = scraper_utils.initialize_row()
 
@@ -235,7 +264,7 @@ def scrape(urls):
     row.name_last = name.last
     row.name_middle = name.middle
     row.name_suffix = name.suffix
-    row.most_recent_term_id = session_id
+    row.most_recent_term_id = urls[0][1]
     party = {'(D)': 'Democrat', '(R)': 'Republican', '(I)': 'Independent'}
     row.party = party[title[-1]]
     row.party_id = scraper_utils.get_party_id(row.party)
@@ -310,24 +339,24 @@ def scrape(urls):
     return row
 
 
-def set_session_id():
-    scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    scraper_utils.crawl_delay(crawl_delay)
-    return(soup.find('div', class_='siteBienniumSessionName').text.split('-')[1].strip())
+# def set_session_id():
+#     scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
+#     page = scraper_utils.request(scrape_url)
+#     soup = BeautifulSoup(page.content, 'html.parser')
+#     scraper_utils.crawl_delay(crawl_delay)
+#     return(soup.find('div', class_='siteBienniumSessionName').text.split('-')[1].strip())
 
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
-    url = get_urls()
+    url = get_urls(True)
     wiki_url = get_wiki_links(
         'https://en.wikipedia.org/wiki/Arkansas_House_of_Representatives', 'House')
     wiki_url = {
         **wiki_url, **get_wiki_links('https://en.wikipedia.org/wiki/Arkansas_Senate', 'Senate')}
 
-    urls = [(path, wiki_url[key])for key, path in url.items()]
-    session_id = set_session_id()
+    urls = [(path, wiki_url[key[0:2]])for key, path in url.items()]
+    # session_id = set_session_id()
     print('Initialized Scraping')
 
     # Next, we'll scrape the data we want to collect from those URLs.
