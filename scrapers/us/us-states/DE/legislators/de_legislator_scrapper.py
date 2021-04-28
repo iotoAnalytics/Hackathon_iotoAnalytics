@@ -296,7 +296,7 @@ if __name__ == '__main__':
     print('done dicts!')
 
     with Pool() as pool:
-        data = pool.map(scrape, legis_info[0:5])
+        data = pool.map(scrape, legis_info)
     print('done scraping!')
     scraper_utils.write_data(data)
 
