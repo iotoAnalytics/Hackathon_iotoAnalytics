@@ -23,8 +23,8 @@ from pprint import pprint
 from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
-from scraper_utils import USStateLegislatorScraperUtils
 import time
+from scraper_utils import USStateLegislatorScraperUtils
 
 
 state_abbreviation = 'AZ'
