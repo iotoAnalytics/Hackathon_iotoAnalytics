@@ -16,22 +16,22 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-
 import boto3
 import re
 from nameparser import HumanName
 from pprint import pprint
-from database import Database
 from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
 import time
+from scraper_utils import USStateLegislatorScraperUtils
+
 
 state_abbreviation = 'AZ'
 database_table_name = 'demo_template_legislators'
 
-scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
+scraper_utils = USStateLegislatorScraperUtils(
+    state_abbreviation, database_table_name)
 
 base_url = 'https://www.azleg.gov'
 # Get scraper delay from website robots.txt file
@@ -126,7 +126,7 @@ def scrape(url):
     phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
     phone_number = [{'office': '', 'number': phone_number}]
 
-    row.phone_number = phone_number
+    row.phone_numbers = phone_number
 
     # There's other stuff we can gather on the page, but this will do for demo purposes
 
@@ -139,7 +139,8 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     start = time.time()
-    print(f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) since the crawl delay is very large (ie: {crawl_delay} seconds). If you need to abort, press ctrl + c.')
+    print(
+        f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) since the crawl delay is very large (ie: {crawl_delay} seconds). If you need to abort, press ctrl + c.')
     print('Collecting URLS...')
     urls = get_urls()
     print('URLs Collected.')
@@ -154,6 +155,6 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print(f'Scraper ran succesfully!')

@@ -10,34 +10,34 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
-from selenium import webdriver
-import json
-from datetime import datetime
-from psycopg2 import sql
-from database import CursorFromConnectionFromPool
-from functools import partial
-import unidecode
-import datefinder
-import psycopg2
-from urllib.request import urlopen as uReq
-import pandas as pd
-import time
-import argparse
-import numpy as np
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup as soup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
+import numpy as np
+import argparse
+import time
+import pandas as pd
+from urllib.request import urlopen as uReq
+import psycopg2
+import datefinder
+import unidecode
+from functools import partial
+from database import CursorFromConnectionFromPool
+from psycopg2 import sql
+from datetime import datetime
+import json
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
 
 
 # Initialize config parser and get variables from config file
@@ -158,23 +158,23 @@ def collect_rep_bio_info(myurl):
     test_df['birthday'] = test_df['birthday'].apply(to_date)
 
     def add_district_phone(number):
-        phone_number = []
+        phone_numbers = []
         try:
             number = number.replace(".", "-")
-            phone_number.append(
+            phone_numbers.append(
                 {'office': 'district office', 'number': number})
         except:
             pass
-        return phone_number
+        return phone_numbers
 
     def add_house_phone(number):
-        phone_number = []
+        phone_numbers = []
         try:
             number = number.replace(".", "-")
-            phone_number.append({'office': 'house', 'number': number})
+            phone_numbers.append({'office': 'house', 'number': number})
         except:
             pass
-        return phone_number
+        return phone_numbers
 
     test_df['districtphone'] = test_df['district phone'].apply(
         add_district_phone)
@@ -243,7 +243,7 @@ def collect_rep_bio_info(myurl):
 
         return addresses
 
-    test_df['phone_number'] = test_df.apply(
+    test_df['phone_numbers'] = test_df.apply(
         lambda row: append_phones(row.districtphone, row.housephone), axis=1)
 
     test_df['committees'] = test_df.apply(lambda row: append_committees(row.com1, row.com2, row.com3, row.com4,
@@ -510,7 +510,7 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
 

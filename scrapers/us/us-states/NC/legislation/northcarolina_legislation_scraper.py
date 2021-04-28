@@ -16,32 +16,32 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from sklearn import linear_model
-from joblib import dump, load
-from nltk.stem import WordNetLemmatizer
-from nltk.corpus import wordnet as wn
-from nltk.corpus import stopwords
-import nltk
-import io
-import requests
-import PyPDF2
-import unidecode
-import datefinder
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-import pandas as pd
 from multiprocessing import Pool
+import pandas as pd
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from scraper_utils import USStateLegislationScraperUtils
+import datefinder
+import unidecode
+import PyPDF2
+import requests
+import io
+import nltk
+from nltk.corpus import stopwords
+from nltk.corpus import wordnet as wn
+from nltk.stem import WordNetLemmatizer
+from joblib import dump, load
+from sklearn import linear_model
 
 
 
@@ -492,7 +492,7 @@ if __name__ == '__main__':
     billinfos = collect_bill_urls(
         'https://www.ncleg.gov/Legislation/Bills/ByKeyword/2021/All')
     # billinfos = billinfos[:100]
-    smalldf = pd.DataFrame(billinfos[:10])
+    smalldf = pd.DataFrame(billinfos)
 
     # print(billinfos)
     links = [d['source_url'] for d in billinfos]
@@ -501,7 +501,7 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         # #
-        bill_data = pool.map(func=collect_bill_details, iterable=lessLinks)
+        bill_data = pool.map(func=collect_bill_details, iterable=links)
     # #
     maindf = pd.DataFrame(bill_data)
 
@@ -522,7 +522,7 @@ if __name__ == '__main__':
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
-    # print('Writing data to database...')
-    # scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
-    #
-    # print('Complete!')
+    print('Writing data to database...')
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print('Complete!')

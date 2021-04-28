@@ -10,6 +10,24 @@ Description:
 
 '''
 # from _typeshed import NoneType
+import sys
+import os
+from pathlib import Path
+import pandas as pd
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
+
+# set path to current file directory
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
+
+
 from selenium.webdriver.support.ui import WebDriverWait
 import io
 import pdfplumber
@@ -28,25 +46,9 @@ from database import Database
 from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
-from legislation_scraper_utils import LegislationScraperUtils, LegislationRow, USFedLegislationScraperUtils
+from scraper_utils import LegislationScraperUtils, LegislationRow, USFedLegislationScraperUtils
 import tqdm
 import traceback
-import sys
-import os
-from pathlib import Path
-import pandas as pd
-pd.set_option('display.max_rows', 500)
-pd.set_option('display.max_columns', 500)
-pd.set_option('display.width', 1000)
-
-# set path to current file directory
-abspath = os.path.abspath(__file__)
-dname = os.path.dirname(abspath)
-os.chdir(dname)
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-sys.path.insert(0, str(p))
 
 
 # Initialize config parser and get variables from config file
@@ -240,7 +242,8 @@ def scrape(info):
         if header.text == 'Bill Number:':
             row.bill_name = rows[index].text.replace('PDF', '').strip()
             pdf_link = site_url + rows[index].find('a')['href']
-            response = requests.get(pdf_link, stream=True, headers=scraper_utils.request_headers)
+            response = requests.get(
+                pdf_link, stream=True, headers=scraper_utils.request_headers)
             scraper_utils.crawl_delay(crawl_delay)
             try:
                 pdf = pdfplumber.open(io.BytesIO(response.content))
@@ -413,7 +416,7 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
 

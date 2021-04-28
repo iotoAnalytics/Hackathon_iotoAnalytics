@@ -25,8 +25,6 @@ class LegislationRow:
     committees: List[dict] = field(default_factory=list)
     bill_type: str = ''
     bill_title: str = ''
-    country_id: int = 0
-    country: str = ''
     current_status: str = ''
     principal_sponsor_id: int = None
     principal_sponsor: str = ''
@@ -41,6 +39,8 @@ class LegislationRow:
     votes: List[dict] = field(default_factory=list)
     source_topic: str = ''
     topic: str = ''
+    country_id: int = 0
+    country: str = ''
 
 
 @dataclass
@@ -87,7 +87,9 @@ class LegislatorRow:
         for attr, value in self.__dict__.items():
             yield attr, value
 
+    source_id: str = ''
     most_recent_term_id: str = ''
+    source_url: str = ''
     name_full: str = ''
     name_last: str = ''
     name_first: str = ''
@@ -100,7 +102,7 @@ class LegislatorRow:
     role: str = ''
     years_active: List[int] = field(default_factory=list)
     committees: List[dict] = field(default_factory=list)
-    phone_number: List[dict] = field(default_factory=list)
+    phone_numbers: List[dict] = field(default_factory=list)
     addresses: List[dict] = field(default_factory=list)
     email: str = ''
     birthday: datetime = None
@@ -108,8 +110,6 @@ class LegislatorRow:
     occupation: List[str] = field(default_factory=list)
     education: List[dict] = field(default_factory=list)
     military_experience: str = ''
-    source_url: str = ''
-    source_id: str = ''
 
 
 @dataclass
@@ -117,10 +117,10 @@ class USLegislatorRow(LegislatorRow):
     """
     Data structure for housing data about each piece of legislator.
     """
-    state: str = ''
     state_id: int = None
-    district: str = ''
+    state: str = ''
     areas_served: List[str] = field(default_factory=list)
+    district: str = ''
 
 
 @dataclass

@@ -7,8 +7,17 @@ all pages. Feel free to modify the scripts as necessary.
 Note that the functions in the scraper_utils.py and database_tables.py file should not
 have to change. Please extend the classes in these files if you need to modify them.
 '''
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import io
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
 from database import Database
@@ -28,14 +37,6 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 # import PyPDF2
@@ -300,6 +301,6 @@ if __name__ == '__main__':
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    # scraper_utils.insert_legislation_data_into_db(data)
+    # scraper_utils.write_data(data)
 
     print('Complete!')

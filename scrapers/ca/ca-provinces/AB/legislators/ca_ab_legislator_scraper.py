@@ -1,32 +1,35 @@
-import sys, os
+import sys
+import os
 from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-from urllib.request import urlopen as uReq
-from bs4 import BeautifulSoup as soup
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-import re
-from datetime import datetime
-import boto3
-from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from nameparser import HumanName
-import pandas as pd
-import unidecode
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 import numpy as np
+import unidecode
+import pandas as pd
+from nameparser import HumanName
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
+from selenium import webdriver
+import boto3
+from datetime import datetime
+import re
+from pprint import pprint
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from bs4 import BeautifulSoup as soup
+from urllib.request import urlopen as uReq
 
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
+
 
 def scrape_members_link(link):
     mem_bios = []
@@ -117,7 +120,8 @@ def collect_mla_data(link):
             except:
                 pass
 
-    card_body = page_soup.find("div", {"class": "card-body bg-white mla-contact"})
+    card_body = page_soup.find(
+        "div", {"class": "card-body bg-white mla-contact"})
     addr_location = card_body.findAll("div", {"class": "col-lg-2 pb-2"})
     addr = card_body.findAll("div", {"class": "col-lg-3 pb-2"})
     exc = 0
@@ -134,8 +138,9 @@ def collect_mla_data(link):
         except:
             exc = 1
     row.addresses = addresses
-    phone_number = []
-    phone_soup = page_soup.findAll("div", {"class": "row border-bottom pt-2 ml-0 mr-0"})
+    phone_numbers = []
+    phone_soup = page_soup.findAll(
+        "div", {"class": "row border-bottom pt-2 ml-0 mr-0"})
     # print(len(phone_soup))
     for ps in phone_soup:
         office_loc = ps.div.text
@@ -150,16 +155,18 @@ def collect_mla_data(link):
                     else:
                         office = office_loc
                     try:
-                        phone = (phone_tags[i + 1]["href"]).replace("tel:", "").strip()
+                        phone = (phone_tags[i + 1]["href"]
+                                 ).replace("tel:", "").strip()
                         phone = phone.replace(".", "-")
                         phone_info = {'office': office, 'number': phone}
                         # print(phone_info)
-                        phone_number.append(phone_info)
+                        phone_numbers.append(phone_info)
                     except:
                         pass
 
             i += 1
-    legislator_phone_soup = page_soup.find("div", {"class": "row border-bottom ml-0 mr-0"})
+    legislator_phone_soup = page_soup.find(
+        "div", {"class": "row border-bottom ml-0 mr-0"})
     leg_div = legislator_phone_soup.find("div", {"class": "col-lg-auto pb-2"})
     leg_tags = leg_div.findAll()
     office_loc = 'Legislature Office'
@@ -172,17 +179,18 @@ def collect_mla_data(link):
                 else:
                     office = office_loc
                 try:
-                    phone = (phone_tags[i + 1]["href"]).replace("tel:", "").strip()
+                    phone = (phone_tags[i + 1]["href"]
+                             ).replace("tel:", "").strip()
                     phone = phone.replace(".", "-")
                     phone_info = {'office': office, 'number': phone}
                     # print(phone_info)
-                    phone_number.append(phone_info)
+                    phone_numbers.append(phone_info)
                 except:
                     pass
 
         i += 1
 
-    row.phone_number = phone_number
+    row.phone_numbers = phone_numbers
     row.most_recent_term_id = years_active[len(years_active) - 1]
 
     committees = []
@@ -237,10 +245,13 @@ if __name__ == '__main__':
     wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
     wiki_people = scrape_wiki(wiki_link)
     with Pool() as pool:
-        wiki_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
-    wikidf = pd.DataFrame(wiki_data)[['birthday', 'education', 'name_first', 'name_last', 'occupation']]
+        wiki_data = pool.map(
+            func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+    wikidf = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'name_first', 'name_last', 'occupation']]
     # print(wikidf)
-    big_df = pd.merge(leg_df, wikidf, how='left', on=["name_first", "name_last"])
+    big_df = pd.merge(leg_df, wikidf, how='left',
+                      on=["name_first", "name_last"])
 
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
@@ -254,6 +265,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

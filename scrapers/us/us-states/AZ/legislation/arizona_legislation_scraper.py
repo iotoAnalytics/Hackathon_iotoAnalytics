@@ -41,6 +41,40 @@ import numpy as np
 import pickle
 import os
 import json
+import pickle
+import numpy as np
+import gzip
+import argparse
+import time
+import unicodedata
+import matplotlib.pyplot as plt
+from numpy.linalg import norm
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from sklearn.decomposition import PCA
+import utils
+import pandas as pd
+import bs4
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import requests
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
+import selenium
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+import PyPDF2
+import io
+import xml.etree.ElementTree as ET
+from scraper_utils import USStateLegislationScraperUtils
+
 
 # import dbwork
 # import xmltodict
@@ -506,11 +540,12 @@ if __name__ == '__main__':
     #
     # big_df = topics.add_topics(bill_df)
     print(bill_df)
+    bill_df = scraper_utils.add_topics(bill_df)
 
     big_list_of_dicts = bill_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

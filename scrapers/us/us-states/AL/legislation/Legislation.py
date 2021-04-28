@@ -46,16 +46,16 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import numpy
-import datetime
-from itertools import product
-from multiprocessing import Pool
-from legislation_scraper_utils import USStateLegislationScraperUtils
-from database import Database
-import pandas as pd
-from bs4 import BeautifulSoup
-import requests
 import configparser
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from database import Database
+from scraper_utils import USStateLegislationScraperUtils
+from multiprocessing import Pool
+from itertools import product
+import datetime
+import numpy
 
 
 # Testing imports
@@ -457,8 +457,8 @@ def scrape():
     # fields_house = open_file('data2.txt')[0]
 
     print('step Insert: ' + current_session)
-    scraper_utils.insert_legislation_data_into_db(list(fields_house.values()))
-    scraper_utils.insert_legislation_data_into_db(list(fields.values()))
+    scraper_utils.write_data(list(fields_house.values()))
+    scraper_utils.write_data(list(fields.values()))
 
     # for d in list(fields_house.values())[:10]:
     #     print(d)

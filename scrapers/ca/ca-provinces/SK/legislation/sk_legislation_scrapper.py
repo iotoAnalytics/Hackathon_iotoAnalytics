@@ -19,7 +19,7 @@ from pathlib import Path
 from io import BytesIO
 import pdfx
 import pdfplumber
-from legislation_scraper_utils import CAProvinceTerrLegislationScraperUtils
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 
 prov_terr_abbreviation = 'SK'
 database_table_name = 'ca_sk_legislation'
@@ -30,8 +30,10 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
 pdf_link = 'https://www.legassembly.sk.ca/media/1398/progress-of-bills.pdf'
 crawl_delay = scraper_utils.get_crawl_delay(pdf_link)
 
+
 def get_bill_info(link):
-    response = requests.get(link, stream=True, headers=scraper_utils.request_headers)
+    response = requests.get(
+        link, stream=True, headers=scraper_utils.request_headers)
     pdf = pdfplumber.open(BytesIO(response.content))
     item_lst = []
     for _ in range(0, len(pdf.pages)):
@@ -58,7 +60,8 @@ def get_bill_dict(list):
     bill_dict_lst = []
     for _ in range(0, len(list)):
         url = list[_]
-        response = requests.get(url, stream=True, headers=scraper_utils.request_headers)
+        response = requests.get(
+            url, stream=True, headers=scraper_utils.request_headers)
         pdf = pdfplumber.open(BytesIO(response.content))
         title = ''
         sponsor = ''
@@ -259,5 +262,5 @@ bill_dict = get_bill_dict(pdf_lst)
 print('done lists')
 data = [make_row(x) for x in match_lst(bill_dict, bill_info_lst)]
 print('done data')
-scraper_utils.insert_legislation_data_into_db(data)
+scraper_utils.write_data(data)
 print('done')

@@ -1,38 +1,38 @@
 '''
 This website will block your IP if too many requests are sent
 '''
-
-import sys, os
+import sys
+import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-from legislator_scraper_utils import USStateLegislatorScraperUtils
 
-import pickle
-import numpy as np
-import gzip
-import argparse
-import time
-import pandas as pd
-import bs4
-from urllib.request import urlopen as uReq
-from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import psycopg2
-from nameparser import HumanName
-import requests
-import datefinder
-import unidecode
-from multiprocessing import Pool
-import datetime
-import re
-from geotext import GeoText
-# import html.parser
-import requests
 from requests import get
+from geotext import GeoText
+import re
+import datetime
+from multiprocessing import Pool
+import unidecode
+import datefinder
+import requests
+from nameparser import HumanName
+import psycopg2
+from bs4 import BeautifulSoup as soup
+from urllib.request import Request
+from urllib.request import urlopen as uReq
+import bs4
+import pandas as pd
+import time
+import argparse
+import gzip
+import numpy as np
+import pickle
+from scraper_utils import USStateLegislatorScraperUtils
+
+# import html.parser
 
 scraper_utils = USStateLegislatorScraperUtils('WI', 'us_wi_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://docs.legis.wisconsin.gov')
@@ -86,7 +86,8 @@ def getSenateLinks(myurl):
                 areas_served = []
                 areas_served.append(party_area[1].replace(")", ""))
 
-                district_tags = person_info.findAll("span", {"style": "width:8em;"})
+                district_tags = person_info.findAll(
+                    "span", {"style": "width:8em;"})
                 district = ""
                 state_member_id = ""
                 for dt in district_tags:
@@ -94,12 +95,14 @@ def getSenateLinks(myurl):
                         if "District" in dt.small.text:
                             district = dt.text.replace("District ", "")
                             index = district_tags.index(dt) + 1
-                            state_url = 'https://docs.legis.wisconsin.gov' + (district_tags[index].a["href"])
+                            state_url = 'https://docs.legis.wisconsin.gov' + \
+                                (district_tags[index].a["href"])
                             if role == "Senator":
                                 state_member_id = state_url.split("senate/")[1]
                             else:
 
-                                state_member_id = state_url.split("assembly/")[1]
+                                state_member_id = state_url.split(
+                                    "assembly/")[1]
 
                     except Exception as ex:
 
@@ -111,7 +114,7 @@ def getSenateLinks(myurl):
 
                 email_info = pi.find("span", {"class": "info email"})
                 email = email_info.a.text
-                phone_number = []
+                phone_numbers = []
 
                 telephone_info = pi.find("span", {"class": "info telephone"})
                 numbers = telephone_info.text.replace("Telephone:", "")
@@ -120,13 +123,13 @@ def getSenateLinks(myurl):
                     number = number.replace(")", "").strip()
                     if number:
                         pn = {'office': "", 'number': number.replace(" ", "-")}
-                        phone_number.append(pn)
+                        phone_numbers.append(pn)
 
                 info = {'state_url': state_url, 'name_full': name, 'name_first': hn.first, 'name_last': hn.last,
                         'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party, 'party_id': party_id,
                         'areas_served': areas_served, 'state': "WI", 'state_id': 55, 'country': 'USA', 'country_id': 1,
                         'role': role, 'district': district, 'state_member_id': state_member_id, 'email': email,
-                        'phone_number': phone_number}
+                        'phone_numbers': phone_numbers}
 
                 infos.append(info)
 
@@ -167,7 +170,8 @@ def collect_leg_data(myurl):
     addr_info = {'location': 'Madison Office', 'address': office_address}
     addresses.append(addr_info)
     try:
-        voting_address_info = page_soup.find("span", {"class": "info voting_address"})
+        voting_address_info = page_soup.find(
+            "span", {"class": "info voting_address"})
         voting_addr = str(voting_address_info)
         voting_addr = voting_addr.split("span")[3]
         voting_addr = voting_addr.replace(">", "")
@@ -175,10 +179,10 @@ def collect_leg_data(myurl):
         voting_addr = voting_addr.replace("</", "")
         voting_addr = voting_addr.replace("\n", " ")
         voting_addr = " ".join(voting_addr.split())
-        addr_info = {'location': 'Voting Address', 'address': voting_addr.strip()}
+        addr_info = {'location': 'Voting Address',
+                     'address': voting_addr.strip()}
         # print(addr_info)
         addresses.append(addr_info)
-
 
     except:
         pass
@@ -216,7 +220,8 @@ def get_senate_wiki_links(repLink):
         try:
             info = person.findAll("td")
             info = info[1]
-            biolink = "https://en.wikipedia.org" + (info.span.span.span.a["href"])
+            biolink = "https://en.wikipedia.org" + \
+                (info.span.span.span.a["href"])
 
             bio_links.append(biolink)
             # print(biolink)
@@ -273,9 +278,6 @@ def find_wiki_data(repLink):
         birthday = b
         # print(b)
 
-
-
-
     except:
         # couldn't find birthday in side box
         birthday = None
@@ -313,8 +315,6 @@ def find_wiki_data(repLink):
                     if year_started.startswith("12"):
                         year_started = year_started.substring(1)
 
-
-
                 else:
                     pass
 
@@ -335,7 +335,8 @@ def find_wiki_data(repLink):
 
     # get education
     education = []
-    lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD", "DDS", "MS", "BS", "MBA", "MS", "MD"]
+    lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
+            "DDS", "MS", "BS", "MBA", "MS", "MD"]
 
     try:
         uClient = uReq(repLink)
@@ -398,7 +399,6 @@ def find_wiki_data(repLink):
         name = name.replace(" (politician)", "")
         name = name.replace(" (American politician)", "")
         name = name.replace(" (Wisconsin politician)", "")
-
 
     except:
         name = ""
@@ -495,16 +495,23 @@ if __name__ == '__main__':
     # print(len(leg_wiki_links))
 
     with Pool() as pool:
-        rep_data = pool.map(func=scraper_utils.scrape_wiki_bio, iterable=leg_wiki_links)
+        rep_data = pool.map(
+            func=scraper_utils.scrape_wiki_bio, iterable=leg_wiki_links)
     wiki_df = pd.DataFrame(rep_data)
     # print(wiki_df)
     #
-    mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=["name_first", "name_last"])
-    mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({np.nan: None})
-    mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({np.nan: None})
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
+    mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=[
+                              "name_first", "name_last"])
+    mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({
+                                                                                          np.nan: None})
+    mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({
+                                                                            np.nan: None})
+    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({
+                                                                        np.nan: None})
+    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({
+                                                                    np.nan: None})
+    mergedRepsData['education'] = mergedRepsData['education'].replace({
+                                                                      np.nan: None})
 
     sample_row = scraper_utils.initialize_row()
     # print(sample_row)
@@ -528,6 +535,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

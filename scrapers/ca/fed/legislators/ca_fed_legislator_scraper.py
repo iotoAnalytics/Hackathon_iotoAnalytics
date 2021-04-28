@@ -15,11 +15,18 @@ Known Issues:
         closed when trying to insert the data. Breaking the data into chunks of 100 or
         so datapoints seemed to remedy the issue.
 '''
-from legislator_scraper_utils import CAFedLegislatorScraperUtils
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[4]
+
+sys.path.insert(0, str(p))
+from scraper_utils import CAFedLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
-from database import Database
 import configparser
 from pprint import pprint
 from nameparser import HumanName
@@ -28,15 +35,6 @@ import pandas as pd
 import xml.etree.ElementTree as ET
 import traceback
 from tqdm import tqdm
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 
 scraper_utils = CAFedLegislatorScraperUtils()
 
@@ -132,7 +130,7 @@ def get_mp_contact_details(contact_url):
     Args:
         contact_url: URL for MP's contact page
     Returns:
-        contact: dictionary containing contact details, including phone_numbers,
+        contact: dictionary containing contact details, including phone_numberss,
             addresses, and email.
     """
     page = scraper_utils.request(contact_url)
@@ -140,7 +138,7 @@ def get_mp_contact_details(contact_url):
 
     container = soup.find('div', {'id': 'contact'})
 
-    contact = {'phone_number': [], 'addresses': [], 'email': ''}
+    contact = {'phone_numbers': [], 'addresses': [], 'email': ''}
 
     try:
         # Email found in first p tag of contact container
@@ -157,7 +155,7 @@ def get_mp_contact_details(contact_url):
 
         contact['addresses'].append(
             {'location': 'House of Commons', 'address': hill_address})
-        contact['phone_number'].append(
+        contact['phone_numbers'].append(
             {'location': 'House of Commons', 'number': hill_phone})
 
         # Get constituency contact details. MP may have multiple constituency offices.
@@ -177,7 +175,7 @@ def get_mp_contact_details(contact_url):
             contact['addresses'].append(
                 {'location': office_name, 'address': con_address})
             if con_phone:
-                contact['phone_number'].append(
+                contact['phone_numbers'].append(
                     {'location': office_name, 'number': con_phone})
     except Exception:
         print('An error occurred extracting contact information.')
@@ -236,7 +234,7 @@ def get_mp_fine_details():
         contact = get_mp_contact_details(contact_url)
         mp_df.at[i, 'email'] = contact['email']
         mp_df.at[i, 'addresses'] = contact['addresses']
-        mp_df.at[i, 'phone_number'] = contact['phone_number']
+        mp_df.at[i, 'phone_numbers'] = contact['phone_numbers']
 
         roles_url = f"{row['source_url']}/xml"
         roles = get_mp_role_details(roles_url)
@@ -331,13 +329,13 @@ def get_individual_sen_page_details(sen_page_url):
     Args:
         sen_page_url: URL for a given senator's page
     Returns:
-        sen_details: Senator detail dictionary contacting phone_number,
+        sen_details: Senator detail dictionary contacting phone_numbers,
             email, and committees
     """
     page = scraper_utils.request(sen_page_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    sen_details = {'phone_number': [], 'email': '', 'committees': []}
+    sen_details = {'phone_numbers': [], 'email': '', 'committees': []}
 
     bio_card = soup.find('ul', {'class': 'biography_card_details'})
 
@@ -345,7 +343,7 @@ def get_individual_sen_page_details(sen_page_url):
         'li', {'class': 'biography_card_details_telephone'})
     tele_con.strong.extract()
     telephone = tele_con.get_text().strip()
-    sen_details['phone_number'].append(
+    sen_details['phone_numbers'].append(
         {'number': telephone, 'location': 'Senate'})
 
     email_con = bio_card.find('li', {'class': 'biography_card_details_email'})
@@ -379,7 +377,7 @@ def get_sen_fine_details():
 
     for i, row in sen_df.iterrows():
         sen_details = get_individual_sen_page_details(row['source_url'])
-        sen_df.at[i, 'phone_number'] = sen_details['phone_number']
+        sen_df.at[i, 'phone_numbers'] = sen_details['phone_numbers']
         sen_df.at[i, 'email'] = sen_details['email']
         sen_df.at[i, 'committees'] = sen_details['committees']
 
@@ -420,7 +418,7 @@ if __name__ == '__main__':
 
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
-        scraper_utils.insert_legislator_data_into_db(result.to_dict('records'))
+        scraper_utils.write_data(result.to_dict('records'))
     else:
         print('Either write to database switch set to false or no data collected. No data written to database.')
 

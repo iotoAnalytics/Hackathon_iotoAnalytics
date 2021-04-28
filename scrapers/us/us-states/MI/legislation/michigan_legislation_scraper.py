@@ -7,32 +7,30 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import io
-import requests
-import PyPDF2
-from string import ascii_uppercase
-import re
-import datetime
-from multiprocessing import Pool
-import unidecode
-import datefinder
-from nameparser import HumanName
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import pandas as pd
-import utils
-import unicodedata
-import time
-import argparse
-import gzip
-import numpy as np
-import pickle
-import os
 import json
-
+import pickle
+import numpy as np
+import gzip
+import argparse
+import time
+import unicodedata
+import utils
+import pandas as pd
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
+from string import ascii_uppercase
+import PyPDF2
+import requests
+import io
+from scraper_utils import USStateLegislationScraperUtils
 
 
 state_abbreviation = 'MI'
@@ -55,7 +53,9 @@ def get_bill_info(link):
 
     try:
         uClient = uReq(link)
+
         scraper_utils.crawl_delay(crawl_delay)
+
         page_html = uClient.read()
         uClient.close()
         # # html parsing
@@ -250,36 +250,35 @@ def get_bill_info(link):
                 (doc["href"]).replace("..", "")
             if ".pdf" in doc_link:
                 pdf_link = doc_link
-        try:
-            r = scraper_utils.request(pdf_link)
-            scraper_utils.crawl_delay(crawl_delay)
-            f = io.BytesIO(r.content)
-            reader = PyPDF2.PdfFileReader(f, strict=False)
-            if reader.isEncrypted:
-                reader.decrypt('')
 
-            page_done = 0
-            i = 0
-            while page_done == 0:
-                try:
-                    contents = reader.getPage(i).extractText()
-                    bill_text = bill_text + " " + contents
+                r = scraper_utils.request(pdf_link)
+                scraper_utils.crawl_delay(crawl_delay)
+                f = io.BytesIO(r.content)
+                reader = PyPDF2.PdfFileReader(f, strict=False)
+                if reader.isEncrypted:
+                    reader.decrypt('')
+        # print(pdf_link)
 
-                except:
-                    page_done = 1
-                i = i + 1
-            bill_text = bill_text.replace("\n", "")
-            print(bill_text)
-        except:
-            # print("issue or no pdf")
-            # print(link)
-            pass
+        page_done = 0
+        i = 0
+        while page_done == 0:
+            try:
+                contents = reader.getPage(i).extractText()
+                bill_text = bill_text + " " + contents
+                # print(bill_text)
+
+            except:
+                page_done = 1
+            i = i + 1
+        bill_text = bill_text.replace("\n", "")
+        # print(bill_text)
+
 
     except Exception as ex:
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(ex).__name__, ex.args)
-        print(message)
-        print(link)
+        # print(message)
+        # print(link)
 
     # get goverlytics_id, url
     goverlytics_id = "MI_2019-2020_" + bill_name
@@ -349,7 +348,7 @@ if __name__ == '__main__':
             i += 1
         except:
             failed = 1
-
+    #
     failed = 0
     i = 1
     while failed == 0:
@@ -366,7 +365,7 @@ if __name__ == '__main__':
             i += 1
         except:
             failed = 1
-
+    #
     failed = 0
     i = 0
     while failed == 0:
@@ -423,12 +422,13 @@ if __name__ == '__main__':
     # # #
     big_df['country_id'] = sample_row.country_id
 
+    big_df = scraper_utils.add_topics(big_df)
     print(big_df)
-
+    #
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
