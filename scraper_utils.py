@@ -41,7 +41,6 @@ date collectors.
 # BASE CLASSES
 ##########################################
 
-
 class ScraperUtils:
     """Bases class containing methods universal to all ScraperUtils"""
 
@@ -138,7 +137,6 @@ class ScraperUtils:
         if not self._robots.get(base_url) and auto_add_enabled:
             self.add_robot(base_url)
 
-
     def request(self, url, **kwargs):
         """More polite version of the requests.get function.
         Valid kwargs:
@@ -202,9 +200,9 @@ class ScraperUtils:
             return request_rate
         return DEFAULT_CRAWL_RATE
 
-    def crawl_delay(self, min_seconds):
+    def crawl_delay(self, minimum_seconds):
         """Add delay. Should be called after making request to website so as to not overburden web server."""
-        time.sleep(random.uniform(1, 1.1) * min_seconds)
+        time.sleep(random.uniform(1, 1.1) * minimum_seconds)
 
     def initialize_row(self):
         """Instantiates a Row object filled with default values."""
