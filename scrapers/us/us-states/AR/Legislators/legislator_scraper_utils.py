@@ -40,7 +40,7 @@ class USStateLegislatorRow:
     years_active: List[int] = field(default_factory=list)
     committees: List[dict] = field(default_factory=list)
     areas_served: List[str] = field(default_factory=list)
-    phone_number: List[dict] = field(default_factory=list)
+    phone_numbers: List[dict] = field(default_factory=list)
     addresses: List[dict] = field(default_factory=list)
     email: str = ''
     birthday: datetime = None
@@ -81,7 +81,8 @@ class USStateLegislatorScraperUtils:
                 curs.execute(query)
                 state_results = curs.fetchall()
             except Exception as e:
-                sys.exit(f'An exception occurred retrieving us_parties, countries, us_state_info from database:\n{e}')
+                sys.exit(
+                    f'An exception occurred retrieving us_parties, countries, us_state_info from database:\n{e}')
 
         self.parties = pd.DataFrame(parties_results)
         self.countries = pd.DataFrame(countries_results)
@@ -106,14 +107,17 @@ class USStateLegislatorScraperUtils:
 
         try:
             row.country = self.country
-            row.country_id = int(self.countries.loc[self.countries['country'] == self.country]['id'].values[0])
+            row.country_id = int(
+                self.countries.loc[self.countries['country'] == self.country]['id'].values[0])
             row.state = self.state_abbreviation
             row.state_id = int(
                 self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
         except IndexError:
-            sys.exit('An error occurred inserting state_id and/or country_id. Did you update the config file?')
+            sys.exit(
+                'An error occurred inserting state_id and/or country_id. Did you update the config file?')
         except Exception as e:
-            sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
+            sys.exit(
+                f'An error occurred involving the state_id and/or country_id: {e}')
 
         return row
 
@@ -122,7 +126,8 @@ class USStateLegislatorScraperUtils:
         Used for getting the party ID number.
         """
         try:
-            party_id = int(self.parties.loc[self.parties['party'] == party_name]['id'].values[0])
+            party_id = int(
+                self.parties.loc[self.parties['party'] == party_name]['id'].values[0])
         except IndexError:
             sys.exit(
                 'An error occurred getting party_id.\nParty not found. Has the party been collected, and is it in the correct format?')
@@ -131,13 +136,14 @@ class USStateLegislatorScraperUtils:
 
         return party_id
 
-    def insert_legislator_data_into_db(self, data):
+    def write_data(self, data):
         """
         Takes care of inserting legislator data into database.
         """
 
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows or dictionaries!')
+            raise TypeError(
+                'Data being written to database must be a list of USStateLegislationRows or dictionaries!')
 
         with CursorFromConnectionFromPool() as curs:
             try:
@@ -165,7 +171,7 @@ class USStateLegislatorScraperUtils:
                         years_active int[],
                         committees jsonb,
                         areas_served text[],
-                        phone_number jsonb,
+                        phone_numbers jsonb,
                         addresses jsonb,
                         email text,
                         birthday date,
@@ -182,7 +188,8 @@ class USStateLegislatorScraperUtils:
                 curs.connection.commit()
 
             except Exception as e:
-                print(f'An exception occurred creating {self.database_table_name}:\n{e}')
+                print(
+                    f'An exception occurred creating {self.database_table_name}:\n{e}')
 
             insert_legislator_query = sql.SQL("""
                 WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
@@ -209,7 +216,7 @@ class USStateLegislatorScraperUtils:
                     role = excluded.role,
                     committees = excluded.committees,
                     areas_served = excluded.areas_served,
-                    phone_number = excluded.phone_number,
+                    phone_numbers = excluded.phone_numbers,
                     addresses = excluded.addresses,
                     email = excluded.email,
                     birthday = excluded.birthday,
@@ -232,19 +239,24 @@ class USStateLegislatorScraperUtils:
                                row.name_full, row.name_last, row.name_first, row.name_middle, row.name_suffix,
                                row.country_id, row.country, row.state_id, row.state, row.party_id, row.party,
                                row.role, row.district, row.years_active,
-                               json.dumps(row.committees, default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row.committees, default=USStateLegislatorScraperUtils.__json_serial),
                                row.areas_served,
-                               json.dumps(row.phone_number, default=USStateLegislatorScraperUtils.__json_serial),
-                               json.dumps(row.addresses, default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row.phone_numbers, default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row.addresses, default=USStateLegislatorScraperUtils.__json_serial),
                                row.email, row.birthday, row.seniority,
                                row.occupation,
-                               json.dumps(row.education, default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row.education, default=USStateLegislatorScraperUtils.__json_serial),
                                row.military_experience)
 
                         curs.execute(insert_legislator_query, tup)
 
                     except Exception as e:
-                        print(f'An exception occurred inserting {row.source_url}: {e}')
+                        print(
+                            f'An exception occurred inserting {row.source_url}: {e}')
 
                 elif isinstance(row, dict):
                     try:
@@ -255,15 +267,20 @@ class USStateLegislatorScraperUtils:
                                row['country_id'], row['country'], row['state_id'], row['state'], row['party_id'],
                                row['party'],
                                row['role'], row['district'], row['years_active'],
-                               json.dumps(row['committees'], default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row['committees'], default=USStateLegislatorScraperUtils.__json_serial),
                                row['areas_served'],
-                               json.dumps(row['phone_number'], default=USStateLegislatorScraperUtils.__json_serial),
-                               json.dumps(row['addresses'], default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row['phone_numbers'], default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row['addresses'], default=USStateLegislatorScraperUtils.__json_serial),
                                row['email'], row['birthday'], row['seniority'],
                                row['occupation'],
-                               json.dumps(row['education'], default=USStateLegislatorScraperUtils.__json_serial),
+                               json.dumps(
+                                   row['education'], default=USStateLegislatorScraperUtils.__json_serial),
                                row['military_experience'])
 
                         curs.execute(insert_legislator_query, tup)
                     except Exception as e:
-                        print(f'An exception occurred inserting {row["state_url"]}: {e}')
+                        print(
+                            f'An exception occurred inserting {row["state_url"]}: {e}')

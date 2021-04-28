@@ -18,18 +18,18 @@ sys.path.insert(0, str(p))
 
 sys.path.append("..")
 
-import boto3
-from legislator_scraper_utils import USStateLegislatorScraperUtils
-from bs4 import BeautifulSoup
-import requests
-from multiprocessing import Pool
-from database import Database
-import re
-from datetime import date, datetime
-from nameparser import HumanName
-from pprint import pprint
-import configparser
 
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+from datetime import date, datetime
+import re
+from database import Database
+from multiprocessing import Pool
+import requests
+from bs4 import BeautifulSoup
+from scraper_utils import USStateLegislatorScraperUtils
+import boto3
 
 
 # # Initialize config parser and get variables from config file
@@ -386,7 +386,7 @@ def scrape(url):
     if contact_info_dict['areaserved'] != None:
         row.areas_served = contact_info_dict['areaserved']
     if contact_info_dict['phonenumbers'] != None:
-        row.phone_number = contact_info_dict['phonenumbers']
+        row.phone_numbers = contact_info_dict['phonenumbers']
     if contact_info_dict['email'] != None:
         row.email = contact_info_dict['email']
 
@@ -406,7 +406,7 @@ if __name__ == '__main__':
             data = pool.map(scrape, urls)
         # pprint(data)
         # Once we collect the data, we'll write it to the database.
-        scraper_utils.insert_legislator_data_into_db(data)
+        scraper_utils.write_data(data)
 
     except:
         sys.exit('error\n')

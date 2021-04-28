@@ -16,25 +16,23 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import pdfplumber
-import io
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import pandas as pd
-import request_url
-import requests
+from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-from legislation_scraper_utils import USStateLegislationScraperUtils
-
-
+import requests
+import request_url
+import pandas as pd
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import io
+import pdfplumber
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
 
 # # Initialize config parser and get variables from config file
 # configParser = configparser.RawConfigParser()
@@ -140,7 +138,8 @@ def get_actions(soup):
 
 def get_billtext(pdf_link):
     try:
-        response = requests.get(pdf_link, stream=True, headers=scraper_utils.request_headers)
+        response = requests.get(pdf_link, stream=True,
+                                headers=scraper_utils.request_headers)
         pdf = pdfplumber.open(io.BytesIO(response.content))
         bill_txt = ''
         for _ in range(0, len(pdf.pages)):
@@ -283,6 +282,6 @@ if __name__ == '__main__':
         data = pool.map(scrape, bill_lst)
 
     print('done scraping!')
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

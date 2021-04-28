@@ -16,32 +16,32 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from sklearn import linear_model
-from joblib import dump, load
-from nltk.stem import WordNetLemmatizer
-from nltk.corpus import wordnet as wn
-from nltk.corpus import stopwords
-import nltk
-import io
-import requests
-import PyPDF2
-import unidecode
-import datefinder
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-import pandas as pd
 from multiprocessing import Pool
+import pandas as pd
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from scraper_utils import USStateLegislationScraperUtils
+import datefinder
+import unidecode
+import PyPDF2
+import requests
+import io
+import nltk
+from nltk.corpus import stopwords
+from nltk.corpus import wordnet as wn
+from nltk.stem import WordNetLemmatizer
+from joblib import dump, load
+from sklearn import linear_model
 
 
 
@@ -235,7 +235,7 @@ def collect_vote_info(link):
 
     vote_data = {'date': date, 'description': description, 'yea': yea, 'nay': nay, 'nv': nv, 'absent': absent,
                  'total': total, 'passed': passed, 'chamber': chamber, 'votes': votes}
-    # print(vote_data)
+    print(vote_data)
     return vote_data
 
 
@@ -275,17 +275,13 @@ def collect_bill_details(bill_url):
 
     typetext = page_soup.find(
         "div", {"class": "col-12 col-sm-6 h2 text-center order-sm-2"})
-    try:
-        if "Bill" in typetext.text:
-            bill_type = "Bill"
-        elif "Resolution" in typetext.text:
-            bill_type = "Resolution"
-        else:
-            bill_type = "Other"
-
-    except:
+    if "Bill" in typetext.text:
+        bill_type = "Bill"
+    elif "Resolution" in typetext.text:
+        bill_type = "Resolution"
+    else:
         bill_type = "Other"
-        print(bill_url)
+
     # find sponsors and principal sponsor
     sponsorsdiv = page_soup.findAll(
         "div", {"class": "col-8 col-sm-9 col-xl-10 text-left pad-row"})
@@ -373,75 +369,66 @@ def collect_bill_details(bill_url):
 
     # get actions
     actions = []
-    try:
-        cardbody = page_soup.findAll("div", {"class": "card-body"})
-        cb = cardbody[0]
+    cardbody = page_soup.findAll("div", {"class": "card-body"})
+    cb = cardbody[0]
 
-        for cb in cardbody:
-            rows = (cb.findAll("div", {"class": "row"}))
-            row = rows[0]
+    for cb in cardbody:
+        rows = (cb.findAll("div", {"class": "row"}))
+        row = rows[0]
 
-            for row in rows:
+        for row in rows:
 
-                try:
-                    date = row.find("div", {"class": "col-7 col-md-2 pr-0"}).text
-                    d = datetime.datetime.strptime(
-                        date, "%m/%d/%Y").strftime("%Y-%m-%d")
+            try:
+                date = row.find("div", {"class": "col-7 col-md-2 pr-0"}).text
+                d = datetime.datetime.strptime(
+                    date, "%m/%d/%Y").strftime("%Y-%m-%d")
 
-                    chamber = row.find(
-                        "div", {"class": "col-7 col-md-1 col-lg-2 pr-0 text-nowrap"}).text
-                    description = row.find(
-                        "div", {"class": "col-7 col-md-4 col-lg-3 pr-0"}).text
+                chamber = row.find(
+                    "div", {"class": "col-7 col-md-1 col-lg-2 pr-0 text-nowrap"}).text
+                description = row.find(
+                    "div", {"class": "col-7 col-md-4 col-lg-3 pr-0"}).text
 
-                    action = {'date': d, 'action_by': chamber,
-                              'description': description}
-                    actions.append(action)
+                action = {'date': d, 'action_by': chamber,
+                          'description': description}
+                actions.append(action)
 
-                    # get vote url, and vote data
-                    voteData = row.find(
-                        "div", {"class": "col-7 col-md-2 order-2 order-md-0 pr-0"})
-                    voteLink = voteData.a["href"]
-                    voteLink = "https://www.ncleg.gov/" + voteLink
+                # get vote url, and vote data
+                voteData = row.find(
+                    "div", {"class": "col-7 col-md-2 order-2 order-md-0 pr-0"})
+                voteLink = voteData.a["href"]
+                voteLink = "https://www.ncleg.gov/" + voteLink
 
-                    vote_data = collect_vote_info(voteLink)
+                vote_data = collect_vote_info(voteLink)
 
-                    votes.append(vote_data)
+                votes.append(vote_data)
 
-                except Exception as ex:
+            except Exception as ex:
 
-                    template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-                    message = template.format(type(ex).__name__, ex.args)
-                    # print(message)
-    except:
-        print(bill_url)
+                template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+                message = template.format(type(ex).__name__, ex.args)
+                # print(message)
 
     # get key words
 
     keywordsdiv = page_soup.findAll(
         "div", {"class": "col-8 col-sm-9 col-xl-10 text-left scroll-column"})
-    site_topic = ""
-    try:
-        site_topic = keywordsdiv[1].text
-    except:
-        pass
-    try:
-        r = scraper_utils.request(bill_link)
-        scraper_utils.crawl_delay(crawl_delay)
-        f = io.BytesIO(r.content)
-        reader = PyPDF2.PdfFileReader(f)
+    site_topic = keywordsdiv[1].text
 
-        page_done = 0
-        i = 0
-        while page_done == 0:
-            try:
-                contents = reader.getPage(i).extractText()
-                bill_text = bill_text + " " + contents
+    r = scraper_utils.request(bill_link)
+    scraper_utils.crawl_delay(crawl_delay)
+    f = io.BytesIO(r.content)
+    reader = PyPDF2.PdfFileReader(f)
 
-            except:
-                page_done = 1
-            i = i + 1
-    except:
-        pass
+    page_done = 0
+    i = 0
+    while page_done == 0:
+        try:
+            contents = reader.getPage(i).extractText()
+            bill_text = bill_text + " " + contents
+
+        except:
+            page_done = 1
+        i = i + 1
     bill_text = bill_text.replace("\n", "")
     # print(bill_text)
 
@@ -467,7 +454,6 @@ def collect_bill_details(bill_url):
               'site_topic': site_topic, 'votes': votes, 'committees': [], 'cosponsors': [], 'cosponsors_id': [],
               'topic': "", 'bill_text': bill_text, 'bill_description': bill_description, 'bill_summary': bill_summary,
               'country_id': scraper_utils.country_id, 'country': scraper_utils.country}
-    # print(bill_d)
 
     return bill_d
 #
@@ -505,20 +491,17 @@ if __name__ == '__main__':
     # this is only 50 urls right now?
     billinfos = collect_bill_urls(
         'https://www.ncleg.gov/Legislation/Bills/ByKeyword/2021/All')
-    # billinfos = billinfos[1200:]
-
-    smalldf = pd.DataFrame(billinfos)
+    # billinfos = billinfos[:100]
+    smalldf = pd.DataFrame(billinfos[:10])
 
     # print(billinfos)
     links = [d['source_url'] for d in billinfos]
-    print(links)
-
-    # lessLinks = links[:10]
+    lessLinks = links[:10]
     link = links[0]
 
     with Pool() as pool:
         # #
-        bill_data = pool.map(func=collect_bill_details, iterable=links)
+        bill_data = pool.map(func=collect_bill_details, iterable=lessLinks)
     # #
     maindf = pd.DataFrame(bill_data)
 
@@ -535,13 +518,11 @@ if __name__ == '__main__':
     big_df['source_id'] = ""
     # big_df = add_topics(big_df)
     # big_df = topics.add_topics(big_df)
-    big_df = scraper_utils.add_topics(big_df)
-    big_df['source_topic'] = big_df['site_topic']
     print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

@@ -16,19 +16,20 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils
-from bs4 import BeautifulSoup
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from nameparser import HumanName
-import re
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-from pprint import pprint
-import datetime
 import boto3
+import datetime
+from pprint import pprint
+from urllib.parse import parse_qs
+import urllib.parse as urlparse
+import re
+from nameparser import HumanName
+import configparser
+from database import Database
+from multiprocessing import Pool
+import requests
+from bs4 import BeautifulSoup
+from scraper_utils import USStateLegislationScraperUtils
+
 
 
 state_abbreviation = 'IL'
@@ -242,6 +243,6 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

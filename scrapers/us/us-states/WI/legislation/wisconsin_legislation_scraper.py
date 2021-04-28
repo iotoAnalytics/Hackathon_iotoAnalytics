@@ -12,29 +12,28 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import io
-import requests
-import PyPDF2
-import unidecode
-import datefinder
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import boto3
-import datetime
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-import pandas as pd
-from multiprocessing import Pool
 import numpy as np
-
+from multiprocessing import Pool
+import pandas as pd
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import urllib.parse as urlparse
+from urllib.parse import parse_qs
+import datetime
+import boto3
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from scraper_utils import USStateLegislationScraperUtils
+import datefinder
+import unidecode
+import PyPDF2
+import requests
+import io
 
 # from selenium import webdriver
 
@@ -49,7 +48,8 @@ legislator_table_name = 'us_wi_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
-crawl_delay = scraper_utils.get_crawl_delay('https://docs.legis.wisconsin.gov/')
+crawl_delay = scraper_utils.get_crawl_delay(
+    'https://docs.legis.wisconsin.gov/')
 
 
 def get_assembly_bills(myurl):
@@ -322,6 +322,6 @@ if __name__ == '__main__':
     # print(big_list_of_dicts)
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

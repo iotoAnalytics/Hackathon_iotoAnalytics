@@ -11,17 +11,15 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-
-import time
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-from database import Database
-from multiprocessing import Pool
-import requests
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import requests
+from multiprocessing import Pool
+from database import Database
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
 import time
 
 
@@ -57,37 +55,11 @@ def get_urls():
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
-    state, and state_id values, as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
-
+    # Send request to website
+    page = scraper_utils.request(url)
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row.
-    row.source_url = url
-
-    # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
-    # the party name from the website, then get the party_id from scraper_utils
-    # This can be done like so:
-
-    # Replace with your logic to collect party for legislator.
-    # Must be full party name. Ie: Democrat, Republican, etc.
-    party = 'Republican'
-    row.party_id = scraper_utils.get_party_id(party)
-    row.party = party
-
-    # Other than that, you can replace this statement with the rest of your scraper logic.
+    # ... Collect data from page
 
     # Delay so we don't overburden web servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -106,7 +78,6 @@ if __name__ == '__main__':
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database:
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
-

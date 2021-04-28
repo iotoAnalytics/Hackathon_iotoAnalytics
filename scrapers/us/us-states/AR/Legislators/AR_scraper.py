@@ -20,19 +20,18 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import pandas as pd
-import requests
-import boto3
-import re
-import datetime
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing.dummy import Pool
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
-
+from multiprocessing.dummy import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import datetime
+import re
+import boto3
+import requests
+import pandas as pd
 
 
 # Initialize config parser and get variables from config file
@@ -258,7 +257,7 @@ def scrape(urls):
         data = data.strip()
 
         if label == 'Phone:':
-            row.phone_number.append({'district office': data.replace(
+            row.phone_numbers.append({'district office': data.replace(
                 '(', '').replace(')', '').replace(' ', '-')})
 
         elif label == 'Email:':
@@ -339,7 +338,7 @@ if __name__ == '__main__':
         # pprint(data)
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
 

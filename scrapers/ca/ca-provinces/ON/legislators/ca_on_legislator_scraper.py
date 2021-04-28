@@ -1,3 +1,13 @@
+import sys
+import os
+from pathlib import Path
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 from datetime import datetime
 import numpy as np
 import re
@@ -14,15 +24,6 @@ from urllib.request import Request
 from urllib.request import urlopen as uReq
 import bs4
 import pandas as pd
-import sys
-import os
-from pathlib import Path
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('ON', 'ca_on_legislators')
@@ -146,7 +147,7 @@ def scrape(diction):
     except:
         row.party_id = 0
     row.addresses = info[2]
-    row.phone_number = info[3]
+    row.phone_numbers = info[3]
     row.years_active = info[4]
     row.most_recent_term_id = info[5]
 
@@ -185,5 +186,5 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, dict_lst)
     print('done collecting data')
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
     print('complete!')

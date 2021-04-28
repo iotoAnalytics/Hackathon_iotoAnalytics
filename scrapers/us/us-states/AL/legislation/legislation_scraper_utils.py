@@ -17,6 +17,7 @@ that occur with data collection. These can be used with your legislation
 date collectors.
 """
 
+
 @dataclass
 class USStateLegislationRow:
     """
@@ -33,7 +34,7 @@ class USStateLegislationRow:
     committees: List[dict] = field(default_factory=list)
     state_id: int = 0
     state: str = ''
-    bill_type: str =  ''
+    bill_type: str = ''
     bill_title: str = ''
     current_status: str = ''
     principal_sponsor_id: int = None
@@ -43,8 +44,8 @@ class USStateLegislationRow:
     cosponsors: List[str] = field(default_factory=list)
     cosponsors_id: List[int] = field(default_factory=list)
     bill_text: str = ''
-    bill_description: str =''
-    bill_summary:str = ''
+    bill_description: str = ''
+    bill_summary: str = ''
     actions: List[dict] = field(default_factory=list)
     votes: List[dict] = field(default_factory=list)
     site_topic: str = ''
@@ -55,6 +56,7 @@ class USStateLegislationScraperUtils:
     """
     Utilities to help with collecting and storing legislation data.
     """
+
     def __init__(self, state_abbreviation, database_table_name, legislator_table_name):
         """
         The state_abbreviation, database_table_name, and legislator_table_name come from
@@ -64,7 +66,7 @@ class USStateLegislationScraperUtils:
         self.state_abbreviation = state_abbreviation
         self.database_table_name = database_table_name
         self.legislator_table_name = legislator_table_name
-        
+
         with CursorFromConnectionFromPool() as curs:
             try:
                 query = 'SELECT state_no, state_name, abbreviation FROM us_state_info'
@@ -81,7 +83,6 @@ class USStateLegislationScraperUtils:
         self.states = pd.DataFrame(state_results)
         self.legislators = pd.DataFrame(legislator_results)
 
-    
     def __json_serial(self, obj):
         """
         Serializes date/datetime object. This is used to convert date and datetime objects to
@@ -102,30 +103,33 @@ class USStateLegislationScraperUtils:
         except ValueError:
             pass
         return value
-    
+
     def initialize_row(self) -> USStateLegislationRow:
         '''
         Factory method for creating a legislation row. This gets sent back to the scrape() function
         which then gets filled in with values collected from the website.
         '''
         row = USStateLegislationRow()
-        
+
         try:
             row.state = self.state_abbreviation
-            row.state_id = int(self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
+            row.state_id = int(
+                self.states.loc[self.states['abbreviation'] == self.state_abbreviation]['state_no'].values[0])
         except IndexError:
-            sys.exit('An error occurred inserting state_id. Has the config file been updated?')
+            sys.exit(
+                'An error occurred inserting state_id. Has the config file been updated?')
         except Exception as e:
-            sys.exit(f'An error occurred involving the state_id and/or country_id: {e}')
+            sys.exit(
+                f'An error occurred involving the state_id and/or country_id: {e}')
         return row
-    
-    
-    def insert_legislation_data_into_db(self, data : List[USStateLegislationRow]) -> None:
+
+    def write_data(self, data: List[USStateLegislationRow]) -> None:
         """
         Takes care of inserting legislation data into database.
         """
         if not isinstance(data, list):
-            raise TypeError('Data being written to database must be a list of USStateLegislationRows!')
+            raise TypeError(
+                'Data being written to database must be a list of USStateLegislationRows!')
         with CursorFromConnectionFromPool() as curs:
             try:
                 create_table_query = sql.SQL("""
@@ -163,7 +167,8 @@ class USStateLegislationScraperUtils:
                     """).format(table=sql.Identifier(self.database_table_name))
                 curs.execute(create_table_query)
             except Exception as e:
-                print(f'An exception occurred creating {self.database_table_name}:\n{e}')
+                print(
+                    f'An exception occurred creating {self.database_table_name}:\n{e}')
             insert_legislator_query = sql.SQL("""
                 INSERT INTO {table}
                 VALUES (
@@ -202,24 +207,27 @@ class USStateLegislationScraperUtils:
             for row in data:
                 try:
                     tup = (row.goverlytics_id, row.bill_state_id, date_collected, row.bill_name,
-                    row.session, row.date_introduced, row.source_url, row.url, row.chamber_origin,
-                    json.dumps(row.committees, default=USStateLegislationScraperUtils.__json_serial),
-                    row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
-                    row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                    row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                    json.dumps(row.actions, default=USStateLegislationScraperUtils.__json_serial),
-                    json.dumps(row.votes, default=USStateLegislationScraperUtils.__json_serial),
-                    row.source_topic, row.topic)
-                
+                           row.session, row.date_introduced, row.source_url, row.url, row.chamber_origin,
+                           json.dumps(
+                               row.committees, default=USStateLegislationScraperUtils.__json_serial),
+                           row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
+                           row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
+                           row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
+                           json.dumps(
+                               row.actions, default=USStateLegislationScraperUtils.__json_serial),
+                           json.dumps(
+                               row.votes, default=USStateLegislationScraperUtils.__json_serial),
+                           row.source_topic, row.topic)
+
                     curs.execute(insert_legislator_query, tup)
                 except Exception as e:
-                    print(f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-    
+                    print(
+                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+
     def search_for_legislators(self, **kwargs) -> pd.DataFrame:
         """
         Returns a dataframe containing search results based on kwargs.
         """
-
 
         query_lst = []
         for k, v in kwargs.items():
@@ -230,7 +238,8 @@ class USStateLegislationScraperUtils:
             elif isinstance(v, str):
                 q = f'{k}=="{v}"'
             else:
-                print(f'Unable to use {k}: {v} as search parameter. Must search by either a text or int column.')
+                print(
+                    f'Unable to use {k}: {v} as search parameter. Must search by either a text or int column.')
                 continue
             query_lst.append(q)
         query = ' & '.join(query_lst)
@@ -265,6 +274,7 @@ class USStateLegislationScraperUtils:
             return self.__convert_to_int(df.iloc[0]['goverlytics_id'])
         else:
             return None
+
     def legislators_search_startswith(self, column_val_to_return, column_to_search, startswith, **kwargs):
         """
         Utilizes panda's .startswith method for finding information about legislators. Useful for finding
@@ -277,16 +287,14 @@ class USStateLegislationScraperUtils:
         startswith = self.__convert_to_int(startswith)
         if df is not None:
             try:
-                val = df.loc[df[column_to_search].str.startswith(startswith)][column_val_to_return].values[0]
+                val = df.loc[df[column_to_search].str.startswith(
+                    startswith)][column_val_to_return].values[0]
             except IndexError:
-                print(f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
+                print(
+                    f"Unable to find '{column_val_to_return}' using these search parameters: {column_to_search} : {startswith}")
             except KeyError:
-                print(f"'{column_to_search}' is not a valid column name in the legislator data frame!")
+                print(
+                    f"'{column_to_search}' is not a valid column name in the legislator data frame!")
         if isinstance(val, numpy.int64):
             val = int(val)
         return val
-    
-    
-  
-  
-

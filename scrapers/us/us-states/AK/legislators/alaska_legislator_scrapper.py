@@ -16,15 +16,15 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from pprint import pprint
-import re
-from database import Database
-from multiprocessing import Pool
-import request_url
-import requests
-from bs4 import BeautifulSoup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
 import pandas as pd
+from scraper_utils import USStateLegislatorScraperUtils
+from bs4 import BeautifulSoup
+import requests
+import request_url
+from multiprocessing import Pool
+from database import Database
+import re
+from pprint import pprint
 
 
 state_abbreviation = 'AK'
@@ -352,7 +352,7 @@ def scrape_gov(data_dict):
     row.source_url = data_dict['URL']
     row.role = data_dict['Role']
 
-    row.phone_number = find_phone(url)
+    row.phone_numbers = find_phone(url)
     row.committees = find_com(url)
     row.years_active = find_years(url)
 
@@ -382,6 +382,6 @@ if __name__ == '__main__':
         data = pool.map(scrape_gov, dict_lst)
         print('done scraping!')
 
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

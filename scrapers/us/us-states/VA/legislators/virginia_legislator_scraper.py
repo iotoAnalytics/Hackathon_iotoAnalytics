@@ -7,29 +7,30 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import re
-import datetime
-from multiprocessing import Pool
-import unidecode
-import datefinder
-import requests
-from nameparser import HumanName
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import urlopen as uReq
-import bs4
-import pandas as pd
-import time
-import argparse
-import gzip
-import numpy as np
+from scraper_utils import USStateLegislatorScraperUtils
 import pickle
-from legislator_scraper_utils import USStateLegislatorScraperUtils
+import numpy as np
+import gzip
+import argparse
+import time
+import pandas as pd
+import bs4
+from urllib.request import urlopen as uReq
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import requests
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
 
 
 
 scraper_utils = USStateLegislatorScraperUtils('VA', 'us_va_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('https://virginiageneralassembly.gov')
+crawl_delay = scraper_utils.get_crawl_delay(
+    'https://virginiageneralassembly.gov')
 
 
 def get_delegate_links(myurl):
@@ -69,15 +70,15 @@ def get_delegate_links(myurl):
         capitol_phone = capitol_phone.replace(") ", "-")
         district_phone = person_td[5].text.replace("(", "")
         district_phone = district_phone.replace(") ", "-")
-        phone_number = [{'office': 'capitol office', 'number': capitol_phone},
-                        {'office': 'district office', 'number': district_phone}]
+        phone_numbers = [{'office': 'capitol office', 'number': capitol_phone},
+                         {'office': 'district office', 'number': district_phone}]
 
         email = person_td[6].text
 
         if "Vacant" not in name_full:
             person_info = {'state_url': person_link, 'state_member_id': member_id, 'name_full': name_full,
                            'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle,
-                           'name_suffix': hn.suffix, 'phone_number': phone_number, 'email': email,
+                           'name_suffix': hn.suffix, 'phone_numbers': phone_numbers, 'email': email,
                            'party': party, 'party_id': party_id, 'district': district}
             delegate_infos.append(person_info)
 
@@ -368,17 +369,17 @@ def find_senate_bio_links(myurl):
         district_number = other_infos[4].text.replace("(", "")
         district_number = district_number.replace("( ", "-")
 
-        phone_number = []
+        phone_numbers = []
         pn_info = {'office': 'Pocahontas Building',
                    'number': pocahontas_number}
-        phone_number.append(pn_info)
+        phone_numbers.append(pn_info)
         dn_info = {'office': "District Office", 'number': district_number}
-        phone_number.append(pn_info)
+        phone_numbers.append(pn_info)
 
         person_info = {'state_url': state_url, 'state_member_id': state_member_id, 'name_full': name_full,
                        'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle,
                        'name_suffix': hn.suffix, 'district': district, 'party': party, 'party_id': party_id,
-                       'phone_number': phone_number}
+                       'phone_numbers': phone_numbers}
         # print(person_info)
         senate_infos.append(person_info)
 
@@ -774,6 +775,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

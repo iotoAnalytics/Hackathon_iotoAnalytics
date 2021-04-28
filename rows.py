@@ -100,7 +100,7 @@ class LegislatorRow:
     role: str = ''
     years_active: List[int] = field(default_factory=list)
     committees: List[dict] = field(default_factory=list)
-    phone_number: List[dict] = field(default_factory=list)
+    phone_numbers: List[dict] = field(default_factory=list)
     addresses: List[dict] = field(default_factory=list)
     email: str = ''
     birthday: datetime = None

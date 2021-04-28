@@ -16,17 +16,16 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import time
-from multiprocessing import Pool
-import pandas as pd
-import request_url
-from bs4 import BeautifulSoup
-import requests
-import re
-import configparser
+from scraper_utils import USStateLegislationScraperUtils
 from database import Database
-from legislation_scraper_utils import USStateLegislationScraperUtils
-
+import configparser
+import re
+import requests
+from bs4 import BeautifulSoup
+import request_url
+import pandas as pd
+from multiprocessing import Pool
+import time
 
 
 header = {
@@ -45,6 +44,7 @@ scraper_utils = USStateLegislationScraperUtils(
 
 base_url = 'http://www.akleg.gov/basis/Home/BillsandLaws'
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
 
 def past_terms_url(url):
     url_request = request_url.UrlRequest.make_request(url, header)
@@ -259,6 +259,6 @@ if __name__ == '__main__':
     print('done scrapping')
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.insert_legislation_data_into_db(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

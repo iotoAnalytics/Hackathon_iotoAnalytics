@@ -17,7 +17,7 @@ from datetime import datetime
 import sys
 import os
 from pathlib import Path
-from legislator_scraper_utils import CAProvTerrLegislatorScraperUtils
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
@@ -112,7 +112,7 @@ def scrape(info_dict):
     row.riding = url_riding
     row.addresses = addresses
     row.email = email
-    row.phone_number = phone
+    row.phone_numbers = phone
     row.source_url = url
     for item in info_dict['wiki_list']:
         if name_first in item and name_last in item:
@@ -136,5 +136,5 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, info_dict)
     print('Done Scraping!')
-    scraper_utils.insert_legislator_data_into_db(data)
+    scraper_utils.write_data(data)
     print('Complete!')

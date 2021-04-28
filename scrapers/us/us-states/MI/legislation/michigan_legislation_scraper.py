@@ -7,32 +7,30 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils
-import io
-import requests
-import PyPDF2
-from string import ascii_uppercase
-import re
-import datetime
-from multiprocessing import Pool
-import unidecode
-import datefinder
-from nameparser import HumanName
-import psycopg2
-from bs4 import BeautifulSoup as soup
-from urllib.request import Request
-from urllib.request import urlopen as uReq
-import pandas as pd
-import utils
-import unicodedata
-import time
-import argparse
-import gzip
-import numpy as np
-import pickle
-import os
 import json
-
+import pickle
+import numpy as np
+import gzip
+import argparse
+import time
+import unicodedata
+import utils
+import pandas as pd
+from urllib.request import urlopen as uReq
+from urllib.request import Request
+from bs4 import BeautifulSoup as soup
+import psycopg2
+from nameparser import HumanName
+import datefinder
+import unidecode
+from multiprocessing import Pool
+import datetime
+import re
+from string import ascii_uppercase
+import PyPDF2
+import requests
+import io
+from scraper_utils import USStateLegislationScraperUtils
 
 
 state_abbreviation = 'MI'
@@ -431,6 +429,6 @@ if __name__ == '__main__':
     # print(big_list_of_dicts)
 
     print('Writing data to database...')
-    scraper_utils.insert_legislation_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

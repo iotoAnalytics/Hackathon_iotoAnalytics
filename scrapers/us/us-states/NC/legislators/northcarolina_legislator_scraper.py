@@ -16,29 +16,28 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import json
-from datetime import datetime
-from psycopg2 import sql
-from functools import partial
-import unidecode
-import datefinder
-import psycopg2
-from urllib.request import urlopen as uReq
-import pandas as pd
-import time
-import argparse
-import numpy as np
-import boto3
-import re
-from nameparser import HumanName
-from pprint import pprint
-import configparser
-from database import Database
-from multiprocessing import Pool
-import requests
+from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup as soup
-from legislator_scraper_utils import USStateLegislatorScraperUtils
-
+import requests
+from multiprocessing import Pool
+from database import Database
+import configparser
+from pprint import pprint
+from nameparser import HumanName
+import re
+import boto3
+import numpy as np
+import argparse
+import time
+import pandas as pd
+from urllib.request import urlopen as uReq
+import psycopg2
+import datefinder
+import unidecode
+from functools import partial
+from psycopg2 import sql
+from datetime import datetime
+import json
 
 
 # # Initialize config parser and get variables from config file
@@ -467,16 +466,16 @@ def collect_legislator_details(biographyUrl):
     if last.text.replace("-", "").replace(" ", "").isnumeric():
         # implies that it's a phone number
 
-        phone_number = last.text
+        phone_numbers = last.text
         regions.remove(last)
         if role == "Representative":
             office = ""
-            phone = {'office': office, 'number': phone_number}
+            phone = {'office': office, 'number': phone_numbers}
             phones.append(phone)
 
     else:
         # if no phone number
-        phone_number = ""
+        phone_numbers = ""
 
     try:
         rightPhoneDiv = page_soup.find(
@@ -581,7 +580,7 @@ def collect_legislator_details(biographyUrl):
     legDict = {'source_url': biographyUrl, 'name_full': fullname, 'name_first': name_first, 'name_last': hn.last,
                'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party, 'party_id': party_id,
                'district': district,
-               'role': role, 'areas_served': areas_served, 'phone_number': phones,
+               'role': role, 'areas_served': areas_served, 'phone_numbers': phones,
                'occupation': occupation, 'email': email, 'military_experience': military_experience,
                'addresses': addresses, 'committees': committees, 'most_recent_term_id': session}
 
@@ -695,6 +694,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    scraper_utils.insert_legislator_data_into_db(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
