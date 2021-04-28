@@ -2,7 +2,7 @@ from urllib.parse import urlparse
 
 class NoRobotsConfiguredException(Exception):
     def __init__(self, func, url, robot_urls):
-        msg = f'Cannot run {func.__name__} for the given url: {url}. Robots must first be configured for the given url.\nThe following urls are configured: {robot_urls}'
+        msg = f"Cannot run '{func.__name__}' for the given url: {url}. Robots must first be configured for the given url.\nThe following urls are configured: {robot_urls}"
         super().__init__(msg)
 
 
