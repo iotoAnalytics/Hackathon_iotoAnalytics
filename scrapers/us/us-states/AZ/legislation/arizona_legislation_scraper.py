@@ -7,7 +7,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-from legislation_scraper_utils import USStateLegislationScraperUtils
+
 import xml.etree.ElementTree as ET
 import io
 import PyPDF2
@@ -47,8 +47,6 @@ import gzip
 import argparse
 import time
 import unicodedata
-import matplotlib.pyplot as plt
-from numpy.linalg import norm
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -89,7 +87,7 @@ crawl_delay = scraper_utils.get_crawl_delay('https://apps.azleg.gov')
 
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
-driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
                           chrome_options=chrome_options)
 print("driver found")
 wait = WebDriverWait(driver, 10)
@@ -208,7 +206,7 @@ def collect_bill_data(myurl):
 
     html = driver.page_source
     bill_soup = soup(html, 'html.parser')
-    print(bill_soup)
+
 
     bill_title = ""
     try:
@@ -291,7 +289,7 @@ def collect_bill_data(myurl):
                                      'total': total, 'passed': passed, 'chamber': chamber, 'votes': []}
                         votes.append(vote_info)
                     else:
-                        print(len(vote_info))
+                      pass
 
     except:
         pass
@@ -372,7 +370,7 @@ def collect_bill_texts(bill_id):
                 page_done = 1
             i = i + 1
         bill_text = bill_text.replace("\n", "")
-        print(bill_text)
+
     except:
         # print("issue or no pdf")
         # print(link)
@@ -513,9 +511,10 @@ if __name__ == '__main__':
     links_name_df = pd.DataFrame(bill_info)
     # print(links_name_df)
     links = links_name_df["source_url"]
+    print(len(links))
     bill_ids = links_name_df['source_id']
-    # lesslinks = links[:50]
-    # lessids = bill_ids[:50]
+    # lesslinks = links[:10]
+    # lessids = bill_ids[:10]
 
     #
     with Pool() as pool:
@@ -540,7 +539,7 @@ if __name__ == '__main__':
     #
     # big_df = topics.add_topics(bill_df)
     print(bill_df)
-    bill_df = scraper_utils.add_topics(bill_df)
+
 
     big_list_of_dicts = bill_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")

@@ -810,11 +810,13 @@ class LegislationScraperUtils(ScraperUtils):
             pred_label = (possible_labels[np.argmax(pred)])
             # print(pred_label)
 
-            df['topic'][i] = pred_label
+            # df['topic'][i] = pred_label
+            df.loc[i, 'topic'] = pred_label
             #
             i = i + 1
 
         df = df.drop(columns=['label'])
+        print(df)
         dicts = df.to_dict('records')
 
         return dicts

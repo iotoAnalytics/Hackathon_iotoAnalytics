@@ -504,7 +504,7 @@ if __name__ == '__main__':
     # this is only 50 urls right now?
     billinfos = collect_bill_urls(
         'https://www.ncleg.gov/Legislation/Bills/ByKeyword/2021/All')
-
+    # billinfos = billinfos[:10]
     smalldf = pd.DataFrame(billinfos)
 
     # print(billinfos)
