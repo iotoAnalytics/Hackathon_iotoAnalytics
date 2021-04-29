@@ -802,13 +802,13 @@ class LegislationScraperUtils(ScraperUtils):
         i = 0
 
         for pred in predictions:
-            print('text:')
+            # print('text:')
             txt = eval_texts[i]
             # txt = df.loc[['text'], [i]]
-            print(txt)
-            print("predicted label:")
+            # print(txt)
+            # print("predicted label:")
             pred_label = (possible_labels[np.argmax(pred)])
-            print(pred_label)
+            # print(pred_label)
 
             df['topic'][i] = pred_label
             #
