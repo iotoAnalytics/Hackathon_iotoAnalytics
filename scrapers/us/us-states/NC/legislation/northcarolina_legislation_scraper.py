@@ -530,8 +530,7 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     big_df = big_df.drop(['psurl'], axis=1)
     big_df['source_id'] = ""
-    # big_df = add_topics(big_df)
-    # big_df = topics.add_topics(big_df)
+
     print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
