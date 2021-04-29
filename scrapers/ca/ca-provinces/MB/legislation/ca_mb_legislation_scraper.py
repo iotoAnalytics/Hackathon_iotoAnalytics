@@ -170,19 +170,16 @@ def collect_bill_data(info):
 if __name__ == '__main__':
     bills_main = 'https://web2.gov.mb.ca/bills/42-3/index.php'
     bill_infos = scrape_bill_links(bills_main)
+    print(len(bill_infos))
     less_infos = bill_infos[:70]
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     with Pool() as pool:
         data = pool.map(func=collect_bill_data, iterable=bill_infos)
-    bill_df = pd.DataFrame(data)
-    bill_df = scraper_utils.add_topics(bill_df)
-    print(bill_df)
 
-    big_list_of_dicts = bill_df.to_dict('records')
-    print(*big_list_of_dicts, sep="\n")
+
 
     print('Writing data to database...')
-    scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(data)
 
     print('Complete!')

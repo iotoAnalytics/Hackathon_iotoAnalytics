@@ -422,7 +422,7 @@ if __name__ == '__main__':
     # # #
     big_df['country_id'] = sample_row.country_id
 
-    big_df = scraper_utils.add_topics(big_df)
+    # big_df = scraper_utils.add_topics(big_df)
     print(big_df)
     #
     big_list_of_dicts = big_df.to_dict('records')
