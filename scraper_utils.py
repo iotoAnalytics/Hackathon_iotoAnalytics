@@ -695,8 +695,8 @@ class LegislationScraperUtils(ScraperUtils):
             val = int(val)
         return val
 
-
-    def add_topics(self, df):
+    def add_topics(self, list_of_dicts):
+        df = pd.DataFrame(list_of_dicts)
         """
           Pulls a model from an S3 bucket as a temporary file
           Uses the model to classify the bill text
@@ -717,13 +717,13 @@ class LegislationScraperUtils(ScraperUtils):
 
         df = pd.DataFrame(df)
 
-        possible_labels = ['government operations', 'health', 'education', 'macroeconomics', 'informal',
+        possible_labels = ['government operations', 'health', 'education', 'macroeconomics', '',
                            'international affairs', 'civil rights', 'social welfare', 'public lands',
                            'defense', 'domestic commerce', 'law and crime', 'culture', 'transportation',
                            'environment', 'labor', 'housing', 'technology', 'immigration', 'energy',
                            'agriculture', 'foreign trade']
 
-        label_dict = {'government operations': 0, 'health': 1, 'education': 2, 'macroeconomics': 3, 'informal': 4,
+        label_dict = {'government operations': 0, 'health': 1, 'education': 2, 'macroeconomics': 3, '': 4,
                       'international affairs': 5, 'civil rights': 6, 'social welfare': 7, 'public lands': 8,
                       'defense': 9,
                       'domestic commerce': 10, 'law and crime': 11, 'culture': 12, 'transportation': 13,
@@ -734,7 +734,7 @@ class LegislationScraperUtils(ScraperUtils):
             label_dict[possible_label] = index
 
         # default initial value
-        df = df.assign(topic="informal")
+        df = df.assign(topic="")
         l = df.topic.replace(label_dict)
 
         df = df.assign(label=l)
@@ -839,6 +839,7 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         return self.get_attribute('division', 'abbreviation', state_abbreviation)
 
     def write_data(self, data, database_table=None):
+
         """
         Inserts legislator data into database table. Data must be either a list of Row objects or dictionaries.
         """
@@ -874,7 +875,8 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                          legislator_table_name, USLegislationRow())
 
     def write_data(self, data, database_table=None) -> None:
-        """
+        data = self.add_topics(data)
+        """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
         table = database_table if database_table else self.database_table_name
@@ -936,6 +938,7 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
+
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislators(data, table)
 
@@ -960,6 +963,7 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
         return row
 
     def write_data(self, data, database_table=None):
+
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
@@ -1004,6 +1008,7 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         return row
 
     def write_data(self, data, database_table=None) -> None:
+
         """
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
