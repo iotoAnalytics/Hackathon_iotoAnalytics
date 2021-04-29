@@ -693,6 +693,7 @@ class LegislationScraperUtils(ScraperUtils):
             val = int(val)
         return val
 
+
     def add_topics(self, list_of_dicts):
         df = pd.DataFrame(list_of_dicts)
         """
@@ -814,8 +815,9 @@ class LegislationScraperUtils(ScraperUtils):
             i = i + 1
 
         df = df.drop(columns=['label'])
+        dicts = df.to_dict('records')
 
-        return df
+        return dicts
 # endregion
 
 # region US Scraper Utils
@@ -873,6 +875,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                          legislator_table_name, USLegislationRow())
 
     def write_data(self, data, database_table=None) -> None:
+
         data = self.add_topics(data)
         """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
@@ -962,6 +965,7 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
 
     def write_data(self, data, database_table=None):
 
+
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
@@ -1006,6 +1010,8 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         return row
 
     def write_data(self, data, database_table=None) -> None:
+        # add topics
+        data = self.add_topics(data)
 
         """
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.

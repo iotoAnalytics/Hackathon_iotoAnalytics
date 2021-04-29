@@ -42,17 +42,11 @@ from selenium.webdriver.common.by import By
 # import PyPDF2
 # from selenium.common.exceptions import TimeoutException
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
 
-prov_terr_abbreviation = str(configParser.get(
-    'scraperConfig', 'state_abbreviation'))
+prov_terr_abbreviation = 'BC'
 
-database_table_name = str(configParser.get(
-    'scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get(
-    'scraperConfig', 'legislator_table_name'))
+database_table_name = 'ca_bc_legislation'
+legislator_table_name = 'ca_bc_legislators'
 
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
@@ -65,7 +59,7 @@ chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-extensions')
 chrome_options.add_argument('--disable-gpu')
 
-driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
                           chrome_options=chrome_options)
 print("driver found")
 
@@ -292,15 +286,12 @@ if __name__ == '__main__':
     # print(url_df)
     less_urls = url_df['source_url'][:6]
     urls = url_df['source_url']
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls
+
     with Pool() as pool:
         data = pool.map(scrape, less_urls)
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    # scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

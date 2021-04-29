@@ -88,10 +88,11 @@ def collect_bill_urls(myurl):
         link = "https://www.ncleg.gov" + link
         gd = ("NC_20202021_" + bill_name)
         url = '/us/nc/legislation/' + gd
-        bill_info = {'source_url': link, 'bill_name': bill_name,
-                     'goverlytics_id': gd, 'url': url}
-        if bill_info not in bill_infos:
-            bill_infos.append(bill_info)
+        if "BillLookUp" in link:
+            bill_info = {'source_url': link, 'bill_name': bill_name,
+                         'goverlytics_id': gd, 'url': url}
+            if bill_info not in bill_infos:
+                bill_infos.append(bill_info)
     return bill_infos
 
 
@@ -235,7 +236,7 @@ def collect_vote_info(link):
 
     vote_data = {'date': date, 'description': description, 'yea': yea, 'nay': nay, 'nv': nv, 'absent': absent,
                  'total': total, 'passed': passed, 'chamber': chamber, 'votes': votes}
-    print(vote_data)
+    # print(vote_data)
     return vote_data
 
 
@@ -275,11 +276,14 @@ def collect_bill_details(bill_url):
 
     typetext = page_soup.find(
         "div", {"class": "col-12 col-sm-6 h2 text-center order-sm-2"})
-    if "Bill" in typetext.text:
-        bill_type = "Bill"
-    elif "Resolution" in typetext.text:
-        bill_type = "Resolution"
-    else:
+    try:
+        if "Bill" in typetext.text:
+            bill_type = "Bill"
+        elif "Resolution" in typetext.text:
+            bill_type = "Resolution"
+        else:
+            bill_type = "Other"
+    except:
         bill_type = "Other"
 
     # find sponsors and principal sponsor
@@ -370,66 +374,75 @@ def collect_bill_details(bill_url):
     # get actions
     actions = []
     cardbody = page_soup.findAll("div", {"class": "card-body"})
-    cb = cardbody[0]
+    try:
+        cb = cardbody[0]
 
-    for cb in cardbody:
-        rows = (cb.findAll("div", {"class": "row"}))
-        row = rows[0]
+        for cb in cardbody:
+            rows = (cb.findAll("div", {"class": "row"}))
+            row = rows[0]
 
-        for row in rows:
+            for row in rows:
 
-            try:
-                date = row.find("div", {"class": "col-7 col-md-2 pr-0"}).text
-                d = datetime.datetime.strptime(
-                    date, "%m/%d/%Y").strftime("%Y-%m-%d")
+                try:
+                    date = row.find("div", {"class": "col-7 col-md-2 pr-0"}).text
+                    d = datetime.datetime.strptime(
+                        date, "%m/%d/%Y").strftime("%Y-%m-%d")
 
-                chamber = row.find(
-                    "div", {"class": "col-7 col-md-1 col-lg-2 pr-0 text-nowrap"}).text
-                description = row.find(
-                    "div", {"class": "col-7 col-md-4 col-lg-3 pr-0"}).text
+                    chamber = row.find(
+                        "div", {"class": "col-7 col-md-1 col-lg-2 pr-0 text-nowrap"}).text
+                    description = row.find(
+                        "div", {"class": "col-7 col-md-4 col-lg-3 pr-0"}).text
 
-                action = {'date': d, 'action_by': chamber,
-                          'description': description}
-                actions.append(action)
+                    action = {'date': d, 'action_by': chamber,
+                              'description': description}
+                    actions.append(action)
 
-                # get vote url, and vote data
-                voteData = row.find(
-                    "div", {"class": "col-7 col-md-2 order-2 order-md-0 pr-0"})
-                voteLink = voteData.a["href"]
-                voteLink = "https://www.ncleg.gov/" + voteLink
+                    # get vote url, and vote data
+                    voteData = row.find(
+                        "div", {"class": "col-7 col-md-2 order-2 order-md-0 pr-0"})
+                    voteLink = voteData.a["href"]
+                    voteLink = "https://www.ncleg.gov/" + voteLink
 
-                vote_data = collect_vote_info(voteLink)
+                    vote_data = collect_vote_info(voteLink)
 
-                votes.append(vote_data)
+                    votes.append(vote_data)
 
-            except Exception as ex:
+                except Exception as ex:
 
-                template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-                message = template.format(type(ex).__name__, ex.args)
-                # print(message)
-
+                    template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+                    message = template.format(type(ex).__name__, ex.args)
+                    # print(message)
+    except:
+        pass
     # get key words
 
     keywordsdiv = page_soup.findAll(
         "div", {"class": "col-8 col-sm-9 col-xl-10 text-left scroll-column"})
-    site_topic = keywordsdiv[1].text
+    try:
+        site_topic = keywordsdiv[1].text
+    except:
+        site_topic = ""
 
-    r = scraper_utils.request(bill_link)
-    scraper_utils.crawl_delay(crawl_delay)
-    f = io.BytesIO(r.content)
-    reader = PyPDF2.PdfFileReader(f)
+    try:
 
-    page_done = 0
-    i = 0
-    while page_done == 0:
-        try:
-            contents = reader.getPage(i).extractText()
-            bill_text = bill_text + " " + contents
+        r = scraper_utils.request(bill_link)
+        scraper_utils.crawl_delay(crawl_delay)
+        f = io.BytesIO(r.content)
+        reader = PyPDF2.PdfFileReader(f)
 
-        except:
-            page_done = 1
-        i = i + 1
-    bill_text = bill_text.replace("\n", "")
+        page_done = 0
+        i = 0
+        while page_done == 0:
+            try:
+                contents = reader.getPage(i).extractText()
+                bill_text = bill_text + " " + contents
+
+            except:
+                page_done = 1
+            i = i + 1
+        bill_text = bill_text.replace("\n", "")
+    except:
+        pass
     # print(bill_text)
 
     # except Exception as ex:
@@ -443,7 +456,7 @@ def collect_bill_details(bill_url):
         date_introduced = actions[introducedIndex]['date']
         chamber_origin = actions[introducedIndex]['action_by']
     except:
-        date_introduced = ""
+        date_introduced = None
         chamber_origin = ""
 
     bill_d = {'source_url': bill_url, 'bill_title': bill_title, 'bill_type': bill_type, 'sponsors': sponsors,
@@ -451,7 +464,7 @@ def collect_bill_details(bill_url):
               'principal_sponsor_id': principal_sponsor_id, 'current_status': "",
               'psurl': psurl, 'actions': actions, 'date_introduced': date_introduced,
               'chamber_origin': chamber_origin, 'session': '2020-2021', 'state': 'NC', 'state_id': '37',
-              'site_topic': site_topic, 'votes': votes, 'committees': [], 'cosponsors': [], 'cosponsors_id': [],
+              'source_topic': site_topic, 'votes': votes, 'committees': [], 'cosponsors': [], 'cosponsors_id': [],
               'topic': "", 'bill_text': bill_text, 'bill_description': bill_description, 'bill_summary': bill_summary,
               'country_id': scraper_utils.country_id, 'country': scraper_utils.country}
 
@@ -491,13 +504,14 @@ if __name__ == '__main__':
     # this is only 50 urls right now?
     billinfos = collect_bill_urls(
         'https://www.ncleg.gov/Legislation/Bills/ByKeyword/2021/All')
-    # billinfos = billinfos[:100]
+
     smalldf = pd.DataFrame(billinfos)
 
     # print(billinfos)
     links = [d['source_url'] for d in billinfos]
-    lessLinks = links[:10]
-    link = links[0]
+    print(len(links))
+    # lessLinks = links[:10]
+    # link = links[0]
 
     with Pool() as pool:
         # #
