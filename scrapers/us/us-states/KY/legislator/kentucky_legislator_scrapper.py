@@ -47,13 +47,12 @@ def get_urls():
     # Get url of current year assymbly members
     content = request_find(senate_members_url, 'div', {'id': 'cbqwpctl00_ctl00_m_g_4af53f99_1f77_4ed2_a980_056e3cfc19c5'})
     for link in content.find_all('a'):
-        urls.append([link['href'], 'Senate'])
+        urls.append(link['href'])
 
     content = request_find(house_members_url, 'div', {'id': 'cbqwpctl00_ctl00_m_g_4af53f99_1f77_4ed2_a980_056e3cfc19c5'})
     for link in content.find_all('a'):
-        urls.append([link['href'], 'House'])
-    pprint(urls[0])
-    # return [['Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=130', "House"]]
+        urls.append(link['href'])
+    # return [['Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=68', "House"]]
     return urls
 
 def scrape(url):
@@ -72,11 +71,11 @@ def scrape(url):
     each column.
     '''
     base_url = 'https://legislature.ky.gov/'
-    url_request = requests.get(base_url + url[0], verify=False)
+    url_request = requests.get(base_url + url, verify=False)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     row = scraper_utils.initialize_row()
 
-    row.party = url[1]
+    row.source_url = base_url + url
 
 
     committee_list = url_soup.find('div', {'id':'legcommittees'}).find_all('li')
@@ -103,7 +102,7 @@ def scrape(url):
     for index, p in enumerate(p_list):
         target = p.text
         if target == "Home City":
-            areas_served = p_list[index+1].text
+            areas_served = [p_list[index+1].text]
         elif target == "Phone Number(s)":
             phone_number_list = p_list[index+1].get_text(separator='|', strip=True).split('|')
             for number in phone_number_list:
@@ -142,11 +141,14 @@ def scrape(url):
 
     full_name = ""
     for index, name in enumerate(temp):
-        if len(temp) == 3 and index ==1:
+        if len(temp) == 3 and index == 1:
             name_dict[NAME_KEYS[index+1]] = name
             full_name = full_name + name + " "
         else:
-            name_dict[NAME_KEYS[index]] = name
+            if len(temp) == 3 and index == 2:
+                name_dict[NAME_KEYS[index -1]] = name
+            else:
+                name_dict[NAME_KEYS[index]] = name    
             full_name = full_name + name + " "
 
     name_dict["name_full"] = full_name[:-1]
@@ -188,9 +190,10 @@ if __name__ == '__main__':
         # data = [scrape(url) for url in urls]
         with Pool() as pool:
             data = pool.map(scrape, urls)
+        # pprint(data)
         # Once we collect the data, we'll write it to the database.
         scraper_utils.write_data(data)
 
-    except:
-        sys.exit('error\n')
+    except Exception as e:
+        sys.exit(f'error: {e}\n')
     print('Complete!')

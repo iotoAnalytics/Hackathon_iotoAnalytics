@@ -337,17 +337,12 @@ def scrape(url):
     '''
 
     row = scraper_utils.initialize_row()
-    pprint('1')
     row.source_url = url
     row.most_recent_term_id = retrieve_current_term()
-    pprint('2')
     page = scraper_utils.request(url)
-    pprint('3')
     scraper_utils.crawl_delay(crawl_delay)
     soup = BeautifulSoup(page.content, 'html.parser')
-    pprint('4')
     name_info_dict = retrieve_name_info(soup)
-    pprint('name')
     # Let scraper_utils.insert_legislator_data_into_db enter default values for empty columns
     if name_info_dict['suffix'] != None:
         row.name_suffix = name_info_dict['suffix']
@@ -366,7 +361,6 @@ def scrape(url):
                                 'class': 'block block-system first last odd'})
 
     bio_info_dict = retrieve_biography_info(content)
-    pprint('bio')
     if bio_info_dict['occupation'] != None:
         row.occupation = bio_info_dict['occupation']
     if bio_info_dict['yearsactive'] != None:
@@ -376,19 +370,16 @@ def scrape(url):
         'div', 'pane-content').find('a').text.split(' ')[1]
 
     party = retrieve_party(content)
-    pprint('party')
     if party != None:
         row.party_id = scraper_utils.get_party_id(party)
         row.party = party
 
     committees = retrieve_committees(content)
-    pprint('committee')
     # If committees is not empty we insert it
     if committees:
         row.committees = committees
 
     contact_info_dict = retrieve_contact_info(content)
-    pprint('contact')
     if contact_info_dict['address'] != None:
         row.addresses = contact_info_dict['address']
     if contact_info_dict['areaserved'] != None:
@@ -416,6 +407,6 @@ if __name__ == '__main__':
         scraper_utils.write_data(data)
 
 
-    except:
-        sys.exit('error\n')
+    except Exception as e:
+        sys.exit(f'error: {e}\n')
     print('Complete!')

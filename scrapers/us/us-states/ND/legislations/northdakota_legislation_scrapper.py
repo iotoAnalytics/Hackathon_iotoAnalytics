@@ -215,7 +215,7 @@ def retrieve_bill_url(soup):
             
             # pprint(sponsors)
             # pprint(principal_sponsor)
-            pprint(f'source_url: {pdf_link}')
+            # pprint(f'source_url: {pdf_link}')
             sponsors_id = find_id(sponsors)
             
             # pprint(f'sponsors_id: {sponsors_id}')

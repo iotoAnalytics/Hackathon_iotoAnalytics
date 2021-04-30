@@ -74,7 +74,6 @@ def find_id(spons):
     if len(spons) == 0:
         return sponsors_id
 
-    pprint(spons)
     for spon in spons:
             search_for = dict(name_last=spon)
             id = scraper_utils.get_legislator_id(**search_for)
@@ -100,7 +99,6 @@ def get_urls():
     content = request_find(house_members_url, 'div', {'id': 'cbqwpctl00_ctl00_m_g_4af53f99_1f77_4ed2_a980_056e3cfc19c5'})
     for link in content.find_all('a'):
         urls.append([link['href'], 'House'])
-    pprint(urls[0])
     # return [['Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=130', "House"]]
     return urls
 
@@ -149,7 +147,7 @@ def scrape(url):
         else:
             principal_sponsor = principal_sponsor + name + " "
 
-    search_for = dict(name_full=principal_sponsor)
+    search_for = dict(name_full=principal_sponsor[:-1])
     principal_sponsor_id = scraper_utils.get_legislator_id(**search_for)
     
     url_request = requests.get(url_soup.find('a', {'class': 'block_btn'})['href'], verify=False)
@@ -215,16 +213,16 @@ if __name__ == '__main__':
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    # try:
-    with Pool() as pool:
-        result = []
-        data = pool.map(scrape, urls)
-        for lst in data:
-            for row in lst:
-                result.append(row)
-        # Once we collect the data, we'll write it to the database.
-        # scraper_utils.write_data(result)
+    try:
+        with Pool() as pool:
+            result = []
+            data = pool.map(scrape, urls)
+            for lst in data:
+                for row in lst:
+                    result.append(row)
+            # Once we collect the data, we'll write it to the database.
+            scraper_utils.write_data(result)
 
-    # except:
-    #     # sys.exit('error\n')
+    except Exception as e:
+        sys.exit(f'error: {e}\n')
     print('Complete!')
