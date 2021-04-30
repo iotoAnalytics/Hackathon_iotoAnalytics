@@ -42,17 +42,11 @@ from selenium.webdriver.common.by import By
 # import PyPDF2
 # from selenium.common.exceptions import TimeoutException
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
 
-prov_terr_abbreviation = str(configParser.get(
-    'scraperConfig', 'state_abbreviation'))
+prov_terr_abbreviation = 'BC'
 
-database_table_name = str(configParser.get(
-    'scraperConfig', 'database_table_name'))
-legislator_table_name = str(configParser.get(
-    'scraperConfig', 'legislator_table_name'))
+database_table_name = 'ca_bc_legislation'
+legislator_table_name = 'ca_bc_legislators'
 
 scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       database_table_name,
@@ -65,7 +59,7 @@ chrome_options.add_argument('--headless')
 chrome_options.add_argument('--disable-extensions')
 chrome_options.add_argument('--disable-gpu')
 
-driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
                           chrome_options=chrome_options)
 print("driver found")
 
@@ -87,18 +81,21 @@ def get_urls(myurl):
     page_soup = soup(html, 'html.parser')
     url_infos = []
     hansardlist = page_soup.find("ul", {"class": "BCLASS-Hansard-List"})
-    listings = hansardlist.findAll("li")
-    for li in listings:
-        url = (li.div.div.div.div.a["href"])
+    try:
+        listings = hansardlist.findAll("li")
+        for li in listings:
+            url = (li.div.div.div.div.a["href"])
 
-        if "/gov" in url:
-            bill_num = "gov" + url.split("/gov")[1]
-        else:
-            bill_num = "m" + url.split("/m")[1]
-        bill_num = bill_num.split("-")[0]
-        info = {'source_url': url, 'bill_name': bill_num}
-        # print(info)
-        url_infos.append(info)
+            if "/gov" in url:
+                bill_num = "gov" + url.split("/gov")[1]
+            else:
+                bill_num = "m" + url.split("/m")[1]
+            bill_num = bill_num.split("-")[0]
+            info = {'source_url': url, 'bill_name': bill_num}
+            # print(info)
+            url_infos.append(info)
+    except:
+        print(myurl)
     scraper_utils.crawl_delay(crawl_delay)
     return url_infos
 
@@ -272,9 +269,7 @@ if __name__ == '__main__':
                         '%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
     ammendement_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
                       '/1st-session/bills/amended '
-    third_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
-                        '/1st-session/bills/third-reading#Default={%22o%22:[{%22d%22:0,' \
-                        '%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
+    third_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament/1st-session/bills/third-reading#Default={%22o%22:[{%22d%22:0,%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     pd.options.display.max_colwidth = 200
@@ -290,17 +285,15 @@ if __name__ == '__main__':
     url_df = pd.concat((third_urls, url_df)).sort_index(
     ).drop_duplicates('bill_name')  # .reset_index(drop=True)
     # print(url_df)
-    less_urls = url_df['source_url'][:6]
+    less_urls = url_df['source_url'][:11]
     urls = url_df['source_url']
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls
+    print(len(urls))
+
     with Pool() as pool:
-        data = pool.map(scrape, less_urls)
+        data = pool.map(scrape, urls)
     print(*data, sep='\n')
 
     # Once we collect the data, we'll  write it to the database.
-    # scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

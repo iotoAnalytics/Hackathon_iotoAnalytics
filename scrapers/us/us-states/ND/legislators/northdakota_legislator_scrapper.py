@@ -16,7 +16,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-sys.path.append("..")
+# sys.path.append("..")
 
 
 import configparser
@@ -339,7 +339,6 @@ def scrape(url):
     row = scraper_utils.initialize_row()
     row.source_url = url
     row.most_recent_term_id = retrieve_current_term()
-
     page = scraper_utils.request(url)
     scraper_utils.crawl_delay(crawl_delay)
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -404,10 +403,10 @@ if __name__ == '__main__':
         # data = [scrape(url) for url in urls]
         with Pool() as pool:
             data = pool.map(scrape, urls)
-        # pprint(data)
         # Once we collect the data, we'll write it to the database.
         scraper_utils.write_data(data)
 
-    except:
-        sys.exit('error\n')
+
+    except Exception as e:
+        sys.exit(f'error: {e}\n')
     print('Complete!')
