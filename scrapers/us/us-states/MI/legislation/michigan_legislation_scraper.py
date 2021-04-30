@@ -406,7 +406,7 @@ if __name__ == '__main__':
 
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
-    # big_df = topics.add_topics(big_df)
+
     big_df['source_url'] = big_df['state_url']
     big_df['source_id'] = big_df['bill_state_id']
     big_df['source_topic'] = big_df['site_topic']
@@ -422,7 +422,7 @@ if __name__ == '__main__':
     # # #
     big_df['country_id'] = sample_row.country_id
 
-    # big_df = scraper_utils.add_topics(big_df)
+
     print(big_df)
     #
     big_list_of_dicts = big_df.to_dict('records')
