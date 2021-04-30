@@ -13,7 +13,6 @@ from torch.utils.data import TensorDataset
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
 
-
 import sys
 import pandas as pd
 from database import Database, CursorFromConnectionFromPool, Persistence
@@ -39,12 +38,12 @@ import exceptions
 from pandas.core.computation.ops import UndefinedVariableError
 import numpy
 
-
 """
 Contains utilities and data structures meant to help resolve common issues
 that occur with data collection. These can be used with your legislator
 date collectors.
 """
+
 
 # region Base Scraper Utils
 ##########################################
@@ -256,8 +255,11 @@ class LegislatorScraperUtils(ScraperUtils):
 
     def scrape_wiki_bio(self, wiki_link):
         """
-        Used for getting missing legislator fields from their wikipedia bios. Useful for getting things like a legislator's birthday or education.
+        Used for getting missing legislator fields from their wikipedia bios.
+        Useful for getting things like a legislator's birthday or education.
+        Takes in a link to the personal wikipedia page of the legislator
         """
+        # get available birthday
         try:
             uClient = uReq(wiki_link)
             page_html = uClient.read()
@@ -265,15 +267,13 @@ class LegislatorScraperUtils(ScraperUtils):
             # # html parsing
             page_soup = soup(page_html, "html.parser")
 
-            # #
             # # #grabs each product
             reps = page_soup.find("div", {"class": "mw-parser-output"})
             repBirth = reps.find("span", {"class": "bday"}).text
-
+            # convert to proper data format
             b = datetime.strptime(repBirth, "%Y-%m-%d").date()
 
             birthday = b
-            # print(b)
 
         except:
             # couldn't find birthday in side box
@@ -302,10 +302,10 @@ class LegislatorScraperUtils(ScraperUtils):
                         print(b)
 
         except Exception as ex:
-
+            # birthday not available
             pass
 
-        # get years_active, based off of "assumed office"
+        # get years_active, based off of "assumed office" year
         years_active = []
         year_started = ""
         try:
@@ -343,19 +343,19 @@ class LegislatorScraperUtils(ScraperUtils):
 
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
             message = template.format(type(ex).__name__, ex.args)
-            # print(message)
 
         if year_started != "":
+            # create a list of years from that year to current year
+            # use current year + 1 since it doesn't include endpoint
+            # will need to be updated each year
             years_active = list(range(int(year_started), 2022))
-            # years_active_lst.append(years_active_i)
+
         else:
             years_active = []
-            # years_active_i = []
-            # years_active_i.append(years_active)
-            # years_active_lst.append(years_active_i)
 
         # get education
         education = []
+        # possible education levels that might show up, feel free to add more
         lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
                 "DDS", "MS", "BS", "MBA", "MS", "MD"]
 
@@ -365,11 +365,9 @@ class LegislatorScraperUtils(ScraperUtils):
             uClient.close()
             # # html parsing
             page_soup = soup(page_html, "html.parser")
-
-            # #
             # # #grabs each product
             reps = page_soup.find("div", {"class": "mw-parser-output"})
-            # repsAlmaMater = reps.find("th", {"scope:" "row"})
+
             left_column_tags = reps.findAll()
             lefttag = left_column_tags[0]
             for lefttag in left_column_tags:
@@ -402,9 +400,8 @@ class LegislatorScraperUtils(ScraperUtils):
 
             message = template.format(type(ex).__name__, ex.args)
 
-            # print(message)
-
         # get full name
+        # this is necessary as it will be use to merge the resulting dataframe with the rest of your data
         try:
             uClient = uReq(wiki_link)
             page_html = uClient.read()
@@ -416,8 +413,6 @@ class LegislatorScraperUtils(ScraperUtils):
             head = page_soup.find("h1", {"id": "firstHeading"})
             name = head.text
             name = name.split("(")[0].strip()
-            # name = name.replace(" (Canadian politician)", "")
-            # name = name.replace(" (Quebec politician)", "")
 
         except:
             name = ""
@@ -447,9 +442,11 @@ class LegislatorScraperUtils(ScraperUtils):
                         occupation.append(occ)
 
         except:
+            # no occupation available
             pass
 
         most_recent_term_id = ""
+
         try:
             most_recent_term_id = (years_active[len(years_active) - 1])
 
@@ -461,9 +458,14 @@ class LegislatorScraperUtils(ScraperUtils):
                 'most_recent_term_id': str(most_recent_term_id)}
 
         """
-            returns dictionary with the following fields, if available
-            choose the ones that you weren't able to find from the gov website
-            merge the resulting data with the data you scraped from the gov website
+            returns dictionary with the following fields if available
+            choose the ones that you weren't able to find from the gov website 
+            
+            merge the resulting data with the data you scraped from the gov website, on name_first and name_last
+            
+            Note: not all legislators will have a wikipedia page.  
+            This may cause some fields to be 'NaN' after the merge.
+            Replace all NaN fields with "None" or something similar or you may get a type error when uploading to db
       
         """
         return info
@@ -693,35 +695,43 @@ class LegislationScraperUtils(ScraperUtils):
             val = int(val)
         return val
 
+    def add_topics(self, list_of_dicts):
 
-    def add_topics(self, df):
         """
           Pulls a model from an S3 bucket as a temporary file
           Uses the model to classify the bill text
           Returns the dataframe with the topics filled in
+
           If you want a different model just upload it to the S3
           and change the code in this function to implement that model instead
+
+          Currently this function is being called in both the US and CA prov/terr write_data functions,
+          at some point might want two different models/ add topic functions for the different countries
+
+          Takes either a list of dictionaries or a list of rows
+
           """
+        # convert input into dataframe form
+        df = pd.DataFrame(list_of_dicts)
         print('Loading model...')
         s3 = boto3.client('s3')
-
+        # load model from S3 bucket named bill-topic-classifier-sample
         with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
             s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
             mlmodel = f.name
             print(mlmodel)
 
-        #
         print('Model loaded.')
 
         df = pd.DataFrame(df)
 
-        possible_labels = ['government operations', 'health', 'education', 'macroeconomics', 'informal',
+        possible_labels = ['government operations', 'health', 'education', 'macroeconomics', '',
                            'international affairs', 'civil rights', 'social welfare', 'public lands',
                            'defense', 'domestic commerce', 'law and crime', 'culture', 'transportation',
                            'environment', 'labor', 'housing', 'technology', 'immigration', 'energy',
                            'agriculture', 'foreign trade']
-
-        label_dict = {'government operations': 0, 'health': 1, 'education': 2, 'macroeconomics': 3, 'informal': 4,
+        # the possible labes (CAP topics) are assigned numbers
+        label_dict = {'government operations': 0, 'health': 1, 'education': 2, 'macroeconomics': 3, '': 4,
                       'international affairs': 5, 'civil rights': 6, 'social welfare': 7, 'public lands': 8,
                       'defense': 9,
                       'domestic commerce': 10, 'law and crime': 11, 'culture': 12, 'transportation': 13,
@@ -731,13 +741,12 @@ class LegislationScraperUtils(ScraperUtils):
         for index, possible_label in enumerate(possible_labels):
             label_dict[possible_label] = index
 
-        # default initial value
-        df = df.assign(topic="informal")
+        # default initial value is empty string, or informal for all topic entries
+        df = df.assign(topic="")
         l = df.topic.replace(label_dict)
 
         df = df.assign(label=l)
 
-        # print(df)
         eval_texts = df.bill_text.values
 
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
@@ -762,7 +771,7 @@ class LegislationScraperUtils(ScraperUtils):
                                            sampler=SequentialSampler(dataset_val),
                                            batch_size=1,
                                            )
-
+        # get pretrained model
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model = BertForSequenceClassification.from_pretrained("bert-base-uncased",
                                                               num_labels=len(label_dict),
@@ -775,6 +784,8 @@ class LegislationScraperUtils(ScraperUtils):
         model.eval()
 
         loss_val_total = 0
+
+        # make predictions
         predictions, true_vals = [], []
 
         for batch in dataloader_validation:
@@ -799,23 +810,28 @@ class LegislationScraperUtils(ScraperUtils):
         predictions = np.concatenate(predictions, axis=0)
 
         i = 0
-
+        # fill the dataframe topic column, line by line
         for pred in predictions:
-            print('text:')
+            # print('text:')
             txt = eval_texts[i]
-            # txt = df.loc[['text'], [i]]
-            print(txt)
-            print("predicted label:")
-            pred_label = (possible_labels[np.argmax(pred)])
-            print(pred_label)
 
-            df['topic'][i] = pred_label
+            # print(txt)
+            # print("predicted label:")
+            pred_label = (possible_labels[np.argmax(pred)])
+            # print(pred_label)
+            # put predicted value in its row in the topic column of the dataframe
+            df.loc[i, 'topic'] = pred_label
             #
             i = i + 1
-
+        # get rid of this label row that was only used for classification
         df = df.drop(columns=['label'])
+        print(df)
+        # return the dataframe to a list of dictionaries
+        dicts = df.to_dict('records')
 
-        return df
+        return dicts
+
+
 # endregion
 
 # region US Scraper Utils
@@ -872,7 +888,8 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                          legislator_table_name, USLegislationRow())
 
     def write_data(self, data, database_table=None) -> None:
-        """
+        data = self.add_topics(data)
+        """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
         table = database_table if database_table else self.database_table_name
@@ -897,6 +914,8 @@ class USStateLegislationScraperUtils(USFedLegislationScraperUtils):
         row.state = self.state
         row.state_id = self.state_id
         return row
+
+
 # endregion
 
 # region Canadian Scraper Utils
@@ -934,6 +953,7 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
+
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislators(data, table)
 
@@ -966,7 +986,8 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
 
 
 class CAFedLegislationScraperUtils(LegislationScraperUtils):
-    def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators', row_type=CAFedLegislationRow()):
+    def __init__(self, database_table_name='ca_fed_legislation', legislator_table_name='ca_fed_legislators',
+                 row_type=CAFedLegislationRow()):
         super().__init__('ca', database_table_name, legislator_table_name, row_type)
 
     def get_region(self, prov_terr_abbrev):
@@ -1002,6 +1023,9 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         return row
 
     def write_data(self, data, database_table=None) -> None:
+        # add topics
+        data = self.add_topics(data)
+
         """
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """

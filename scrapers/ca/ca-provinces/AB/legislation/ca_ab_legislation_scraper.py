@@ -28,8 +28,8 @@ import pandas as pd
 
 
 # Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# configParser = configparser.RawConfigParser()
+# configParser.read('config.cfg')
 
 prov_terr_abbreviation = 'AB'
 database_table_name = 'ca_ab_legislation'
@@ -207,20 +207,21 @@ def scrape_bills(link):
 if __name__ == '__main__':
     bills_main = 'https://www.assembly.ab.ca/assembly-business/bills/bills-by-legislature'
     bill_links = scrape_bill_links(bills_main)
+    print(len(bill_links))
     less_links = bill_links[:10]
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
 
     with Pool() as pool:
         bill_data = pool.map(func=scrape_bills, iterable=bill_links)
-    bill_df = pd.DataFrame(bill_data)
-    print(bill_df)
-    bill_df = scraper_utils.add_topics(bill_df)
+    # bill_df = pd.DataFrame(bill_data)
+    # print(bill_df)
+    # bill_df = scraper_utils.add_topics(bill_df)
 
-    big_list_of_dicts = bill_df.to_dict('records')
-    print(*big_list_of_dicts, sep="\n")
+    # big_list_of_dicts = bill_df.to_dict('records')
+    # print(*big_list_of_dicts, sep="\n")
 
     print('Writing data to database...')
-    scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(bill_data)
 
     print('Complete!')

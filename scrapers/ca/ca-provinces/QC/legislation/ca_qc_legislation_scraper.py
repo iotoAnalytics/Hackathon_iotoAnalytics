@@ -390,7 +390,7 @@ if __name__ == '__main__':
     bill_info_df['country_id'] = scraper_utils.country_id
 
     print(bill_info_df)
-    bill_info_df = scraper_utils.add_topics(bill_info_df)
+
 
     big_list_of_dicts = bill_info_df.to_dict('records')
     # print(*big_list_of_dicts, sep="\n")
