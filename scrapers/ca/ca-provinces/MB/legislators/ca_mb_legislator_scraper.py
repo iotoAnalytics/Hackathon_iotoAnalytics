@@ -11,17 +11,7 @@ from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-import re
-from datetime import datetime
-import boto3
-# from selenium import webdriver
-# from selenium.common.exceptions import TimeoutException
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-# from selenium.webdriver.common.by import By
+
 from nameparser import HumanName
 import pandas as pd
 import unidecode
@@ -33,6 +23,7 @@ crawl_delay = scraper_utils.get_crawl_delay('https://www.gov.mb.ca/')
 
 
 def scrape_main_page(link):
+    # get a list of links to members' bio pages through the main pages
     members = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -64,6 +55,7 @@ def scrape_main_page(link):
 
 
 def collect_mla_data(link_party):
+    # scrape member's bio pages
     link = link_party['source_url']
     row = scraper_utils.initialize_row()
     row.source_url = link
@@ -146,7 +138,7 @@ def collect_mla_data(link_party):
             stop = 1
     addr_info = {'location': address_location,
                  'address': address.replace('\xa0', "").strip()}
-    # print(addr_info)
+
     addresses.append(addr_info)
 
     address_location = hthrees[1].text.split(":")[0].strip()
@@ -188,6 +180,7 @@ def collect_mla_data(link_party):
 
 
 def scrape_main_wiki(link):
+    # get links to members' personal wikipedia pages
     wiki_urls = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -200,7 +193,7 @@ def scrape_main_wiki(link):
     for tr in table:
         td = tr.findAll("td")[1]
         url = 'https://en.wikipedia.org' + (td.span.span.span.a["href"])
-        # print(url)
+
         wiki_urls.append(url)
     scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
@@ -209,6 +202,7 @@ def scrape_main_wiki(link):
 if __name__ == '__main__':
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
+
     members_link = 'https://www.gov.mb.ca/legislature/members/mla_list_constituency.html'
 
     member_bios = scrape_main_page(members_link)
@@ -217,7 +211,7 @@ if __name__ == '__main__':
 
         data = pool.map(func=collect_mla_data, iterable=member_bios)
     leg_df = pd.DataFrame(data)
-
+    # drop columns that we'll get from wikipedia instead
     leg_df = leg_df.drop(columns=[
                          'birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
 
