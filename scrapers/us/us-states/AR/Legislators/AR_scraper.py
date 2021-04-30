@@ -10,7 +10,11 @@ Notes:
 
 - Missing years served, could be scraped from within a paragraph on the individual house and senate sites, but since this would rely on 
     the paragraph word structure, it is highly subject to error in the future.
+
+- Scrapes historical legislators by using full name as a key, will overwrite earlier legislators if they have the same name
+- May also have duplicate legislators if they switch districts or chambers
 '''
+
 import sys
 import os
 from pathlib import Path
@@ -19,18 +23,13 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 from multiprocessing.dummy import Pool
-from database import Database
 import configparser
-from pprint import pprint
 from nameparser import HumanName
-import datetime
+from datetime import datetime
 import re
-import boto3
-import requests
 import pandas as pd
 
 
@@ -45,35 +44,64 @@ configParser.read('config.cfg')
 # scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name, country)
 scraper_utils = USStateLegislatorScraperUtils('AR', 'us_ar_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.arkleg.state.ar.us')
-session_id = ''
+# session_id = ''
 
+def get_sessions(historical=False):
+    current_year = datetime.year
+    session_url = f'https://www.arkleg.state.ar.us/Acts/SearchByRange?startAct=1&endAct=1000&keywords=&ddBienniumSession={current_year}%2F{current_year}R#SearchResults'
 
-def get_urls():
+    page = scraper_utils.request(session_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    sessions = soup.find(
+        'select', id='ddBienniumSession').find_all('option')[1:]
+
+    if not historical:
+        year, code = sessions[0]['value'].split('/')
+        return {'year': year, 'code' :code}
+
+    codes = []
+    for session in sessions:
+        year, code = session['value'].split('/')
+        codes.append({'year': year, 'code' :code})
+    return codes
+
+def get_urls(historical=False):
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
     '''
-    urls = {}
-
-    # Logic goes here! Some sample code:
-    scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
     base_url = 'https://www.arkleg.state.ar.us'
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    chambers = soup.find_all(
-        'div', class_='col-sm-2 col-md-2 d-none d-md-block d-lg-block d-xl-block')
-    districts = soup.find_all('div', {
-                              'class': 'col-md-2 col-md-2 d-none d-md-block d-lg-block d-xl-block', 'aria-colindex': 4})
+    urls = {}
+    codes = get_sessions(historical)
 
-    divs = soup.find_all('div', class_='col-sm-6 col-md-6')
-    links = []
-    for div in divs:
-        links.append(div.find('a'))
 
-    for index, path in enumerate(links):
-        chamber = chambers[index].text.split('\n')[2].strip()
-        district = districts[index].text.split('\n')[2].strip()
-        urls[(chamber, district)] = base_url + path['href']
+    for session in codes:
+        year = session['year']
+        code = session['code']
+        scrape_url = f'https://www.arkleg.state.ar.us/Legislators/List?ddBienniumSession={year}%2F{code}'
+        
+        page = scraper_utils.request(scrape_url)
+        soup = BeautifulSoup(page.content, 'html.parser')
+        chambers = soup.find_all(
+            'div', class_='col-sm-2 col-md-2 d-none d-md-block d-lg-block d-xl-block')
+        districts = soup.find_all('div', {
+                                'class': 'col-md-2 col-md-2 d-none d-md-block d-lg-block d-xl-block', 'aria-colindex': 4})
 
+        divs = soup.find_all('div', class_='col-sm-6 col-md-6')
+        links = []
+        for div in divs:
+            links.append(div.find('a'))
+
+        for index, path in enumerate(links):
+            chamber = chambers[index].text.split('\n')[2].strip().replace('Representative-Elect', 'Representative')
+            district = districts[index].text.split('\n')[2].strip()
+            name = path.text.split(' ')
+            name = [name[0], name[-1]]
+            if year == str(datetime.now().year): #non historical 
+                if (chamber, district, path.text) not in urls.keys():
+                    urls[(chamber, district, path.text)] = (base_url + path['href'], year)
+            else: #historical
+                if path.text not in urls.keys():
+                    urls[path.text] = (base_url + path['href'], year)
     return urls
 
 
@@ -142,7 +170,7 @@ def scrape_wiki(url, row):
 
     try:
         rep_birth = table.find('span', {"class": "bday"}).text
-        birthday = datetime.datetime.strptime(rep_birth, "%Y-%m-%d").date()
+        birthday = datetime.strptime(rep_birth, "%Y-%m-%d").date()
         row.birthday = birthday
     except Exception as e:
         try:
@@ -150,7 +178,7 @@ def scrape_wiki(url, row):
             rep_birth = table.find(
                 lambda tag: tag.name == "tr" and "Born" in tag.text).text
             year_birth = re.findall('\d\d\d\d', rep_birth)[0]
-            birthday = datetime.datetime.strptime(year_birth, "%Y").date()
+            birthday = datetime.strptime(year_birth, "%Y").date()
             row.birthday = birthday
         except Exception as e:
             pass
@@ -216,117 +244,141 @@ def scrape(urls):
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
     '''
-    url = urls[0]
+    try:
+        url = urls[0][0]
 
-    row = scraper_utils.initialize_row()
+        row = scraper_utils.initialize_row()
 
-    page = scraper_utils.request(url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    row.source_url = url
-    title = soup.find('h1')
-    address = title.parent.find('b').string
-    row.addresses.append({'location': 'district office', 'address': address})
-    title = title.text.split(' ')
-    row.role = title[0]
-    name = HumanName(' '.join(title[1:-1]))
-    row.name_full = name.full_name
-    row.name_first = name.first
-    row.name_last = name.last
-    row.name_middle = name.middle
-    row.name_suffix = name.suffix
-    row.most_recent_term_id = session_id
-    party = {'(D)': 'Democrat', '(R)': 'Republican', '(I)': 'Independent'}
-    row.party = party[title[-1]]
-    row.party_id = scraper_utils.get_party_id(row.party)
-
-    table = soup.find('div', class_='col-md-7')
-    trs = table.find_all(
-        'div', class_='col-sm-12 d-sm-block d-md-none d-lg-none d-xl-none')
-
-    for tr in trs:
-        label = tr.find('b')
+        page = scraper_utils.request(url)
+        soup = BeautifulSoup(page.content, 'html.parser')
+        row.source_url = url
+        title = soup.find('h1')
         try:
-            data = tr.find('a').text
-        except:
-            data = tr.find('b').next_sibling
+            address = title.parent.find('b').string
+            row.addresses.append({'location': 'district office', 'address': address})
+        except AttributeError:
+            pass
+        title = title.text.split(' ')
+        row.role = title[0]
+        party = {'(D)': 'Democrat', '(R)': 'Republican', '(I)': 'Independent'}
+        if title[-1] in party.keys():
+            row.party = party[title[-1]]
+            row.party_id = scraper_utils.get_party_id(row.party)
+            name = HumanName(' '.join(title[1:-1]))
+        else:
+            name = HumanName(' '.join(title[1:]))
+        row.name_full = name.full_name
+        row.name_first = name.first
+        row.name_last = name.last
+        row.name_middle = name.middle
+        row.name_suffix = name.suffix
+        row.most_recent_term_id = urls[0][1]
 
-        if data is None:
-            continue
+        table = soup.find('div', class_='col-md-7')
+        trs = table.find_all(
+            'div', class_='col-sm-12 d-sm-block d-md-none d-lg-none d-xl-none')
 
-        label = label.text
-        data = data.strip()
+        for tr in trs:
+            label = tr.find('b')
+            try:
+                data = tr.find('a').text
+            except:
+                data = tr.find('b').next_sibling
 
-        if label == 'Phone:':
-            row.phone_numbers.append({'district office': data.replace(
-                '(', '').replace(')', '').replace(' ', '-')})
+            if data is None:
+                continue
 
-        elif label == 'Email:':
-            row.email = data
+            label = label.text
+            data = data.strip()
 
-        elif label == 'District:':
-            row.district = data
+            if label == 'Phone:':
+                row.phone_numbers.append({'district office': data.replace(
+                    '(', '').replace(')', '').replace(' ', '-')})
 
-        elif label == 'Seniority:':
-            row.seniority = int(data)
+            elif label == 'Email:':
+                row.email = data
 
-        elif label == 'Occupation:':
-            row.occupation.append(data)
+            elif label == 'District:':
+                row.district = data
 
-        elif label == 'Veteran:':
-            row.military_experience = data
+            elif label == 'Seniority:':
+                row.seniority = int(data)
 
-        elif label == 'Seniority:':
-            row.seniority = data
+            elif label == 'Occupation:':
+                row.occupation.append(data)
 
-        elif label == 'Public Service:':
-            # We do not look at years ranges, what the years represent is too hard to figure out
-            years = re.sub('\d\d\d\d-\d\d\d\d', '', data)
-            years = re.findall('\d\d\d\d', data)
-            year_range = []
-            for year in years:
-                if int(year) % 2 == 1:
-                    year_range.append(int(year) + 1)
-                year_range.append(int(year))
+            elif label == 'Veteran:':
+                row.military_experience = data
 
-            # this has potential for error, I took a guess that the last year continues to current date
-            year_range += list(range(year_range[-1],
-                               datetime.datetime.now().year + 1))
-            row.years_active = list(set(year_range))
+            elif label == 'Seniority:':
+                row.seniority = data
 
-    committees = soup.find_all('div', class_=['col-sm-12 col-md-12'])[1:]
-    for committee in committees:
-        group = committee.find('a').text.strip().title()
+            elif label == 'Public Service:':
+                try:
+                    # We do not look at years ranges, what the years represent is too hard to figure out
+                    years = re.sub('\d\d\d\d-\d\d\d\d', '', data)
+                    years = re.findall('\d\d\d\d', data)
+                    year_range = []
+                    for year in years:
+                        if int(year) % 2 == 1:
+                            year_range.append(int(year) + 1)
+                        year_range.append(int(year))
+
+                    # this has potential for error, I took a guess that the last year continues to current date
+                    year_range += list(range(year_range[-1],
+                                    datetime.now().year + 1))
+                    row.years_active = list(set(year_range))
+                except IndexError:
+                    # no house/senate served prob
+                    pass
+
+        committees = soup.find_all('div', class_=['col-sm-12 col-md-12'])[1:]
+        for committee in committees:
+            group = committee.find('a').text.strip().title()
+
+            try:
+                role = committee.find('b').text.strip()
+            except:
+                role = 'Member'
+
+            row.committees.append({'role:': role, 'committee:': group})
 
         try:
-            role = committee.find('b').text.strip()
+            scrape_wiki(urls[1], row)
         except:
-            role = 'Member'
-
-        row.committees.append({'role:': role, 'committee:': group})
-
-    scrape_wiki(urls[1], row)
-    scraper_utils.crawl_delay(crawl_delay)
+            pass
+        scraper_utils.crawl_delay(crawl_delay)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(urls)
     return row
 
 
-def set_session_id():
-    scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    scraper_utils.crawl_delay(crawl_delay)
-    return(soup.find('div', class_='siteBienniumSessionName').text.split('-')[1].strip())
+# def set_session_id():
+#     scrape_url = 'https://www.arkleg.state.ar.us/Legislators/List'
+#     page = scraper_utils.request(scrape_url)
+#     soup = BeautifulSoup(page.content, 'html.parser')
+#     scraper_utils.crawl_delay(crawl_delay)
+#     return(soup.find('div', class_='siteBienniumSessionName').text.split('-')[1].strip())
 
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
-    url = get_urls()
+    url = get_urls(True)
     wiki_url = get_wiki_links(
         'https://en.wikipedia.org/wiki/Arkansas_House_of_Representatives', 'House')
     wiki_url = {
         **wiki_url, **get_wiki_links('https://en.wikipedia.org/wiki/Arkansas_Senate', 'Senate')}
 
-    urls = [(path, wiki_url[key])for key, path in url.items()]
-    session_id = set_session_id()
+    urls = []
+    for key, path in url.items():
+        try:
+            urls.append([path, wiki_url[key[0:2]]])
+        except KeyError:
+            urls.append([path])
+
+    # session_id = set_session_id()
     print('Initialized Scraping')
 
     # Next, we'll scrape the data we want to collect from those URLs.
@@ -335,7 +387,6 @@ if __name__ == '__main__':
     # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
-        # pprint(data)
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
