@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
@@ -14,8 +15,6 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
-
-
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
@@ -150,7 +149,7 @@ def collect_mla_data(link):
                         office = office_loc
                     try:
                         phone = (phone_tags[i + 1]["href"]
-                                 ).replace("tel:", "").strip()
+                        ).replace("tel:", "").strip()
                         phone = phone.replace(".", "-")
                         phone_info = {'office': office, 'number': phone}
 
@@ -174,7 +173,7 @@ def collect_mla_data(link):
                     office = office_loc
                 try:
                     phone = (phone_tags[i + 1]["href"]
-                             ).replace("tel:", "").strip()
+                    ).replace("tel:", "").strip()
                     phone = phone.replace(".", "-")
                     phone_info = {'office': office, 'number': phone}
                     # print(phone_info)
@@ -234,7 +233,6 @@ if __name__ == '__main__':
     leg_df = pd.DataFrame(data)
     # get these from wikipedia instead
     leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
-
 
     wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
     wiki_people = scrape_wiki(wiki_link)

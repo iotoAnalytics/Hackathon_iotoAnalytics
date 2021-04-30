@@ -11,26 +11,13 @@ import sys
 import os
 from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 import io
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-import re
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-import datetime
-import boto3
+
 from urllib.request import urlopen as uReq
-import urllib.parse
-from urllib.request import Request
+
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 from selenium import webdriver
@@ -38,10 +25,9 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 
-
-# import PyPDF2
-# from selenium.common.exceptions import TimeoutException
-
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
 
 prov_terr_abbreviation = 'BC'
 
@@ -53,6 +39,8 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(prov_terr_abbreviation,
                                                       legislator_table_name)
 crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
 
+# load chrome driver info for selenium
+# chrome driver comes from web_drivers folder
 chrome_options = webdriver.ChromeOptions()
 
 chrome_options.add_argument('--headless')
@@ -101,9 +89,6 @@ def get_urls(myurl):
 
 
 def scrape(url):
-    # r = scraper_utils.request(url)
-    # data = r.json()
-    # print(data)
 
     driver.get(url)
     timeout = 5
@@ -119,12 +104,6 @@ def scrape(url):
     html = driver.page_source
 
     page_soup = soup(html, 'html.parser')
-
-    # try:
-    #     expln = page_soup.find("div", {"class": "explannote"})
-    #
-    # except:
-    #     pass
 
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -196,13 +175,7 @@ def scrape(url):
         date = center.text.split("on the")[1]
         date = date.replace("day of", "").strip()
         date = date.split(" ")
-        # date = date[:5]
-        # date = " ".join(date)
-        # print(date)
 
-        #
-        # explan = page_soup.find("div", {"class": "explannote"})
-        # print(explan)
 
     except:
         pass
@@ -217,7 +190,7 @@ def scrape(url):
     #
     # except:
     #     pass
-        # print(timeout)
+    # print(timeout)
     # html = driver.page_source
     #
     # page_soup = soup(html, 'html.parser')
@@ -264,12 +237,18 @@ def scrape(url):
 
 
 if __name__ == '__main__':
+    # bc bills are currently under 3 categories:
+
+    # having completed first reading on this page
     first_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
                         '/1st-session/bills/first-reading#Default={%22o%22:[{%22d%22:0,' \
                         '%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
+    # ammendments on this page
     ammendement_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament' \
                       '/1st-session/bills/amended '
+    # having completed third reading on this page
     third_reading_url = 'https://www.leg.bc.ca/parliamentary-business/legislation-debates-proceedings/42nd-parliament/1st-session/bills/third-reading#Default={%22o%22:[{%22d%22:0,%22p%22:%22BillTypeOWSCHCS%22},{%22d%22:0,%22p%22:%22BillNumber%22}]} '
+
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     pd.options.display.max_colwidth = 200
@@ -280,11 +259,12 @@ if __name__ == '__main__':
 
     third_urls = pd.DataFrame(get_urls(third_reading_url))
 
+    # put all the bill infos into one dataframe
     url_df = pd.concat((ammendment_urls, first_urls)).sort_index().drop_duplicates(
         'bill_name')  # .reset_index(drop=True)
     url_df = pd.concat((third_urls, url_df)).sort_index(
     ).drop_duplicates('bill_name')  # .reset_index(drop=True)
-    # print(url_df)
+
     less_urls = url_df['source_url'][:11]
     urls = url_df['source_url']
     print(len(urls))
