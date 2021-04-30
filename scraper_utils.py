@@ -110,6 +110,10 @@ class ScraperUtils:
                 query = f'SELECT * FROM {country}_divisions'
                 cur.execute(query)
                 division_results = cur.fetchall()
+
+                query = f"SELECT * FROM website_metadata WHERE scraper_table = '{database_table_name}'"
+                cur.execute(query)
+                website_metadata_results = cur.fetchall()
             except Exception as e:
                 sys.exit(
                     f'An exception occurred retrieving tables from database:\n{e}')
@@ -117,6 +121,7 @@ class ScraperUtils:
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
         self.divisions = pd.DataFrame(division_results)
+        self.website_metadata = pd.DataFrame(website_metadata_results)
 
         self.country = self.countries.loc[self.countries['abbreviation']
                                           == country]['country'].values[0]
@@ -147,6 +152,14 @@ class ScraperUtils:
         if not self._robots.get(base_url) and auto_add_enabled:
             self.add_robot(base_url)
 
+    # # url_data_changed = url_data_changed
+    # def website_data_changed(self, url, response_headers):
+    #     etag = response_headers.get('Etag')
+    #     if not etag: return False
+
+    #     etag = 
+
+
     def request(self, url, **kwargs):
         """More polite version of the requests.get function.
         Valid kwargs:
@@ -169,6 +182,7 @@ class ScraperUtils:
             raise exceptions.NoRobotsConfiguredException(
                 self.request, url, list(self._robots.keys()))
         ua = headers.get('User-Agent', '*')
+
         can_fetch = r.can_fetch(ua, url)
         if can_fetch:
             return requests.get(url, headers=headers)
