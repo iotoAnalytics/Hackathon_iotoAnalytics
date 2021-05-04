@@ -1,6 +1,7 @@
 import sys
 import os
 from pathlib import Path
+
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
@@ -9,29 +10,18 @@ import numpy as np
 import unidecode
 import pandas as pd
 from nameparser import HumanName
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
-from selenium import webdriver
-import boto3
-from datetime import datetime
-import re
-from pprint import pprint
-import configparser
-from database import Database
+
 from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
-
-
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
 
 
 def scrape_members_link(link):
+    # scrape main page to get a list of links to all the individual members' pages
     mem_bios = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -52,6 +42,7 @@ def scrape_members_link(link):
 
 
 def collect_mla_data(link):
+    # scrape a member's bio page to get available information
     row = scraper_utils.initialize_row()
     uClient = uReq(link)
     page_html = uClient.read()
@@ -96,6 +87,7 @@ def collect_mla_data(link):
     riding = riding.split("for")[1].strip()
     row.riding = riding
 
+    # years active
     dates_of_service = page_soup.find("div", {"class": "mla_dos mla_table"})
     dates_of_service = dates_of_service.findAll("span")
     start = (dates_of_service[1].text)
@@ -104,6 +96,7 @@ def collect_mla_data(link):
     end = (dates_of_service[3].text)
 
     if end == 'Current':
+        # this will have to be updated each year, should be current year + 1
         years_active = list(range(int(start), 2022))
     else:
         end = int(start.split("-")[0])
@@ -141,7 +134,7 @@ def collect_mla_data(link):
     phone_numbers = []
     phone_soup = page_soup.findAll(
         "div", {"class": "row border-bottom pt-2 ml-0 mr-0"})
-    # print(len(phone_soup))
+
     for ps in phone_soup:
         office_loc = ps.div.text
         phones = ps.find("div", {"class": "col-lg-auto pb-2"})
@@ -156,10 +149,10 @@ def collect_mla_data(link):
                         office = office_loc
                     try:
                         phone = (phone_tags[i + 1]["href"]
-                                 ).replace("tel:", "").strip()
+                        ).replace("tel:", "").strip()
                         phone = phone.replace(".", "-")
                         phone_info = {'office': office, 'number': phone}
-                        # print(phone_info)
+
                         phone_numbers.append(phone_info)
                     except:
                         pass
@@ -180,7 +173,7 @@ def collect_mla_data(link):
                     office = office_loc
                 try:
                     phone = (phone_tags[i + 1]["href"]
-                             ).replace("tel:", "").strip()
+                    ).replace("tel:", "").strip()
                     phone = phone.replace(".", "-")
                     phone_info = {'office': office, 'number': phone}
                     # print(phone_info)
@@ -209,6 +202,7 @@ def collect_mla_data(link):
 
 
 def scrape_wiki(link):
+    # get the links for all the legislator's wikipedia pages
     wiki_bios = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -233,14 +227,12 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     members_link = 'https://www.assembly.ab.ca/members/members-of-the-legislative-assembly/chamber-seating-plan'
     mla_links = scrape_members_link(members_link)
-    # print(mla_links)
-    # mla_links = mla_links[:40]
 
     with Pool() as pool:
         data = pool.map(func=collect_mla_data, iterable=mla_links)
     leg_df = pd.DataFrame(data)
+    # get these from wikipedia instead
     leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
-    # print(leg_df)
 
     wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
     wiki_people = scrape_wiki(wiki_link)

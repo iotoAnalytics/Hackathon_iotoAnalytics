@@ -2,30 +2,23 @@ import sys
 import os
 from pathlib import Path
 
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 import io
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
+
 import PyPDF2
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
-import datetime
-import boto3
+
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 prov_terr_abbreviation = 'MB'
 database_table_name = 'ca_mb_legislation'
@@ -38,6 +31,7 @@ crawl_delay = scraper_utils.get_crawl_delay('https://web2.gov.mb.ca/')
 
 
 def scrape_bill_links(link):
+    # return a dataframe with the bill infos accessible from the main page + links to individual bill pages
     bill_infos = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -100,6 +94,7 @@ def scrape_bill_links(link):
 
 
 def collect_bill_data(info):
+
     link = info['source_url']
 
     row = scraper_utils.initialize_row()
@@ -130,7 +125,7 @@ def collect_bill_data(info):
         explan = explan.text.strip()
         explan = explan.replace('\n', "")
         row.bill_description = explan
-        # print(row.bill_description)
+
     except:
         # print(link)
         pass
@@ -138,6 +133,8 @@ def collect_bill_data(info):
     row.bill_type = 'Bill'
     centers = page_soup.find("table", {"class": "centers"})
     center = centers.find("td", {"class": "center"})
+
+    # try to get available bill text from pdf link
     pdf_link = 'https://web2.gov.mb.ca/bills/42-3/' + (center.a["href"])
     bill_text = ""
 
@@ -168,6 +165,7 @@ def collect_bill_data(info):
 
 
 if __name__ == '__main__':
+
     bills_main = 'https://web2.gov.mb.ca/bills/42-3/index.php'
     bill_infos = scrape_bill_links(bills_main)
     print(len(bill_infos))
@@ -176,8 +174,6 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     with Pool() as pool:
         data = pool.map(func=collect_bill_data, iterable=bill_infos)
-
-
 
     print('Writing data to database...')
     scraper_utils.write_data(data)
