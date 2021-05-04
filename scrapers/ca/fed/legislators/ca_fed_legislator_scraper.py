@@ -40,8 +40,8 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 
 scrape_mps = True
-scrape_senators = False
-write_results_to_database = False
+scrape_senators = True
+write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'

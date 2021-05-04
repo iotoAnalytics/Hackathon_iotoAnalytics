@@ -313,7 +313,7 @@ class LegislatorScraperUtils(ScraperUtils):
                         b = datetime.strptime(born, "%Y-%m-%d").date()
 
                         birthday = b
-                        print(b)
+                        # print(b)
 
         except Exception as ex:
             # birthday not available
@@ -733,7 +733,7 @@ class LegislationScraperUtils(ScraperUtils):
         with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
             s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
             mlmodel = f.name
-            print(mlmodel)
+            # print(mlmodel)
 
         print('Model loaded.')
 
@@ -839,7 +839,7 @@ class LegislationScraperUtils(ScraperUtils):
             i = i + 1
         # get rid of this label row that was only used for classification
         df = df.drop(columns=['label'])
-        print(df)
+        # print(df)
         # return the dataframe to a list of dictionaries
         dicts = df.to_dict('records')
 
@@ -902,10 +902,10 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                          legislator_table_name, USLegislationRow())
 
     def write_data(self, data, database_table=None) -> None:
-        data = self.add_topics(data)
         """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
+        # data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
@@ -967,7 +967,6 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
-
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislators(data, table)
 
@@ -1016,6 +1015,8 @@ class CAFedLegislationScraperUtils(LegislationScraperUtils):
         """
         Takes care of inserting legislation data into database. Data must be either a list or Row objects or dictionaries.
         """
+        
+        data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislation(data, table)
 
@@ -1037,12 +1038,10 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         return row
 
     def write_data(self, data, database_table=None) -> None:
-        # add topics
-        data = self.add_topics(data)
-
         """
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
+        data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_prov_terr_legislation(data, table)
 # endregion
