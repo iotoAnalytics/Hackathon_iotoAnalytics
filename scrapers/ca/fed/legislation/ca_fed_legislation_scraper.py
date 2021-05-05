@@ -172,7 +172,7 @@ def scrape(xml_url):
     XML sheet, additional data collection may occur, including data collection from an
     individual bill's information page.
     Args:
-        xml_url: XML URL containing information about a list of bill
+        xml_url: XML URL containing information about a list of bills
     Returns:
         List of rows containing bill information
     """
@@ -327,7 +327,7 @@ if __name__ == '__main__':
             wr = csv.writer(result_file)
             wr.writerow(xml_urls)
 
-    xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
+    xml_urls = xml_urls if len(xml_urls) > 0 else []
     # xml_urls = xml_urls if len(xml_urls) > 0 else []
 
     xml_data = [scrape(xml_url) for xml_url in xml_urls]

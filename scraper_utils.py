@@ -71,20 +71,13 @@ class ScraperUtils:
             """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
             ua = user_agent if user_agent else self.user_agent
             return self.rp.crawl_delay(ua)
-            # crawl_delay = self.rp.crawl_delay(ua)
-            # if crawl_delay:
-            #     return crawl_delay
-            # return 2
+
 
         def get_request_rate(self, user_agent=None):
             """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
             ua = user_agent if user_agent else self.user_agent
             return self.rp.request_rate(ua)
-            # rr = self.rp.request_rate(ua)
-            # if rr:
-            #     return rr
-            # RR = namedtuple('RequestRate', ['requests', 'seconds'])
-            # return RR(1, 2)
+
 
         def can_fetch(self, url, user_agent=None):
             """Determine whether data from a given URL can be collected."""
@@ -261,11 +254,6 @@ class LegislatorScraperUtils(ScraperUtils):
         except Exception:
             return val
 
-    def get_party_id(self, party_name):
-        """
-        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
-        """
-        return self.get_attribute('party', 'party', party_name)
 
     def scrape_wiki_bio(self, wiki_link):
         """
@@ -862,6 +850,12 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
     def __init__(self, database_table_name='us_fed_legislators'):
         super().__init__('us', database_table_name, USLegislatorRow())
 
+    def get_party_id(self, party_name):
+        """
+        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
+        """
+        return self.get_attribute('party', 'party', party_name)
+
     def get_state_id(self, state_abbreviation):
         """Returns state ID based on a given state abbreviation."""
         return self.get_attribute('division', 'abbreviation', state_abbreviation)
@@ -951,6 +945,16 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         super().__init__('ca', database_table_name, row_type)
 
+    def get_party_id(self, party_name, location=None):
+        """Return the party ID for a given party and location. Party name must be the party full name."""
+        if not location:
+            raise exceptions.MissingLocationException(self.get_party_id)
+        df = self.parties
+        try:
+            return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
+        except IndexError:
+            raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
+
     def get_prov_terr_id(self, prov_terr_abbrev):
         """Returns the province/territory ID for a given province/territory abbreviation."""
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
@@ -981,6 +985,10 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
         self.province_territory_id = self.get_prov_terr_id(
             prov_terr_abbreviation)
         self.region = self.get_region(prov_terr_abbreviation)
+
+    def get_party_id(self, party_name):
+        """Return the party ID for the party from this province or territory. Party name must be the party full name."""
+        return super().get_party_id(party_name, self.province_territory)
 
     def initialize_row(self):
         """Create a Row object filled with default values."""
