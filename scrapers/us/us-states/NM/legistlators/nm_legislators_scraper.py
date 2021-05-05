@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 import time
 from scraper_utils import USStateLegislatorScraperUtils
 from tqdm import tqdm
+from datetime import date
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -23,8 +24,8 @@ wiki_url = 'https://en.wikipedia.org/'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
-senators_and_reps = ['/Members/Legislator_List?T=S', '/Members/Legislator_List?T=R']
-senators_and_reps_wiki = ['/wiki/New_Mexico_Senate', '/wiki/New_Mexico_House_of_Representatives']
+senators_and_reps = ['/Members/Legislator_List?T=R', '/Members/Legislator_List?T=S']
+senators_and_reps_wiki = ['/wiki/New_Mexico_House_of_Representatives', '/wiki/New_Mexico_Senate']
 
 
 def make_soup(url):
@@ -306,44 +307,69 @@ def create_rows(length):
     return [scraper_utils.initialize_row() for _ in range(length)]
 
 
-def organize_data():
+def fill_rows_from_gov_site():
     """
-    Organizes the flow of helper functions.
+    Fill in rows from gov site.
+
+    :return: list of rows filled with all data scraped from gov site sorted by legislator role, then district number.
     """
 
     all_urls = join_senators_and_reps()
-    # all_wiki_urls = join_senators_and_reps_wiki()
+
     rows = create_rows(len(all_urls))
 
     pbar = tqdm(range(len(all_urls)))
     pbar_test = tqdm(range(15))
 
-    for item in pbar_test:
-        pbar.set_description(f'Setting info for URL:{all_urls[item]}')
+    for item in pbar:
         soup = make_soup(all_urls[item])
-        # set_source_id(all_urls[item], rows[item])
-        # set_source_url(all_urls[item], rows[item])
-        # set_name_info(rows[item], soup)
-        # set_party_info(rows[item], soup)
-        # set_occupation(rows[item], soup)
-        # set_role(rows[item], soup)
-        # set_district(rows[item], soup)
+        set_source_id(all_urls[item], rows[item])
+        set_source_url(all_urls[item], rows[item])
+        set_name_info(rows[item], soup)
+        set_party_info(rows[item], soup)
+        set_occupation(rows[item], soup)
+        set_role(rows[item], soup)
+        set_district(rows[item], soup)
         # set_phone_numbers(rows[item], soup)
-        set_addresses(rows[item], soup)
-        set_committees(rows[item], soup)
+        set_email(rows[item], soup)
+        # set_addresses(rows[item], soup)
+        # set_committees(rows[item], soup)
 
-        # print(scraper_utils.scrape_wiki_bio(all_wiki_urls[item]))
+    return sorted(rows, key=lambda item: (item.role, int(item.district)))
 
-    for r in rows:
-        print(r)
+
+def fill_rows_from_wiki(sorted_rows):
+    """
+    Take rows that are partially filled and grabs any other missing information from wikipedia (birthday, years served,
+    etc).
+
+    :param sorted_rows: list of sorted rows filled with info from gov site but missing fields
+    :return:
+    """
+
+    all_wiki_urls = join_senators_and_reps_wiki()
+    pbar = tqdm(range(len(sorted_rows)))
+    pbar_test = tqdm(range(20))
+    for item in pbar:
+        wiki_info = scraper_utils.scrape_wiki_bio(all_wiki_urls[item])
+        sorted_rows[item].education = wiki_info['education']
+
+        # s = wiki_info['birthday']
+        # print(s)
+        sorted_rows[item].birthday = str(wiki_info['birthday'])
+        sorted_rows[item].years_active = wiki_info['years_active']
+        sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
+
+    pprint(sorted_rows)
 
 
 def main():
     """
     Driver
     """
+    rows = fill_rows_from_gov_site()
+    fill_rows_from_wiki(rows)
 
-    organize_data()
 
 
 if __name__ == '__main__':
