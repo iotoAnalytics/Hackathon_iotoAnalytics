@@ -39,6 +39,7 @@ def scrape_members_link(link_containing_all_members):
     try:
       link_to_member_bio = BASE_URL + member.a['href']
       if link_to_member_bio not in mem_bios_urls:
+        link_to_member_bio = link_to_member_bio.replace('\n', '')
         mem_bios_urls.append(link_to_member_bio)
     except Exception:
       pass
@@ -56,6 +57,8 @@ def collect_mla_data(link_to_mla):
   main_content_container = page_soup.find('div', {'class' : 'content'})
   full_name = main_content_container.find('span').text
   full_name = remove_prefix_from_name(full_name, "Hon.")
+  
+  human_name = HumanName(full_name)
 
   row.name_full = human_name.full_name
   row.name_last = human_name.last
@@ -75,6 +78,22 @@ def collect_mla_data(link_to_mla):
 
   riding = main_content_container.find('div', {'class' : 'field--name-field-constituency'}).text
   row.riding = riding
+
+  # Everyone has the same office address. That address is declared at the footer of page
+  page_footer = page_soup.find('footer')
+  address_container = page_footer.find('div', {'class' : 'footer-row--right'})
+  full_address = address_container.find('p').text
+  full_address = full_address.replace('\xa0', '')
+  parts_of_address = full_address.split('\n')
+
+  address_location = parts_of_address[0]
+
+  # This may not make sense but the address that is split has 6 entries, last two are not relevant
+  address = parts_of_address[1] + parts_of_address[2] + parts_of_address[3]
+  address_info = {'location' :  address_location, 'address' : address}
+  row.addresses = [address_info]
+  print(row.addresses)
+
   return row
 
 # Want to add this to general functoins
@@ -105,4 +124,4 @@ if __name__ == '__main__':
   
   leg_df = pd.DataFrame(data)
   leg_df = leg_df.drop(columns = columns_not_on_main_site)
-  print(leg_df)
+  # print(leg_df)
