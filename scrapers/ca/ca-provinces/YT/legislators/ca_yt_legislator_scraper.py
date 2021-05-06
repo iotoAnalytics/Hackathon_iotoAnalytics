@@ -1,3 +1,5 @@
+## TODO: Raise Exception when looking for element and it's not there
+
 import sys
 import os
 from pathlib import Path
