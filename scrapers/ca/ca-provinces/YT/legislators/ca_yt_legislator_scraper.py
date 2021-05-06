@@ -41,8 +41,14 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def driver():
   main_page_soup = get_page_as_soup(MLA_URL)
-  scraper_for_main = ScrapeFromMain()
+  scraper_for_main = ScraperForMainSite()
+
   all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
+
+  with Pool() as pool:
+    data = pool.map(func=get_mla_data,
+                    iterable=all_mla_links)
+
   # delete after... only here because need to test if main function at the end runs
   return all_mla_links
 
@@ -50,33 +56,36 @@ def get_page_as_soup(url):
   page_html = get_site_as_html(url)
   return soup(page_html, 'html.parser')
 
-class ScrapeFromMain:  
+def get_mla_data(mla_url):
+  scraper_for_mla = ScraperForMLAs(mla_url)
+  return scraper_for_mla.get_rows()
+
+class ScraperForMainSite:  
   def get_all_mla_links(self, main_page_soup):
     mem_bios_urls = []
-    list_of_url_spans = self.get_list_of_member_url_span(main_page_soup)
+    list_of_url_spans = self.__get_list_of_member_url_span(main_page_soup)
 
     for span in list_of_url_spans:
-      self.extract_mla_url_from_span(span, mem_bios_urls)
+      self.__extract_mla_url_from_span(span, mem_bios_urls)
     scraper_utils.crawl_delay(crawl_delay)
     return mem_bios_urls
 
-  def get_list_of_member_url_span(self, main_page_soup):
+  def __get_list_of_member_url_span(self, main_page_soup):
     container_of_all_members = main_page_soup.find('div', {'class' : 'view-content'})
     return container_of_all_members.findAll('span')
 
-  def extract_mla_url_from_span(self, span, current_list_of_urls):
+  def __extract_mla_url_from_span(self, span, current_list_of_urls):
     try:
       link_to_member_bio = BASE_URL + span.a['href']
-      self.add_url_to_list(link_to_member_bio, current_list_of_urls)
+      self.__add_url_to_list(link_to_member_bio, current_list_of_urls)
     except Exception:
       pass
     return link_to_member_bio
 
-  def add_url_to_list(self, url, current_list_of_urls):
+  def __add_url_to_list(self, url, current_list_of_urls):
     if url not in current_list_of_urls:
       url = url.replace('\n', '')
       current_list_of_urls.append(url)
-    
 
 def scrape_main_wiki_link(wiki_link):
     wiki_urls = []
@@ -93,6 +102,63 @@ def scrape_main_wiki_link(wiki_link):
         wiki_urls.append(url)
     scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
+
+class ScraperForMLAs():
+  def __init__(self, mla_url):
+    self.row = scraper_utils.initialize_row()
+    self.url = mla_url
+    self.main_container = find_main_container()
+    self.set_row_data()
+
+  def find_main_container():
+    page_soup = get_page_as_soup(self.url)
+    return page_soup.find('div', {'class' : 'content'})
+
+  def get_rows():
+    return self.row
+
+  def set_row_data():
+    self.row.source_url = self.url
+    set_name_data()
+    set_role_data()
+    set_party_data()
+
+  def set_name_data():
+    human_name = get_full_human_name()
+    row.name_full = human_name.full_name
+    row.name_last = human_name.last
+    row.name_first = human_name.first
+    row.name_middle = human_name.middle
+    row.name_suffix = human_name.suffix
+
+  def get_full_human_name():
+    full_name = self.main_container.find('span'.text)
+    full_name = full_name.replace('hon', '').strip()
+    return HumanName(full_name)
+  
+  def set_role_data():
+    role_container = self.main_container.find('div', {'class' : 'field--name-field-title'})
+    row.role = assign_role(role_containre)
+
+  def assign_role(role):
+    if role == None:
+      return "Member of the Legislative Assembly"
+    else:
+      return role.text
+
+  def set_party_data():
+    party_info_container = self.main_container.find('div', {'class' : 'field--name-field-party-affiliation'})
+    party_info = party_info_container.text
+    party_name = edit_party_name(party_info)
+    row.party = party_name
+  
+  def edit_party_name(party_name):
+    if 'Liberal' in party_name:
+      return 'Liberal'
+    elif 'Democratic' in party_name:
+      return 'New Democratic'
+    else:
+      return party_name
 
 # TODO: CLEAN UP CODE
 # Try and refactor each part to a separate function(like get name, add name data)
@@ -215,18 +281,6 @@ def find_longest_thread(array_of_ints):
       return_array.clear()
       return_array.append(array_of_ints[i])
   return return_array
-
-
-# !!!Want to add this to general functoins
-def remove_prefix_from_name(full_name, prefix):
-  return full_name.replace(prefix, "").strip()
-
-
-def assign_role(role):
-  if role == None:
-    return "Member of the Legislative Assembly"
-  else:
-    return role.text
 
 # Repeated so I wanted to extract as function
 def get_site_as_html(link_to_open):
