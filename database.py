@@ -14,6 +14,7 @@ from psycopg2 import sql
 from datetime import date, datetime
 import json
 import utils
+import sys
 
 db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
 db_port = 5432
@@ -744,12 +745,12 @@ class Persistence:
                        row.publications,
                        json.dumps(row.last_major_event, default=utils.json_serial))
 
-                try:
-                    cur.execute(insert_legislator_query, tup)
+            try:
+                cur.execute(insert_legislator_query, tup)
 
-                except Exception as e:
-                    print(
-                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+            except Exception as e:
+                print(
+                    f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
     @staticmethod
     def write_ca_prov_terr_legislation(data, table):

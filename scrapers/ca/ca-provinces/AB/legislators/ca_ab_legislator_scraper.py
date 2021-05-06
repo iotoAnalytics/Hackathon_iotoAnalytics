@@ -16,7 +16,7 @@ import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
 
-scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
+scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators_test')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
 
 

@@ -71,20 +71,13 @@ class ScraperUtils:
             """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
             ua = user_agent if user_agent else self.user_agent
             return self.rp.crawl_delay(ua)
-            # crawl_delay = self.rp.crawl_delay(ua)
-            # if crawl_delay:
-            #     return crawl_delay
-            # return 2
+
 
         def get_request_rate(self, user_agent=None):
             """Return crawl delay for a given URL based on robots.txt file. If a robots.txt file cannot be found or parsed, a default value will be returned."""
             ua = user_agent if user_agent else self.user_agent
             return self.rp.request_rate(ua)
-            # rr = self.rp.request_rate(ua)
-            # if rr:
-            #     return rr
-            # RR = namedtuple('RequestRate', ['requests', 'seconds'])
-            # return RR(1, 2)
+
 
         def can_fetch(self, url, user_agent=None):
             """Determine whether data from a given URL can be collected."""
@@ -109,6 +102,10 @@ class ScraperUtils:
                 query = f'SELECT * FROM {country}_divisions'
                 cur.execute(query)
                 division_results = cur.fetchall()
+
+                query = f"SELECT * FROM website_metadata WHERE scraper_table = '{database_table_name}'"
+                cur.execute(query)
+                website_metadata_results = cur.fetchall()
             except Exception as e:
                 sys.exit(
                     f'An exception occurred retrieving tables from database:\n{e}')
@@ -116,6 +113,7 @@ class ScraperUtils:
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
         self.divisions = pd.DataFrame(division_results)
+        self.website_metadata = pd.DataFrame(website_metadata_results)
 
         self.country = self.countries.loc[self.countries['abbreviation']
                                           == country]['country'].values[0]
@@ -146,6 +144,14 @@ class ScraperUtils:
         if not self._robots.get(base_url) and auto_add_enabled:
             self.add_robot(base_url)
 
+    # # url_data_changed = url_data_changed
+    # def website_data_changed(self, url, response_headers):
+    #     etag = response_headers.get('Etag')
+    #     if not etag: return False
+
+    #     etag = 
+
+
     def request(self, url, **kwargs):
         """More polite version of the requests.get function.
         Valid kwargs:
@@ -168,6 +174,7 @@ class ScraperUtils:
             raise exceptions.NoRobotsConfiguredException(
                 self.request, url, list(self._robots.keys()))
         ua = headers.get('User-Agent', '*')
+
         can_fetch = r.can_fetch(ua, url)
         if can_fetch:
             return requests.get(url, headers=headers)
@@ -247,11 +254,6 @@ class LegislatorScraperUtils(ScraperUtils):
         except Exception:
             return val
 
-    def get_party_id(self, party_name):
-        """
-        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
-        """
-        return self.get_attribute('party', 'party', party_name)
 
     def scrape_wiki_bio(self, wiki_link):
         """
@@ -299,7 +301,7 @@ class LegislatorScraperUtils(ScraperUtils):
                         b = datetime.strptime(born, "%Y-%m-%d").date()
 
                         birthday = b
-                        print(b)
+                        # print(b)
 
         except Exception as ex:
             # birthday not available
@@ -719,7 +721,7 @@ class LegislationScraperUtils(ScraperUtils):
         with tempfile.NamedTemporaryFile(mode='w+b', delete=False) as f:
             s3.download_fileobj('bill-topic-classifier-sample', 'bert_data_dem4.pt', f)
             mlmodel = f.name
-            print(mlmodel)
+            # print(mlmodel)
 
         print('Model loaded.')
 
@@ -825,7 +827,7 @@ class LegislationScraperUtils(ScraperUtils):
             i = i + 1
         # get rid of this label row that was only used for classification
         df = df.drop(columns=['label'])
-        print(df)
+        # print(df)
         # return the dataframe to a list of dictionaries
         dicts = df.to_dict('records')
 
@@ -847,6 +849,12 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
 
     def __init__(self, database_table_name='us_fed_legislators'):
         super().__init__('us', database_table_name, USLegislatorRow())
+
+    def get_party_id(self, party_name):
+        """
+        Return party ID based on a given party. Party must be a full name, such as "Liberal" or "Republicans".
+        """
+        return self.get_attribute('party', 'party', party_name)
 
     def get_state_id(self, state_abbreviation):
         """Returns state ID based on a given state abbreviation."""
@@ -888,10 +896,10 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
                          legislator_table_name, USLegislationRow())
 
     def write_data(self, data, database_table=None) -> None:
-        data = self.add_topics(data)
         """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
+        # data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
@@ -937,6 +945,16 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         super().__init__('ca', database_table_name, row_type)
 
+    def get_party_id(self, party_name, location=None):
+        """Return the party ID for a given party and location. Party name must be the party full name."""
+        if not location:
+            raise exceptions.MissingLocationException(self.get_party_id)
+        df = self.parties
+        try:
+            return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
+        except IndexError:
+            raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
+
     def get_prov_terr_id(self, prov_terr_abbrev):
         """Returns the province/territory ID for a given province/territory abbreviation."""
         return self.get_attribute('division', 'abbreviation', prov_terr_abbrev)
@@ -953,7 +971,6 @@ class CAFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         Inserts legislator data into database. Data must be either a ist of Row objects or dictionaries.
         """
-
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislators(data, table)
 
@@ -968,6 +985,10 @@ class CAProvTerrLegislatorScraperUtils(CAFedLegislatorScraperUtils):
         self.province_territory_id = self.get_prov_terr_id(
             prov_terr_abbreviation)
         self.region = self.get_region(prov_terr_abbreviation)
+
+    def get_party_id(self, party_name):
+        """Return the party ID for the party from this province or territory. Party name must be the party full name."""
+        return super().get_party_id(party_name, self.province_territory)
 
     def initialize_row(self):
         """Create a Row object filled with default values."""
@@ -1002,6 +1023,8 @@ class CAFedLegislationScraperUtils(LegislationScraperUtils):
         """
         Takes care of inserting legislation data into database. Data must be either a list or Row objects or dictionaries.
         """
+        
+        data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislation(data, table)
 
@@ -1023,12 +1046,10 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         return row
 
     def write_data(self, data, database_table=None) -> None:
-        # add topics
-        data = self.add_topics(data)
-
         """
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
+        data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_prov_terr_legislation(data, table)
 # endregion
