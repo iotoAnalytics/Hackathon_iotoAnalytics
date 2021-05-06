@@ -1,8 +1,9 @@
 import sys
 import os
 from pathlib import Path
+import re
+import datetime
 
-# To find the required modules... but is it really required with venv?
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -12,14 +13,10 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
 import requests
 from multiprocessing import Pool
-
 from nameparser import HumanName
 import pandas as pd
 import unidecode
 import numpy as np
-import re
-import datetime
-
 
 BASE_URL = 'https://yukonassembly.ca/'
 MLA_URL = 'https://yukonassembly.ca/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -37,29 +34,49 @@ NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {24 : 1978,
                                     34 : 2016,
                                     35 : 2021}
 CURRENT_YEAR = datetime.datetime.now().year
+columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('YT', 'ca_yt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
-columns_not_on_main_site = ['birthday', 'education', 'occupation']
+def driver():
+  main_page_soup = get_page_as_soup(MLA_URL)
+  scraper_for_main = ScrapeFromMain()
+  all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
+  # delete after... only here because need to test if main function at the end runs
+  return all_mla_links
 
-def scrape_members_link(main_link):
-  mem_bios_urls = []
-  page_html = get_site_as_html(main_link)
-  page_soup = soup(page_html, 'html.parser')
-  members_container = page_soup.find('div', {'class' : 'view-content'})
-  member_container = members_container.findAll('span')
+def get_page_as_soup(url):
+  page_html = get_site_as_html(url)
+  return soup(page_html, 'html.parser')
 
-  for member in member_container:
+class ScrapeFromMain:  
+  def get_all_mla_links(self, main_page_soup):
+    mem_bios_urls = []
+    list_of_url_spans = self.get_list_of_member_url_span(main_page_soup)
+
+    for span in list_of_url_spans:
+      self.extract_mla_url_from_span(span, mem_bios_urls)
+    scraper_utils.crawl_delay(crawl_delay)
+    return mem_bios_urls
+
+  def get_list_of_member_url_span(self, main_page_soup):
+    container_of_all_members = main_page_soup.find('div', {'class' : 'view-content'})
+    return container_of_all_members.findAll('span')
+
+  def extract_mla_url_from_span(self, span, current_list_of_urls):
     try:
-      link_to_member_bio = BASE_URL + member.a['href']
-      if link_to_member_bio not in mem_bios_urls:
-        link_to_member_bio = link_to_member_bio.replace('\n', '')
-        mem_bios_urls.append(link_to_member_bio)
+      link_to_member_bio = BASE_URL + span.a['href']
+      self.add_url_to_list(link_to_member_bio, current_list_of_urls)
     except Exception:
       pass
-  scraper_utils.crawl_delay(crawl_delay)
-  return mem_bios_urls
+    return link_to_member_bio
+
+  def add_url_to_list(self, url, current_list_of_urls):
+    if url not in current_list_of_urls:
+      url = url.replace('\n', '')
+      current_list_of_urls.append(url)
+    
 
 def scrape_main_wiki_link(wiki_link):
     wiki_urls = []
@@ -221,7 +238,7 @@ def get_site_as_html(link_to_open):
 if __name__ == '__main__':
   pd.set_option('display.max_rows', None)
   pd.set_option('display.max_columns', None)
-  individual_mla_links = scrape_members_link(MLA_URL)
+  individual_mla_links = driver()
 
   with Pool() as pool:
     data = pool.map(func=collect_mla_data, iterable=individual_mla_links)
