@@ -16,6 +16,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
+from scraper_utils import USStateLegislatorScraperUtils
 import boto3
 import re
 import numpy as np
@@ -28,8 +29,6 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 import time
-from scraper_utils import USStateLegislatorScraperUtils
-from tqdm import tqdm
 
 state_abbreviation = 'KS'
 database_table_name = 'test_us_ks_legislators'
@@ -77,7 +76,7 @@ def get_urls():
         urls.append(link)
 
     # Delay so we do not overburden servers
-  #  scraper_utils.crawl_delay(crawl_delay)
+    #  scraper_utils.crawl_delay(crawl_delay)
 
     return urls
 
@@ -126,6 +125,171 @@ def find_sens_wiki(repLink):
     return bio_links
 
 
+def find_party_and_district(main_div, row):
+    party_block = main_div.find('h2').text
+    party = party_block.split(' ')[3]
+
+    row.party_id = scraper_utils.get_party_id(party)
+    row.party = party
+
+    # Get district
+    district = party_block.split(' ')[1]
+    #  print(district)
+    row.district = district
+
+
+def get_name_and_role(main_div, row):
+    # Get names and current roll (House or Senate)
+    current_role = ""
+    name_line = main_div.find('h1').text
+    name_full = name_line
+
+    if "-" in name_line:
+        name_full = name_full[:name_full.index("-")]
+    if "Senator" in name_full:
+        name_full = name_full.replace('Senator ', '')
+        current_role = "Senator"
+    if "Representative" in name_full:
+        current_role = "Representative"
+        name_full = name_full.replace('Representative ', '')
+
+    row.role = current_role
+
+    hn = HumanName(name_full)
+    row.name_full = name_full
+    row.name_last = hn.last
+    row.name_first = hn.first
+    row.name_middle = hn.middle
+    row.name_suffix = hn.suffix
+    print(name_full + '\n')
+
+
+def get_phone_numbers(capitol_office, home, business, row):
+    phone_numbers = []
+
+    number = capitol_office.text.split("Phone: ")[1].strip()
+    phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', number)[0]
+    phone_info = {'office': 'capitol office',
+                  'number': phone_number}
+    phone_numbers.append(phone_info)
+
+    try:
+        numbers = home.text.split("Phone: ")[1].strip()
+        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
+        phone_info = {'office': 'home',
+                      'number': phone_number}
+        phone_numbers.append(phone_info)
+    except Exception:
+        pass
+
+    try:
+        numbers = business.text.split("Phone: ")[1].strip()
+        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
+        phone_info = {'office': 'usiness',
+                      'number': phone_number}
+        phone_numbers.append(phone_info)
+    except Exception:
+        pass
+
+    row.phone_numbers = phone_numbers
+
+
+def get_email(capitol_office, row):
+    # get email
+    capitol_email = capitol_office.a.text
+    row.email = capitol_email
+
+
+def get_address(capitol_office, row):
+    # get address room number for capitol office
+    room_number = capitol_office.text.split("Room: ")[1].strip()
+    room_number = room_number[:room_number.index('\n')]
+    address = {'office': 'capitol office',
+               'address': room_number + ' - 300 SW 10th St. - Topeka, Kansas 66612'}
+
+    row.address = address
+
+
+def get_occupation(business, row):
+    # get occupation
+    jobs = []
+    job = business.text.split("Occupation: ")[1].strip()
+
+    if '\n' in job:
+        job = job[:job.index('\n')]
+
+    if '/' in job:
+        jobs.append(job.split('/')[0])
+        jobs.append(job.split('/')[1])
+    else:
+        jobs.append(job)
+
+    row.occupation = jobs
+
+
+def get_years_active(contact_sidebar, row):
+    # get years active
+    terms = []
+    years = []
+    try:
+        years_block = contact_sidebar.find_all('p')[4]
+        years_text = re.findall(r'[0-9]{4}', years_block.text)
+        for term in years_text:
+            term = int(term)
+            terms.append(term)
+    except Exception:
+        pass
+
+    # Convert term length to actual years
+
+    # Converting terms from the form year-year eg. 2012-2014
+    if len(terms) > 1:
+        j = 0
+        k = -1
+        for i in range(1, len(terms), 2):
+            j += 2
+            k += 2
+            for year in range(terms[len(terms) - j], terms[len(terms) - k] + 1):
+                years.append(year)
+
+    # converting term which is current
+    if len(terms) > 0:
+        for year in range(terms[0], 2021 + 1):
+            years.append(year)
+
+    row.years_active = years
+
+
+def get_committees(main_div, row):
+    # get committees
+    committees = []
+    committee_leadership = main_div.find('tbody', {'id': 'commoffice-tab-1'})
+    committee_member = main_div.find('tbody', {'id': 'comm-tab-1'})
+    try:
+        rows = committee_leadership.find_all('tr')
+        for row in rows:
+            row_details = row.find_all('td')
+            role = row_details[0].text
+            committee = row_details[1].text
+            committee = committee[:committee.index(" -")].replace('\n', '')
+            committees.append({"role": role, "committee": committee})
+    except Exception:
+        pass
+    try:
+        member_row = committee_member.find_all('tr')
+        for row in member_row:
+            row_details = row.find_all('td')
+            committee = row_details[0].text
+            committee = committee[:committee.index("-")].strip()
+            committee = committee.replace('\n', '')
+            committees.append({"role": 'member', "committee": committee})
+    except Exception:
+        pass
+
+    print(committees)
+    row.committees = committees
+
+
 def scrape(url):
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -158,144 +322,29 @@ def scrape(url):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
+    # getting the main part of the page
     main_div = soup.find('div', {'id': 'main'})
-    party_block = main_div.find('h2').text
 
-    party = party_block.split(' ')[3]
-
-    row.party_id = scraper_utils.get_party_id(party)
-    row.party = party
-    # print(party)
-
-    # Get names and current roll (House or Senate)
-    current_role = ""
-    name_line = main_div.find('h1').text
-    name_full = name_line
-
-    if "-" in name_line:
-        name_full = name_full[:name_full.index("-")]
-    if "Senator" in name_full:
-        name_full = name_full.replace('Senator ', '')
-        current_role = "Senator"
-    if "Representative" in name_full:
-        current_role = "Representative"
-        name_full = name_full.replace('Representative ', '')
-
-    row.role = current_role
-    
-
-    hn = HumanName(name_full)
-    row.name_full = name_full
-    row.name_last = hn.last
-    row.name_first = hn.first
-    row.name_middle = hn.middle
-    row.name_suffix = hn.suffix
-    # print(name_full)
-
-    # Get district
-
-    district = party_block.split(' ')[1]
-    #  print(district)
-    row.district = district
-
-    # Get phone number
-    phone_numbers = []
+    # getting the sidebar data
     contact_sidebar = soup.find('div', {'id': 'sidebar'})
 
     capitol_office = contact_sidebar.find_all('p')[0]
     home = contact_sidebar.find_all('p')[1]
     business = contact_sidebar.find_all('p')[2]
 
-    number = capitol_office.text.split("Phone: ")[1].strip()
-    phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', number)[0]
-    phone_info = {'office': 'Capitol Office',
-                  'number': phone_number}
-    phone_numbers.append(phone_info)
+    # calling data collection functions
+    find_party_and_district(main_div, row)
+    get_name_and_role(main_div, row)
+    get_phone_numbers(capitol_office, home, business, row)
+    get_email(capitol_office, row)
+    get_address(capitol_office, row)
+    get_occupation(business, row)
+    get_years_active(contact_sidebar, row)
+    get_committees(main_div, row)
 
-    try:
-        numbers = home.text.split("Phone: ")[1].strip()
-        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
-        phone_info = {'office': 'Home',
-                      'number': phone_number}
-        phone_numbers.append(phone_info)
-    except:
-        pass
+    # Delay so we do not overburden servers
+    # scraper_utils.crawl_delay(crawl_delay)
 
-    try:
-        numbers = business.text.split("Phone: ")[1].strip()
-        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
-        phone_info = {'office': 'Business',
-                      'number': phone_number}
-        phone_numbers.append(phone_info)
-    except:
-        pass
-
-    row.phone_numbers = phone_numbers
-    #  print(phone_numbers)
-
-    # get email
-    capitol_email = capitol_office.a.text
-    row.email = capitol_email
-    #   print(capitol_email)
-
-    # get occupation
-    jobs = []
-    job = business.text.split("Occupation: ")[1].strip()
-
-    if '\n' in job:
-        job = job[:job.index('\n')]
-
-    if '/' in job:
-        jobs.append(job.split('/')[0])
-        jobs.append(job.split('/')[1])
-    else:
-        jobs.append(job)
-
-    #  print(jobs)
-    row.occupation = jobs
-
-    # get years active
-    terms = []
-    years = []
-    try:
-        years_block = contact_sidebar.find_all('p')[4]
-        years_text = re.findall(r'[0-9]{4}', years_block.text)
-        for term in years_text:
-            term = int(term)
-            terms.append(term)
-    #   print(terms)
-    except:
-        pass
-
-    # Convert term length to actual years
-
-    # Converting terms from the form year-year eg. 2012-2014
-    if len(terms) > 1:
-        j = 0
-        k = -1
-        for i in range(1, len(terms), 2):
-            j += 2
-            k += 2
-            for year in range(terms[len(terms) - j], terms[len(terms) - k] + 1):
-                years.append(year)
-
-    # converting term which is current
-    if len(terms) > 0:
-        for year in range(terms[0], 2021 + 1):
-            years.append(year)
-
-    # print(years)
-
-    row.years_active = years
-
-    # get committees
-
-    tabs_section = main_div.find_all('div', {'class':'tabs'})
-    
-    print(tabs_section)
-    # # Delay so we do not overburden servers
-   # scraper_utils.crawl_delay(crawl_delay)
-    #
     return row
 
 
@@ -320,7 +369,6 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
 
-   
     wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
     wiki_sen_link = 'https://en.wikipedia.org/wiki/Kansas_Senate'
 
@@ -340,17 +388,17 @@ if __name__ == '__main__':
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
-   
+
     big_df['education'] = big_df['education'].replace({np.nan: None})
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
 
     print('Scraping complete')
- 
+
     big_list_of_dicts = big_df.to_dict('records')
-    #print(big_list_of_dicts)
+    # print(big_list_of_dicts)
 
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    # scraper_utils.write_data(big_list_of_dicts)
 
-    print(f'Scraper ran succesfully!')
+    print(f'Scraper ran successfully!')
