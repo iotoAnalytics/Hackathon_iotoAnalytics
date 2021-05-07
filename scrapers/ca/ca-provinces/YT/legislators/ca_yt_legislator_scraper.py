@@ -24,6 +24,7 @@ from tqdm import tqdm
 BASE_URL = 'https://yukonassembly.ca/'
 MLA_URL = 'https://yukonassembly.ca/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Yukon_Legislative_Assembly#Current_members'
+COMMITTEE_URL = 'https://yukonassembly.ca/committees'
 NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {24 : 1978,
                                     25 : 1982,
                                     26 : 1985,
@@ -46,22 +47,29 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 def driver():
-  main_page_soup = get_page_as_soup(MLA_URL)
-  scraper_for_main = ScraperForMainSite()
+  # main_page_soup = get_page_as_soup(MLA_URL)
+  # scraper_for_main = ScraperForMainSite()
 
-  print("Getting data from mla pages...")
-  all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
-  mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
+  # print("Getting data from mla pages...")
+  # all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
+  # mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
 
-  print("Getting data from wiki pages...")
-  individual_wiki_links = scrape_main_wiki_link(WIKI_URL)
-  wiki_data = get_data_from_all_links(scraper_utils.scrape_wiki_bio, individual_wiki_links)
+  # print("Getting data from wiki pages...")
+  # all_wiki_links = scrape_main_wiki_link(WIKI_URL)
+  # wiki_data = get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
-  complete_data_set = configure_data(mla_data, wiki_data)
+  print("Getting committee data from committee pages...")
+  main_committees_page_soup = get_page_as_soup(COMMITTEE_URL)
+  scraper_for_committees = ScraperForCommitteesMainSite()
+  all_committee_links = scraper_for_committees.get_all_commitee_links(main_committees_page_soup)
+  committee_data = get_data_from_all_links(get_committee_data, all_committee_links)
 
-  print('Writing data to database...')
-  scraper_utils.write_data(complete_data_set)
-  print("Complete")
+
+  # complete_data_set = configure_data(mla_data, wiki_data)
+
+  # print('Writing data to database...')
+  # scraper_utils.write_data(complete_data_set)
+  # print("Complete")
 
 def get_page_as_soup(url):
   page_html = get_site_as_html(url)
@@ -71,6 +79,7 @@ def get_site_as_html(link_to_open):
   uClient = urlopen(link_to_open)
   page_html = uClient.read()
   uClient.close()
+  scraper_utils.crawl_delay(crawl_delay)
   return page_html
 
 def get_data_from_all_links(function, all_mla_links):
@@ -113,8 +122,11 @@ def scrape_main_wiki_link(wiki_link):
         url = 'https://en.wikipedia.org' + (td.a["href"])
 
         wiki_urls.append(url)
-    scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
+
+def get_committee_data(committee_url):
+  scraper_for_committee = ScraperForCommittee(committee_url)
+  return scraper_for_committee.get_rows()
 
 class ScraperForMainSite:  
   def get_all_mla_links(self, main_page_soup):
@@ -123,7 +135,6 @@ class ScraperForMainSite:
 
     for span in list_of_url_spans:
       self.__extract_mla_url_from_span(span, mem_bios_urls)
-    scraper_utils.crawl_delay(crawl_delay)
     return mem_bios_urls
 
   def __get_list_of_member_url_span(self, main_page_soup):
@@ -306,6 +317,42 @@ class ScraperForMLAs:
 
   def __set_committee_data(self):
     pass
+
+class ScraperForCommitteesMainSite:
+  def get_all_commitee_links(self, soup):
+    committee_urls = []
+    list_of_url_li = self.__get_list_of_committee_url_li(soup)
+
+    for li in list_of_url_li:
+      self.__extract_committee_url_from_li(li, committee_urls)
+    return committee_urls
+
+  def __get_list_of_committee_url_li(self, soup):
+    container_of_all_committee_links = soup.find('aside')
+    container_of_all_li = container_of_all_committee_links.find('li', {'class' : 'expanded dropdown active active-trail'})
+    return container_of_all_li.findAll('li')
+
+  def __extract_committee_url_from_li(self, li, current_committee_list):
+    if (self.__is_irrelevant_list(li)):
+      return
+    try:
+      link_to_committee = BASE_URL + li.a['href']
+      self.__add_url_to_list(link_to_committee, current_committee_list)
+    except Exception:
+      pass
+    return link_to_committee
+  
+  def __is_irrelevant_list(self, li):
+    return li.has_attr('class') and li['class'][0] == 'expanded'
+
+  def __add_url_to_list(self, url, current_list_of_urls):
+    if url not in current_list_of_urls:
+      url = url.replace('\n', '')
+      current_list_of_urls.append(url)
+
+# class ScraperForCommittee:
+#   def __init__(self, committee_url):
+
 
 if __name__ == '__main__':
   driver()
