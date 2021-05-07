@@ -31,7 +31,7 @@ from urllib.request import Request
 import time
 
 state_abbreviation = 'KS'
-database_table_name = 'test_us_ks_legislators'
+database_table_name = 'us_ks_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
@@ -58,7 +58,7 @@ def get_urls():
     items = table.find_all('tr')
 
     # We'll collect only the first 10 to keep things simple. Need to skip first record
-    for tr in items[1:11]:
+    for tr in items[1:]:
         link = base_url + tr.find('a').get('href')
         # print(link)
         urls.append(link)
@@ -70,13 +70,13 @@ def get_urls():
     table = soup.find('table', {'class': 'bottom'})
     items = table.find_all('tr')
     # scraping just 10 for testing
-    for tr in items[1:11]:
+    for tr in items[1:]:
         link = base_url + tr.find('a').get('href')
         #  print(link)
         urls.append(link)
 
     # Delay so we do not overburden servers
-    #  scraper_utils.crawl_delay(crawl_delay)
+    scraper_utils.crawl_delay(crawl_delay)
 
     return urls
 
@@ -125,6 +125,14 @@ def find_sens_wiki(repLink):
     return bio_links
 
 
+def get_most_recent_term_id(soup, row):
+    header_div = soup.find('div', {'id': 'logo2'})
+    term_id = header_div.find('h5').text
+    term_id = term_id.split(' ')[0].strip()
+
+    row.most_recent_term_id = term_id
+
+
 def find_party_and_district(main_div, row):
     party_block = main_div.find('h2').text
     party = party_block.split(' ')[3]
@@ -161,7 +169,6 @@ def get_name_and_role(main_div, row):
     row.name_first = hn.first
     row.name_middle = hn.middle
     row.name_suffix = hn.suffix
-    print(name_full + '\n')
 
 
 def get_phone_numbers(capitol_office, home, business, row):
@@ -185,7 +192,7 @@ def get_phone_numbers(capitol_office, home, business, row):
     try:
         numbers = business.text.split("Phone: ")[1].strip()
         phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
-        phone_info = {'office': 'usiness',
+        phone_info = {'office': 'business',
                       'number': phone_number}
         phone_numbers.append(phone_info)
     except Exception:
@@ -202,26 +209,31 @@ def get_email(capitol_office, row):
 
 def get_address(capitol_office, row):
     # get address room number for capitol office
+    addresses = []
     room_number = capitol_office.text.split("Room: ")[1].strip()
     room_number = room_number[:room_number.index('\n')]
     address = {'office': 'capitol office',
                'address': room_number + ' - 300 SW 10th St. - Topeka, Kansas 66612'}
-
-    row.address = address
+    addresses.append(address)
+    row.addresses = addresses
 
 
 def get_occupation(business, row):
     # get occupation
     jobs = []
-    job = business.text.split("Occupation: ")[1].strip()
+    try:
+        job = business.text.split("Occupation: ")[1].strip()
 
-    if '\n' in job:
-        job = job[:job.index('\n')]
+        if '\n' in job:
+            job = job[:job.index('\n')]
 
-    if '/' in job:
-        jobs.append(job.split('/')[0])
-        jobs.append(job.split('/')[1])
-    else:
+        if '/' in job:
+            jobs.append(job.split('/')[0])
+            jobs.append(job.split('/')[1])
+        else:
+            jobs.append(job)
+    except Exception:
+        job = None
         jobs.append(job)
 
     row.occupation = jobs
@@ -262,32 +274,34 @@ def get_years_active(contact_sidebar, row):
 
 def get_committees(main_div, row):
     # get committees
-    committees = []
+    committees_list = []
     committee_leadership = main_div.find('tbody', {'id': 'commoffice-tab-1'})
     committee_member = main_div.find('tbody', {'id': 'comm-tab-1'})
     try:
         rows = committee_leadership.find_all('tr')
-        for row in rows:
-            row_details = row.find_all('td')
+        for r in rows:
+            row_details = r.find_all('td')
             role = row_details[0].text
             committee = row_details[1].text
             committee = committee[:committee.index(" -")].replace('\n', '')
-            committees.append({"role": role, "committee": committee})
+            committee_detail = {"role": role, "committee": committee}
+            committees_list.append(committee_detail)
+
     except Exception:
         pass
     try:
         member_row = committee_member.find_all('tr')
-        for row in member_row:
-            row_details = row.find_all('td')
+        for r in member_row:
+            row_details = r.find_all('td')
             committee = row_details[0].text
             committee = committee[:committee.index("-")].strip()
             committee = committee.replace('\n', '')
-            committees.append({"role": 'member', "committee": committee})
+            committee_detail = {"role": "member", "committee": committee}
+            committees_list.append(committee_detail)
     except Exception:
         pass
 
-    print(committees)
-    row.committees = committees
+    row.committees = committees_list
 
 
 def scrape(url):
@@ -329,10 +343,17 @@ def scrape(url):
     contact_sidebar = soup.find('div', {'id': 'sidebar'})
 
     capitol_office = contact_sidebar.find_all('p')[0]
-    home = contact_sidebar.find_all('p')[1]
-    business = contact_sidebar.find_all('p')[2]
+    try:
+        home = contact_sidebar.find_all('p')[1]
+    except Exception:
+        home = None
+    try:
+        business = contact_sidebar.find_all('p')[2]
+    except Exception:
+        business = None
 
     # calling data collection functions
+    get_most_recent_term_id(soup, row)
     find_party_and_district(main_div, row)
     get_name_and_role(main_div, row)
     get_phone_numbers(capitol_office, home, business, row)
@@ -343,13 +364,13 @@ def scrape(url):
     get_committees(main_div, row)
 
     # Delay so we do not overburden servers
-    # scraper_utils.crawl_delay(crawl_delay)
+    scraper_utils.crawl_delay(crawl_delay)
 
     return row
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
+    # Getting URLs from gov't website
     start = time.time()
     print(
         f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) since the crawl delay is very large (ie: {crawl_delay} seconds). If you need to abort, press ctrl + c.')
@@ -369,6 +390,7 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
 
+    # getting urls from wikipedia
     wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
     wiki_sen_link = 'https://en.wikipedia.org/wiki/Kansas_Senate'
 
@@ -395,10 +417,10 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+    # print(big_df['committees'])
 
     print('Writing data to database...')
 
-    # scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
