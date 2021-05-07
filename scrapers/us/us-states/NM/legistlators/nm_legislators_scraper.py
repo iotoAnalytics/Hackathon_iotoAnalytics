@@ -55,12 +55,12 @@ def get_urls(path):
     soup = BeautifulSoup(page.content, 'lxml')
     content_table = soup.find('div', {'class': 'panel-body'})
     links = content_table.find_all('a', {'class': 'thumbnail text-center'})
-    links = tqdm(links)
 
-    for link in links:
+    pbar = tqdm(links)
+    for link in pbar:
         urls.append(base_url + '/Members/' + link.get('href'))
+        scraper_utils.crawl_delay(crawl_delay)
 
-    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
@@ -96,8 +96,8 @@ def get_wiki_urls(path):
         href = rows[row].find_all('td')[1].find('a').get('href')
         link = wiki_url + href
         urls.append(link)
+        scraper_utils.crawl_delay(crawl_delay)
 
-    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
@@ -182,9 +182,11 @@ def set_occupation(row, soup):
     """
 
     content = soup.find('span', {'id': 'MainContent_formViewLegislator_lblOccupation'})
-    occupation = content.text
+    occupations = []
+    if content.text != '':
+        occupations.append(content.text)
 
-    row.occupation = occupation
+    row.occupation = occupations
 
 
 def set_role(row, soup):
@@ -250,9 +252,10 @@ def set_addresses(row, soup):
 
     content = soup.find('span', {'id': 'MainContent_formViewLegislator_lblAddress'}).text
     address = {'address': content, 'location': ''}
-    addresses = [address]
 
-    row.addresses = addresses
+    if address['address'].strip() != ',':
+        addresses = [address]
+        row.addresses = addresses
 
 
 def set_email(row, soup):
@@ -330,12 +333,12 @@ def fill_rows_from_gov_site():
         set_occupation(rows[item], soup)
         set_role(rows[item], soup)
         set_district(rows[item], soup)
-        # set_phone_numbers(rows[item], soup)
+        set_phone_numbers(rows[item], soup)
         set_email(rows[item], soup)
-        # set_addresses(rows[item], soup)
-        # set_committees(rows[item], soup)
+        set_addresses(rows[item], soup)
+        set_committees(rows[item], soup)
 
-    return sorted(rows, key=lambda item: (item.role, int(item.district)))
+    return sorted(rows, key=lambda row: (row.role, int(row.district)))
 
 
 def fill_rows_from_wiki(sorted_rows):
@@ -349,14 +352,12 @@ def fill_rows_from_wiki(sorted_rows):
 
     all_wiki_urls = join_senators_and_reps_wiki()
     pbar = tqdm(range(len(sorted_rows)))
-    pbar_test = tqdm(range(20))
     for item in pbar:
         wiki_info = scraper_utils.scrape_wiki_bio(all_wiki_urls[item])
         sorted_rows[item].education = wiki_info['education']
 
-        # s = wiki_info['birthday']
-        # print(s)
-        sorted_rows[item].birthday = str(wiki_info['birthday'])
+        if wiki_info['birthday'] is not None:
+            sorted_rows[item].birthday = str(wiki_info['birthday'])
         sorted_rows[item].years_active = wiki_info['years_active']
         sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
 
@@ -369,7 +370,8 @@ def main():
     """
     rows = fill_rows_from_gov_site()
     fill_rows_from_wiki(rows)
-
+    scraper_utils.write_data(rows, 'us_nm_legislators')
+    pprint(rows)
 
 
 if __name__ == '__main__':
