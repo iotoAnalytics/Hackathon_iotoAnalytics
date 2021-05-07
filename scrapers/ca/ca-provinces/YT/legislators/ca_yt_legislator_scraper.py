@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import datetime
+from time import sleep
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -19,7 +20,8 @@ from nameparser import HumanName
 import pandas as pd
 import unidecode
 import numpy as np
-from tqdm import tqdm
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 BASE_URL = 'https://yukonassembly.ca/'
 MLA_URL = 'https://yukonassembly.ca/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -43,10 +45,14 @@ columns_not_on_main_site = ['birthday', 'education', 'occupation']
 scraper_utils = CAProvTerrLegislatorScraperUtils('YT', 'ca_yt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
+options = Options()
+options.headless = True
+
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
-def driver():
+def program_driver():
   # main_page_soup = get_page_as_soup(MLA_URL)
   # scraper_for_main = ScraperForMainSite()
 
@@ -63,7 +69,7 @@ def driver():
   scraper_for_committees = ScraperForCommitteesMainSite()
   all_committee_links = scraper_for_committees.get_all_commitee_links(main_committees_page_soup)
   committee_data = get_data_from_all_links(get_committee_data, all_committee_links)
-
+  print(committee_data)
 
   # complete_data_set = configure_data(mla_data, wiki_data)
 
@@ -82,10 +88,11 @@ def get_site_as_html(link_to_open):
   scraper_utils.crawl_delay(crawl_delay)
   return page_html
 
-def get_data_from_all_links(function, all_mla_links):
+def get_data_from_all_links(function, all_links):
+  data = []
   with Pool() as pool:
     data = pool.map(func=function,
-                    iterable=all_mla_links)
+                    iterable=all_links)
   return data
 
 def get_mla_data(mla_url):
@@ -124,9 +131,16 @@ def scrape_main_wiki_link(wiki_link):
         wiki_urls.append(url)
     return wiki_urls
 
+# def get_committee_data_from_all_links(function, all_committee_links):
+#   data = []
+#   for link in all_committee_links:
+#     data.append(function(link))
+#   return data
+
 def get_committee_data(committee_url):
   scraper_for_committee = ScraperForCommittee(committee_url)
-  return scraper_for_committee.get_rows()
+  scraper_utils.crawl_delay(crawl_delay)
+  return scraper_for_committee.get_data()
 
 class ScraperForMainSite:  
   def get_all_mla_links(self, main_page_soup):
@@ -176,7 +190,6 @@ class ScraperForMLAs:
     self.__set_contact_info()
     self.__set_service_period()
     self.__set_most_recent_term_id()
-    self.__set_committee_data()
 
   def __set_name_data(self):
     human_name = self.__get_full_human_name()
@@ -315,9 +328,6 @@ class ScraperForMLAs:
   def __set_most_recent_term_id(self):
     self.row.most_recent_term_id = self.row.years_active[-1]
 
-  def __set_committee_data(self):
-    pass
-
 class ScraperForCommitteesMainSite:
   def get_all_commitee_links(self, soup):
     committee_urls = []
@@ -350,9 +360,75 @@ class ScraperForCommitteesMainSite:
       url = url.replace('\n', '')
       current_list_of_urls.append(url)
 
-# class ScraperForCommittee:
-#   def __init__(self, committee_url):
+class ScraperForCommittee:
+  def __init__(self, committee_url):
+    self.url = committee_url
+    self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
+    self.driver.switch_to.default_content()
+    self.__collect_data()
+  def get_data(self):
+    return self.data
+  
+  def __collect_data(self):
+    self.__open_url()
+    committee_name = self.__get_committee_name()
+    names = self.__get_members_names(committee_name)
+    self.data = {committee_name : names}
+    self.driver.close()
+    self.driver.quit()
 
+  def __open_url(self):
+    self.driver.get(self.url)
+    self.driver.maximize_window()
+    sleep(2)
+
+  def __get_committee_name(self):
+    return self.driver.find_element_by_class_name('page-header').text
+
+  def __get_members_names(self, committee_name):
+    if 'Special Committee on Civil Emergency Legislation' in committee_name:
+      return self.__get_members_from_weird_special_committee()
+    elif 'Select Committee on Bill 108, Legislative Renewal Act' in committee_name:
+      return self.__get_members_from_special(1)
+    elif 'Special' in committee_name or 'Select' in committee_name:
+      return self.__get_members_from_special(0)
+    else:
+      return self.__get_names_from_normal()
+
+  def __get_members_from_weird_special_committee(self):
+    main_container = self.driver.find_element_by_class_name('content')
+    member_containers = main_container.find_elements_by_class_name('paragraph--type--member')
+    names = []
+    for member in member_containers:
+      try:
+        name = member.find_element_by_tag_name('span').text
+        names.append(name)
+      except Exception:
+        pass
+    return names
+
+  def __get_members_from_special(self, ul_index):
+    main_container = self.driver.find_element_by_class_name('col-md-8')
+    members_container = main_container.find_elements_by_tag_name('ul')[ul_index]
+    names_container = members_container.find_elements_by_tag_name('li')
+    names = []
+    for name in names_container:
+      if '(' in name.text:
+        member_name = name.text.split('(')[0]
+        role = name.text.split('(')[1].split(')')[0]
+      else:
+        member_name = name.text
+        role = 'member'
+      names.append(self.__add_name_and_role(member_name, role))
+    return names
+
+  def __get_names_from_normal(self):
+      names_container = self.driver.find_element_by_xpath('/html/body/div[1]/div/div/section/div[2]/article/div/div[2]/div/div[2]/div[1]/div/div[2]')
+      names = names_container.find_elements_by_tag_name('span')
+      return [self.__add_name_and_role(name.text, 'member') for name in names]
+  
+  def __add_name_and_role(self, name, role):
+    return {name : role}
 
 if __name__ == '__main__':
-  driver()
+  program_driver()
