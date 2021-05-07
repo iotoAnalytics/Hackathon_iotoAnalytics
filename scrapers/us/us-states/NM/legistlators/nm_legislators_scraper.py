@@ -310,24 +310,22 @@ def create_rows(length):
     return [scraper_utils.initialize_row() for _ in range(length)]
 
 
-def fill_rows_from_gov_site():
+def scrape_gov_site(all_gov_urls, rows):
     """
     Fill in rows from gov site.
 
+    :param all_gov_urls: all URLS from gov site
+    :param rows: list of unfilled rows
     :return: list of rows filled with all data scraped from gov site sorted by legislator role, then district number.
     """
 
-    all_urls = join_senators_and_reps()
-
-    rows = create_rows(len(all_urls))
-
-    pbar = tqdm(range(len(all_urls)))
+    pbar = tqdm(range(len(rows)))
     pbar_test = tqdm(range(15))
 
     for item in pbar:
-        soup = make_soup(all_urls[item])
-        set_source_id(all_urls[item], rows[item])
-        set_source_url(all_urls[item], rows[item])
+        soup = make_soup(all_gov_urls[item])
+        set_source_id(all_gov_urls[item], rows[item])
+        set_source_url(all_gov_urls[item], rows[item])
         set_name_info(rows[item], soup)
         set_party_info(rows[item], soup)
         set_occupation(rows[item], soup)
@@ -341,16 +339,16 @@ def fill_rows_from_gov_site():
     return sorted(rows, key=lambda row: (row.role, int(row.district)))
 
 
-def fill_rows_from_wiki(sorted_rows):
+def scrape_wiki_site(all_wiki_urls, sorted_rows):
     """
     Take rows that are partially filled and grabs any other missing information from wikipedia (birthday, years served,
     etc).
 
-    :param sorted_rows: list of sorted rows filled with info from gov site but missing fields
+    :param all_wiki_urls: all URLS from wiki site
+    :param sorted_rows: list of partially filled rows
     :return:
     """
 
-    all_wiki_urls = join_senators_and_reps_wiki()
     pbar = tqdm(range(len(sorted_rows)))
     for item in pbar:
         wiki_info = scraper_utils.scrape_wiki_bio(all_wiki_urls[item])
@@ -361,17 +359,31 @@ def fill_rows_from_wiki(sorted_rows):
         sorted_rows[item].years_active = wiki_info['years_active']
         sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
 
-    pprint(sorted_rows)
+
+def organize_data():
+    """
+    Organize flow of helper functions and row setting.
+    1. Get all gov and wiki urls
+    2. Create all rows
+    3. Scrape gov urls and fill rows
+    4. Scrape wiki urls and fill rows
+    5. Write to data
+    """
+
+    all_gov_urls = join_senators_and_reps()
+    all_wiki_urls = join_senators_and_reps_wiki()
+    rows = create_rows(len(all_gov_urls))
+
+    unfinished_rows = scrape_gov_site(all_gov_urls, rows)
+    scrape_wiki_site(all_wiki_urls, unfinished_rows)
+    scraper_utils.write_data(rows, 'us_nm_legislators')
 
 
 def main():
     """
     Driver
     """
-    rows = fill_rows_from_gov_site()
-    fill_rows_from_wiki(rows)
-    scraper_utils.write_data(rows, 'us_nm_legislators')
-    pprint(rows)
+    organize_data()
 
 
 if __name__ == '__main__':
