@@ -132,6 +132,7 @@ def get_most_recent_term_id(soup, row):
 
     row.most_recent_term_id = term_id
 
+
 def find_party_and_district(main_div, row):
     party_block = main_div.find('h2').text
     party = party_block.split(' ')[3]
@@ -272,7 +273,6 @@ def get_years_active(contact_sidebar, row):
 
 
 def get_committees(main_div, row):
-
     # get committees
     committees_list = []
     committee_leadership = main_div.find('tbody', {'id': 'commoffice-tab-1'})
@@ -417,7 +417,7 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = big_df.to_dict('records')
-    #print(big_df['committees'])
+    # print(big_df['committees'])
 
     print('Writing data to database...')
 
