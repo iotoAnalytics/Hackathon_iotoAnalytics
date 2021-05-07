@@ -220,13 +220,20 @@ def update_committee_data(data, urls):
     # print(urls)
     # TODO - Consider Multiprocessing
     committees_data_list = [scrape_committee(url) for url in urls]
+    committees = []
 
     for committee_members in committees_data_list:
         for member in committee_members:
             for legislator in data: # Match member in committee to legislator row and update committee field
                 if 'source_id' in member and member['source_id'] == legislator.source_id or \
                     'district' in member and member['district'] == legislator.district:
-                    legislator.committees.append({'role': member['role'], 'committee': member['committee'],})
+                    committee = {
+                        'role': member['role'],
+                        'committee': member['committee'],
+                    }
+                    committees.append(committees)
+
+    legislator.committees = committees
 
     return data
 
