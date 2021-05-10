@@ -40,7 +40,8 @@ NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {24 : 1978,
                                     34 : 2016,
                                     35 : 2021}
 CURRENT_YEAR = datetime.datetime.now().year
-columns_not_on_main_site = ['birthday', 'education', 'occupation']
+THREADS_FOR_POOL = 12
+columns_not_on_main_site = ['birthday', 'education', 'occupation', 'committees']
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('YT', 'ca_yt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -49,33 +50,41 @@ header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHT
 options = Options()
 options.headless = True
 
+'''
+This is required as a global variable.
+Each committee link is accessed one at a time, so each link adds data to this variable.
+The unproccessed committee data will be processed to be merged with the actual dataset.
+'''
+unproccessed_committee_data = {}
+
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 def program_driver():
-  # main_page_soup = get_page_as_soup(MLA_URL)
-  # scraper_for_main = ScraperForMainSite()
+  main_page_soup = get_page_as_soup(MLA_URL)
+  scraper_for_main = ScraperForMainSite()
 
-  # print("Getting data from mla pages...")
-  # all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
-  # mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
+  print("Getting data from mla pages...")
+  all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
+  mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
 
-  # print("Getting data from wiki pages...")
-  # all_wiki_links = scrape_main_wiki_link(WIKI_URL)
-  # wiki_data = get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
+  print("Getting data from wiki pages...")
+  all_wiki_links = scrape_main_wiki_link(WIKI_URL)
+  wiki_data = get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
   print("Getting committee data from committee pages...")
   main_committees_page_soup = get_page_as_soup(COMMITTEE_URL)
   scraper_for_committees = ScraperForCommitteesMainSite()
   all_committee_links = scraper_for_committees.get_all_commitee_links(main_committees_page_soup)
-  committee_data = get_data_from_all_links(get_committee_data, all_committee_links)
-  print(committee_data)
+  # This function will add to the global committee_data variable
+  get_committee_data_from_all_links(get_committee_data, all_committee_links)
+  committee_data = organize_unproccessed_committee_data()
 
-  # complete_data_set = configure_data(mla_data, wiki_data)
+  complete_data_set = configure_data(mla_data, wiki_data, committee_data)
 
-  # print('Writing data to database...')
-  # scraper_utils.write_data(complete_data_set)
-  # print("Complete")
+  print('Writing data to database...')
+  scraper_utils.write_data(complete_data_set)
+  print("Complete")
 
 def get_page_as_soup(url):
   page_html = get_site_as_html(url)
@@ -90,7 +99,7 @@ def get_site_as_html(link_to_open):
 
 def get_data_from_all_links(function, all_links):
   data = []
-  with Pool() as pool:
+  with Pool(THREADS_FOR_POOL) as pool:
     data = pool.map(func=function,
                     iterable=all_links)
   return data
@@ -99,7 +108,7 @@ def get_mla_data(mla_url):
   scraper_for_mla = ScraperForMLAs(mla_url)
   return scraper_for_mla.get_rows()
 
-def configure_data(mla_data, wiki_data):
+def configure_data(mla_data, wiki_data, committee_data):
   mla_df = pd.DataFrame(mla_data)
   mla_df = mla_df.drop(columns = columns_not_on_main_site)
   
@@ -107,12 +116,19 @@ def configure_data(mla_data, wiki_data):
     ['birthday', 'education', 'name_first', 'name_last', 'occupation']
   ]
 
-  big_df = pd.merge(mla_df, wiki_df, 
+  mla_wiki_df = pd.merge(mla_df, wiki_df, 
                     how='left',
                     on=['name_first', 'name_last'])
-  big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-  big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-  big_df['education'] = big_df['education'].replace({np.nan: None})
+  mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
+  mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
+  mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
+
+  committee_df = pd.DataFrame(committee_data)
+
+  big_df = pd.merge(mla_wiki_df, committee_df,
+                    how='left',
+                    on=['name_first', 'name_last'])
+  big_df['committees'] = big_df['committees'].replace({np.nan: None})
 
   return big_df.to_dict('records')
 
@@ -131,16 +147,24 @@ def scrape_main_wiki_link(wiki_link):
         wiki_urls.append(url)
     return wiki_urls
 
-# def get_committee_data_from_all_links(function, all_committee_links):
-#   data = []
-#   for link in all_committee_links:
-#     data.append(function(link))
-#   return data
+# This function is stupidly slow, but we can't use Pool() as pool because 
+# it will not add to the global variable.
+def get_committee_data_from_all_links(function, all_committee_links):
+  for link in all_committee_links:
+    function(link)
 
 def get_committee_data(committee_url):
   scraper_for_committee = ScraperForCommittee(committee_url)
   scraper_utils.crawl_delay(crawl_delay)
-  return scraper_for_committee.get_data()
+
+def organize_unproccessed_committee_data():
+  return_data = []
+  for member in unproccessed_committee_data.keys():
+    name_first = member.split(' ')[0]
+    name_last = member.split(' ')[1]
+    committees = unproccessed_committee_data[member]
+    return_data.append({'name_first' : name_first, 'name_last' : name_last, 'committees' : committees})
+  return return_data
 
 class ScraperForMainSite:  
   def get_all_mla_links(self, main_page_soup):
@@ -366,16 +390,15 @@ class ScraperForCommittee:
     self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
     self.driver.switch_to.default_content()
     self.__collect_data()
-  def get_data(self):
-    return self.data
   
   def __collect_data(self):
     self.__open_url()
     committee_name = self.__get_committee_name()
     names = self.__get_members_names(committee_name)
-    self.data = {committee_name : names}
+    data = {committee_name : names}
     self.driver.close()
     self.driver.quit()
+    self.__organize_committee_data(data)
 
   def __open_url(self):
     self.driver.get(self.url)
@@ -393,7 +416,7 @@ class ScraperForCommittee:
     elif 'Special' in committee_name or 'Select' in committee_name:
       return self.__get_members_from_special(0)
     else:
-      return self.__get_names_from_normal()
+      return self.__get_members_from_normal()
 
   def __get_members_from_weird_special_committee(self):
     main_container = self.driver.find_element_by_class_name('content')
@@ -402,7 +425,7 @@ class ScraperForCommittee:
     for member in member_containers:
       try:
         name = member.find_element_by_tag_name('span').text
-        names.append(name)
+        names.append(self.__add_name_and_role(name, 'member'))
       except Exception:
         pass
     return names
@@ -422,13 +445,28 @@ class ScraperForCommittee:
       names.append(self.__add_name_and_role(member_name, role))
     return names
 
-  def __get_names_from_normal(self):
+  def __get_members_from_normal(self):
       names_container = self.driver.find_element_by_xpath('/html/body/div[1]/div/div/section/div[2]/article/div/div[2]/div/div[2]/div[1]/div/div[2]')
       names = names_container.find_elements_by_tag_name('span')
       return [self.__add_name_and_role(name.text, 'member') for name in names]
   
   def __add_name_and_role(self, name, role):
     return {name : role}
+
+  def __organize_committee_data(self, data):
+    committee_name = list(data.keys())[0]
+    list_of_members = data[committee_name]
+    for member in list_of_members:
+      self.__add_member_committee_data(member, committee_name)
+    
+  def __add_member_committee_data(self, member, committee_name):
+    member_full_name = list(member.keys())[0]
+    role = member[member_full_name]
+    if 'Hon.' in member_full_name:
+      member_full_name = member_full_name.replace('Hon. ', '')
+    unproccessed_committee_data.setdefault(member_full_name, [])
+    list_of_member_committees = unproccessed_committee_data[member_full_name]
+    list_of_member_committees.append({'role' : role, 'committee' : committee_name})
 
 if __name__ == '__main__':
   program_driver()
