@@ -18,7 +18,6 @@ import requests
 from multiprocessing import Pool
 from nameparser import HumanName
 import pandas as pd
-import unidecode
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
