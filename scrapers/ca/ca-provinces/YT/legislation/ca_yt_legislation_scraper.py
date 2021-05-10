@@ -81,15 +81,34 @@ class SessionScraper:
     
     def __scrape(self):
         active_page_content = self.__get_active_page()
-        print(len(active_page_content))
+        bill_rows = self.__get_relevant_table_rows(active_page_content)
+        print(bill_rows)
         
     def __get_active_page(self):
         main_content = driver.find_element_by_css_selector('body > div > div > div > section > div.region.region-content > article > div > div.paragraph.paragraph--type--tabbed-content.paragraph--view-mode--default > div > div.tabs--content')
         main_content_direct_child_divs = main_content.find_elements_by_xpath('./*')
         for div in main_content_direct_child_divs:
-            class_name = div.get_attribute('class')
-            if 'hidden' not in class_name:
+            if self.__is_not_hidden_div(div):
                 return div
+
+    def __is_not_hidden_div(self, div):
+        return 'hidden' not in div.get_attribute('class')
+
+    def __get_relevant_table_rows(self, active_page_content):
+        all_tables = active_page_content.find_elements_by_tag_name('table')
+        rows = []
+        for table in all_tables:
+            self.__get_rows(table, rows)
+        return rows
+
+    def __get_rows(self, table, rows):
+        all_trs = table.find_elements_by_tag_name('tr')[2:]
+        for tr in all_trs:
+            if len(tr.find_elements_by_xpath('./*')) != 1:
+                link_td = tr.find_elements_by_tag_name('td')[1]
+                a = link_td.find_element_by_tag_name('a')
+                print(a.get_attribute('href'))
+
 
 if __name__ == '__main__':
     main_program = Main_Functions()
