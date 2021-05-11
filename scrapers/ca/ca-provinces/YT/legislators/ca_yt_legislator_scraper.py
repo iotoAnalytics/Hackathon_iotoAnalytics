@@ -247,7 +247,7 @@ class ScraperForMLAs:
     try:
       self.row.party_id = scraper_utils.get_party_id(party_name)
     except:
-      row.party_id = 0
+      self.row.party_id = 0
 
   def __set_riding_data(self):
     riding = self.main_container.find('div', {'class' : 'field--name-field-constituency'}).text

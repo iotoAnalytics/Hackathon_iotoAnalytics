@@ -1,27 +1,18 @@
 import sys
 import os
 from pathlib import Path
-import boto3
-import re
 from nameparser import HumanName
-from pprint import pprint
-from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup
-import time
 from scraper_utils import USStateLegislatorScraperUtils
 from tqdm import tqdm
-from datetime import date
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-scraper_utils = USStateLegislatorScraperUtils('NM', 'nm_sc_legislators')
-
 base_url = 'https://www.nmlegis.gov'
 wiki_url = 'https://en.wikipedia.org/'
 
-# Get scraper delay from website robots.txt file
+scraper_utils = USStateLegislatorScraperUtils('NM', 'nm_sc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 senators_and_reps = ['/Members/Legislator_List?T=R', '/Members/Legislator_List?T=S']

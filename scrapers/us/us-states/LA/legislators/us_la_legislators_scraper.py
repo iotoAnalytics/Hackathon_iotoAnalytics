@@ -337,10 +337,12 @@ def get_wiki_urls(path):
     pbar = tqdm(range(1, len(rows)))
     for row in pbar:
         try:
-            href = rows[row].find_all('td')[1].find('a').get('href')
+            legislator_wikipage = rows[row].find_all('td')[1].find('a')
+            href = legislator_wikipage.get('href')
             if '/wiki' in href:
                 link = wiki_url + href
-                urls.append(link)
+                district = legislator_wikipage.parent.parent.find('td').text.replace('\n','')
+                urls.append([district, link])
         except Exception:
             pass
         scraper_utils.crawl_delay(crawl_delay)
@@ -348,23 +350,36 @@ def get_wiki_urls(path):
     return urls
 
 
-def scrape_wiki_site(wiki_urls, sorted_rows):
+def scrape_wiki_site(wiki_urls, rows):
     """
     Take partially filled sorted rows and collect any other missing information from wikipedia (birthday, years served,
     etc).
     """
 
-    pbar = tqdm(range(len(sorted_rows)+1))
-    for item in pbar:
-        wiki_info = scraper_utils.scrape_wiki_bio(wiki_urls[item])
-        sorted_rows[item].education = wiki_info['education']
+    # pbar = tqdm(range(len(sorted_rows)))
+    # for item in pbar:
+    #     wiki_info = scraper_utils.scrape_wiki_bio(wiki_urls[item])
+    #     sorted_rows[item].education = wiki_info['education']
+    #
+    #     if wiki_info['birthday'] is not None:
+    #         sorted_rows[item].birthday = str(wiki_info['birthday'])
+    #     sorted_rows[item].years_active = wiki_info['years_active']
+    #     sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
+    for url in wiki_urls:
+        wiki_info = scraper_utils.scrape_wiki_bio(url[1])
+        url.append(wiki_info)
 
-        if wiki_info['birthday'] is not None:
-            sorted_rows[item].birthday = str(wiki_info['birthday'])
-        sorted_rows[item].years_active = wiki_info['years_active']
-        sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
+    for row in rows:
+        for url in wiki_urls:
+            if row.district == url[0] and row.name_last == url[2].get('name_last'):
+                try:
+                    row.education = url[2].get('education').replace('\n', ' ')
+                    row.occupation = url[2].get('occupation').replace('\n', ' ')
+                    row.birthday = url[2].get('birthday').replace('\n', ' ')
+                except Exception:
+                    pass
 
-    return sorted_rows
+    return rows
 
 
 if __name__ == '__main__':
@@ -386,12 +401,12 @@ if __name__ == '__main__':
 
     sen_urls = get_senate_urls()
     with Pool() as pool:
-        data = pool.map(scrape_senate, sen_urls)
-
-    sen_partially_filled_sorted_rows = sorted(data, key=lambda row: (row.role, int(row.district)))
+        sen_partially_filled_rows = pool.map(scrape_senate, sen_urls)
+    #
+    # sen_partially_filled_sorted_rows = sorted(data, key=lambda row: (row.role, int(row.district)))
     # rep_wiki = get_wiki_urls('wiki/Louisiana_House_of_Representatives')
     sen_wiki = get_wiki_urls('wiki/Louisiana_State_Senate')
     # pprint(sen_wiki)
-    sen_data = scrape_wiki_site(sen_wiki, sen_partially_filled_sorted_rows)
+    sen_data = scrape_wiki_site(sen_wiki, sen_partially_filled_rows)
     pprint(sen_data)
     print('Complete!')
