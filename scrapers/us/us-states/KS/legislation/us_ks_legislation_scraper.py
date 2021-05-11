@@ -82,6 +82,22 @@ def get_session(soup):
     return session
 
 
+def get_full_name(url):
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    main_div = soup.find('div', {'id': 'main'})
+    name = main_div.find('h1').text
+
+    if "Senator" in name:
+        name = name.split("Senator ")[1]
+    elif "Representative" in name:
+        name = name.split("Representative ")[1]
+    if " - " in name:
+        name = name.split(" - ")[0]
+    return name
+
+
 def get_bill_type_chamber(bill_name, row):
     chamber_origin = ''
     bill_type = ''
@@ -130,12 +146,18 @@ def get_committees(sponsor):
     return committee_detail
 
 
-def get_sponsor_id(sponsor):
+def get_sponsor_id(sponsor_name):
     sponsor_id = None
-    if "Committee" not in sponsor:
-        name_last = sponsor
-        search_for = dict(name_last=name_last)
+    if "Committee" not in sponsor_name:
+        hn = HumanName(sponsor_name)
+        name_first = hn.first
+        name_middle = hn.middle
+        name_last = hn.last
+        name_suffix = hn.suffix
+
+        search_for = dict(name_last=name_last, name_first=name_first)
         sponsor_id = scraper_utils.get_legislator_id(**search_for)
+
     return sponsor_id
 
 
@@ -151,17 +173,18 @@ def get_sponsors(sidebar, row):
 
         for sponsor in sponsors_detail:
             name = sponsor.text
-
             if "Committee" in name:
                 committee = get_committees(sponsor)
                 committees.append(committee)
-            elif "Senator" in name:
-                name = name.split("Senator ")[1]
+            else:
+                link = "http://www.kslegislature.org" + sponsor.get('href')
+                name = get_full_name(link)
                 sponsor_id = get_sponsor_id(name)
-            elif "Representative" in name:
-                name = name.split("Representative ")[1]
-                sponsor_id = get_sponsor_id(name)
-            sponsors.append(name)
+
+                hn = HumanName(name)
+                name_last = hn.last
+
+            sponsors.append(name_last)
             sponsor_ids.append(sponsor_id)
     except Exception:
         pass
@@ -176,7 +199,6 @@ def get_principal_sponsor(sidebar, row):
     sponsors_tabs = sidebar.find(
         'ul', {'class': 'introduce-tab-content'})
     sponsor_id = None
-    name = None
     try:
         sponsors = sponsors_tabs.find_all('a')
         if len(sponsors) == 1:
@@ -186,17 +208,19 @@ def get_principal_sponsor(sidebar, row):
             if "Committee" in name:
                 committee = get_committees(sponsor)
                 committees.append(committee)
-            elif "Senator" in name:
-                name = name.split("Senator ")[1]
+            else:
+                link = "http://www.kslegislature.org" + sponsor.get('href')
+                name = get_full_name(link)
                 sponsor_id = get_sponsor_id(name)
-            elif "Representative" in name:
-                name = name.split("Representative ")[1]
-                sponsor_id = get_sponsor_id(name)
+                hn = HumanName(name)
+                name_last = hn.last
+
+
     except Exception:
         pass
     row.committees = committees
     row.principal_sponsor_id = sponsor_id
-    row.principal_sponsor = name
+    row.principal_sponsor = name_last
 
 
 def get_bill_description(main_div, row):
@@ -257,30 +281,139 @@ def get_actions(bottom_div, row):
     row.actions = actions_list
 
 
-def get_vote_data(bottom_div, row):
+def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv):
+    all_names = []
+    legislator_links = main_content.findAll('a')
+    for link in legislator_links:
+        link = 'http://www.kslegislature.org' + link.get('href')
+        if "rep_" in link:
+            name = get_full_name(link)
+            all_names.append(name)
+        elif "sen_" in link:
+            name = get_full_name(link)
+            all_names.append(name)
+    group_one = yeas + nays
+    group_two = yeas + nays + pandp
+    group_three = yeas + nays + pandp + anv
+    group_four = yeas + nays + pandp + anv + nv
+
+    for name in all_names[: yeas]:
+        voter_id = get_sponsor_id(name)
+        hn = HumanName(name)
+        name_last = hn.last
+        vote = "yea"
+        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data_list.append(voter_data)
+
+    for name in all_names[yeas: group_one]:
+        voter_id = get_sponsor_id(name)
+        hn = HumanName(name)
+        name_last = hn.last
+        vote = "nay"
+        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data_list.append(voter_data)
+
+    for name in all_names[group_one: group_two]:
+        voter_id = get_sponsor_id(name)
+        hn = HumanName(name)
+        name_last = hn.last
+        vote = "passing"
+        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data_list.append(voter_data)
+
+    for name in all_names[group_two: group_three]:
+        voter_id = get_sponsor_id(name)
+        hn = HumanName(name)
+        name_last = hn.last
+        vote = "absent"
+        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data_list.append(voter_data)
+
+    for name in all_names[group_three: group_four]:
+        voter_id = get_sponsor_id(name)
+        hn = HumanName(name)
+        name_last = hn.last
+        vote = "not voting"
+        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data_list.append(voter_data)
+
+    print(voter_data_list)
+
+    return voter_data_list
+
+
+def get_vote_detail(votes, row):
+    page = scraper_utils.request(votes)
+    soup = BeautifulSoup(page.content, 'lxml')
+
     voter_data_list = []
     passed = 0
+
+    bill_summary = soup.find('h4').text
+    row.bill_summary = bill_summary
+
+    main_content = soup.find('div', {'id': 'main_content'})
+    getting_votes = main_content.findAll('h3')
+
+    # getting if vote passed 1 or 0
+    if "passed" in getting_votes[0].text:
+        passed = 1
+    elif "Passed" in getting_votes[0].text:
+        passed = 1
+    elif "Adopted" in getting_votes[0].text:
+        passed = 1
+
+    # getting vote date
+    date_string = getting_votes[0].text.split(' - ')[3]
+    date_string = date_string.strip()
+    date = datetime.strptime(date_string, '%m/%d/%Y')
+    date = date.strftime("%Y-%m-%d")
+
+    # getting number of Yea
+    yeas = getting_votes[2].text.split("Yea - (")[1]
+    yeas = yeas.split(')')[0]
+    yeas = int(yeas)
+
+    # getting number of Nay
+    nays = getting_votes[3].text.split("Nay - (")[1]
+    nays = nays.split(')')[0]
+    nays = int(nays)
+
+    # getting number of Present and passing
+    pandp = getting_votes[4].text.split("Present and Passing - (")[1]
+    pandp = pandp.split(')')[0]
+    pandp = int(pandp)
+
+    # getting number of absent not voting
+    anv = getting_votes[5].text.split("Absent and Not Voting - (")[1]
+    anv = anv.split(')')[0]
+    anv = int(anv)
+
+    # getting number of Not voting
+    nv = getting_votes[6].text.split("Not Voting - (")[1]
+    nv = nv.split(')')[0]
+    nv = int(nv)
+
+    voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
+
+    # need to still get description and chamber
+    vote_data = {'date': date, 'description': "On passage of the bill.",
+                 'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': 127, 'passed': passed, 'chamber': "House",
+                 'votes': voter_data_list}
+
+
+def get_vote_data(bottom_div, row):
     table = bottom_div.find('table', {'class': 'bottom'})
     table_rows = table.findAll('tr')
     for r in table_rows:
         r_text = r.text
         if "Final Action" in r_text:
-            print(r_text)
-            if "Passed" in r_text:
-                passed = 1
-            elif "passed" in r_text:
-                passed = 1
-            elif "Adopted" in r_text:
-                passed = 1
-            votes = r.find('a').get('href')
-
-            print(votes)
-#     voter_data = {'goverlytics_id': 123, 'legislator': Smith, 'votetext': yea}
-#     vote_data = {'date': 2020-03-23, 'description': On passage of the bill.,
-# 'yea': 123, 'nay': 3, 'nv': 0, 'absent': 1, 'total': 127, 'passed': 1,
-# 'chamber': House,
-# 'votes': voter_data_list
-# }
+            try:
+                votes = r.find('a').get('href')
+                votes = "http://www.kslegislature.org" + votes
+                get_vote_detail(votes, row)
+            except Exception:
+                pass
 
 
 def scrape(url):
