@@ -4,12 +4,12 @@ from pathlib import Path
 from time import sleep
 import re
 from enum import Enum
+import datetime
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-import io
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import requests
 from multiprocessing import Pool
@@ -127,18 +127,28 @@ class SessionScraper:
 
     def __get_rows(self, table, rows):
         all_trs = table.find_elements_by_tag_name('tr')[2:]
+        bill_type = 'Government Bill'
         for tr in all_trs:
             if len(tr.find_elements_by_xpath('./*')) != 1:
-                rows.append(tr)
+                rows.append({'type' : bill_type,
+                             'row' : tr})
+            else:
+                bill_type = 'Non-Government Bill'
 
     def __get_row_data(self, bill_row):
         row = scraper_utils.initialize_row()
-        row.source_id = self.__get_source_id(bill_row)
-        row.bill_name =self.__get_bill_name(bill_row)
+        row.source_id = self.__get_source_id(bill_row['row'])
+        row.bill_name =self.__get_bill_name(bill_row['row'])
         row.session = str(CURRENT_LEGISLATURE) + "-" + str(self.current_session)
+        row.goverlytics_id = self.__get_goveryltics_id(row)
+        row.date_introduced = self.__get_date(bill_row['row'])
         # All bills are on one page.
         row.source_url = BILLS_URL
         row.chamber_origin = "Legislative Assembly"
+        row.bill_type = bill_row['type']
+        row.bill_title = self.__get_bill_title(bill_row['row'])
+        row.principal_sponsor = self.__get_principal_sponsor(bill_row['row'])
+        row.principal_sponsor_id = self.__get_principal_sponsor_id(row)
         return row
     
     def __get_source_id(self, bill_row):
@@ -151,8 +161,33 @@ class SessionScraper:
 
     def __get_bill_name(self, bill_row):
         return "Bill-" + bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Name.value].text
+    
+    def __get_goveryltics_id(self, data_row):
+        prov = PROV_TERR_ABBREVIATION
+        session = data_row.session.split('-')[1]
+        bill_name = data_row.bill_name.replace('-', '').upper()
+        return prov + '_' + session + '_' + bill_name
 
+    def __get_date(self, bill_row):
+        first_reading = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.First_Reading.value].text
+        date = datetime.datetime.strptime(first_reading, '%B %d, %Y')
+        date = date.strftime('%Y-%b-%d')
+        return date
 
+    def __get_bill_title(self, bill_row):
+        return bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Title.value].text
+
+    def __get_principal_sponsor(self, bill_row):
+        return bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Sponsor.value].text
+
+    def __get_principal_sponsor_id(self, row):
+        search_for = {'name_last' : row.principal_sponsor}
+        try:
+            sponsor_id = scraper_utils.get_legislator_id(** search_for)
+            sponsor_id = int(sponsor_id)
+        except Exception:
+            sponsor_id = 0
+        return sponsor_id
 if __name__ == '__main__':
     main_program = Main_Functions()
     main_program.program_driver()
