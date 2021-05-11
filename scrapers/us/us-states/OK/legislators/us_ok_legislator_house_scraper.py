@@ -19,17 +19,18 @@ import re
 from tqdm import tqdm
 import datetime
 
-
-
 BASE_URL = 'https://okhouse.gov'
 WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
+
+STATE_ABBREVIATION = 'OK'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
 
 DEBUG_MODE = False
 NUM_POOL_THREADS = 10
 CURRENT_YEAR = datetime.datetime.now().year
 
-scraper_utils = USStateLegislatorScraperUtils('OK', 'us_ok_legislators')
+scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def get_urls():
