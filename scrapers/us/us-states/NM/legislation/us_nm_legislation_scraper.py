@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 from time import sleep
 from tqdm import tqdm
+import pandas as pd
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -166,13 +167,33 @@ def scrape(url):
     get_session(url, row)
 
 
+def translate_abbreviations(string):
+    """
+    Takes abbreviation table (for bill actions) and translates it into its corresponding description.
+    :param string: input string representing the abbreviation (scraped from bill action(s))
+    :return: a string representing the abbreviation description or None if the input string does not match
+    """
+
+    soup = make_soup('https://www.nmlegis.gov/Legislation/Action_Abbreviations')
+    table = soup.find('table', {'id': 'MainContent_gridViewAbbreviations'})
+    pd_table = pd.read_html(str(table))[0]
+    pd_dict = pd_table.to_dict('records')
+    pprint(pd_dict)
+    for dic in pd_dict:
+        if dic['Code'] == string:
+            return dic['Description']
+
+    return None
+
 
 def main():
-    urls = get_urls()
-    # pprint(urls)
-
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    # urls = get_urls()
+    # # pprint(urls)
+    #
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    s = translate_abbreviations('API.')
+    pprint(s)
 
 
 if __name__ == '__main__':
