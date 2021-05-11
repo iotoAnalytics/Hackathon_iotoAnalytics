@@ -44,10 +44,8 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 class Main_Functions:
     def program_driver(self):
         self.__open_url()
-        current_leglislature_sessions = self.__get_legislature_sessions()
-        for session in current_leglislature_sessions:
-            SessionScraper(session)
-            sleep(2)
+        current_session = self.__get_current_session()
+        SessionScraper(current_session)
         self.__end_driver()
 
     def __open_url(self):
@@ -55,17 +53,15 @@ class Main_Functions:
         driver.maximize_window()
         sleep(2) 
 
-    def __get_legislature_sessions(self):
+    def __get_current_session(self):
         dropdown_menu = driver.find_element_by_tag_name('select')
         return self.__find_current_sessions(dropdown_menu)
 
     def __find_current_sessions(self, dropdown_menu):
         dropdown_options = dropdown_menu.find_elements_by_tag_name('option')
-        legislature_session_list = []
         for legislature in dropdown_options:
             if self.__is_current_legislature(legislature):
-                legislature_session_list.append(legislature)
-        return legislature_session_list
+                return legislature
 
     def __is_current_legislature(self, legislature):
         return str(CURRENT_LEGISLATURE) in legislature.text
@@ -82,7 +78,8 @@ class SessionScraper:
     def __scrape(self):
         active_page_content = self.__get_active_page()
         bill_rows = self.__get_relevant_table_rows(active_page_content)
-        print(bill_rows)
+        for row in bill_rows:
+            print(f"bill no = {row.find_elements_by_tag_name('td')[0].text}")
         
     def __get_active_page(self):
         main_content = driver.find_element_by_css_selector('body > div > div > div > section > div.region.region-content > article > div > div.paragraph.paragraph--type--tabbed-content.paragraph--view-mode--default > div > div.tabs--content')
@@ -105,9 +102,7 @@ class SessionScraper:
         all_trs = table.find_elements_by_tag_name('tr')[2:]
         for tr in all_trs:
             if len(tr.find_elements_by_xpath('./*')) != 1:
-                link_td = tr.find_elements_by_tag_name('td')[1]
-                a = link_td.find_element_by_tag_name('a')
-                print(a.get_attribute('href'))
+                rows.append(tr)
 
 
 if __name__ == '__main__':
