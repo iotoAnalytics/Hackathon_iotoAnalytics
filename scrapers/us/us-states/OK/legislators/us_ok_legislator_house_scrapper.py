@@ -1,6 +1,6 @@
 # TODO - Try/Exception
 
-# Unavailable data - SourceID, email, seniority, military exp
+# Unavailable data - SourceID, seniority, military exp
 # Wiki data - birthday, occupation, education 
 
 import sys
@@ -63,6 +63,7 @@ def scrape(url):
     _set_years_active(row, soup)
     _set_phone_numbers(row, soup)
     _set_addresses(row, soup)
+    _set_email(row, soup)
     _set_areas_served(row, soup)
     _set_district(row, soup)
 
@@ -223,6 +224,22 @@ def _set_addresses(row, soup):
     }
 
     row.addresses = [address]
+
+def _set_email(row, soup):
+    district_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblDistrict'}).text
+    pattern = re.compile('[0-9]+')
+    district = pattern.search(district_str).group(0)
+
+    house_members_contact_path = '/Members/Contact.aspx'
+    house_members_query = '?District='
+    scrape_url = BASE_URL + house_members_contact_path + house_members_query + district
+    
+    email_soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    email = email_soup.find('input', {'id': 'txtMemberEmail'}).get('value')
+    row.email = email
+    
 
 def _set_areas_served(row, soup):
     areas_served_county_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblCounties'}).text
