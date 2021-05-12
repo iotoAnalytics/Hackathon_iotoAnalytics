@@ -106,7 +106,7 @@ def scrape_rep(url):
 
     row.role = 'Representative'
 
-    set_info_from_scraped_gov_url(row, soup)
+    get_info_from_scraped_gov_url(row, soup)
 
     # year_active: I have year_elected on the webpages, should I rely on that info alone and convert that into
     # years_active? or should I collect that elsewhere?
@@ -121,17 +121,18 @@ def scrape_rep(url):
     return row
 
 
-def set_info_from_scraped_gov_url(row, soup):
-    set_name(row, soup)
-    set_party(row, soup)
-    set_district(row, soup)
-    set_address(row, soup)
-    set_phone_number(row, soup)
-    set_email(row, soup)
-    set_committees(row, soup)
+def get_info_from_scraped_gov_url(row, soup):
+    get_name(row, soup)
+    get_party(row, soup)
+    get_district(row, soup)
+    get_address(row, soup)
+    get_phone_number(row, soup)
+    get_email(row, soup)
+    get_committees(row, soup)
+    get_years_active(row, soup)
 
 
-def set_committees(row, soup):
+def get_committees(row, soup):
     # committees
     committees = []
     committees_html = soup.find('span', {'id': re.compile("body_FormView1_COMMITTEEASSIGNMENTS2Label")})
@@ -158,41 +159,49 @@ def set_committees(row, soup):
     row.committees = committees
 
 
-def set_email(row, soup):
+def get_email(row, soup):
     # email
     email = soup.find('span', {'id': re.compile("body_FormView6_EMAILADDRESSPUBLICLabel")}).text
     row.email = email
 
 
-def set_phone_number(row, soup):
-    # phone number PROBLEM HERE
+def get_years_active(row, soup):
+    # convert years elected to years active
+    year_elected = soup.find('span', {'id': re.compile("body_FormView6_EMAILADDRESSPUBLICLabel")}).text
+    if year_elected != "":
+        years_active = list(range(int(year_elected), 2022))
+        row.years_active = list(range(int(year_elected), 2022))
+
+
+def get_phone_number(row, soup):
+    # phone number
     raw_phone_number = soup.find('span', {'id': re.compile("body_FormView3_DISTRICTOFFICEPHONELabel")}).text
     phone_number = raw_phone_number.replace("(", "").replace(") ", "-")
     phone_number = [{'office': 'district office', 'number': phone_number}]
     row.phone_numbers = phone_number
 
 
-def set_address(row, soup):
+def get_address(row, soup):
     # address
     address = soup.find('span', {'id': re.compile("body_FormView3_OFFICEADDRESS2Label")}).text
     address = [{'location': 'district office', 'address': address}]
     row.addresses = address
 
 
-def set_district(row, soup):
+def get_district(row, soup):
     # district
     district = soup.find('span', {'id': re.compile("body_FormView5_DISTRICTNUMBERLabel")}).text
     row.district = district
 
 
-def set_party(row, soup):
+def get_party(row, soup):
     # party
     party = soup.find('span', {'id': re.compile("body_FormView5_PARTYAFFILIATIONLabel")}).text
     row.party_id = scraper_utils.get_party_id(party)
     row.party = party
 
 
-def set_name(row, soup):
+def get_name(row, soup):
     # name
     name_full = soup.find('span', {'id': re.compile("body_FormView5_FULLNAMELabel")}).text
     hn = HumanName(name_full)
@@ -267,7 +276,7 @@ def scrape_senate(url):
 
     row.role = 'Senator'
 
-    set_info_from_scraped_gov_url(row, soup)
+    get_info_from_scraped_gov_url(row, soup)
 
     # year_active: I have year_elected on the webpages, should I rely on that info alone and convert that into
     # years_active? or should I collect that elsewhere?
@@ -376,6 +385,7 @@ def scrape_wiki_site(wiki_urls, rows):
                     row.education = url[2].get('education').replace('\n', ' ')
                     row.occupation = url[2].get('occupation').replace('\n', ' ')
                     row.birthday = url[2].get('birthday').replace('\n', ' ')
+                    row.most_recent_term_id = url[2].get('most_recent_term_id').repace('\n', ' ')
                 except Exception:
                     pass
 
