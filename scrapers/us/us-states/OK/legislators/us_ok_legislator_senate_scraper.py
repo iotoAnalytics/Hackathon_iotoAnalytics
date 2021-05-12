@@ -194,7 +194,7 @@ def _set_party(row, bio_info):
         party = 'Democrat'
 
     row.party = party
-    row.party = scraper_utils.get_party_id(party)
+    row.party_id = scraper_utils.get_party_id(party)
 
 def _set_role(row, soup):
     role_str = soup.find('div', {'class', 'bSenBio__title'}).text

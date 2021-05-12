@@ -72,10 +72,10 @@ def program_driver():
   committee_data = organize_unproccessed_committee_data(unprocessed_committee_data)
 
   complete_data_set = configure_data(mla_data, wiki_data, committee_data)
-
-  print('Writing data to database...')
-  scraper_utils.write_data(complete_data_set)
-  print("Complete")
+  print(complete_data_set)
+  # print('Writing data to database...')
+  # scraper_utils.write_data(complete_data_set)
+  # print("Complete")
 
 def get_page_as_soup(url):
   page_html = get_site_as_html(url)
@@ -260,12 +260,12 @@ class ScraperForMLAs:
     address_info = {'location' :  address_location, 'address' : street_address}
     self.row.addresses = address_info
   
-  '''
-  This function returns part of a list (parts_of_address).
-  This is because only the first three from the split address is relevant.
-  If html structure changes, this may need to be fixed.
-  '''
   def __get_address(self):
+    '''
+      This function returns part of a list (parts_of_address).
+      This is because only the first three from the split address is relevant.
+      If html structure changes, this may need to be fixed.
+    '''
     page_footer = self.soup.find('footer')
     address_container = page_footer.find('div', {'class' : 'footer-row--right'})
     full_address = address_container.find('p').text
@@ -287,13 +287,11 @@ class ScraperForMLAs:
     numbers = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', contact_info.text)
     return self.__categorize_numbers(numbers)
 
-  '''
-  phone_types is in this order because the website has the numbers ordered from phone then fax,
-  so effectively our numbers parm from above method will store numbers as such
-  '''
   def __categorize_numbers(self, numbers):
     categorized_numbers = []
     i = 0
+    # phone_types is in this order because the website has the numbers ordered from phone then fax,
+    # so effectively our numbers parm from above method will store numbers as such
     phone_types = ['phone', 'fax']
     for number in numbers:
       info = {'office' : phone_types[i],
