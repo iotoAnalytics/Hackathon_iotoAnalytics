@@ -160,23 +160,20 @@ def get_session(url, row):
     row.session = session
 
 
-def translate_abbreviations(string):
+def translate_abbreviations():
     """
     Takes abbreviation table (for bill actions) and translates it into its corresponding description.
-    :param string: input string representing the abbreviation (scraped from bill action(s))
-    :return: a string representing the abbreviation description or None if the input string does not match
+    :return: a dictionary with abbreviations as keys and descriptions as values
     """
 
+    translation_dict = {}
     soup = make_soup('https://www.nmlegis.gov/Legislation/Action_Abbreviations')
-    table = soup.find('table', {'id': 'MainContent_gridViewAbbreviations'})
-    pd_table = pd.read_html(str(table))[0]
-    pd_dict = pd_table.to_dict('records')
-    pprint(pd_dict)
-    for dic in pd_dict:
-        if dic['Code'] == string:
-            return dic['Description']
-
-    return None
+    table = soup.find('table', {'id': 'MainContent_gridViewAbbreviations'}).find_all('tr')
+    for tr in table:
+        columns = tr.find_all('td')
+        for _ in columns:
+            translation_dict[columns[0].text.strip()] = columns[1].text.strip()
+    return translation_dict
 
 
 def get_bill_actions(url, row):
@@ -196,25 +193,40 @@ def get_bill_actions(url, row):
     sleep(1)
 
     actions = table.find_elements_by_tag_name('span')
+
+    abbreviation_dict = translate_abbreviations()
     for action in actions:
         action_dict = {'date': '', 'action_by': '', 'description': ''}
         info = action.text.split('\n')
         single_line = info[0].split('-')
         if len(info) == 3:
-            # todo: change abbreviation
+            for word in info[2].split():
+                clean_word = re.sub('\\W+', '', word)
+                if clean_word in abbreviation_dict.keys():
+                    info[2] = info[2].replace(word, abbreviation_dict[clean_word].lower().title())
+
             action_dict['description'] = info[2]
-            pprint(info[1].split(':')[1].strip())
             action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
 
         elif len(single_line) == 3:
-            action_dict['description'] = single_line[0].strip()
-            # todo: single line doesn't have year. need to look back one to get year but check month
-            action_dict['date'] = str(datetime.strptime(single_line[2].replace('.', '').strip(), '%b %d').date())
+            soup = make_soup(url)
+            header = soup.find('span', {'id': 'MainContent_formViewLegislationTitle_lblSession'}).text
+            session = header.split('-')[0].split()[0]
 
-        elif len(single_line) == 2:
-            # todo: change abbreviation
+            date_without_year = single_line[2].replace('.', '').strip() + f' {session}'
+            converted_date_format = str(datetime.strptime(date_without_year, '%b %d %Y').date())
+
+            action_dict['date'] = converted_date_format
             action_dict['description'] = single_line[0].strip()
-            action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
+
+        elif len(single_line) <= 2:
+            new_info = info[0].split()
+            for word in new_info:
+                clean_word = re.sub('\\W+', '', word)
+                if clean_word in abbreviation_dict.keys():
+                    info[0] = info[0].replace(word, abbreviation_dict[clean_word])
+
+            action_dict['description'] = info[0]
 
         bill_actions.append(action_dict)
 
@@ -233,21 +245,22 @@ def scrape(url):
     # get_bill_sponsor_info(url, row)
     # get_session(url, row)
     get_bill_actions(url, row)
+    # translate_abbreviations()
 
 
 def main():
-    # urls = get_urls()
-    # # pprint(urls)
-    #
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
+    urls = get_urls()
+    # pprint(urls)
 
-    lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
-           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
-           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
-    for url in lst:
-        row = scraper_utils.initialize_row()
-        get_bill_actions(url, row)
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
+
+    # lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
+    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
+    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
+    # for url in lst:
+    #     row = scraper_utils.initialize_row()
+    #     get_bill_actions(url, row)
 
 
 if __name__ == '__main__':
