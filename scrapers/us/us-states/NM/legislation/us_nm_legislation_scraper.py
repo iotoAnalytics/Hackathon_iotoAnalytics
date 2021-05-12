@@ -16,6 +16,7 @@ from pathlib import Path
 from time import sleep
 from tqdm import tqdm
 import pandas as pd
+from datetime import datetime
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -30,11 +31,16 @@ base_url = 'https://www.nmlegis.gov/Legislation/Legislation_List'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
-options = Options()
-options.headless = True
-driver = webdriver.Chrome(executable_path='H:\Projects\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe', options=options)
-driver.get(base_url)
-driver.maximize_window()
+
+def open_driver():
+    options = Options()
+    options.headless = True
+    driver = webdriver.Chrome(
+        executable_path='H:\Projects\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe',
+        options=options)
+    driver.get(base_url)
+    driver.maximize_window()
+    return driver
 
 
 def make_soup(url):
@@ -59,19 +65,21 @@ def get_urls():
     """
 
     urls = []
-
+    driver = open_driver()
     button = driver.find_element_by_id('MainContent_btnSearch')
     button.click()
-    table = driver.find_element_by_css_selector('#MainContent_gridViewLegislation > tbody').find_elements_by_tag_name('tr')
+    table = driver.find_element_by_css_selector('#MainContent_gridViewLegislation > tbody').find_elements_by_tag_name(
+        'tr')
     sleep(2)
 
-    pbar = tqdm(table[0:10])
+    pbar = tqdm(table[0:50])
     for row in pbar:
         link = row.find_element_by_tag_name('a').get_attribute('href')
         pbar.set_description(f'Scraping {link}')
         urls.append(link)
         scraper_utils.crawl_delay(crawl_delay)
 
+    driver.quit()
     return urls
 
 
@@ -82,10 +90,10 @@ def open_bill_link(url):
     :param url: URL to bill
     :return: new selenium driver object
     """
-
+    driver = open_driver()
     bill = driver.get(url)
     driver.maximize_window()
-
+    driver.quit()
     return bill
 
 
@@ -137,9 +145,6 @@ def get_bill_sponsor_info(url, row):
     row.sponsors_id = sponsor_ids
     row.sponsors = sponsors
 
-    pprint(sponsor_ids)
-    pprint(sponsors)
-
 
 def get_session(url, row):
     """
@@ -153,18 +158,6 @@ def get_session(url, row):
     header = soup.find('span', {'id': 'MainContent_formViewLegislationTitle_lblSession'}).text
     session = header.split('-')[0]
     row.session = session
-    pprint(session)
-
-
-def scrape(url):
-    row = scraper_utils.initialize_row()
-    row.source_url = url
-
-    bill_link = open_bill_link(url)
-    get_bill_title(url, row)
-    get_bill_name(url, row)
-    get_bill_sponsor_info(url, row)
-    get_session(url, row)
 
 
 def translate_abbreviations(string):
@@ -186,14 +179,75 @@ def translate_abbreviations(string):
     return None
 
 
+def get_bill_actions(url, row):
+    """
+
+    :param url:
+    :param row:
+    :return:
+    """
+    bill_actions = []
+
+    driver = open_driver()
+    driver.get(url)
+    button = driver.find_element_by_css_selector('#MainContent_tabContainerLegislation_tabPanelActions_tab')
+    button.click()
+    table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelActions_dataListActions')
+    sleep(1)
+
+    actions = table.find_elements_by_tag_name('span')
+    for action in actions:
+        action_dict = {'date': '', 'action_by': '', 'description': ''}
+        info = action.text.split('\n')
+        single_line = info[0].split('-')
+        if len(info) == 3:
+            # todo: change abbreviation
+            action_dict['description'] = info[2]
+            pprint(info[1].split(':')[1].strip())
+            action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
+
+        elif len(single_line) == 3:
+            action_dict['description'] = single_line[0].strip()
+            # todo: single line doesn't have year. need to look back one to get year but check month
+            action_dict['date'] = str(datetime.strptime(single_line[2].replace('.', '').strip(), '%b %d').date())
+
+        elif len(single_line) == 2:
+            # todo: change abbreviation
+            action_dict['description'] = single_line[0].strip()
+            action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
+
+        bill_actions.append(action_dict)
+
+    pprint(bill_actions)
+    driver.quit()
+    # return bill_actions
+
+
+def scrape(url):
+    row = scraper_utils.initialize_row()
+    row.source_url = url
+
+    # bill_link = open_bill_link(url)
+    # get_bill_title(url, row)
+    # get_bill_name(url, row)
+    # get_bill_sponsor_info(url, row)
+    # get_session(url, row)
+    get_bill_actions(url, row)
+
+
 def main():
     # urls = get_urls()
     # # pprint(urls)
     #
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
-    s = translate_abbreviations('API.')
-    pprint(s)
+
+    lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
+           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
+           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
+    for url in lst:
+        row = scraper_utils.initialize_row()
+        get_bill_actions(url, row)
 
 
 if __name__ == '__main__':

@@ -8,3 +8,4 @@ test_legislators/
 test.*
 .vscode/
 scrapers/us/us-states/templates/
+.pytest_cache/

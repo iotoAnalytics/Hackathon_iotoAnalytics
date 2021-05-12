@@ -11,13 +11,11 @@ path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
-import requests
-from multiprocessing import Pool
 
-from urllib.request import urlopen as uReq
-
-from bs4 import BeautifulSoup as soup
 import pandas as pd
+import pdfplumber
+import io
+import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
@@ -26,14 +24,18 @@ Change the current legislature to the most recent
 '''
 CURRENT_LEGISLATURE = 34
 PROV_TERR_ABBREVIATION = 'YT'
-DATABASE_TABLE_NAME = 'ca_yt'
+DATABASE_TABLE_NAME = 'ca_yt_legislation_test'
 LEGISLATOR_TABLE_NAME = 'ca_yt_legislators'
 BASE_URL = 'https://yukonassembly.ca/'
 BILLS_URL = 'https://yukonassembly.ca/house-business/progress-bills'
 
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+
 header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 options = Options()
-options.headless = False
+options.headless = True
 
 driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
 driver.switch_to.default_content()
@@ -47,8 +49,14 @@ class Main_Functions:
     def program_driver(self):
         self.__open_url()
         current_session = self.__get_current_session()
-        SessionScraper(current_session)
-        self.__end_driver()
+        try:
+            scraper = SessionScraper(current_session)
+        finally:
+            self.__end_driver()
+
+        print('Writing data to database...')
+        scraper_utils.write_data(scraper.data)
+        print("Complete")
 
     def __open_url(self):
         driver.get(BILLS_URL)
@@ -86,7 +94,7 @@ class SessionScraper:
     def __init__(self, session):
         session.click()
         self.current_session = self.__get_current_session_as_num(session)
-        self.__scrape()
+        self.data = self.__scrape()
     
     def __get_current_session_as_num(self, session):
         session_as_text = session.text.split(' - ')[1]
@@ -105,8 +113,9 @@ class SessionScraper:
         bill_rows = self.__get_relevant_table_rows(active_page_content)
         bill_data = []
         for bill_row in bill_rows:
-            bill_data.append(self.__get_row_data(bill_row))
-        print(bill_data)
+            if not self.__bill_already_exists(bill_row, bill_data):
+                bill_data.append(self.__get_row_data(bill_row))
+        return bill_data
         
     def __get_active_page(self):
         main_content = driver.find_element_by_css_selector('body > div > div > div > section > div.region.region-content > article > div > div.paragraph.paragraph--type--tabbed-content.paragraph--view-mode--default > div > div.tabs--content')
@@ -134,6 +143,12 @@ class SessionScraper:
                              'row' : tr})
             else:
                 bill_type = 'Non-Government Bill'
+    
+    def __bill_already_exists(self, row, data_list):
+        for data_set in data_list:
+            if data_set.bill_name == self.__get_bill_name(row['row']):
+                return True
+        return False
 
     def __get_row_data(self, bill_row):
         row = scraper_utils.initialize_row()
@@ -143,12 +158,16 @@ class SessionScraper:
         row.goverlytics_id = self.__get_goveryltics_id(row)
         row.date_introduced = self.__get_date(bill_row['row'])
         # All bills are on one page.
-        row.source_url = BILLS_URL
+        row.source_url = self.__get_pdf_link(bill_row['row'])
         row.chamber_origin = "Legislative Assembly"
         row.bill_type = bill_row['type']
         row.bill_title = self.__get_bill_title(bill_row['row'])
         row.principal_sponsor = self.__get_principal_sponsor(bill_row['row'])
         row.principal_sponsor_id = self.__get_principal_sponsor_id(row)
+        row.actions = self.__get_actions(bill_row['row'])
+        row.current_status = self.__get_current_status(row.actions)
+        row.bill_text = self.__get_bill_text_from_pdf(row.source_url)
+        row.region = scraper_utils.get_region(PROV_TERR_ABBREVIATION)
         return row
     
     def __get_source_id(self, bill_row):
@@ -175,7 +194,10 @@ class SessionScraper:
         return date
 
     def __get_bill_title(self, bill_row):
-        return bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Title.value].text
+        bill_title = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Title.value].text
+        if '\n' in bill_title:
+            return bill_title.split('\n')[0]
+        return bill_title
 
     def __get_principal_sponsor(self, bill_row):
         return bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Sponsor.value].text
@@ -188,6 +210,122 @@ class SessionScraper:
         except Exception:
             sponsor_id = 0
         return sponsor_id
+
+    def __get_actions(self, bill_row):
+        relevant_cells = bill_row.find_elements_by_tag_name('td')[:3:-1]
+        for index in range(len(relevant_cells)):
+            relevant_cells[index] = self.__remove_new_line_from_text_if_empty(relevant_cells[index])
+
+        actions = []
+        for index in range(len(relevant_cells)):
+            current_cell = relevant_cells[index]
+            action = (self.__add_action_attribute(current_cell, index))
+            if action != None:
+                actions.append(action)
+        return actions
+    
+    def __remove_new_line_from_text_if_empty(self, cell):
+        return cell.text.strip()
+
+    def __add_action_attribute(self, cell, cell_position):
+        if (len(cell) == 0):
+            return
+        cell = self.__remove_unneccessary_text(cell)
+        date = datetime.datetime.strptime(cell, '%B %d, %Y')
+        date = date.strftime('%Y-%b-%d')
+        description = self.__match_cell_position_to_action(cell_position)
+        action_by = self.__get_action_by(description)
+        return {'date' : date, 'action_by' : action_by, 'description' : description}
+    
+    def __remove_unneccessary_text(self, cell):
+        cell = cell.replace('Amendments', '')
+        return cell.replace('Amendment', '').strip()
+
+    def __match_cell_position_to_action(self, position):
+        if position == 0:
+            return 'Assent'
+        if position == 1:
+            return 'Third Reading'
+        if position == 2:
+            return 'Reported by Committee'
+        if position == 3:
+            return 'Second Reading'
+        if position == 4:
+            return 'First Reading'
+
+    def __get_action_by(self, action_description):
+        if action_description == 'Assent':
+            return 'Commissioner'
+        if 'Committee' in action_description:
+            return 'Committee'
+        return 'Legislative Assembly'
+
+    def __get_current_status(self, actions):
+        return actions[0]['description']
+
+    def __get_bill_text_from_pdf(self, pdf_url):
+        '''
+        This function serves to get the "EXPLANATORY NOTE" from the bill pdf.
+        This section ranges from 1 page to multiple pages, so we'll be getting the first five pages from when this section starts.
+        '''
+        NUM_PAGES_TO_EXTRACT = 5
+        pdf = self.__open_pdf(pdf_url)
+        pages = self.__get_pdf_pages(pdf, NUM_PAGES_TO_EXTRACT)
+        text = ''
+        if not self.__explanatory_note_exists(pages[0:2]):
+            return self.__clean_up_text(text)
+        for page in pages:
+            text += self.__extract_explanatory_note(page)
+            if self.__check_if_end_of_explanatory_note(page):
+                return self.__clean_up_text(text)
+        pdf.close()
+        return self.__clean_up_text(text)
+
+    def __open_pdf(self, pdf_url):
+        response = requests.get(pdf_url, stream = True )
+        return pdfplumber.open(io.BytesIO(response.content))   
+
+    def __get_pdf_pages(self, pdf, num_pages_to_extract):
+        # The 0th page for these pdfs are all a title page, hence why we splice from 1st
+        return pdf.pages[1 : num_pages_to_extract]
+
+    def __explanatory_note_exists(self, pages):
+        '''
+        Some pages have a blank page then an explanatory note...
+        '''
+        for page in pages:
+            eng_half_of_page = self.__get_eng_half(page)
+            if eng_half_of_page == None:
+                return False
+            if 'EXPLANATORY NOTE' in eng_half_of_page:
+                return True
+        return False
+
+    def __get_eng_half(self, page):
+        APPROX_PAGE_HALF = 0.485
+        eng_half = page.crop((0, 0, float(page.width) * APPROX_PAGE_HALF, page.height))
+        return eng_half.extract_text()
+
+    def __extract_explanatory_note(self, page):
+        eng_half_of_page = self.__get_eng_half(page)
+        if 'EXPLANATORY NOTE' in eng_half_of_page:
+            eng_half_of_page = eng_half_of_page.split('EXPLANATORY NOTE')[1]
+        if 'BILL NO.' in eng_half_of_page:
+            eng_half_of_page = eng_half_of_page.split('BILL NO.')[0]
+        return eng_half_of_page
+
+    def __check_if_end_of_explanatory_note(self, page):
+        eng_half_of_page = self.__get_eng_half(page)
+        if 'BILL NO.' in eng_half_of_page:
+            return True
+        else:
+            return False
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', ' ')
+        text = text.replace('  ', ' ')
+        return text
+
 if __name__ == '__main__':
     main_program = Main_Functions()
     main_program.program_driver()
