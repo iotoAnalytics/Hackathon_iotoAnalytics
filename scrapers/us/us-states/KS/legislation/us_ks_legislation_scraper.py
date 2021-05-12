@@ -29,6 +29,9 @@ from multiprocessing import Pool
 import requests
 from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislationScraperUtils
+import pdfplumber
+import requests
+import io
 
 state_abbreviation = 'KS'
 database_table_name = 'us_ks_legislation'
@@ -58,7 +61,7 @@ def get_urls():
         table = soup.find(
             'div', {'class': 'infinite-tabs'})
 
-        for li in table.findAll('li')[:100]:
+        for li in table.findAll('li'):
             link = base_url + li.find('a').get('href')
             urls.append(link)
 
@@ -165,7 +168,6 @@ def get_sponsors(sidebar, row):
     sponsors = []
     sponsor_ids = []
     committees = []
-    sponsor_id = None
     sponsors_tabs = sidebar.find(
         'ul', {'class': 'sponsor-tab-content'})
     try:
@@ -176,6 +178,7 @@ def get_sponsors(sidebar, row):
             if "Committee" in name:
                 committee = get_committees(sponsor)
                 committees.append(committee)
+                sponsors.append(name)
             else:
                 link = "http://www.kslegislature.org" + sponsor.get('href')
                 name = get_full_name(link)
@@ -183,9 +186,10 @@ def get_sponsors(sidebar, row):
 
                 hn = HumanName(name)
                 name_last = hn.last
+                sponsors.append(name_last)
+                if sponsor_id is not None:
+                    sponsor_ids.append(sponsor_id)
 
-            sponsors.append(name_last)
-            sponsor_ids.append(sponsor_id)
     except Exception:
         pass
 
@@ -198,7 +202,7 @@ def get_principal_sponsor(sidebar, row):
     committees = []
     sponsors_tabs = sidebar.find(
         'ul', {'class': 'introduce-tab-content'})
-    sponsor_id = None
+
     try:
         sponsors = sponsors_tabs.find_all('a')
         if len(sponsors) == 1:
@@ -208,19 +212,19 @@ def get_principal_sponsor(sidebar, row):
             if "Committee" in name:
                 committee = get_committees(sponsor)
                 committees.append(committee)
+                row.principal_sponsor = name
             else:
                 link = "http://www.kslegislature.org" + sponsor.get('href')
                 name = get_full_name(link)
                 sponsor_id = get_sponsor_id(name)
                 hn = HumanName(name)
                 name_last = hn.last
-
+                row.principal_sponsor = name_last
+                row.principal_sponsor_id = sponsor_id
 
     except Exception:
         pass
     row.committees = committees
-    row.principal_sponsor_id = sponsor_id
-    row.principal_sponsor = name_last
 
 
 def get_bill_description(main_div, row):
@@ -262,8 +266,8 @@ def get_actions(bottom_div, row):
     table = bottom_div.find('table', {'class': 'bottom'})
     table_rows = table.findAll('tr')
 
-    for row in table_rows[1:]:
-        row_sections = row.findAll('td')
+    for r in table_rows[1:]:
+        row_sections = r.findAll('td')
 
         date = row_sections[0].text
         datetime_date = datetime.strptime(date, '%a, %b %d, %Y')
@@ -337,8 +341,6 @@ def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
         voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
         voter_data_list.append(voter_data)
 
-    print(voter_data_list)
-
     return voter_data_list
 
 
@@ -369,6 +371,13 @@ def get_vote_detail(votes, row):
     date = datetime.strptime(date_string, '%m/%d/%Y')
     date = date.strftime("%Y-%m-%d")
 
+    # getting Chamber
+    chamber = getting_votes[0].text.split(' - ')[0]
+
+    # getting description
+    description = getting_votes[0].text.split(chamber + ' - ')[1]
+    description = description[:description.index(";")]
+
     # getting number of Yea
     yeas = getting_votes[2].text.split("Yea - (")[1]
     yeas = yeas.split(')')[0]
@@ -394,26 +403,47 @@ def get_vote_detail(votes, row):
     nv = nv.split(')')[0]
     nv = int(nv)
 
+    total = yeas + nays + pandp + anv + nv
+
     voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
 
-    # need to still get description and chamber
-    vote_data = {'date': date, 'description': "On passage of the bill.",
-                 'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': 127, 'passed': passed, 'chamber': "House",
+    vote_data = {'date': date, 'description': description,
+                 'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
+                 'chamber': chamber,
                  'votes': voter_data_list}
+
+    return vote_data
 
 
 def get_vote_data(bottom_div, row):
+    voting_data = []
     table = bottom_div.find('table', {'class': 'bottom'})
     table_rows = table.findAll('tr')
     for r in table_rows:
         r_text = r.text
-        if "Final Action" in r_text:
+        if "Yea" in r_text:
             try:
                 votes = r.find('a').get('href')
                 votes = "http://www.kslegislature.org" + votes
-                get_vote_detail(votes, row)
+                vote_data = get_vote_detail(votes, row)
+                voting_data.append(vote_data)
             except Exception:
                 pass
+
+    row.votes = voting_data
+
+
+def get_bill_text(main_div, row):
+    table_row = main_div.findAll('tr')
+    try:
+        pdf_link = "http://www.kslegislature.org" + table_row[1].find('a').get('href')
+        response = requests.get(pdf_link, stream=True)
+        pdf = pdfplumber.open(io.BytesIO(response.content))
+        page = pdf.pages[0]
+        text = page.extract_text()
+        row.bill_text = text
+    except Exception:
+        pass
 
 
 def scrape(url):
@@ -458,117 +488,18 @@ def scrape(url):
     row.bill_name = bill_name
     row.session = session
 
-    # get_bill_type_chamber(bill_name, row)
-    # get_sponsors(sidebar, row)
-    # get_principal_sponsor(sidebar, row)
-    # get_bill_description(main_div, row)
-    # get_introduced_date(bottom_div, row)
-    # get_current_status(bottom_div, row)
-    # get_actions(bottom_div, row)
+    get_bill_type_chamber(bill_name, row)
+    get_sponsors(sidebar, row)
+    get_principal_sponsor(sidebar, row)
+    get_bill_description(main_div, row)
+    get_introduced_date(bottom_div, row)
+    get_current_status(bottom_div, row)
+    get_actions(bottom_div, row)
     get_vote_data(bottom_div, row)
+    get_bill_text(main_div, row)
 
-    # The Illinois state legislation website has their data stored in a weird way...
-    # everything is stored in spans so we're gonna try pulling the data we need from
-    # those. Your implementations will probably look quite a bit different than this.
-
-    # Get bill description and summary
-    # bill_description = ''
-    # bill_summary = ''
-    # spans = soup.findAll('span')
-    # for idx, span in enumerate(spans):
-    #     txt = span.text
-    #     if 'Short Description:' in txt:
-    #         bill_description = spans[idx + 1].text
-    #     if 'Synopsis As Introduced' in txt:
-    #         bill_summary = spans[idx + 1].text.strip()
-    # row.bill_description = bill_description
-    # row.bill_summary = bill_summary
-    #
-    # # Get bill sponsors
-    # table = soup.find(
-    #     'table', {'width': '440', 'border': '0', 'align': 'left'})
-    # table_td = table.find('td', {'width': '100%'})
-    #
-    # a_tag = table_td.findAll('a', href=True)
-    # sponsors = []
-    # for a in a_tag:
-    #     if '/house/Rep.asp' in a['href'] or '/senate/Senator.asp' in a['href']:
-    #         sponsors.append(a.text)
-    #
-    # # # We'll now try to get the legislator goverlytics ID. Fortunately for us, this
-    # # # site provides a unique identifier for each legislator. Normally we would do
-    # # # the following:
-    # # sponsor_id = scraper_utils.get_legislator_id(state_member_id=legislator_id)
-    # # # However, since this is often not the case, we will search for the id using the
-    # # # legislator name. We are given the legislator's full name, but if you are given
-    # # # only the legislator initials and last name, which is more often the case, be sure to
-    # # # use the legislators_search_startswith() method, which might look something like this:
-    # # sponsor_id = scraper_utils.legislators_search_startswith('goverlytics_id', 'name_first', first_initial, name_last=name_last)
-    #
-    # sponsors_id = []
-    # for sponsor in sponsors:
-    #     hn = HumanName(sponsor)
-    #     name_first = hn.first
-    #     name_middle = hn.middle
-    #     name_last = hn.last
-    #     name_suffix = hn.suffix
-    #
-    #     search_for = dict(name_first=name_first, name_middle=name_middle,
-    #                       name_last=name_last, name_suffix=name_suffix)
-    #
-    #     sponsor_id = scraper_utils.get_legislator_id(**search_for)
-    #
-    #     # Some sponsor IDs weren't found, so we won't include these.
-    #     # If you are unable to find legislators based on the provided search criteria, be
-    #     # sure to investigate. Check the database and make sure things like names match
-    #     # exactly, including case and diacritics.
-    #     if sponsor_id is not None:
-    #         sponsors_id.append(sponsor_id)
-    #
-    # row.sponsors = sponsors
-    # row.sponsors_id = sponsors_id
-    #
-    # # Get actions
-    # actions_table = soup.findAll('table', {
-    #                              'width': '600', 'cellspacing': '0', 'cellpadding': '2', 'bordercolor': 'black', 'border': '1'})[1]
-    #
-    # action_date = ''
-    # action_by = ''
-    # action_description = ''
-    # actions = []
-    # number_of_columns = 3
-    # # Skip the header row
-    # for idx, td in enumerate(actions_table.findAll('td')[3:]):
-    #     # With this type of method, normally you would search by 'tr' and then grab the value
-    #     # from each 'td' in the row, but for some reason, beautiful soup wasn't able to find
-    #     # the 'tr' so I had to get the value using a different, less intuitive method.
-    #     mod = idx % number_of_columns
-    #     if mod == 0:
-    #         action_date = td.text.strip()
-    #     if mod == 1:
-    #         action_by = td.text.strip()
-    #     if mod == 2:
-    #         action_description = td.text.strip()
-    #         actions.append(
-    #             dict(date=action_date, action_by=action_by, description=action_description))
-    #
-    # # We can get the date introduced from the first action, and the current status from
-    # # the most recent action.
-    # date_introduced = None
-    # current_status = ''
-    # if len(actions) > 0:
-    #     date_introduced = datetime.datetime.strptime(
-    #         actions[0]['date'], '%m/%d/%Y')
-    #     current_status = actions[-1]['description']
-    #
-    # row.actions = actions
-    # row.current_status = current_status
-    # row.date_introduced = date_introduced
-    #
-    # # There's more data on other pages we can collect, but we have enough data for this demo!
-    #
-    # # Delay so we do not overburden servers
-    # scraper_utils.crawl_delay(crawl_delay)
+    # Delay so we do not overburden servers
+    scraper_utils.crawl_delay(crawl_delay)
 
     return row
 
@@ -589,6 +520,6 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    # scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
