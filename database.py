@@ -32,7 +32,7 @@ class Database:
     Author: Jose Salvatierra
     Source: https://www.udemy.com/course/the-complete-python-postgresql-developer-course
     """
-    __connection_pool = None
+    _connection_pool = None
 
     @staticmethod
     def initialise():
@@ -44,7 +44,7 @@ class Database:
         db_token = client.generate_db_auth_token(
             db_host, db_port, db_user, Region=db_region)
 
-        Database.__connection_pool = pool.SimpleConnectionPool(1,
+        Database._connection_pool = pool.SimpleConnectionPool(1,
                                                                10,
                                                                database=db_name, host=db_host, user=db_user, password=db_token)
 
@@ -56,7 +56,7 @@ class Database:
         Returns:
             connection: a psycopg2 connection to the database.
         """
-        return cls.__connection_pool.getconn()
+        return cls._connection_pool.getconn()
 
     @classmethod
     def return_connection(cls, connection):
@@ -66,14 +66,18 @@ class Database:
         Args:
             connection: Psycopg2 database connection to be returned.
         """
-        Database.__connection_pool.putconn(connection)
+        Database._connection_pool.putconn(connection)
 
     @classmethod
     def close_all_connections(cls):
         """
         Closes all connections in the connection pool.
         """
-        Database.__connection_pool.closeall()
+        Database._connection_pool.closeall()
+
+    def __del__(self):
+        if Database._connection_pool:
+            Database._connection_pool.closeall()
 
 
 class CursorFromConnectionFromPool:
@@ -203,7 +207,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
@@ -709,7 +713,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
@@ -830,7 +834,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,

@@ -519,7 +519,7 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     with Pool() as pool:
         data = pool.map(scrape, urls)
 
-    # Once we collect the data, we'll write it to the database.
+    # # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
 
     print('Complete!')
