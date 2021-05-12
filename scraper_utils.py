@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import List
 from rows import *
 import copy
-import atexit
+# import atexit
 import utils
 from urllib.request import urlopen as uReq
 import re
@@ -87,7 +87,7 @@ class ScraperUtils:
     def __init__(self, country, database_table_name, row_type):
 
         Database.initialise()
-        atexit.register(Database.close_all_connections)
+        # atexit.register(Database.close_all_connections)
 
         with CursorFromConnectionFromPool() as cur:
             try:
@@ -103,9 +103,9 @@ class ScraperUtils:
                 cur.execute(query)
                 division_results = cur.fetchall()
 
-                query = f"SELECT * FROM website_metadata WHERE scraper_table = '{database_table_name}'"
-                cur.execute(query)
-                website_metadata_results = cur.fetchall()
+                # query = f"SELECT * FROM website_metadata WHERE scraper_table = '{database_table_name}'"
+                # cur.execute(query)
+                # website_metadata_results = cur.fetchall()
             except Exception as e:
                 sys.exit(
                     f'An exception occurred retrieving tables from database:\n{e}')
@@ -113,7 +113,7 @@ class ScraperUtils:
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
         self.divisions = pd.DataFrame(division_results)
-        self.website_metadata = pd.DataFrame(website_metadata_results)
+        # self.website_metadata = pd.DataFrame(website_metadata_results)
 
         self.country = self.countries.loc[self.countries['abbreviation']
                                           == country]['country'].values[0]

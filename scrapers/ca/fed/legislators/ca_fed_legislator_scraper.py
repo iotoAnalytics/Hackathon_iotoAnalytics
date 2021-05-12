@@ -23,6 +23,7 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[4]
 
 sys.path.insert(0, str(p))
+
 from scraper_utils import CAFedLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
