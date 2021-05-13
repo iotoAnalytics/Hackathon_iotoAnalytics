@@ -51,7 +51,7 @@ def get_urls():
     '''
     urls = []
 
-    # Logic goes here! Some sample code:
+
     paths = '/li/b2021_22/measures/bills/', '/li/b2021_22/measures/concurs/', '/li/b2021_22/measures/resos/'
     for path in paths:
         scrape_url = base_url + path
@@ -61,7 +61,7 @@ def get_urls():
         table = soup.find(
             'div', {'class': 'infinite-tabs'})
 
-        for li in table.findAll('li'):
+        for li in table.findAll('li')[1:5]:
             link = base_url + li.find('a').get('href')
             urls.append(link)
 
@@ -81,7 +81,6 @@ def get_session(soup):
     header_div = soup.find('div', {'id': 'logo2'})
     session = header_div.find('h5').text
     session = session.split(' ')[0].strip()
-
     return session
 
 
@@ -246,7 +245,7 @@ def get_bill_description(main_div, row):
 def get_introduced_date(bottom_div, row):
     table = bottom_div.find('table', {'class': 'bottom'})
     table_rows = table.findAll('tr')
-    date_row = table_rows[len(table_rows) - 1]
+    date_row = table_rows[-1]
     date = date_row.findAll('td')[0].text
     datetime_date = datetime.strptime(date, '%a, %b %d, %Y')
     datetime_date = datetime_date.strftime("%Y-%m-%d")
@@ -258,6 +257,9 @@ def get_current_status(bottom_div, row):
     table_rows = table.findAll('tr')
     current_status_row = table_rows[1]
     status = current_status_row.findAll('td')[2].text.strip()
+    status = status.replace("  ", "")
+    status = status.replace("\n", "")
+    print(status)
     row.current_status = status
 
 
@@ -284,6 +286,13 @@ def get_actions(bottom_div, row):
         actions_list.append(row_data)
     row.actions = actions_list
 
+def get_voter_details_support_func(vote, name):
+    voter_id = get_sponsor_id(name)
+    hn = HumanName(name)
+    name_last = hn.last
+    voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+    return voter_data
+
 
 def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv):
     all_names = []
@@ -302,43 +311,28 @@ def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
     group_four = yeas + nays + pandp + anv + nv
 
     for name in all_names[: yeas]:
-        voter_id = get_sponsor_id(name)
-        hn = HumanName(name)
-        name_last = hn.last
         vote = "yea"
-        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data = get_voter_details_support_func(vote, name)
         voter_data_list.append(voter_data)
 
     for name in all_names[yeas: group_one]:
-        voter_id = get_sponsor_id(name)
-        hn = HumanName(name)
-        name_last = hn.last
         vote = "nay"
-        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data = get_voter_details_support_func(vote, name)
         voter_data_list.append(voter_data)
 
     for name in all_names[group_one: group_two]:
-        voter_id = get_sponsor_id(name)
-        hn = HumanName(name)
-        name_last = hn.last
         vote = "passing"
-        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data = get_voter_details_support_func(vote, name)
         voter_data_list.append(voter_data)
 
     for name in all_names[group_two: group_three]:
-        voter_id = get_sponsor_id(name)
-        hn = HumanName(name)
-        name_last = hn.last
         vote = "absent"
-        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data = get_voter_details_support_func(vote, name)
         voter_data_list.append(voter_data)
 
     for name in all_names[group_three: group_four]:
-        voter_id = get_sponsor_id(name)
-        hn = HumanName(name)
-        name_last = hn.last
         vote = "not voting"
-        voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
+        voter_data = get_voter_details_support_func(vote, name)
         voter_data_list.append(voter_data)
 
     return voter_data_list
@@ -441,10 +435,11 @@ def get_bill_text(main_div, row):
         pdf = pdfplumber.open(io.BytesIO(response.content))
         page = pdf.pages[0]
         text = page.extract_text()
-        row.bill_text = text
-    except Exception:
-        pass
 
+    except Exception:
+        text = ""
+
+    row.bill_text = text
 
 def scrape(url):
     '''
@@ -481,11 +476,14 @@ def scrape(url):
 
     bill_name = get_bill_name(main_div)
     session = get_session(soup)
+    row.bill_name = bill_name
 
+    #removing space for goverlytics_id
+    bill_name = bill_name.replace(" ", "")
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
 
     row.goverlytics_id = goverlytics_id
-    row.bill_name = bill_name
+
     row.session = session
 
     get_bill_type_chamber(bill_name, row)
@@ -520,6 +518,6 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
         data = pool.map(scrape, urls)
 
     # # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    #scraper_utils.write_data(data)
 
     print('Complete!')

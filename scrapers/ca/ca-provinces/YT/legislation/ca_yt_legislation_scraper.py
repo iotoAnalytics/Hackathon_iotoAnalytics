@@ -24,7 +24,7 @@ Change the current legislature to the most recent
 '''
 CURRENT_LEGISLATURE = 34
 PROV_TERR_ABBREVIATION = 'YT'
-DATABASE_TABLE_NAME = 'ca_yt_legislation_test'
+DATABASE_TABLE_NAME = 'ca_yt_legislation'
 LEGISLATOR_TABLE_NAME = 'ca_yt_legislators'
 BASE_URL = 'https://yukonassembly.ca/'
 BILLS_URL = 'https://yukonassembly.ca/house-business/progress-bills'
@@ -45,7 +45,7 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(PROV_TERR_ABBREVIATION,
                                                       LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
-class Main_Functions:
+class Main_Program:
     def program_driver(self):
         self.__open_url()
         current_session = self.__get_current_session()
@@ -166,7 +166,8 @@ class SessionScraper:
         row.principal_sponsor_id = self.__get_principal_sponsor_id(row)
         row.actions = self.__get_actions(bill_row['row'])
         row.current_status = self.__get_current_status(row.actions)
-        row.bill_text = self.__get_bill_text_from_pdf(row.source_url)
+        self.__get_bill_info(row)
+        # row.bill_text = self.__get_bill_text_from_pdf(row.source_url)
         row.region = scraper_utils.get_region(PROV_TERR_ABBREVIATION)
         return row
     
@@ -263,31 +264,22 @@ class SessionScraper:
     def __get_current_status(self, actions):
         return actions[0]['description']
 
-    def __get_bill_text_from_pdf(self, pdf_url):
-        '''
-        This function serves to get the "EXPLANATORY NOTE" from the bill pdf.
-        This section ranges from 1 page to multiple pages, so we'll be getting the first five pages from when this section starts.
-        '''
-        NUM_PAGES_TO_EXTRACT = 5
+    def __get_bill_info(self, row):
+        pdf_url = row.source_url
         pdf = self.__open_pdf(pdf_url)
-        pages = self.__get_pdf_pages(pdf, NUM_PAGES_TO_EXTRACT)
-        text = ''
-        if not self.__explanatory_note_exists(pages[0:2]):
-            return self.__clean_up_text(text)
-        for page in pages:
-            text += self.__extract_explanatory_note(page)
-            if self.__check_if_end_of_explanatory_note(page):
-                return self.__clean_up_text(text)
-        pdf.close()
-        return self.__clean_up_text(text)
+        pages = self.__get_pdf_pages(pdf)
+        if not self.__explanatory_note_exists(pages[0:5]):
+            row.bill_text = self.__get_bill_text_with_no_explanatory_note(pages)
+        else:
+            self.__set_bill_summary_and_text(row, pages)
 
     def __open_pdf(self, pdf_url):
         response = requests.get(pdf_url, stream = True )
         return pdfplumber.open(io.BytesIO(response.content))   
 
-    def __get_pdf_pages(self, pdf, num_pages_to_extract):
+    def __get_pdf_pages(self, pdf):
         # The 0th page for these pdfs are all a title page, hence why we splice from 1st
-        return pdf.pages[1 : num_pages_to_extract]
+        return pdf.pages[1:]
 
     def __explanatory_note_exists(self, pages):
         '''
@@ -306,6 +298,37 @@ class SessionScraper:
         eng_half = page.crop((0, 0, float(page.width) * APPROX_PAGE_HALF, page.height))
         return eng_half.extract_text()
 
+    def __get_bill_text_with_no_explanatory_note(self, pages):
+        text = ''
+        for page in pages:
+            text += self.__extract_bill_text_with_no_explanatory_note(page)
+        return self.__clean_up_text(text)
+
+    def __extract_bill_text_with_no_explanatory_note(self, page):
+        '''
+        Some PDFs are bilingual and are divided by a column, where some are not.
+        This will cause some troubles in extracting PDFs that have no columns.
+        '''
+        eng_half = self.__get_eng_half(page)
+        if eng_half == None:
+            return ''
+        else:
+            return eng_half
+
+    def __set_bill_summary_and_text(self, row, pages):
+        text = ''
+        is_getting_summary = True
+        for page in pages:
+            if is_getting_summary:
+                text += self.__extract_explanatory_note(page)
+                if self.__check_if_end_of_explanatory_note(page):
+                    row.bill_summary = self.__clean_up_text(text)
+                    is_getting_summary = False
+                    text = self.__extract_bill_text(page)
+            else:
+                text += self.__extract_bill_text(page)
+        row.bill_text = self.__clean_up_text(text)
+
     def __extract_explanatory_note(self, page):
         eng_half_of_page = self.__get_eng_half(page)
         if 'EXPLANATORY NOTE' in eng_half_of_page:
@@ -313,6 +336,9 @@ class SessionScraper:
         if 'BILL NO.' in eng_half_of_page:
             eng_half_of_page = eng_half_of_page.split('BILL NO.')[0]
         return eng_half_of_page
+
+    def __extract_bill_text(self, page):
+        return self.__get_eng_half(page)
 
     def __check_if_end_of_explanatory_note(self, page):
         eng_half_of_page = self.__get_eng_half(page)
@@ -327,5 +353,5 @@ class SessionScraper:
         return text
 
 if __name__ == '__main__':
-    main_program = Main_Functions()
+    main_program = Main_Program()
     main_program.program_driver()

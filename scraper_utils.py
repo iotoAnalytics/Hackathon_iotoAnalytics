@@ -899,7 +899,7 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         """ 
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
-        # data = self.add_topics(data)
+        data = self.add_topics(data)
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
