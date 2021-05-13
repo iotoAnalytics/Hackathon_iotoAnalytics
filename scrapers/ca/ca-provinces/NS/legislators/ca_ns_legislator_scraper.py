@@ -91,6 +91,21 @@ def get_riding(bio_container, row):
     row.riding = riding
 
 
+def get_phone_number(bio_container, row):
+    phone_numbers = []
+    office = "office"
+    #phone = "phone number"
+    phone_detail = bio_container.findAll('dd', {'class': 'numbers'})
+    phone_number = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)
+
+    print(phone_number)
+    #phone_number = [{'office': '', 'number': phone_number}]
+
+    #row.phone_numbers = phone_number
+
+    #phone_info = {"office": office, "number": phone}
+    #phone_numbers.append(phone_info)
+
 def scrape(url):
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -126,6 +141,8 @@ def scrape(url):
     get_party(bio_container, row)
     get_name(bio_container, row)
     get_riding(bio_container, row)
+    get_phone_number(bio_container, row)
+
 
     # Get phone number
     bio_text = bio_container.text
@@ -156,8 +173,10 @@ if __name__ == '__main__':
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls]
     print('Scraping data...')
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    for url in urls:
+        scrape(url)
     print('Scraping complete')
 
     # Once we collect the data, we'll write it to the database.
