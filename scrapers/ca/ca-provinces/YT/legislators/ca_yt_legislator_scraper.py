@@ -1,5 +1,3 @@
-## TODO: Raise Exception when looking for element and it's not there
-
 import sys
 import os
 from pathlib import Path
@@ -14,7 +12,6 @@ sys.path.insert(0, str(path_to_root))
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
-import requests
 from multiprocessing import Pool
 from nameparser import HumanName
 import pandas as pd
@@ -72,10 +69,9 @@ def program_driver():
   committee_data = organize_unproccessed_committee_data(unprocessed_committee_data)
 
   complete_data_set = configure_data(mla_data, wiki_data, committee_data)
-  print(complete_data_set)
-  # print('Writing data to database...')
-  # scraper_utils.write_data(complete_data_set)
-  # print("Complete")
+  print('Writing data to database...')
+  scraper_utils.write_data(complete_data_set)
+  print("Complete")
 
 def get_page_as_soup(url):
   page_html = get_site_as_html(url)
@@ -215,7 +211,7 @@ class ScraperForMLAs:
 
   def __get_full_human_name(self):
     full_name = self.main_container.find('span').text
-    full_name = full_name.replace('hon', '').strip()
+    full_name = full_name.replace('Hon', '').strip()
     return HumanName(full_name)
   
   def __set_role_data(self):
