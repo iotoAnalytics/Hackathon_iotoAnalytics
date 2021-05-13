@@ -45,7 +45,7 @@ header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHT
 options = Options()
 options.headless = True
 
-scraper_utils = USStateLegislationScraperUtils('OK', 'us_ok_legislation_test', 'us_ok_legislators_test')
+scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION, DATABASE_TABLE_NAME, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape_regular_session():
@@ -305,9 +305,9 @@ def _set_votes(row, soup):
     # print(f'House: {house_votes_url}\nSenate: {senate_votes_url}')
 
     soup = _create_soup(house_votes_url, SOUP_PARSER_TYPE)
-    OKHouseLegislation._format_votes(soup)
-
-
+    # OKHouseLegislation._format_votes(soup)
+    test = OKHouseLegislation()
+    test.format_votes(soup)
 
     # print(text)
 
