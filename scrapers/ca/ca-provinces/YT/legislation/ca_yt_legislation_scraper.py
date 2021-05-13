@@ -45,7 +45,7 @@ scraper_utils = CAProvinceTerrLegislationScraperUtils(PROV_TERR_ABBREVIATION,
                                                       LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
-class Main_Functions:
+class Main_Program:
     def program_driver(self):
         self.__open_url()
         current_session = self.__get_current_session()
@@ -353,5 +353,5 @@ class SessionScraper:
         return text
 
 if __name__ == '__main__':
-    main_program = Main_Functions()
+    main_program = Main_Program()
     main_program.program_driver()
