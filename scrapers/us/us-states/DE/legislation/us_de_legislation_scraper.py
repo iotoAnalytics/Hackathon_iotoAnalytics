@@ -43,8 +43,9 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 # driver = webdriver.Chrome(PATH)
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
-driver = webdriver.Chrome(
-    '../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe', options=chrome_options)
+driver = webdriver.Chrome('../../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+                          options=chrome_options)
+print("driver found")
 driver.get(url)
 
 link_lst = []
