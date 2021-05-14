@@ -122,6 +122,19 @@ def get_info_from_scraped_gov_url(row, soup):
     get_email(row, soup)
     get_committees(row, soup)
     get_years_active(row, soup)
+    get_occupation(row, soup)
+
+
+def get_occupation(row, soup):
+    """
+        collect occupation info from personal page to fill the row. also check roles.
+
+        param: take the row dict and soup of the webpage
+    """
+    #occupation
+
+    occupation = soup.find('span', {'id': re.compile("body_FormView4_OCCUPATIONLabel")}).text
+    row.occupation = occupation
 
 
 def get_committees(row, soup):
