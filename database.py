@@ -224,6 +224,9 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
+                for v in row:
+                    print(v, type(v))
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -238,6 +241,8 @@ class Persistence:
                     cur.execute(insert_legislator_query, tup)
 
                 except Exception as e:
+                    import traceback
+                    print(traceback.format_exc())
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
@@ -849,6 +854,8 @@ class Persistence:
             for row in data:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
+
+                
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,

@@ -45,7 +45,8 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 def get_rep_urls():
     """
-    collect all urls of house representatives' personal page
+    collect all urls of house representatives' personal page.
+    return: a list of urls
     """
     urls = []
     # Logic goes here! Some sample code:
@@ -73,7 +74,7 @@ def get_rep_urls():
 
 def scrape_rep(url):
     '''
-    Insert logic here to scrape_rep all URLs acquired in the get_urls() function.
+    scrape datas from house rep's personal page.
 
     Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
     state, and state_id values, as these have already been inserted by the initialize_row()
@@ -85,21 +86,14 @@ def scrape_rep(url):
     Be sure to insert the correct data type into each row. Otherwise, you will get an error
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
+
+    param: take a url string
+    return: return a dict that represent a row of info of a rep.
     '''
 
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
-    # like so:
     row.source_url = url
-
-    # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
-    # the party name from the website, then get the party_id from scraper_utils
-    # This can be done like so:
-
-    # Replace with your logic to collect party for legislator.
-    # Must be full party name. Ie: Democrat, Republican, etc.
 
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -108,13 +102,6 @@ def scrape_rep(url):
 
     get_info_from_scraped_gov_url(row, soup)
 
-    # year_active: I have year_elected on the webpages, should I rely on that info alone and convert that into
-    # years_active? or should I collect that elsewhere?
-
-    # education: the webpage also have edu info but they are unstructured and unable to meet the dataDict requirements
-
-    # Other than that, you can replace this statement with the rest of your scraper logic.
-
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
     print(row)
@@ -122,6 +109,11 @@ def scrape_rep(url):
 
 
 def get_info_from_scraped_gov_url(row, soup):
+    """
+    collect info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     get_name(row, soup)
     get_party(row, soup)
     get_district(row, soup)
@@ -130,9 +122,27 @@ def get_info_from_scraped_gov_url(row, soup):
     get_email(row, soup)
     get_committees(row, soup)
     get_years_active(row, soup)
+    get_occupation(row, soup)
+
+
+def get_occupation(row, soup):
+    """
+        collect occupation info from personal page to fill the row. also check roles.
+
+        param: take the row dict and soup of the webpage
+    """
+    #occupation
+
+    occupation = soup.find('span', {'id': re.compile("body_FormView4_OCCUPATIONLabel")}).text
+    row.occupation = occupation
 
 
 def get_committees(row, soup):
+    """
+    collect committees info from personal page to fill the row. also check roles.
+
+    param: take the row dict and soup of the webpage
+    """
     # committees
     committees = []
     committees_html = soup.find('span', {'id': re.compile("body_FormView1_COMMITTEEASSIGNMENTS2Label")})
@@ -160,20 +170,38 @@ def get_committees(row, soup):
 
 
 def get_email(row, soup):
+    """
+    collect email info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     # email
     email = soup.find('span', {'id': re.compile("body_FormView6_EMAILADDRESSPUBLICLabel")}).text
     row.email = email
 
 
 def get_years_active(row, soup):
+    """
+    collect year elected info from personal page to fill the row. convert that into a years active list.
+
+    param: take the row dict and soup of the webpage
+    """
     # convert years elected to years active
-    year_elected = soup.find('span', {'id': re.compile("body_FormView6_EMAILADDRESSPUBLICLabel")}).text
+    year_elected = soup.find('span', {'id': re.compile("body_FormView4_YEARELECTEDLabel")}).text
     if year_elected != "":
-        years_active = list(range(int(year_elected), 2022))
-        row.years_active = list(range(int(year_elected), 2022))
+        try:
+            years_active = list(range(int(year_elected), 2022))
+            row.years_active = list(range(int(year_elected), 2022))
+        except Exception:
+            pass
 
 
 def get_phone_number(row, soup):
+    """
+    collect phone number info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     # phone number
     raw_phone_number = soup.find('span', {'id': re.compile("body_FormView3_DISTRICTOFFICEPHONELabel")}).text
     phone_number = raw_phone_number.replace("(", "").replace(") ", "-")
@@ -182,6 +210,11 @@ def get_phone_number(row, soup):
 
 
 def get_address(row, soup):
+    """
+    collect address info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     # address
     address = soup.find('span', {'id': re.compile("body_FormView3_OFFICEADDRESS2Label")}).text
     address = [{'location': 'district office', 'address': address}]
@@ -189,12 +222,22 @@ def get_address(row, soup):
 
 
 def get_district(row, soup):
+    """
+    collect district info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     # district
     district = soup.find('span', {'id': re.compile("body_FormView5_DISTRICTNUMBERLabel")}).text
     row.district = district
 
 
 def get_party(row, soup):
+    """
+    collect party info from personal page to fill the row.
+
+    param: take the row dict and soup of the webpage
+    """
     # party
     party = soup.find('span', {'id': re.compile("body_FormView5_PARTYAFFILIATIONLabel")}).text
     row.party_id = scraper_utils.get_party_id(party)
@@ -202,6 +245,12 @@ def get_party(row, soup):
 
 
 def get_name(row, soup):
+    """
+    collect name info from personal page to fill the row.
+    parses the name with name parser to determine first, middle and last name.
+
+    param: take the row dict and soup of the webpage
+    """
     # name
     name_full = soup.find('span', {'id': re.compile("body_FormView5_FULLNAMELabel")}).text
     hn = HumanName(name_full)
@@ -215,6 +264,8 @@ def get_name(row, soup):
 def get_senate_urls():
     """
     collect all urls of senates' personal page
+
+    return: a list of urls
     """
     urls = []
     # Logic goes here! Some sample code:
@@ -225,8 +276,6 @@ def get_senate_urls():
     # request and soup
     page = requests.get(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
-
-    # urls = {base_url + prod_path['href'] for prod_path in soup.findAll('a', {'href': re.compile("H_Reps/members")})}
 
     legislator_list = soup.find_all('div', {'class': 'media-body'})
     for item in legislator_list:
@@ -243,7 +292,7 @@ def get_senate_urls():
 
 def scrape_senate(url):
     '''
-    Insert logic here to scrape_senate all URLs acquired in the get_urls() function.
+    scrape datas from house rep's personal page.
 
     Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
     state, and state_id values, as these have already been inserted by the initialize_row()
@@ -255,21 +304,14 @@ def scrape_senate(url):
     Be sure to insert the correct data type into each row. Otherwise, you will get an error
     when inserting data into database. Refer to the data dictionary to see data types for
     each column.
+
+    param: take a url string
+    return: return a dict that represent a row of info of a rep.
     '''
 
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
-    # like so:
     row.source_url = url
-
-    # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
-    # the party name from the website, then get the party_id from scraper_utils
-    # This can be done like so:
-
-    # Replace with your logic to collect party for legislator.
-    # Must be full party name. Ie: Democrat, Republican, etc.
 
     page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -277,13 +319,6 @@ def scrape_senate(url):
     row.role = 'Senator'
 
     get_info_from_scraped_gov_url(row, soup)
-
-    # year_active: I have year_elected on the webpages, should I rely on that info alone and convert that into
-    # years_active? or should I collect that elsewhere?
-
-    # education: the webpage also have edu info but they are unstructured and unable to meet the dataDict requirements
-
-    # Other than that, you can replace this statement with the rest of your scraper logic.
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -334,8 +369,12 @@ def get_legislator_info_from_main_page(soup):
 def get_wiki_urls(path):
     """
     Takes base URL of wikipedia, scrape senates/house member's page URLS.
+
+    param: taks the wiki path of legislators wikipage
+    return: a list of urls
     """
 
+    print("If the tqdm bar seems stucked at 100%, please wait a bit longer, Thanks!")
     urls = []
     scrape_url = wiki_url + path
     page = scraper_utils.request(scrape_url)
@@ -363,17 +402,11 @@ def scrape_wiki_site(wiki_urls, rows):
     """
     Take partially filled sorted rows and collect any other missing information from wikipedia (birthday, years served,
     etc).
+
+    param: a list of wiki urls and list of legislator info row dicts
+    return: a list of legislator info row dicts
     """
 
-    # pbar = tqdm(range(len(sorted_rows)))
-    # for item in pbar:
-    #     wiki_info = scraper_utils.scrape_wiki_bio(wiki_urls[item])
-    #     sorted_rows[item].education = wiki_info['education']
-    #
-    #     if wiki_info['birthday'] is not None:
-    #         sorted_rows[item].birthday = str(wiki_info['birthday'])
-    #     sorted_rows[item].years_active = wiki_info['years_active']
-    #     sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
     for url in wiki_urls:
         wiki_info = scraper_utils.scrape_wiki_bio(url[1])
         url.append(wiki_info)
@@ -382,10 +415,10 @@ def scrape_wiki_site(wiki_urls, rows):
         for url in wiki_urls:
             if row.district == url[0] and row.name_last == url[2].get('name_last'):
                 try:
-                    row.education = url[2].get('education').replace('\n', ' ')
-                    row.occupation = url[2].get('occupation').replace('\n', ' ')
-                    row.birthday = url[2].get('birthday').replace('\n', ' ')
-                    row.most_recent_term_id = url[2].get('most_recent_term_id').repace('\n', ' ')
+                    row.education = url[2].get('education')
+                    row.occupation = url[2].get('occupation')
+                    row.birthday = url[2].get('birthday')
+                    row.most_recent_term_id = url[2].get('most_recent_term_id')
                 except Exception:
                     pass
 
@@ -393,30 +426,24 @@ def scrape_wiki_site(wiki_urls, rows):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape_rep:
-    # html = get_main_page_html()
-    # info_list = get_legislator_info_from_main_page(html)
-    # pprint(info_list)
-
-    # Next, we'll scrape_rep the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    #
-    # # Once we collect the data, we'll write it to the database.
-    # scraper_utils.insert_legislator_data_into_db(data)
-    # rep_urls = get_rep_urls()
-    # data = [scrape_rep(url) for url in rep_urls]
-    # with Pool() as pool:
-    #     data = pool.map(scrape_rep, rep_urls)
 
     sen_urls = get_senate_urls()
     with Pool() as pool:
         sen_partially_filled_rows = pool.map(scrape_senate, sen_urls)
-    #
-    # sen_partially_filled_sorted_rows = sorted(data, key=lambda row: (row.role, int(row.district)))
-    # rep_wiki = get_wiki_urls('wiki/Louisiana_House_of_Representatives')
+
     sen_wiki = get_wiki_urls('wiki/Louisiana_State_Senate')
     # pprint(sen_wiki)
     sen_data = scrape_wiki_site(sen_wiki, sen_partially_filled_rows)
     pprint(sen_data)
+
+    rep_urls = get_rep_urls()
+    with Pool() as pool:
+        rep_partially_filled_rows = pool.map(scrape_rep, rep_urls)
+    rep_wiki = get_wiki_urls('wiki/Louisiana_House_of_Representatives')
+    rep_data = scrape_wiki_site(rep_wiki, rep_partially_filled_rows)
+    pprint(rep_data)
+
+    data = rep_data + sen_data
+    scraper_utils.write_data(data)
+
     print('Complete!')

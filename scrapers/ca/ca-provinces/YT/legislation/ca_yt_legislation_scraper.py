@@ -21,19 +21,20 @@ from selenium.webdriver.chrome.options import Options
 
 '''
 Change the current legislature to the most recent
+This scraper will not work if the current session isn't populated with 4~5 bills
+    for government and non-government bills
 '''
 CURRENT_LEGISLATURE = 34
 PROV_TERR_ABBREVIATION = 'YT'
-DATABASE_TABLE_NAME = 'ca_yt_legislation'
+DATABASE_TABLE_NAME = 'ca_yt_legislation_test'
 LEGISLATOR_TABLE_NAME = 'ca_yt_legislators'
-BASE_URL = 'https://yukonassembly.ca/'
-BILLS_URL = 'https://yukonassembly.ca/house-business/progress-bills'
+BASE_URL = 'https://yukonassembly.ca'
+BILLS_URL = BASE_URL + '/house-business/progress-bills'
 
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
-header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 options = Options()
 options.headless = True
 
@@ -201,7 +202,8 @@ class SessionScraper:
         return bill_title
 
     def __get_principal_sponsor(self, bill_row):
-        return bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Sponsor.value].text
+        name = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Sponsor.value].text
+        return re.findall('[A-Za-z]+', name)[0]
 
     def __get_principal_sponsor_id(self, row):
         search_for = {'name_last' : row.principal_sponsor}
@@ -221,7 +223,7 @@ class SessionScraper:
         for index in range(len(relevant_cells)):
             current_cell = relevant_cells[index]
             action = (self.__add_action_attribute(current_cell, index))
-            if action != None:
+            if action:
                 actions.append(action)
         return actions
     
@@ -274,7 +276,8 @@ class SessionScraper:
             self.__set_bill_summary_and_text(row, pages)
 
     def __open_pdf(self, pdf_url):
-        response = requests.get(pdf_url, stream = True )
+        response = requests.get(pdf_url, headers=scraper_utils._request_headers, stream=True)
+        scraper_utils.crawl_delay(crawl_delay)
         return pdfplumber.open(io.BytesIO(response.content))   
 
     def __get_pdf_pages(self, pdf):
@@ -350,7 +353,7 @@ class SessionScraper:
     def __clean_up_text(self, text):
         text = text.replace('\n', ' ')
         text = text.replace('  ', ' ')
-        return text
+        return text.strip()
 
 if __name__ == '__main__':
     main_program = Main_Program()

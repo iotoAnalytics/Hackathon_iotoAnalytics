@@ -1,13 +1,9 @@
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
-import boto3
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import sys
@@ -17,6 +13,7 @@ from time import sleep
 from tqdm import tqdm
 import pandas as pd
 from datetime import datetime
+import tabula
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -97,6 +94,17 @@ def open_bill_link(url):
     return bill
 
 
+def get_source_url(url, row):
+    """
+    Set the source url.
+
+    :param url: Legislation url
+    :param row: Legislation row
+    """
+
+    row.source_url = url
+
+
 def get_bill_name(url, row):
     """
     Grab bill name and set it to row.
@@ -160,23 +168,20 @@ def get_session(url, row):
     row.session = session
 
 
-def translate_abbreviations(string):
+def translate_abbreviations():
     """
     Takes abbreviation table (for bill actions) and translates it into its corresponding description.
-    :param string: input string representing the abbreviation (scraped from bill action(s))
-    :return: a string representing the abbreviation description or None if the input string does not match
+    :return: a dictionary with abbreviations as keys and descriptions as values
     """
 
+    translation_dict = {}
     soup = make_soup('https://www.nmlegis.gov/Legislation/Action_Abbreviations')
-    table = soup.find('table', {'id': 'MainContent_gridViewAbbreviations'})
-    pd_table = pd.read_html(str(table))[0]
-    pd_dict = pd_table.to_dict('records')
-    pprint(pd_dict)
-    for dic in pd_dict:
-        if dic['Code'] == string:
-            return dic['Description']
-
-    return None
+    table = soup.find('table', {'id': 'MainContent_gridViewAbbreviations'}).find_all('tr')
+    for tr in table:
+        columns = tr.find_all('td')
+        for _ in columns:
+            translation_dict[columns[0].text.strip()] = columns[1].text.strip()
+    return translation_dict
 
 
 def get_bill_actions(url, row):
@@ -196,31 +201,119 @@ def get_bill_actions(url, row):
     sleep(1)
 
     actions = table.find_elements_by_tag_name('span')
+
+    abbreviation_dict = translate_abbreviations()
     for action in actions:
         action_dict = {'date': '', 'action_by': '', 'description': ''}
         info = action.text.split('\n')
         single_line = info[0].split('-')
         if len(info) == 3:
-            # todo: change abbreviation
+            for word in info[2].split():
+                clean_word = re.sub('\\W+', '', word)
+                if clean_word in abbreviation_dict.keys():
+                    info[2] = info[2].replace(word, abbreviation_dict[clean_word].lower().title())
+
             action_dict['description'] = info[2]
-            pprint(info[1].split(':')[1].strip())
             action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
 
         elif len(single_line) == 3:
-            action_dict['description'] = single_line[0].strip()
-            # todo: single line doesn't have year. need to look back one to get year but check month
-            action_dict['date'] = str(datetime.strptime(single_line[2].replace('.', '').strip(), '%b %d').date())
+            soup = make_soup(url)
+            header = soup.find('span', {'id': 'MainContent_formViewLegislationTitle_lblSession'}).text
+            session = header.split('-')[0].split()[0]
 
-        elif len(single_line) == 2:
-            # todo: change abbreviation
+            date_without_year = single_line[2].replace('.', '').strip() + f' {session}'
+            converted_date_format = str(datetime.strptime(date_without_year, '%b %d %Y').date())
+
+            action_dict['date'] = converted_date_format
             action_dict['description'] = single_line[0].strip()
-            action_dict['date'] = str(datetime.strptime(info[1].split(':')[1].strip(), '%m/%d/%Y').strftime('%Y-%m-%d'))
+
+        elif len(single_line) <= 2:
+            new_info = info[0].split()
+            for word in new_info:
+                clean_word = re.sub('\\W+', '', word)
+                if clean_word in abbreviation_dict.keys():
+                    info[0] = info[0].replace(word, abbreviation_dict[clean_word])
+
+            action_dict['description'] = info[0]
 
         bill_actions.append(action_dict)
 
     pprint(bill_actions)
     driver.quit()
-    # return bill_actions
+    return bill_actions
+
+
+def get_legislator_id(first_last_lst):
+    ids = []
+    for name in first_last_lst:
+        print(name)
+        first = name[1].replace('.', '')
+        last = name[0].replace(',', '')
+        # leg_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id',
+        #                                                      column_to_search='name_first', startswith=first,
+        #                                                      name_last=last)
+        # ids.append(leg_id)
+    # return ids
+
+    # except:
+        # last = first_last_lst[1]
+        # leg_id = scraper_utils.get_legislator_id(name_last=last, name_first=None)
+        # return leg_id
+        # pass
+
+
+def get_bill_votes(url, row):
+    driver = open_driver()
+    driver.get(url)
+    vote_button = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_lblVotes')
+    vote_button.click()
+    vote_table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_dataListVotes')
+    pdfs = vote_table.find_elements_by_tag_name('a')
+
+    votes = []
+
+    for index, pdf in enumerate(pdfs):
+        link = pdf.get_attribute('href')
+        chamber = link.split('VOTE')[0][-1]
+        all_vote_info = {'date': '', 'nv': '', 'nay': '', 'yea': '', 'total': '', 'absent': '', 'passed': '',
+                         'chamber': '', 'description': '', 'votes': []}
+
+        tables = tabula.io.read_pdf(link, pages=1, silent=True)
+        first_table = tables[0].iloc[:, 0:6]
+        first_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+
+        second_table = tables[0].iloc[:, 6:13]
+        second_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+        result = first_table.append(second_table)
+
+        if chamber == 'S':
+            result = result[:-1]
+            all_vote_info['chamber'] = 'Senate'
+        else:
+            all_vote_info['chamber'] = 'House'
+
+        result = result.melt(id_vars='legislator', var_name='vote', value_name='x').dropna().drop('x', 1)
+        result['legislator'] = result['legislator'].str.lower().str.title()
+        vote_dict = result.to_dict('records')
+
+        # result.insert(0, 'goverlytics_id', get_legislator_id(result['legislator'].str.split()))
+
+        all_vote_info['total'] = result['legislator'].count()
+        all_vote_info['nv'] = result.loc[result.vote == 'nv', 'vote'].count()
+        all_vote_info['yea'] = result.loc[result.vote == 'yea', 'vote'].count()
+        all_vote_info['nay'] = result.loc[result.vote == 'nay', 'vote'].count()
+        all_vote_info['absent'] = result.loc[result.vote == 'absent', 'vote'].count() + result.loc[result.vote == 'exc',
+                                                                                                   'vote'].count()
+        all_vote_info['votes'] = vote_dict
+        votes.append(all_vote_info)
+
+
+    row.votes = votes
+    # pprint(result['legislator'].str.split())
+    # print(result.to_string(index=False))
+    # pprint(result.to_dict('records'))
+    pprint(votes)
+    driver.quit()
 
 
 def scrape(url):
@@ -232,22 +325,25 @@ def scrape(url):
     # get_bill_name(url, row)
     # get_bill_sponsor_info(url, row)
     # get_session(url, row)
-    get_bill_actions(url, row)
+    # get_bill_actions(url, row)
+    # translate_abbreviations()
+    get_bill_votes(url, row)
 
 
 def main():
-    # urls = get_urls()
-    # # pprint(urls)
-    #
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
+    urls = get_urls()
+    # pprint(urls)
 
-    lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
-           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
-           'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
-    for url in lst:
-        row = scraper_utils.initialize_row()
-        get_bill_actions(url, row)
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
+
+    # lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
+    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
+    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
+    # for url in lst:
+    #     row = scraper_utils.initialize_row()
+    #     get_bill_actions(url, row)
+
 
 
 if __name__ == '__main__':

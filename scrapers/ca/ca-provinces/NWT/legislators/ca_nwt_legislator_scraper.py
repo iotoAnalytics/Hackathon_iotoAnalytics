@@ -17,7 +17,7 @@ from nameparser import HumanName
 import pandas as pd
 import numpy as np
 
-BASE_URL = 'https://www.ntassembly.ca/'
+BASE_URL = 'https://www.ntassembly.ca'
 MLA_URL = 'https://www.ntassembly.ca/members'
 THREADS_FOR_POOL = 12
 
@@ -32,6 +32,7 @@ def program_driver():
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
+    print(mla_data)
 
 
 class Main_Functions:
@@ -85,7 +86,7 @@ class MLA_Site_Scraper:
         self.__set_role_data()
         self.__set_party_data()
         self.__set_riding_data()
-        self.__set_addresses()
+        self.__set_contact_info()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -125,9 +126,132 @@ class MLA_Site_Scraper:
                 return text.replace('Electoral District', '')
         return ''
 
-    def __set_addresses(self):
-        addresses = []
+    def __set_contact_info(self):
+        raw_members_office_contact_container = self.__find_members_office()
+        raw_constituency_office_contact_container = self.__find_constituency_office()
+
+        self.row.addresses = self.__set_address(raw_members_office_contact_container, raw_constituency_office_contact_container)
+        self.row.email = self.__get_member_email(raw_members_office_contact_container)
+        self.row.phone_numbers = self.__get_numbers(raw_members_office_contact_container, raw_constituency_office_contact_container)
+    
+    def __find_members_office(self):
+        all_paragraphs_in_main_container = self.main_container.findAll('p')
+        for paragraph in all_paragraphs_in_main_container:
+            text = paragraph.text
+            if 'P.O.' in text:
+                return paragraph
+    
+    def __find_constituency_office(self):
+        all_paragraphs_in_main_container = self.main_container.findAll('p')
+        for index, paragraph in enumerate(all_paragraphs_in_main_container):
+            text = paragraph.text
+            if 'Constituency Office' in text:
+                return all_paragraphs_in_main_container[index + 1]
+
+    def __set_address(self, member_address_container, constituency_address_container):
+        member_office_address = self.__get_member_office_address(member_address_container)
+        constituency_office_address = self.__get_constituency_office_address(constituency_address_container)
+        return [member_office_address, constituency_office_address] if constituency_office_address else [member_office_address]
+
+    def __get_member_office_address(self, container):
+        '''
+        It seems that all member's have the same member office address. 
+        This function exists in case that it might change. 
+        '''
+        address = self.__format_member_address(container)
+        return {'location' : 'member\'s office',
+                'address' : address}
         
+    def __format_member_address(self, container):
+        container_text = container.text
+        address = container_text.split('Phone')[0]
+        address = address.replace('\n', '').replace('\xa0', '')
+        address = address.replace('Yellowknife', ' Yellowknife,').replace(',,', ',').replace('  ', ' ')
+        return address
+
+    def __get_constituency_office_address(self, container):
+        try:
+            container_text = container.text
+        except Exception:
+            return
+        address = container_text.split('Ph')[0]
+        if address == '':
+            return
+        address = self.__format_constituency_address(address)
+        return {'location' : 'constituency office',
+                'address' : address}
+
+    def __format_constituency_address(self, text):
+        address = text.replace('\n', ' ').replace('\xa0', '')
+        address = address.replace('  ', ' ')
+        return address.strip()
+
+    def __get_member_email(self, container):
+        email = container.find('a')['href']
+        email = email.replace('mailto:', '')
+        return email.capitalize()
+
+    def __get_numbers(self, member_address_container, constituency_address_container):
+        members_office_number = self.__get_member_office_number(member_address_container)
+        m_office_number_to_add = {'office' : 'member\'s office',
+                                  'number' : members_office_number}
+
+        mobile_number = self.__get_mobile_number(member_address_container)
+        mobile_number_to_add = {'office' : 'mobile',
+                                'number' : mobile_number} if mobile_number else None
+        
+        constituency_office_number = self.__get_constituency_office_number(constituency_address_container)
+        c_office_number_to_add = {'office' : 'constituency office',
+                                      'number' : constituency_office_number} if constituency_office_number else None
+        
+        if not mobile_number_to_add and not c_office_number_to_add:
+            return [m_office_number_to_add]
+        if not mobile_number_to_add:
+            return [m_office_number_to_add, c_office_number_to_add]
+        if not c_office_number_to_add:
+            return [m_office_number_to_add, mobile_number_to_add]
+    def __get_member_office_number(self, container):
+        a_tag = container.a
+        a_tag.decompose()
+        contact_text = container.text
+        contact_text = contact_text.replace('\xa0', '')
+        if 'Phone number:' in contact_text:
+            number = contact_text.split('Phone number:')[1].strip()
+        else:
+            number = contact_text.split('Ph')[1].strip()
+        length_of_phone_number_and_extension = 23
+        return self.__clean_up_number(number, length_of_phone_number_and_extension)
+
+    def __get_mobile_number(self, container):
+        contact_text = container.text
+        try:
+            contact_text = contact_text.split('Mobile: ')[1].strip()
+            return self.__clean_up_number(contact_text, 13)
+        except Exception:
+            pass
+
+    def __get_constituency_office_number(self, container):
+        try:
+            contact_text = container.text
+        except Exception:
+            return
+        if 'Phone number:' in contact_text:
+            number = contact_text.split('Phone number:')[1].strip()
+        elif 'Ph:' in contact_text:
+            number = contact_text.split('Ph:')[1].strip()
+        else:
+            return
+        length_of_phone_number_and_extension = 23
+        return self.__clean_up_number(number, length_of_phone_number_and_extension)
+    
+    def __clean_up_number(self, number, number_length):
+        number = number.replace('(', '').replace(')', '')
+        number = number.replace('ext.', ' ext. ').replace('  ', ' ')
+        number = number.replace('ext', 'ext.').replace('..', '.')
+        number = number.replace('867 ', '867-')
+        return number[:number_length].strip()
+
+
 
 # #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(7) > a > strong > u
 # #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(7) > u > strong > a

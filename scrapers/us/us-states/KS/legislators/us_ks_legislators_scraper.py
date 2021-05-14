@@ -307,18 +307,28 @@ def get_committees(main_div, row):
 
 
 def get_areas_served(big_df_data):
+    # big_df_data = big_df_data.drop(columns="areas_served")
 
     url = "http://www.kslegislature.org/li/b2021_22/members/csv/"
     members_data = requests.get(url)
     m_data = StringIO(members_data.text)
     df = pd.read_csv(m_data)[
         ['County', 'Firstname', 'Lastname']]
-    df2 = df.rename(columns={'Firstname': 'name_first', 'Lastname': 'name_last',
-                             'County': 'areas_served'}, inplace=False)
+    for i in df.index:
 
-    f_df = pd.merge(big_df_data, df2, how='left',
-                        on=["name_first", "name_last"])
-    return f_df
+        areas = []
+        firstname = df.loc[i, "Firstname"]
+        lastname = df.loc[i, "Lastname"]
+        area = str(df.loc[i, "County"])
+        areas.append(str(area))
+        big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname),
+                        'areas_served'] = areas
+        # row_index = big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname)]
+        # big_df_data.at[row_index, 21] = areas
+        print(big_df_data['areas_served'])
+
+    return big_df_data
+
 
 def scrape(url):
     '''
@@ -417,7 +427,6 @@ if __name__ == '__main__':
     all_wiki_links = reps_wiki + sens_wiki
 
     with Pool() as pool:
-
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
         ['birthday', 'education', 'name_first', 'name_last']]
@@ -425,7 +434,8 @@ if __name__ == '__main__':
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
 
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
 
     final_df = get_areas_served(big_df)
@@ -433,10 +443,10 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = final_df.to_dict('records')
-    #print(big_list_of_dicts)
+    print(big_list_of_dicts)
 
     print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+    #scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
