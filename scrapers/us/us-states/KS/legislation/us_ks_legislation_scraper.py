@@ -509,6 +509,7 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
+    # urls = urls[:5]
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
@@ -518,6 +519,6 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
         data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    #scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
