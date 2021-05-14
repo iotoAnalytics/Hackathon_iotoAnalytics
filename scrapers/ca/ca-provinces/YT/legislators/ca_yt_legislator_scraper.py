@@ -1,5 +1,3 @@
-## TODO: Raise Exception when looking for element and it's not there
-
 import sys
 import os
 from pathlib import Path
@@ -14,7 +12,6 @@ sys.path.insert(0, str(path_to_root))
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
-import requests
 from multiprocessing import Pool
 from nameparser import HumanName
 import pandas as pd
@@ -22,10 +19,10 @@ import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-BASE_URL = 'https://yukonassembly.ca/'
-MLA_URL = 'https://yukonassembly.ca/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
+BASE_URL = 'https://yukonassembly.ca'
+MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
+COMMITTEE_URL = BASE_URL + '/committees'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Yukon_Legislative_Assembly#Current_members'
-COMMITTEE_URL = 'https://yukonassembly.ca/committees'
 NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {24 : 1978,
                                     25 : 1982,
                                     26 : 1985,
@@ -44,7 +41,6 @@ THREADS_FOR_POOL = 12
 scraper_utils = CAProvTerrLegislatorScraperUtils('YT', 'ca_yt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
-header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 options = Options()
 options.headless = True
 
@@ -70,9 +66,7 @@ def program_driver():
   all_committee_links = scraper_for_committees.get_all_commitee_links(main_committees_page_soup)
   unprocessed_committee_data = get_data_from_all_links(get_committee_data, all_committee_links)
   committee_data = organize_unproccessed_committee_data(unprocessed_committee_data)
-
   complete_data_set = configure_data(mla_data, wiki_data, committee_data)
-
   print('Writing data to database...')
   scraper_utils.write_data(complete_data_set)
   print("Complete")
@@ -119,14 +113,15 @@ def configure_data(mla_data, wiki_data, committee_data):
   big_df = pd.merge(mla_wiki_df, committee_df,
                     how='left',
                     on=['name_first', 'name_last'])
-  big_df['committees'] = big_df['committees'].replace({np.nan: None})
+  isna = big_df['committees'].isna()
+  big_df.loc[isna, 'committees'] = pd.Series([[]] * isna.sum()).values
 
   return big_df.to_dict('records')
 
 def scrape_main_wiki_link(wiki_link):
     wiki_urls = []
     page_html = get_site_as_html(wiki_link)
-    # # html parsing
+    # html parsing
     page_soup = soup(page_html, "html.parser")
 
     table = page_soup.find("table", {"class": "wikitable sortable"})
@@ -144,16 +139,34 @@ def get_committee_data(committee_url):
   return scraper_for_committee.get_committee_data()
 
 def organize_unproccessed_committee_data(raw_data):
+  restructured_data = {}
   return_data = []
   for committee in raw_data:
-    add_to_return_data(committee, return_data)
+    restructure_committee_data(committee, restructured_data)
+  print(restructured_data)
+  add_to_return_data(restructured_data, return_data)
   return return_data
 
-def add_to_return_data(committee, return_data):
-  for member in committee.keys():
+def restructure_committee_data(committee, restructured_data):
+  committee_name = list(committee.keys())[0]
+  list_of_members = committee[committee_name]
+  for member in list_of_members:
+    add_member_committee_data(member, committee_name, restructured_data)
+
+def add_member_committee_data(member, committee_name, restructured_data):
+  member_full_name = list(member.keys())[0]
+  role = member[member_full_name]
+  if 'Hon.' in member_full_name:
+    member_full_name = member_full_name.replace('Hon. ', '').strip()
+  restructured_data.setdefault(member_full_name, [])
+  list_of_member_committees = restructured_data[member_full_name]
+  list_of_member_committees.append({'role' : role, 'committee' : committee_name})
+
+def add_to_return_data(dict_of_members_and_committees, return_data):
+  for member in dict_of_members_and_committees.keys():
     name_first = member.split(' ')[0]
     name_last = member.split(' ')[1]
-    committees = committee[member]
+    committees = dict_of_members_and_committees[member]
     return_data.append({'name_first' : name_first, 'name_last' : name_last, 'committees' : committees})
 
 class ScraperForMainSite:  
@@ -215,18 +228,12 @@ class ScraperForMLAs:
 
   def __get_full_human_name(self):
     full_name = self.main_container.find('span').text
-    full_name = full_name.replace('hon', '').strip()
+    full_name = full_name.replace('Hon. ', '').strip()
     return HumanName(full_name)
   
   def __set_role_data(self):
     role_container = self.main_container.find('div', {'class' : 'field--name-field-title'})
-    self.row.role = self.__assign_role(role_container)
-
-  def __assign_role(self, role):
-    if role == None:
-      return "Member of the Legislative Assembly"
-    else:
-      return role.text
+    self.row.role = "Member of the Legislative Assembly" if not role_container else role_container.text
 
   def __set_party_data(self):
     party_info_container = self.main_container.find('div', {'class' : 'field--name-field-party-affiliation'})
@@ -260,12 +267,12 @@ class ScraperForMLAs:
     address_info = {'location' :  address_location, 'address' : street_address}
     self.row.addresses = address_info
   
-  '''
-  This function returns part of a list (parts_of_address).
-  This is because only the first three from the split address is relevant.
-  If html structure changes, this may need to be fixed.
-  '''
   def __get_address(self):
+    '''
+      This function returns part of a list (parts_of_address).
+      This is because only the first three from the split address is relevant.
+      If html structure changes, this may need to be fixed.
+    '''
     page_footer = self.soup.find('footer')
     address_container = page_footer.find('div', {'class' : 'footer-row--right'})
     full_address = address_container.find('p').text
@@ -287,19 +294,15 @@ class ScraperForMLAs:
     numbers = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', contact_info.text)
     return self.__categorize_numbers(numbers)
 
-  '''
-  phone_types is in this order because the website has the numbers ordered from phone then fax,
-  so effectively our numbers parm from above method will store numbers as such
-  '''
   def __categorize_numbers(self, numbers):
     categorized_numbers = []
-    i = 0
+    # phone_types is in this order because the website has the numbers ordered from phone then fax,
+    # so effectively our numbers parm from above method will store numbers as such
     phone_types = ['phone', 'fax']
-    for number in numbers:
-      info = {'office' : phone_types[i],
+    for index, number in enumerate(numbers):
+      info = {'office' : phone_types[index],
               'number' : number}
       categorized_numbers.append(info)
-    i = i + 1
     return categorized_numbers
 
   def __set_service_period(self):
@@ -389,10 +392,9 @@ class ScraperForCommittee:
     self.__open_url()
     committee_name = self.__get_committee_name()
     names = self.__get_members_names(committee_name)
-    data = {committee_name : names}
+    self.data = {committee_name : names}
     self.driver.close()
     self.driver.quit()
-    self.__organize_committee_data(data)
 
   def __open_url(self):
     self.driver.get(self.url)
@@ -419,7 +421,7 @@ class ScraperForCommittee:
     for member in member_containers:
       try:
         name = member.find_element_by_tag_name('span').text
-        names.append(self.__add_name_and_role(name, 'member'))
+        names.append({name : 'member'})
       except Exception:
         pass
     return names
@@ -436,31 +438,13 @@ class ScraperForCommittee:
       else:
         member_name = name.text
         role = 'member'
-      names.append(self.__add_name_and_role(member_name, role))
+      names.append({member_name : role})
     return names
 
   def __get_members_from_normal(self):
       names_container = self.driver.find_element_by_xpath('/html/body/div[1]/div/div/section/div[2]/article/div/div[2]/div/div[2]/div[1]/div/div[2]')
       names = names_container.find_elements_by_tag_name('span')
-      return [self.__add_name_and_role(name.text, 'member') for name in names]
-  
-  def __add_name_and_role(self, name, role):
-    return {name : role}
-
-  def __organize_committee_data(self, data):
-    committee_name = list(data.keys())[0]
-    list_of_members = data[committee_name]
-    for member in list_of_members:
-      self.__add_member_committee_data(member, committee_name)
-    
-  def __add_member_committee_data(self, member, committee_name):
-    member_full_name = list(member.keys())[0]
-    role = member[member_full_name]
-    if 'Hon.' in member_full_name:
-      member_full_name = member_full_name.replace('Hon. ', '')
-    self.data.setdefault(member_full_name, [])
-    list_of_member_committees = self.data[member_full_name]
-    list_of_member_committees.append({'role' : role, 'committee' : committee_name})
+      return [{name.text : 'member'} for name in names]
 
 if __name__ == '__main__':
   program_driver()

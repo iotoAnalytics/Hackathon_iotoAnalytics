@@ -29,6 +29,7 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 import time
+from io import StringIO
 
 state_abbreviation = 'KS'
 database_table_name = 'us_ks_legislators'
@@ -47,8 +48,8 @@ def get_urls():
     '''
     urls = []
     # Url we are scraping: http://www.kslegislature.org/li/b2021_22/chamber/senate/roster/
-    path_senate = '/li/b2021_22/chamber/senate/roster/'
-    path_house = '/li/b2021_22/chamber/house/roster/'
+    path_senate = '/li/chamber/senate/roster/'
+    path_house = '/li/chamber/house/roster/'
 
     # getting urls for senate
     scrape_url = base_url + path_senate
@@ -57,11 +58,13 @@ def get_urls():
     table = soup.find('table', {'class': 'bottom'})
     items = table.find_all('tr')
 
-    # We'll collect only the first 10 to keep things simple. Need to skip first record
     for tr in items[1:]:
         link = base_url + tr.find('a').get('href')
         # print(link)
         urls.append(link)
+
+    # Delay so we do not overburden servers
+    scraper_utils.crawl_delay(crawl_delay)
 
     # Collecting representatives urls
     scrape_url = base_url + path_house
@@ -69,7 +72,7 @@ def get_urls():
     soup = BeautifulSoup(page.content, 'html.parser')
     table = soup.find('table', {'class': 'bottom'})
     items = table.find_all('tr')
-    # scraping just 10 for testing
+
     for tr in items[1:]:
         link = base_url + tr.find('a').get('href')
         #  print(link)
@@ -152,7 +155,7 @@ def get_name_and_role(main_div, row):
     name_line = main_div.find('h1').text
     name_full = name_line
 
-    if "-" in name_line:
+    if " - " in name_line:
         name_full = name_full[:name_full.index("-")]
     if "Senator" in name_full:
         name_full = name_full.replace('Senator ', '')
@@ -233,8 +236,7 @@ def get_occupation(business, row):
         else:
             jobs.append(job)
     except Exception:
-        job = None
-        jobs.append(job)
+        pass
 
     row.occupation = jobs
 
@@ -303,6 +305,20 @@ def get_committees(main_div, row):
 
     row.committees = committees_list
 
+
+def get_areas_served(big_df_data):
+
+    url = "http://www.kslegislature.org/li/b2021_22/members/csv/"
+    members_data = requests.get(url)
+    m_data = StringIO(members_data.text)
+    df = pd.read_csv(m_data)[
+        ['County', 'Firstname', 'Lastname']]
+    df2 = df.rename(columns={'Firstname': 'name_first', 'Lastname': 'name_last',
+                             'County': 'areas_served'}, inplace=False)
+
+    f_df = pd.merge(big_df_data, df2, how='left',
+                        on=["name_first", "name_last"])
+    return f_df
 
 def scrape(url):
     '''
@@ -398,9 +414,7 @@ if __name__ == '__main__':
 
     sens_wiki = find_sens_wiki(wiki_sen_link)
 
-    all_wiki_links = reps_wiki
-    for sw in sens_wiki:
-        all_wiki_links.append(sw)
+    all_wiki_links = reps_wiki + sens_wiki
 
     with Pool() as pool:
 
@@ -414,10 +428,12 @@ if __name__ == '__main__':
     big_df['education'] = big_df['education'].replace({np.nan: None})
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
 
+    final_df = get_areas_served(big_df)
+
     print('Scraping complete')
 
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_df['committees'])
+    big_list_of_dicts = final_df.to_dict('records')
+    #print(big_list_of_dicts)
 
     print('Writing data to database...')
 
