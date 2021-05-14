@@ -307,18 +307,37 @@ def get_committees(main_div, row):
 
 
 def get_areas_served(big_df_data):
-
+    #big_df_data = big_df_data.drop(columns="areas_served")
     url = "http://www.kslegislature.org/li/b2021_22/members/csv/"
     members_data = requests.get(url)
     m_data = StringIO(members_data.text)
     df = pd.read_csv(m_data)[
         ['County', 'Firstname', 'Lastname']]
-    df2 = df.rename(columns={'Firstname': 'name_first', 'Lastname': 'name_last',
-                             'County': 'areas_served'}, inplace=False)
+    print(df)
+    for i in df.index:
+        area = []
+        firstname = df.loc[i, "Firstname"]
+        lastname = df.loc[i, "Lastname"]
+        area = df.loc[i, "County"]
 
-    f_df = pd.merge(big_df_data, df2, how='left',
-                        on=["name_first", "name_last"])
-    return f_df
+        print(firstname)
+        big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname),
+                        'areas_served'] = area
+       # row_index = big_df_data.loc[(df['name_first'] == firstname) & (df['name_last'] == lastname)]
+
+
+    # column = df["County"]
+    # for column_val in column.values:
+    #     c_val = [column_val]
+    #     print(c_val)
+    #     df = df.replace(column_val, c_val)
+
+    # df2 = df.rename(columns={'Firstname': 'name_first', 'Lastname': 'name_last',
+    #                          'County': 'areas_served'}, inplace=False)
+    #
+    # f_df = pd.merge(big_df_data, df2, how='left',
+    #                 on=["name_first", "name_last"])
+    return big_df_data
 
 def scrape(url):
     '''
@@ -425,18 +444,19 @@ if __name__ == '__main__':
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
 
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
 
     final_df = get_areas_served(big_df)
 
     print('Scraping complete')
 
-    big_list_of_dicts = final_df.to_dict('records')
+    big_list_of_dicts = big_df.to_dict('records')
     #print(big_list_of_dicts)
 
     print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+    #scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')

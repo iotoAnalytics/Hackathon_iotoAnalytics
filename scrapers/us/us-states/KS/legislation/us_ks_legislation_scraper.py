@@ -45,16 +45,27 @@ base_url = 'http://www.kslegislature.org'
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
+def get_session(soup):
+    header_div = soup.find('div', {'id': 'logo2'})
+    session = header_div.find('h5').text
+    session = session.split(' ')[0].strip()
+    return session
+
 def get_urls():
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
     '''
     urls = []
+    scrape_url = base_url
+    page = scraper_utils.request(scrape_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    session = get_session(soup)
+    session = session.replace('-', '_')
+    session_link = '/li/b' + session[:5] + session[7:]
 
-
-    paths = '/li/b2021_22/measures/bills/', '/li/b2021_22/measures/concurs/', '/li/b2021_22/measures/resos/'
+    paths = '/measures/bills/', '/measures/concurs/', '/measures/resos/'
     for path in paths:
-        scrape_url = base_url + path
+        scrape_url = base_url + session_link + path
         page = scraper_utils.request(scrape_url)
         soup = BeautifulSoup(page.content, 'html.parser')
 
@@ -77,13 +88,6 @@ def get_bill_name(main_div):
     return name
 
 
-def get_session(soup):
-    header_div = soup.find('div', {'id': 'logo2'})
-    session = header_div.find('h5').text
-    session = session.split(' ')[0].strip()
-    return session
-
-
 def get_full_name(url):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
@@ -101,26 +105,25 @@ def get_full_name(url):
 
 
 def get_bill_type_chamber(bill_name, row):
-    chamber_origin = ''
-    bill_type = ''
-    if 'HB' in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Bill'
-    elif 'HR' in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Resolution'
-    elif 'HCR' in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Concurrent Resolution'
-    elif 'SB' in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Bill'
-    elif 'SR' in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Resolution'
-    elif 'SCR' in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Concurrent Resolution'
+    bill_name = bill_name.split(' ')[0]
+    chambers = {
+        'HR': 'House',
+        'SR': 'Senate',
+        'HB': 'House',
+        'SB': 'Senate',
+        'HCR': 'House',
+        'SCR': 'Senate'
+    }
+    bill_types = {
+        'HR': 'Resolution',
+        'SR': 'Resolution',
+        'HB': 'Bill',
+        'SB': 'Bill',
+        'HCR': 'Concurrent Resolution',
+        'SCR': 'Concurrent Resolution'
+    }
+    bill_type = bill_types.get(bill_name)
+    chamber_origin = chambers.get(bill_name)
 
     row.chamber_origin = chamber_origin
     row.bill_type = bill_type
@@ -259,7 +262,6 @@ def get_current_status(bottom_div, row):
     status = current_status_row.findAll('td')[2].text.strip()
     status = status.replace("  ", "")
     status = status.replace("\n", "")
-    print(status)
     row.current_status = status
 
 
@@ -285,6 +287,7 @@ def get_actions(bottom_div, row):
         row_data = {'date': datetime_date, 'action_by': chamber, 'description': description}
         actions_list.append(row_data)
     row.actions = actions_list
+
 
 def get_voter_details_support_func(vote, name):
     voter_id = get_sponsor_id(name)
@@ -352,11 +355,7 @@ def get_vote_detail(votes, row):
     getting_votes = main_content.findAll('h3')
 
     # getting if vote passed 1 or 0
-    if "passed" in getting_votes[0].text:
-        passed = 1
-    elif "Passed" in getting_votes[0].text:
-        passed = 1
-    elif "Adopted" in getting_votes[0].text:
+    if getting_votes[0].text.lower() in {'passed', 'adopted'}:
         passed = 1
 
     # getting vote date
@@ -435,11 +434,12 @@ def get_bill_text(main_div, row):
         pdf = pdfplumber.open(io.BytesIO(response.content))
         page = pdf.pages[0]
         text = page.extract_text()
-
+        row.bill_text = text
     except Exception:
-        text = ""
+        pass
 
-    row.bill_text = text
+
+
 
 def scrape(url):
     '''
@@ -477,8 +477,9 @@ def scrape(url):
     bill_name = get_bill_name(main_div)
     session = get_session(soup)
     row.bill_name = bill_name
+    get_bill_type_chamber(bill_name, row)
 
-    #removing space for goverlytics_id
+    # removing space for goverlytics_id
     bill_name = bill_name.replace(" ", "")
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
 
@@ -486,7 +487,6 @@ def scrape(url):
 
     row.session = session
 
-    get_bill_type_chamber(bill_name, row)
     get_sponsors(sidebar, row)
     get_principal_sponsor(sidebar, row)
     get_bill_description(main_div, row)
@@ -517,7 +517,7 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     with Pool() as pool:
         data = pool.map(scrape, urls)
 
-    # # Once we collect the data, we'll write it to the database.
+    # Once we collect the data, we'll write it to the database.
     #scraper_utils.write_data(data)
 
     print('Complete!')
