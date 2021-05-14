@@ -17,7 +17,7 @@ from nameparser import HumanName
 import pandas as pd
 import numpy as np
 
-BASE_URL = 'https://www.ntassembly.ca/'
+BASE_URL = 'https://www.ntassembly.ca'
 MLA_URL = 'https://www.ntassembly.ca/members'
 THREADS_FOR_POOL = 12
 
@@ -32,6 +32,7 @@ def program_driver():
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
+    print(mla_data)
 
 
 class Main_Functions:
@@ -192,8 +193,23 @@ class MLA_Site_Scraper:
 
     def __get_numbers(self, member_address_container, constituency_address_container):
         members_office_number = self.__get_member_office_number(member_address_container)
-        print(members_office_number)
+        m_office_number_to_add = {'office' : 'member\'s office',
+                                  'number' : members_office_number}
 
+        mobile_number = self.__get_mobile_number(member_address_container)
+        mobile_number_to_add = {'office' : 'mobile',
+                                'number' : mobile_number} if mobile_number else None
+        
+        constituency_office_number = self.__get_constituency_office_number(constituency_address_container)
+        c_office_number_to_add = {'office' : 'constituency office',
+                                      'number' : constituency_office_number} if constituency_office_number else None
+        
+        if not mobile_number_to_add and not c_office_number_to_add:
+            return [m_office_number_to_add]
+        if not mobile_number_to_add:
+            return [m_office_number_to_add, c_office_number_to_add]
+        if not c_office_number_to_add:
+            return [m_office_number_to_add, mobile_number_to_add]
     def __get_member_office_number(self, container):
         a_tag = container.a
         a_tag.decompose()
@@ -203,14 +219,38 @@ class MLA_Site_Scraper:
             number = contact_text.split('Phone number:')[1].strip()
         else:
             number = contact_text.split('Ph')[1].strip()
-        return self.__clean_up_member_office_number(number)
+        length_of_phone_number_and_extension = 23
+        return self.__clean_up_number(number, length_of_phone_number_and_extension)
+
+    def __get_mobile_number(self, container):
+        contact_text = container.text
+        try:
+            contact_text = contact_text.split('Mobile: ')[1].strip()
+            return self.__clean_up_number(contact_text, 13)
+        except Exception:
+            pass
+
+    def __get_constituency_office_number(self, container):
+        try:
+            contact_text = container.text
+        except Exception:
+            return
+        if 'Phone number:' in contact_text:
+            number = contact_text.split('Phone number:')[1].strip()
+        elif 'Ph:' in contact_text:
+            number = contact_text.split('Ph:')[1].strip()
+        else:
+            return
+        length_of_phone_number_and_extension = 23
+        return self.__clean_up_number(number, length_of_phone_number_and_extension)
     
-    def __clean_up_member_office_number(self, number):
+    def __clean_up_number(self, number, number_length):
         number = number.replace('(', '').replace(')', '')
         number = number.replace('ext.', ' ext. ').replace('  ', ' ')
+        number = number.replace('ext', 'ext.').replace('..', '.')
         number = number.replace('867 ', '867-')
-        length_of_phone_number_and_extension = 23
-        return number[:length_of_phone_number_and_extension].strip()
+        return number[:number_length].strip()
+
 
 
 # #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(7) > a > strong > u
