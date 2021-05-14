@@ -1,13 +1,9 @@
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
 from pprint import pprint
 from nameparser import HumanName
 import re
-import boto3
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 import sys
@@ -17,6 +13,7 @@ from time import sleep
 from tqdm import tqdm
 import pandas as pd
 from datetime import datetime
+import tabula
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -95,6 +92,17 @@ def open_bill_link(url):
     driver.maximize_window()
     driver.quit()
     return bill
+
+
+def get_source_url(url, row):
+    """
+    Set the source url.
+
+    :param url: Legislation url
+    :param row: Legislation row
+    """
+
+    row.source_url = url
 
 
 def get_bill_name(url, row):
@@ -232,7 +240,80 @@ def get_bill_actions(url, row):
 
     pprint(bill_actions)
     driver.quit()
-    # return bill_actions
+    return bill_actions
+
+
+def get_legislator_id(first_last_lst):
+    ids = []
+    for name in first_last_lst:
+        print(name)
+        first = name[1].replace('.', '')
+        last = name[0].replace(',', '')
+        # leg_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id',
+        #                                                      column_to_search='name_first', startswith=first,
+        #                                                      name_last=last)
+        # ids.append(leg_id)
+    # return ids
+
+    # except:
+        # last = first_last_lst[1]
+        # leg_id = scraper_utils.get_legislator_id(name_last=last, name_first=None)
+        # return leg_id
+        # pass
+
+
+def get_bill_votes(url, row):
+    driver = open_driver()
+    driver.get(url)
+    vote_button = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_lblVotes')
+    vote_button.click()
+    vote_table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_dataListVotes')
+    pdfs = vote_table.find_elements_by_tag_name('a')
+
+    votes = []
+
+    for index, pdf in enumerate(pdfs):
+        link = pdf.get_attribute('href')
+        chamber = link.split('VOTE')[0][-1]
+        all_vote_info = {'date': '', 'nv': '', 'nay': '', 'yea': '', 'total': '', 'absent': '', 'passed': '',
+                         'chamber': '', 'description': '', 'votes': []}
+
+        tables = tabula.io.read_pdf(link, pages=1, silent=True)
+        first_table = tables[0].iloc[:, 0:6]
+        first_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+
+        second_table = tables[0].iloc[:, 6:13]
+        second_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+        result = first_table.append(second_table)
+
+        if chamber == 'S':
+            result = result[:-1]
+            all_vote_info['chamber'] = 'Senate'
+        else:
+            all_vote_info['chamber'] = 'House'
+
+        result = result.melt(id_vars='legislator', var_name='vote', value_name='x').dropna().drop('x', 1)
+        result['legislator'] = result['legislator'].str.lower().str.title()
+        vote_dict = result.to_dict('records')
+
+        # result.insert(0, 'goverlytics_id', get_legislator_id(result['legislator'].str.split()))
+
+        all_vote_info['total'] = result['legislator'].count()
+        all_vote_info['nv'] = result.loc[result.vote == 'nv', 'vote'].count()
+        all_vote_info['yea'] = result.loc[result.vote == 'yea', 'vote'].count()
+        all_vote_info['nay'] = result.loc[result.vote == 'nay', 'vote'].count()
+        all_vote_info['absent'] = result.loc[result.vote == 'absent', 'vote'].count() + result.loc[result.vote == 'exc',
+                                                                                                   'vote'].count()
+        all_vote_info['votes'] = vote_dict
+        votes.append(all_vote_info)
+
+
+    row.votes = votes
+    # pprint(result['legislator'].str.split())
+    # print(result.to_string(index=False))
+    # pprint(result.to_dict('records'))
+    pprint(votes)
+    driver.quit()
 
 
 def scrape(url):
@@ -244,8 +325,9 @@ def scrape(url):
     # get_bill_name(url, row)
     # get_bill_sponsor_info(url, row)
     # get_session(url, row)
-    get_bill_actions(url, row)
+    # get_bill_actions(url, row)
     # translate_abbreviations()
+    get_bill_votes(url, row)
 
 
 def main():
@@ -261,6 +343,7 @@ def main():
     # for url in lst:
     #     row = scraper_utils.initialize_row()
     #     get_bill_actions(url, row)
+
 
 
 if __name__ == '__main__':
