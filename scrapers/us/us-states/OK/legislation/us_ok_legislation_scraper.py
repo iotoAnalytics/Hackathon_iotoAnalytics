@@ -2,6 +2,7 @@
 # TODO - check for different cases
     # Senate Bill, Senate Resolution, Senate Concurrent Resolution, House Bill, House Concurrent Resolution, House Resolution
     # 1R - Regular Session, 2R - 2nd Regular Session, 1S - Special Session
+# TODO - Consider removing ' from lastname (O'Donnell) 
 
 from pathlib import Path
 import os
@@ -26,7 +27,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from time import sleep
 
-from us_ok_legislation_utils import OKLegislationUtils, OKHouseLegislation
+from us_ok_legislation_utils import OKLegislationUtils, OKLegislationParser
 
 BASE_URL = 'http://webserver1.lsb.state.ok.us/WebApplication3/WebForm1.aspx'
 SOUP_PARSER_TYPE = 'lxml'
@@ -296,20 +297,18 @@ def _set_votes(row, soup):
 
     # pprint(table_rows)
 
-    if len(table_rows) < 2:
+    if len(table_rows) < 1:
         return
 
-    house_votes_url = table_rows[0].find('a').get('href')
-    senate_votes_url = table_rows[1].find('a').get('href')
+    votes = []
 
-    # print(f'House: {house_votes_url}\nSenate: {senate_votes_url}')
+    for table_row in table_rows:
+        url = table_row.find('a').get('href')
+        vote_soup = _create_soup(url, SOUP_PARSER_TYPE)
+        chamber_votes = OKLegislationParser().format_votes(vote_soup)
+        votes.append(chamber_votes)
 
-    soup = _create_soup(house_votes_url, SOUP_PARSER_TYPE)
-    # OKHouseLegislation._format_votes(soup)
-    test = OKHouseLegislation()
-    test.format_votes(soup)
-
-    # print(text)
+    row.votes = votes
 
 def _get_sponsor_data(sponsor_str, sponsor_url=None):
     """
@@ -397,11 +396,35 @@ def main():
     # pprint(data[0])
 
     # test_url = 'http://www.oklegislature.gov/BillInfo.aspx?Bill=SR6&session=2100'
-    test_url = 'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB49&session=2100'
-    data = [scrape(test_url)]
+    # test_url = 'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB49&session=2100'
+    # data = [scrape(test_url)]
 
     # Merge current status and title
     # merge_all_scrape_regular_session_data(data, regular_session_data[0:10])
+
+    # TEST VOTE SCRAPING
+    # Test - House Committee Only
+    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/HB1005_VOTES.HTM#RCS0003'
+
+    # Test - House + Committee
+    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/SB49_VOTES.HTM#RCS0059'
+    test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/HB2122_VOTES.HTM'
+
+    # Test - Senate + Committee
+    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB49_VOTES.HTM#SB49_SCRDR1'
+
+    # Test - Senate + Committee (ALT)
+    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB273_VOTES.HTM'
+
+    # Test - Senate + Committee (FAIL)
+    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB595_votes.htm'
+
+    soup = _create_soup(test_url, SOUP_PARSER_TYPE)
+    # OKHouseLegislation._format_votes(soup)
+    # test = OKHouseLegislation()
+    test = OKLegislationParser()
+    test.format_votes(soup)
+
 
 if __name__ == '__main__':
     main()
