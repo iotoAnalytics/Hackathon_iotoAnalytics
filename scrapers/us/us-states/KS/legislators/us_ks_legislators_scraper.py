@@ -325,7 +325,7 @@ def get_areas_served(big_df_data):
                         'areas_served'] = areas
         # row_index = big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname)]
         # big_df_data.at[row_index, 21] = areas
-        print(big_df_data['areas_served'])
+    print(big_df_data['areas_served'])
 
     return big_df_data
 
@@ -447,6 +447,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
