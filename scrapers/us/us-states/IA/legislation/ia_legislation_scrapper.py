@@ -74,7 +74,7 @@ def get_bill_links(url):
                     split_sponsor = [x.title().strip() for x in sponsor.split('and')]
                     sponsors += split_sponsor
         link_dict.append({
-            'bill_link': bill_link,
+            'bill_link': bill_link.replace(' ', '%20'),
             'bill_title': bill_title,
             'bill_name': bill_name,
             'bill_type': bill_type,
@@ -116,8 +116,6 @@ def scrape_link(dict_item):
 
                 if ' ' in principal_sponsor:
                     first_name_initial = principal_sponsor.split()[0].replace('.', '').title().strip()
-                    print(first_name_initial)
-                    print('\n')
 
                     name_last = principal_sponsor.split()[1].replace('.', '').title().strip()
                     search_for = dict(name_last=name_last)
@@ -146,11 +144,17 @@ def scrape_link(dict_item):
                     name_last = sponsor.split()[1].replace('.', '').title().strip()
                     search_for = dict(name_last=name_last)
 
-                    sponsor_id_lst.append(
-                        scraper_utils.legislators_search_startswith(
-                            'goverlytics_id', 'name_first', first_name_initial, **search_for
+                    if len(first_name_initial)==1:
+                        sponsor_id_lst.append(
+                            scraper_utils.legislators_search_startswith(
+                                'goverlytics_id', 'name_first', first_name_initial, **search_for
+                            )
                         )
-                    )
+                    else:
+                        sponsor_id_lst.append(
+                            scraper_utils.get_legislator_id(**search_for)
+                        )
+
                 else:
                     name_last = sponsor.title().strip()
                     search_for = dict(name_last=name_last)
@@ -168,17 +172,20 @@ def scrape_link(dict_item):
 
     url_request = requests.get(link)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
-    bill_req = requests.get(base_url + url_soup.find('iframe').get('src'))
-    bill_soup = BeautifulSoup(bill_req.content, 'lxml')
+    try:
+        bill_req = requests.get(base_url + url_soup.find('iframe').get('src'))
+        bill_soup = BeautifulSoup(bill_req.content, 'lxml')
 
-    span_lst = bill_soup.find_all('span', {'class': 't'})
-    for span_item in span_lst:
-        if span_item.text == '-':
-            index_num = span_lst.index(span_item) + 1
-            row.current_status = span_lst[index_num].text
+        span_lst = bill_soup.find_all('span', {'class': 't'})
+        for span_item in span_lst:
+            if span_item.text == '-':
+                index_num = span_lst.index(span_item) + 1
+                row.current_status = span_lst[index_num].text
 
-    bill_text = bill_soup.text.replace('\n', ' ').strip()
-    row.bill_text = bill_text
+        bill_text = bill_soup.text.replace('\n', ' ').strip()
+        row.bill_text = bill_text
+    except:
+        print(f'Found no bill text for {link}')
 
     driver.get(link)
     time.sleep(sleep_time)
@@ -198,7 +205,7 @@ def scrape_link(dict_item):
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
-    urls = get_bill_links(url)
+    urls = get_bill_links(url)[1200:-1]
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
@@ -208,6 +215,6 @@ if __name__ == '__main__':
     # data = [scrape_link(link) for link in urls]
 
     # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    # scraper_utils.write_data(data)
 
     print('Complete!')
