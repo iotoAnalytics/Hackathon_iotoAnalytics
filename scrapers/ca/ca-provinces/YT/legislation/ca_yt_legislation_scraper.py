@@ -168,7 +168,6 @@ class SessionScraper:
         row.actions = self.__get_actions(bill_row['row'])
         row.current_status = self.__get_current_status(row.actions)
         self.__get_bill_info(row)
-        # row.bill_text = self.__get_bill_text_from_pdf(row.source_url)
         row.region = scraper_utils.get_region(PROV_TERR_ABBREVIATION)
         return row
     
