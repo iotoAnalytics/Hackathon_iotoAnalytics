@@ -66,6 +66,7 @@ def program_driver():
   all_committee_links = scraper_for_committees.get_all_commitee_links(main_committees_page_soup)
   unprocessed_committee_data = get_data_from_all_links(get_committee_data, all_committee_links)
   committee_data = organize_unproccessed_committee_data(unprocessed_committee_data)
+  
   complete_data_set = configure_data(mla_data, wiki_data, committee_data)
   print('Writing data to database...')
   scraper_utils.write_data(complete_data_set)
