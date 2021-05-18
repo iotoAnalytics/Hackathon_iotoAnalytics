@@ -320,7 +320,7 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = big_df.to_dict('records')
-
+    print(big_list_of_dicts)
     print('Writing data to database...')
 
     scraper_utils.write_data(big_list_of_dicts)
