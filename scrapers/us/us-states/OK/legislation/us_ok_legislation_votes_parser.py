@@ -1,11 +1,7 @@
-# TODO - Can't handle two word first name (Jo Anne) or ' in name (O'Donnell)
-# TODO - Senate Bills doesn't have a status for pass (what's a FAIL condition)
-# TODO - Doesn't support House Committee votes with two lines of status (DO PASS AS AMENDED...) 
-
 from scraper_utils import USStateLegislationScraperUtils
+import re
 import unicodedata
 from pprint import pprint
-import re
 from datetime import datetime
 
 class OKLegislationVotesParser:
@@ -104,9 +100,16 @@ class OKLegislationVotesParser:
         for i, line in enumerate(page[1:]):
             curr_line = page[i]
             prev_line = page[i - 1]
+            next_line = page[i + 1]
 
             if curr_line.isspace() == False and prev_line.isspace() == True:
                 first_line_of_sections.append(curr_line)
+
+            # Special case for house committee votes with multilines for "DO PASS AS AMENDED..."
+            if 'DO PASS AS AMENDED' in curr_line and prev_line.isspace() == False and next_line.isspace() == False:
+                # Separate vote outcome from status
+                vote_outcome_first_line = page[i + 2]
+                first_line_of_sections.append(vote_outcome_first_line)
 
         return first_line_of_sections
 
@@ -122,17 +125,33 @@ class OKLegislationVotesParser:
         padding = '' if is_bad_break else ' '
 
         while not line.isspace():
-            if not is_bad_break or 'DO PASS' in line:
-                match = re.search('[a-zA-Z0-9]+(\s[a-zA-Z0-9]+)*', line)
-                if match:
+            if is_bad_break == True and 'DO PASS AS AMENDED,' in line:
+                try:
+                    match = re.search('[a-zA-Z0-9\,]+(\s[a-zA-Z0-9\,]+)*', line)
                     formatted_line = match.group(0).strip() + padding
                     description += formatted_line
 
+                    idx += 1
+                    line = page[idx]
+                    match = re.search('[a-zA-Z0-9]+(\s[a-zA-Z0-9]+)*', line)
+                    formatted_line = match.group(0).strip() + padding
+                    description += formatted_line
+
+                    description = description.replace(' PASSED', '').strip()
+                except:
+                    print(f'Could not parse description house committee votes.')
+            elif is_bad_break == False or 'DO PASS' in line:
+                try:
+                    match = re.search('[a-zA-Z0-9]+(\s[a-zA-Z0-9]+)*', line)
+                    formatted_line = match.group(0).strip() + padding
+                    description += formatted_line
+
+                    description = description.replace('PASSED', '').strip()
+                except:
+                    print(f'Could not parse description in votes.')
+
             idx += 1
             line = page[idx]
-
-        # Remove extra word (PASSED)
-        description = description.replace('PASSED', '').strip()
 
         return description
 
@@ -193,7 +212,7 @@ class OKLegislationVotesParser:
         voter_data = {}
 
         # Dossett (J.J.) or Dossett, J.J.
-        voter_data['name_last'] = re.sub('\s\([a-zA-Z\.]+\)|\,\s[a-zA-Z\.]+', '', voter)
+        voter_data['name_last'] = re.sub('\s\([a-zA-Z\.]+\)|\,\s[a-zA-Z\.]+|\'', '', voter)
         voter_data['role'] = role
         voter_data['state'] = 'OK'
 
@@ -210,14 +229,14 @@ class OKLegislationVotesParser:
 
         else:
             # Special case for Mr/Mrs.Speaker
-            # TODO - Presents duplicate issue for speaker
             if 'Speaker' in voter_data['name_last']:
-                voter_data['name_last'] = self.scraper_utils.get_attribute('legislator', 'role', 'Speaker', 'name_last')
+                # voter_data['name_last'] = self.scraper_utils.get_attribute('legislator', 'role', 'Speaker', 'name_last')
+                voter_data['name_last'] = 'McCall'
                 voter_data['role'] = 'Speaker'
-            
-            # Special case for O'Donnell 
-            if 'ODonnell' in voter_data['name_last']:
-                voter_data['name_last'] = 'O\'Donnell'
+
+            # Special case for CrosswhiteHader
+            if voter_data['name_last'] == 'Crosswhite Hader' or voter_data['name_last'] == 'Crosswhite':
+                voter_data['name_last'] = 'CrosswhiteHader'
 
             gov_id = self.scraper_utils.get_legislator_id(**voter_data)
 
@@ -584,7 +603,7 @@ class OKSenateCommitteeVotesParser(OKLegislationVotesParser):
                 vote_data['data'] = self._get_date(page, i)
 
             if line == sections_dict['description']:
-                vote_data['description'] = self._get_description(page, i, True)
+                vote_data['description'] = self._get_description(page, i)
 
             elif line == sections_dict['status']:
                 vote_data['passed'] = self._get_passed(page, i)

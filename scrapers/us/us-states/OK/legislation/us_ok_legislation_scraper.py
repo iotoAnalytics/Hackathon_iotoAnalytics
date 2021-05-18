@@ -1,6 +1,3 @@
-# TODO - Consider trying to get all votes data for senate committee oddities
-# BUG - HB9999 should not be scraped
-
 # Unavailable data - source_id, committees, source_topic
 
 from pathlib import Path
@@ -10,13 +7,10 @@ import sys
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-# import boto3
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-# import requests
 from multiprocessing import Pool
 from pprint import pprint
-# from database import Database
 from nameparser import HumanName
 import re
 from datetime import datetime
@@ -27,8 +21,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from time import sleep
 
-import traceback
-
 import pdfplumber
 import requests
 import io
@@ -38,6 +30,7 @@ from us_ok_legislation_votes_parser import OKLegislationVotesParser
 
 # These urls shouldn't be in the OK database
 ODDITIES = [
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=SR1&session=2100',
     'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB9001&session=2100',
     'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB9999&session=2100',
     'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB10852&session=2100',
@@ -83,7 +76,7 @@ def scrape_regular_session():
     scraper_utils.crawl_delay(crawl_delay)
 
     table = regular_session_soup.find('table').find('tbody')
-    table_rows = table.find_all('tr')[2:]
+    table_rows = table.find_all('tr')[1:]
 
     data = []
 
@@ -103,11 +96,6 @@ def scrape_regular_session():
     driver.quit()
 
     return data
-
-def get_urls(data):
-    urls = []
-
-    return
 
 def scrape(url):
     soup = _create_soup(url, SOUP_PARSER_TYPE)
@@ -138,8 +126,8 @@ def scrape(url):
     finally:
         return row
 
-# Merge data obtained from scrape_regular_session (current status, title)
 def merge_all_scrape_regular_session_data(legislation_data, scrape_regular_session_data):
+    # Merge data obtained from scrape_regular_session (current status, title)
     for data in scrape_regular_session_data:
         source_url = data['url']
         legislation_row = _get_legislation_row(legislation_data, source_url)
@@ -415,25 +403,44 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
 
     return sponsor_data
 
-def _format_sponsor_data(sponsor_str, sponsor_url=None):        
-    sponsor_str = re.sub('[/(/)\n]', '', sponsor_str)
-    sponsor_data = sponsor_str.split()
+def _format_sponsor_data(sponsor_str, sponsor_url=None): 
+    sponsor_str = sponsor_str.replace('\n', '')
 
-    if sponsor_data == None or len(sponsor_data) == 0:
+    if sponsor_str == '' or sponsor_str == None:
         return
 
-    is_common_name = len(sponsor_data) > 2
+    # Match last name
+    last_name_match = re.search('[A-Za-z\s]+', sponsor_str)
+    if last_name_match:
+        last_name = last_name_match.group(0)
+        last_name = last_name.replace(' ', '')
 
+    # Match first name
+    first_name_match = re.search('\(([A-Za-z\.])\)', sponsor_str)
+    if first_name_match:
+        first_name = first_name_match.group(1)
+
+    # Match chamber
+    chamber_match = re.search('\((H|S)\)', sponsor_str)
+    if chamber_match:
+        chamber = chamber_match.group(1)
+
+    # Format data
     sponsor = {
-        'last': sponsor_data[0],
-        'first': sponsor_data[1] if is_common_name else None,
-        'name': f'{sponsor_data[1]} {sponsor_data[0]}' if is_common_name else sponsor_data[0],
+        'last': last_name,
+        'first': first_name if first_name_match else None,
+        'name': f'{first_name} {last_name}' if first_name_match else last_name,
     }
 
+    # Get role
     if sponsor_url == None:
-        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_abbr(sponsor_data[2]) if is_common_name else OKLegislationUtils.get_sponsor_role_from_abbr(sponsor_data[1])
+        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_abbr(chamber)
     else:
         sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_url(sponsor_url)
+    
+    # Manually fix oddities
+    if sponsor_url == 'http://www.okhouse.gov/Members/District.aspx?District=22':
+        sponsor['role'] = 'Speaker'
 
     return sponsor
 
@@ -450,14 +457,14 @@ def _get_legislation_row(legislation_data, source_url):
             return row
 
 def main():
+    print('\nSCRAPING OKLAHOMA LEGISLATIONS\n')
+
     # Collect current status, title, and urls of regular session 2021
     print(DEBUG_MODE and 'Collecting scraping data for regular session 2021...\n' or '', end='')
     regular_session_data = scrape_regular_session()
 
     # Remove oddities
-    for reg_ses in regular_session_data:
-        if reg_ses['url'] in ODDITIES:
-            regular_session_data.remove(reg_ses)
+    regular_session_data[:] = [data for data in regular_session_data if data['url'] not in ODDITIES]
 
     # Retrieve urls into one list
     print(DEBUG_MODE and 'Collecting all urls for OK legislation...\n' or '', end='')
@@ -467,9 +474,7 @@ def main():
     # Scrape each url
     print(DEBUG_MODE and 'Begin scraping each urls...\n' or '', end='')
     with Pool(NUM_POOL_THREADS) as pool:
-        data = list(tqdm(pool.imap(scrape, urls[0:1000])))
-
-    # pprint(urls[2000:], width=200)
+        data = list(tqdm(pool.imap(scrape, urls)))
 
     # Merge current status and title
     print(DEBUG_MODE and 'Merging current status and title...\n' or '', end='')
@@ -477,9 +482,9 @@ def main():
 
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
-    scraper_utils.write_data(data[222:224])
-    print(data[222:224])
+    scraper_utils.write_data(data)
 
+    print('\nCOMPLETE!\n')
 
 if __name__ == '__main__':
     main()
