@@ -51,6 +51,7 @@ def make_soup(url):
     scrape_url = url
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'lxml')
+    scraper_utils.crawl_delay(crawl_delay)
     return soup
 
 
@@ -74,7 +75,6 @@ def get_urls():
         link = row.find_element_by_tag_name('a').get_attribute('href')
         pbar.set_description(f'Scraping {link}')
         urls.append(link)
-        scraper_utils.crawl_delay(crawl_delay)
 
     driver.quit()
     return urls
