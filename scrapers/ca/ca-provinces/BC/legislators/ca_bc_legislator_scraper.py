@@ -13,12 +13,7 @@ from urllib.request import urlopen as uReq
 from bs4 import BeautifulSoup as soup
 import requests
 from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-import re
-from datetime import datetime
-import boto3
+
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
@@ -30,10 +25,10 @@ import unidecode
 import numpy as np
 
 
-
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
 
+#initialize selenium web driver
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
 
@@ -46,6 +41,7 @@ scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 
 
 def get_urls(myurl):
+    # get links of all the legislators' individual bio pages
     driver.get(myurl)
     timeout = 5
 
@@ -60,7 +56,7 @@ def get_urls(myurl):
 
     html = driver.page_source
     page_soup = soup(html, 'html.parser')
-    print(page_soup)
+    # print(page_soup)
     urls = []
 
     # print(page_soup)
@@ -71,12 +67,14 @@ def get_urls(myurl):
             mem_link = mem.a['href']
             urls.append(mem_link)
         except:
-            print(mem)
+            # print(mem)
+            pass
     scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
 def scrape(url):
+    # scrape legislators' bio pages
     url_broken = url.split("/")
     name_full = url_broken[len(url_broken) - 1].replace("-", ", ")
     most_recent_term_id = url_broken[len(url_broken) - 2]
@@ -160,7 +158,7 @@ def scrape(url):
     addresses.append(addr_info)
 
     member_info = page_soup.findAll("div", {"class": "BCLASS-Constituency"})
-    # for mein in member_info:
+
     constituency_one = member_info[0].text
     constituency_two = member_info[0].nextSibling
     constituency_two = constituency_two.nextSibling
@@ -244,6 +242,7 @@ def scrape(url):
 
 
 def get_wiki_people(link):
+    # get links to legislators' personal wikipedia pages
     people_links = []
     uClient = uReq(link)
     page_html = uClient.read()
@@ -274,7 +273,6 @@ if __name__ == '__main__':
     urls = get_urls(members_link)
     less_urls = urls[:4]
 
-    # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
     big_df = pd.DataFrame(data)
@@ -289,8 +287,7 @@ if __name__ == '__main__':
 
     big_df['country_id'] = sample_row.country_id
 
-    # print(big_df)
-
+    # get missing data from wikipedia
     general_election_link = 'https://en.wikipedia.org/wiki/2020_British_Columbia_general_election'
 
     wiki_people = get_wiki_people(general_election_link)

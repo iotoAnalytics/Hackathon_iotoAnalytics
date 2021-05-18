@@ -1,35 +1,23 @@
 import sys
 import os
 from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 import io
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
-import requests
-from multiprocessing import Pool
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
-import re
+
 import PyPDF2
-import urllib.parse as urlparse
-from urllib.parse import parse_qs
+
 import datetime
-import boto3
+
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import pandas as pd
 
 
-# Initialize config parser and get variables from config file
-configParser = configparser.RawConfigParser()
-configParser.read('config.cfg')
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 prov_terr_abbreviation = 'QC'
 database_table_name = 'ca_qc_legislation'
@@ -42,6 +30,7 @@ crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
 
 
 def scrape_bill_link(myurl):
+    # scrape main page to get links of bills
     sponsors = []
     bill_name = myurl.split("projet-")[1]
     bill_split_42 = bill_name.split("-42")
@@ -71,10 +60,6 @@ def scrape_bill_link(myurl):
     principal_sponsor = prinspon_first + " " + prinspon_last
     sponsors.append(principal_sponsor)
     principal_sponsor_id = 0
-    # if principal_sponsor in dbwork.psfullnames:
-    #     suindex = dbwork.psfullnames.index(principal_sponsor)
-    #
-    #     principal_sponsor_id = dbwork.psids[suindex]
 
     bill_text = ""
     try:
@@ -120,6 +105,7 @@ def scrape_bill_link(myurl):
                 possible_actions.append(possible_action)
     except:
         pass
+
     votes = []
     months_check = ["Jan", "Feb", "March", "Apr", "May",
                     "June", "July", "Aug", "Sept", "Oct", "Nov", "Dec"]
@@ -210,7 +196,6 @@ def scrape_bill_link(myurl):
 
     current_status = actions[0]["description"]
 
-    # print(votes)
     info = {'source_url': myurl, 'bill_name': bill_name, 'chamber_origin': 'National Assembly',
             'bill_type': 'Bill',
             'province_territory': 'QC', 'province_territory_id': 24, 'session': 2018, 'goverlytics_id': goverlytics_id,
@@ -219,12 +204,15 @@ def scrape_bill_link(myurl):
             'cosponsors_id': [], 'bill_text': bill_text, 'source_id': bill_id, 'bill_summary': "", 'bill_title': "",
             'committees': committees, 'source_topic': "", 'topic': "", 'actions': actions, 'votes': votes,
             'date_introduced': date_introduced, 'current_status': current_status}
-    # print(info)
+
     scraper_utils.crawl_delay(crawl_delay)
     return info
 
 
 if __name__ == '__main__':
+    # all bills can't be accessed through main page so
+    # iterate through sets of bill links by number until one of them fails, to try to get all of them
+    # probably will have to be updated when more bills are created
     bill_infos = []
     failed = 0
     i = 1

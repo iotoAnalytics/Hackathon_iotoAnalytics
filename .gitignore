@@ -7,3 +7,5 @@ test_legislators/
 .idea
 test.*
 .vscode/
+scrapers/us/us-states/templates/
+.pytest_cache/
