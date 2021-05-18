@@ -4,7 +4,7 @@ Author: Justin Tendeck
 """
 
 from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+# from psycopg2 import pool
 import psycopg2
 import configparser
 import boto3
@@ -32,7 +32,7 @@ class Database:
     Author: Jose Salvatierra
     Source: https://www.udemy.com/course/the-complete-python-postgresql-developer-course
     """
-    _connection_pool = None
+    _connection = None
 
     @staticmethod
     def initialise():
@@ -41,12 +41,9 @@ class Database:
         connection pooling. Must be run before attempting to connect to
         the database.
         """
-        db_token = client.generate_db_auth_token(
-            db_host, db_port, db_user, Region=db_region)
+        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
 
-        Database._connection_pool = pool.SimpleConnectionPool(1,
-                                                               10,
-                                                               database=db_name, host=db_host, user=db_user, password=db_token)
+        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod
     def get_connection(cls):
@@ -56,28 +53,29 @@ class Database:
         Returns:
             connection: a psycopg2 connection to the database.
         """
-        return cls._connection_pool.getconn()
+        return cls._connection
+
+    # @classmethod
+    # def return_connection(cls, connection):
+    #     """
+    #     Returns a database connection back to the database connection pool.
+
+    #     Args:
+    #         connection: Psycopg2 database connection to be returned.
+    #     """
+    #     Database._connection.putconn(connection)
 
     @classmethod
-    def return_connection(cls, connection):
-        """
-        Returns a database connection back to the database connection pool.
-
-        Args:
-            connection: Psycopg2 database connection to be returned.
-        """
-        Database._connection_pool.putconn(connection)
-
-    @classmethod
-    def close_all_connections(cls):
+    def close_connection(cls):
         """
         Closes all connections in the connection pool.
         """
-        Database._connection_pool.closeall()
+        Database._connection.close()
 
+    
     def __del__(self):
-        if Database._connection_pool:
-            Database._connection_pool.closeall()
+        if Database._connection:
+            Database.close_connection()
 
 
 class CursorFromConnectionFromPool:
@@ -124,7 +122,7 @@ class CursorFromConnectionFromPool:
         else:
             self.cursor.close()
             self.connection.commit()
-        Database.return_connection(self.connection)
+        # Database.close_connection()
 
 
 class Persistence:
