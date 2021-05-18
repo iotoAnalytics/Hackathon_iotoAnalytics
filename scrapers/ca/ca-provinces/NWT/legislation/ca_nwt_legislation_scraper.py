@@ -6,9 +6,9 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-from PDF_Reader import PDF_Reader
 import pandas as pd
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
+from scraper_utils import PDF_Reader
 import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
