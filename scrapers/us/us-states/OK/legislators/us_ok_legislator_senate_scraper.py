@@ -441,6 +441,10 @@ def scrape_senate_legislators():
     print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
     merge_all_wiki_data(data, wiki_urls)
 
+    # Manually fix any oddities
+    print(DEBUG_MODE and 'Manually fixing oddities...\n' or '', end='')
+    _fix_oddities(data)
+
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if DEBUG_MODE == False:

@@ -230,9 +230,8 @@ class OKLegislationVotesParser:
         else:
             # Special case for Mr/Mrs.Speaker
             if 'Speaker' in voter_data['name_last']:
-                # voter_data['name_last'] = self.scraper_utils.get_attribute('legislator', 'role', 'Speaker', 'name_last')
+                # voter_data['name_last'] = self.scraper_utils.get_attribute('legislator', 'role', 'Representative', 'name_last')
                 voter_data['name_last'] = 'McCall'
-                voter_data['role'] = 'Speaker'
 
             # Special case for CrosswhiteHader
             if voter_data['name_last'] == 'Crosswhite Hader' or voter_data['name_last'] == 'Crosswhite':

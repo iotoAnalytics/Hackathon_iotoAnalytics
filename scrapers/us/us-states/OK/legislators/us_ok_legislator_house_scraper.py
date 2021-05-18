@@ -196,6 +196,10 @@ def _set_role(row, soup):
     role_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblName'}).text
     pattern = re.compile('[a-zA-Z]+')
     role = pattern.search(role_str).group(0)
+
+    if 'Speaker' in role:
+        role = 'Representative'
+
     row.role = role
 
 def _set_years_active(row, soup):

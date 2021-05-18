@@ -44,7 +44,7 @@ STATE_ABBREVIATION = 'OK'
 DATABASE_TABLE_NAME = 'us_ok_legislation'
 LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 NUM_POOL_THREADS = 10
 CURRENT_YEAR = datetime.now().year
 
@@ -223,7 +223,7 @@ def _set_cosponsors(row, soup):
 
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel6_tblCoAuth'})
     # table_rows = table.find_all('tr')[1:-2]
-    table_rows = table.find_all('tr', {'align', 'left'})[1:-2]
+    table_rows = table.find_all('td', {'align': 'left'})[1:-2]
 
     # Return if table is not populated yet
     if len(table_rows) < 3:
@@ -265,6 +265,9 @@ def _set_bill_text(row, soup):
     # Read from PDF
     response = requests.get(url, stream = True)
     pdf = pdfplumber.open(io.BytesIO(response.content))
+
+    if len(pdf.pages) > 100:
+        return
 
     bill_text = ''
     for page in pdf.pages:
@@ -416,7 +419,7 @@ def _format_sponsor_data(sponsor_str, sponsor_url=None):
         last_name = last_name.replace(' ', '')
 
     # Match first name
-    first_name_match = re.search('\(([A-Za-z\.])\)', sponsor_str)
+    first_name_match = re.search('\s\(([A-Za-z\.]+)\)\s', sponsor_str)
     if first_name_match:
         first_name = first_name_match.group(1)
 
@@ -439,9 +442,13 @@ def _format_sponsor_data(sponsor_str, sponsor_url=None):
         sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_url(sponsor_url)
     
     # Manually fix oddities
-    if sponsor_url == 'http://www.okhouse.gov/Members/District.aspx?District=22':
-        sponsor['role'] = 'Speaker'
-
+    if sponsor['first'] != None and sponsor['first'] == 'J.A.':
+        sponsor['first'] = 'JoAnna'
+    
+    if 'McCall and McBride' in sponsor_str or 'McCall and O\'Donnell' in sponsor_str:
+        sponsor['last'] = 'McCall'
+        sponsor['name'] = 'McCall'
+        
     return sponsor
 
 def _merge_scrape_regular_session_data(legislation_row, scrape_regular_session_data):
