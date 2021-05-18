@@ -1,7 +1,3 @@
-# TODO - Try/Exception
-# TODO - Missing Govenor
-# TODO - Consider scraping occupation and education from gov
-
 # Unavailable data - email, seniority, military exp
 # Wiki data - birthday, occupation, education 
 
@@ -26,7 +22,7 @@ WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
 STATE_ABBREVIATION = 'OK'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
 DEBUG_MODE = False
 NUM_POOL_THREADS = 10
@@ -438,8 +434,6 @@ def scrape_senate_legislators():
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if DEBUG_MODE == False:
         scraper_utils.write_data(data)
-
-    # pprint(data[0:2])
 
 # if __name__ == '__main__':
 #     main()
