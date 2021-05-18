@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.options import Options
 
 '''
 Change the current legislature to the most recent
-This scraper will not work if the current session isn't populated with 4~5 bills
+This scraper will not work if the current session isn't populated with 4 bills
     for government and non-government bills
 '''
 CURRENT_LEGISLATURE = 35
