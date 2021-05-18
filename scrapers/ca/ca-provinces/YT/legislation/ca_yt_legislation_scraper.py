@@ -24,9 +24,9 @@ Change the current legislature to the most recent
 This scraper will not work if the current session isn't populated with 4~5 bills
     for government and non-government bills
 '''
-CURRENT_LEGISLATURE = 34
+CURRENT_LEGISLATURE = 35
 PROV_TERR_ABBREVIATION = 'YT'
-DATABASE_TABLE_NAME = 'ca_yt_legislation_test'
+DATABASE_TABLE_NAME = 'ca_yt_legislation'
 LEGISLATOR_TABLE_NAME = 'ca_yt_legislators'
 BASE_URL = 'https://yukonassembly.ca'
 BILLS_URL = BASE_URL + '/house-business/progress-bills'

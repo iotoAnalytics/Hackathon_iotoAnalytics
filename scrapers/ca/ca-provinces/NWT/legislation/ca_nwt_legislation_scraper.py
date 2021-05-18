@@ -20,4 +20,4 @@ pdf = pdfplumber.open(io.BytesIO(response.content))
 
 pages = pdf.pages
 for page in pages:
-    print(page.extract_text())
+    print(page.chars[0])
