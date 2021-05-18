@@ -52,6 +52,7 @@ def scrape(url):
     bio_info = _retrieve_biography_info(soup)
 
     _set_source_id(row, soup)
+    _set_most_recent_term_id(row, bio_info)
     _set_source_url(row, url)
     _set_name(row, soup)
     _set_party(row, bio_info)
@@ -105,7 +106,6 @@ def scrape_committee(url):
     return committee_members
 
 def update_senate_committees(data, urls):
-    # TODO - Consider Multiprocessing
     committees_data_list = [scrape_committee(url) for url in tqdm(urls)]
     # with Pool(NUM_POOL_THREADS) as pool:
     #     committees_data_list = list(tqdm(pool.imap(scrape_committee, urls)))
@@ -155,7 +155,7 @@ def merge_all_wiki_data(legislator_data, wiki_urls):
 
     print(DEBUG_MODE and 'Merging wikipedia data...\n' or '', end='')
     for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, years_active = False)    
+        _merge_wiki_data(legislator_data, data, years_active = False, most_recent_term_id = False)
 
 def _create_soup(url, soup_parser_type):
     scrape_url = url
@@ -168,6 +168,10 @@ def _set_source_id(row, soup):
     sid_str = re.compile('sid=[0-9]+').search(sid_str).group(0)
     sid = re.compile('[0-9]+').search(sid_str).group(0)
     row.source_id = sid
+
+def _set_most_recent_term_id(row, bio_info):
+    # Senate website only showcase current senators
+    row.most_recent_term_id = CURRENT_YEAR
 
 def _set_source_url(row, url):
     row.source_url = url
@@ -255,7 +259,7 @@ def _retrieve_biography_info(soup):
 
 def _normalize_years_active_string(years_active):
     normalized_years_active = re.sub(' ', '', years_active)
-    normalized_years_active = re.sub('[Pp]resent', str(CURRENT_YEAR), normalized_years_active)
+    normalized_years_active = re.sub('([Pp]resent|[Cc]urrent)', str(CURRENT_YEAR), normalized_years_active)
     return normalized_years_active
 
 def _unpack_years_range(years_range):
@@ -271,7 +275,7 @@ def _unpack_years_range(years_range):
 
 def _format_years_active_str_list(original_str):
     # ['2010-2014', '2014 - Present']
-    years_active = re.compile('([0-9]+[ ]*-[0-9]+[ ]*|[0-9]+[ ]*-[ ]*[Pp]resent)').findall(original_str)
+    years_active = re.compile('([0-9]+[ ]*-[0-9]+[ ]*|[0-9]+[ ]*-[ ]*[Pp]resent|[0-9]+[ ]*-[ ]*[Cc]urrent])').findall(original_str)
 
     # Remove spacings and change 'present' to numeric form
     years_active = list(map(lambda ya: _normalize_years_active_string(ya), years_active))
@@ -403,6 +407,14 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
         if most_recent_term_id == True:
             legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
 
+def _fix_oddities(legislator_data):
+    # Manually fixes odd data
+
+    # District 35 - Change name - Jo Anna together forms the first name
+    legislator_row = _get_legislator_row(legislator_data, 'Jo Anna Dossett', '35')
+    legislator_row.name_middle = ''
+    legislator_row.name_first = 'JoAnna'
+
 def scrape_senate_legislators():
     # Collect senate legislators urls
     print(DEBUG_MODE and 'Collecting senate legislator URLs...\n' or '', end='')
@@ -424,7 +436,6 @@ def scrape_senate_legislators():
     # Collect wiki urls
     print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
     wiki_urls = get_wiki_urls_with_district()
-    # pprint(wiki_urls[0:5])
 
     # Merge data from wikipedia
     print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
