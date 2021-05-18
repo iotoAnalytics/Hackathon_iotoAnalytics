@@ -72,7 +72,7 @@ def get_urls():
         table = soup.find(
             'div', {'class': 'infinite-tabs'})
 
-        for li in table.findAll('li')[1:5]:
+        for li in table.findAll('li'):
             link = base_url + li.find('a').get('href')
             urls.append(link)
 
@@ -434,11 +434,12 @@ def get_bill_text(main_div, row):
         pdf = pdfplumber.open(io.BytesIO(response.content))
         page = pdf.pages[0]
         text = page.extract_text()
-        row.bill_text = text
+        if text is not None:
+            row.bill_text = text
+        else:
+            row.bill_text = ""
     except Exception:
-        pass
-
-
+        row.bill_text = ""
 
 
 def scrape(url):

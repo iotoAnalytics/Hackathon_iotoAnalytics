@@ -103,9 +103,6 @@ class ScraperUtils:
                 cur.execute(query)
                 division_results = cur.fetchall()
 
-                # query = f"SELECT * FROM website_metadata WHERE scraper_table = '{database_table_name}'"
-                # cur.execute(query)
-                # website_metadata_results = cur.fetchall()
             except Exception as e:
                 sys.exit(
                     f'An exception occurred retrieving tables from database:\n{e}')
@@ -113,7 +110,6 @@ class ScraperUtils:
         self.countries = pd.DataFrame(countries_results)
         self.parties = pd.DataFrame(parties_results)
         self.divisions = pd.DataFrame(division_results)
-        # self.website_metadata = pd.DataFrame(website_metadata_results)
 
         self.country = self.countries.loc[self.countries['abbreviation']
                                           == country]['country'].values[0]
@@ -143,14 +139,6 @@ class ScraperUtils:
         """Called for methods that have an auto_add_robot parameter."""
         if not self._robots.get(base_url) and auto_add_enabled:
             self.add_robot(base_url)
-
-    # # url_data_changed = url_data_changed
-    # def website_data_changed(self, url, response_headers):
-    #     etag = response_headers.get('Etag')
-    #     if not etag: return False
-
-    #     etag = 
-
 
     def request(self, url, **kwargs):
         """More polite version of the requests.get function.
@@ -226,6 +214,8 @@ class ScraperUtils:
         row.country_id = self.country_id
         row.country = self.country
         return row
+    
+
 
 
 class LegislatorScraperUtils(ScraperUtils):
@@ -697,7 +687,7 @@ class LegislationScraperUtils(ScraperUtils):
             val = int(val)
         return val
 
-    def add_topics(self, list_of_dicts):
+    def add_topics(self, bill_text):
 
         """
           Pulls a model from an S3 bucket as a temporary file
@@ -714,7 +704,7 @@ class LegislationScraperUtils(ScraperUtils):
 
           """
         # convert input into dataframe form
-        df = pd.DataFrame(list_of_dicts)
+        df = pd.DataFrame(bill_text)
         print('Loading model...')
         s3 = boto3.client('s3')
         # load model from S3 bucket named bill-topic-classifier-sample
@@ -826,12 +816,12 @@ class LegislationScraperUtils(ScraperUtils):
             #
             i = i + 1
         # get rid of this label row that was only used for classification
-        df = df.drop(columns=['label'])
+        # df = df.drop(columns=['label'])
         # print(df)
         # return the dataframe to a list of dictionaries
-        dicts = df.to_dict('records')
+        # dicts = df.to_dict('records')
 
-        return dicts
+        return df['topic']
 
 
 # endregion
@@ -1024,7 +1014,10 @@ class CAFedLegislationScraperUtils(LegislationScraperUtils):
         Takes care of inserting legislation data into database. Data must be either a list or Row objects or dictionaries.
         """
         
-        # data = self.add_topics(data)
+        df = pd.DataFrame(data)
+        df['topic'] = self.add_topics(df['bill_text'])
+        data = df.to_dict('records')
+
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_fed_legislation(data, table)
 

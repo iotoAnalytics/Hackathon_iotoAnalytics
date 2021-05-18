@@ -41,7 +41,7 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 
 scrape_mps = True
-scrape_senators = True
+scrape_senators = False
 write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
@@ -86,7 +86,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:50]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:5]:
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -106,7 +106,7 @@ def get_mp_basic_details():
 
         party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
         row.party = mp_party_switcher[party] if party in mp_party_switcher else party
-        row.party_id = scraper_utils.get_party_id(row.party)
+        row.party_id = scraper_utils.get_party_id(row.party, 'Fed - MP')
 
         row.riding = tile.find('div', {'class': 'ce-mip-mp-constituency'}).text
         province_territory = tile.find(
@@ -305,7 +305,7 @@ def get_sen_basic_details():
         party = tds[1].get_text().strip()
         party = sen_party_switcher[party] if party in sen_party_switcher else party
         row.party = party
-        row.party_id = scraper_utils.get_party_id(party)
+        row.party_id = scraper_utils.get_party_id(party, 'Fed - Sen')
 
         # Province/Territory, ID
         prov_terr = tds[2].get_text().strip()
