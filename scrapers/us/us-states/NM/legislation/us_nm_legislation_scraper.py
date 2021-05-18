@@ -241,25 +241,6 @@ def get_bill_actions(url, row):
     return bill_actions
 
 
-# def get_legislator_id(first_last_lst):
-#     ids = []
-#     for name in first_last_lst:
-#         print(name)
-#         first = name[1].replace('.', '')
-#         last = name[0].replace(',', '')
-#         leg_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id',
-#                                                              column_to_search='name_first', startswith=first,
-#                                                              name_last=last)
-#         ids.append(leg_id)
-#     return ids
-#
-#     except:
-#         last = first_last_lst[1]
-#         leg_id = scraper_utils.get_legislator_id(name_last=last, name_first=None)
-#         return leg_id
-#         pass
-
-
 def get_bill_votes(url, row):
     """
     Gets all bill voting data (voting outcomes, chamber, legislator vote, date, etc).
@@ -280,41 +261,50 @@ def get_bill_votes(url, row):
             dates.remove(date)
     votes = []
 
-    for index in range(len(pdfs)):
-        link = pdfs[index].get_attribute('href')
-        chamber = link.split('VOTE')[0][-1]
-        all_vote_info = {'date': '', 'nv': '', 'nay': '', 'yea': '', 'total': '', 'absent': '', 'passed': '',
-                         'chamber': '', 'description': '', 'votes': []}
+    try:
+        for index in range(len(pdfs)):
+            link = pdfs[index].get_attribute('href')
+            chamber = link.split('VOTE')[0][-1]
+            all_vote_info = {'date': '', 'nv': '', 'nay': '', 'yea': '', 'total': '', 'absent': '', 'passed': '',
+                             'chamber': '', 'description': '', 'votes': []}
 
-        tables = tabula.io.read_pdf(link, pages=1, silent=True)
-        first_table = tables[0].iloc[:, 0:6]
-        first_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+            tables = tabula.io.read_pdf(link, pages=1, silent=True)
 
-        second_table = tables[0].iloc[:, 6:13]
-        second_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
-        result = first_table.append(second_table)
+            if chamber == 'S':
+                first_table = tables[0].iloc[:, 0:6]
+                first_table.columns = ['legislator', 'yea', 'nay', 'absent', 'exc', 'rec']
+                second_table = tables[0].iloc[:, 6:13]
+                second_table.columns = ['legislator', 'yea', 'nay', 'absent', 'exc', 'rec']
+                result = first_table.append(second_table)
+                result = result[:-1]
+                all_vote_info['chamber'] = 'Senate'
 
-        if chamber == 'S':
-            result = result[:-1]
-            all_vote_info['chamber'] = 'Senate'
-        else:
-            all_vote_info['chamber'] = 'House'
+            else:
+                first_table = tables[0].iloc[:, 0:6]
+                first_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+                second_table = tables[0].iloc[:, 6:13]
+                second_table.columns = ['legislator', 'yea', 'nay', 'nv', 'exc', 'absent']
+                result = first_table.append(second_table)
+                all_vote_info['chamber'] = 'House'
 
-        result = result.melt(id_vars='legislator', var_name='vote', value_name='x').dropna().drop('x', 1)
-        result['legislator'] = result['legislator'].str.lower().str.title()
-        vote_dict = result.to_dict('records')
+            result = result.melt(id_vars='legislator', var_name='vote', value_name='x').dropna().drop('x', 1)
+            result['legislator'] = result['legislator'].str.lower().str.title()
+            vote_dict = result.to_dict('records')
 
-        # result.insert(0, 'goverlytics_id', get_legislator_id(result['legislator'].str.split()))
+            # result.insert(0, 'goverlytics_id', get_legislator_id(result['legislator'].str.split()))
 
-        all_vote_info['total'] = int(result['legislator'].count())
-        all_vote_info['nv'] = int(result.loc[result.vote == 'nv', 'vote'].count())
-        all_vote_info['yea'] = int(result.loc[result.vote == 'yea', 'vote'].count())
-        all_vote_info['nay'] = int(result.loc[result.vote == 'nay', 'vote'].count())
-        all_vote_info['absent'] = int(result.loc[result.vote == 'absent', 'vote'].count() + result.loc[result.vote == 'exc',
-                                                                                                   'vote'].count())
-        all_vote_info['votes'] = vote_dict
-        all_vote_info['date'] = dates[index].text
-        votes.append(all_vote_info)
+            all_vote_info['total'] = int(result['legislator'].count())
+            all_vote_info['nv'] = int(result.loc[result.vote == 'nv', 'vote'].count())
+            all_vote_info['yea'] = int(result.loc[result.vote == 'yea', 'vote'].count())
+            all_vote_info['nay'] = int(result.loc[result.vote == 'nay', 'vote'].count())
+            all_vote_info['absent'] = int(result.loc[result.vote == 'absent', 'vote'].count() +
+                                          result.loc[result.vote == 'exc', 'vote'].count())
+            all_vote_info['votes'] = vote_dict
+            all_vote_info['date'] = dates[index].text
+            votes.append(all_vote_info)
+
+    except IndexError:
+        pprint(f'Something wrong in vote pdf at {url}')
 
     row.votes = votes
     driver.quit()
@@ -338,18 +328,12 @@ def scrape(url):
 def main():
     urls = get_urls()
 
+    # tabula doesn't work with pool
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
 
     data = [scrape(url) for url in urls]
     scraper_utils.write_data(data, 'us_nm_legislation')
-    # lst = ['https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=1&year=21',
-    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=3&year=21',
-    #        'https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=7&year=21']
-    # for url in lst:
-    #     row = scraper_utils.initialize_row()
-    #     get_bill_actions(url, row)
-    # get_bill_votes('https://www.nmlegis.gov/Legislation/Legislation?chamber=H&legType=B&legNo=23&year=21')
 
 
 if __name__ == '__main__':
