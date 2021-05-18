@@ -12,15 +12,13 @@ from bs4 import BeautifulSoup
 import requests
 from multiprocessing import Pool
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
 import time
-from database import Database
-import configparser
-from pprint import pprint
-from nameparser import HumanName
+import numpy as np
+import math
 import re
-import boto3
 
-sleep_time = 1.5
+sleep_time = 2.5
 
 state_abbreviation = 'IA'
 database_table_name = 'us_ia_legislation'
@@ -144,7 +142,7 @@ def scrape_link(dict_item):
                     name_last = sponsor.split()[1].replace('.', '').title().strip()
                     search_for = dict(name_last=name_last)
 
-                    if len(first_name_initial)==1:
+                    if len(first_name_initial) == 1:
                         sponsor_id_lst.append(
                             scraper_utils.legislators_search_startswith(
                                 'goverlytics_id', 'name_first', first_name_initial, **search_for
@@ -187,13 +185,16 @@ def scrape_link(dict_item):
     except:
         print(f'Found no bill text for {link}')
 
-    driver.get(link)
-    time.sleep(sleep_time)
-    see_all_button = driver.find_element_by_xpath('//*[@id="content"]/div[1]/div[6]/h2/a')
-    driver.execute_script("arguments[0].click();", see_all_button)
-    time.sleep(sleep_time)
-    source_topic = driver.find_element_by_xpath('//*[@id="content"]/div[1]/div[6]/div').text
-    row.source_topic = source_topic
+    try:
+        driver.get(link)
+        time.sleep(sleep_time)
+        see_all_button = driver.find_element_by_xpath('//*[@id="content"]/div[1]/div[6]/h2/a')
+        driver.execute_script("arguments[0].click();", see_all_button)
+        time.sleep(sleep_time)
+        source_topic = driver.find_element_by_xpath('//*[@id="content"]/div[1]/div[6]/div').text
+        row.source_topic = source_topic
+    except NoSuchElementException:
+        print(f'Found no source topic for {link}')
 
     goverlytics_bill_name = dict_item["bill_name"].replace(' ', '_')
     row.goverlytics_id = f'{state_abbreviation}_{dict_item["session"]}_{goverlytics_bill_name}'
@@ -204,17 +205,15 @@ def scrape_link(dict_item):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
-    urls = get_bill_links(url)[1200:-1]
+    # First we'll get the URLs we wish to scrape.
+    urls = get_bill_links(url)
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     with Pool(processes=10) as pool:
         data = pool.map(scrape_link, urls)
 
-    # data = [scrape_link(link) for link in urls]
-
     # Once we collect the data, we'll write it to the database.
-    # scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')
