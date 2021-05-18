@@ -19,10 +19,27 @@ import numpy as np
 
 BASE_URL = 'https://www.ntassembly.ca'
 MLA_URL = 'https://www.ntassembly.ca/members'
+WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_the_Northwest_Territories'
 THREADS_FOR_POOL = 12
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NT', 'ca_nt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
+
+CURRENT_YEAR = datetime.datetime.now().year
+
+# These two will be updated in the program driver
+CURRENT_LEGISLATURE_TERM = 0
+NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {13 : 1995,
+                                    14 : 1999,
+                                    15 : 2003,
+                                    16 : 2007,
+                                    17 : 2011,
+                                    18 : 2015,
+                                    19 : 2019}
+
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 def program_driver():
     main_functions = Main_Functions()
@@ -32,10 +49,17 @@ def program_driver():
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
-    print(mla_data)
 
+    print('Getting data from wiki pages...')
+    all_wiki_links = main_functions.scrape_main_wiki_link(WIKI_URL)
+    wiki_data = main_functions.get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
-class Main_Functions:
+    complete_data_set = main_functions.configure_data(mla_data, wiki_data)
+    print('Writing data to database...')
+    scraper_utils.write_data(complete_data_set)
+    print("Complete")
+
+class Main_Functions:        
     def get_page_as_soup(self, url):
         page_html = self.__get_site_as_html(url)
         return soup(page_html, 'html.parser')
@@ -47,6 +71,37 @@ class Main_Functions:
         scraper_utils.crawl_delay(crawl_delay)
         return page_html
 
+    def update_term_and_legislature_dict(self, soup):
+        global CURRENT_LEGISLATURE_TERM
+        CURRENT_LEGISLATURE_TERM = self.__get_current_legislature(soup)
+        self.__add_current_legislature_term_if_missing(CURRENT_LEGISLATURE_TERM)
+
+    def __get_current_legislature(self, soup):
+        sidebar = soup.find('ul', {'class' : 'menu'})
+        all_menu_item = sidebar.findAll('li')
+        return self.__find_current_legislature(all_menu_item)
+
+    def __find_current_legislature(self, options):
+        for option in options:
+            if self.__option_holds_legislature_term(option):
+                return self.__extract_term_num(option)
+        return -1
+    
+    def __option_holds_legislature_term(self, option):
+        text = option.text
+        return re.search('\d\d[a-z]{2}', text)
+
+    def __extract_term_num(self, option):
+        text = option.text
+        service_period_as_string = re.findall('\d\d[a-z]{2}', text)[0]
+        return int(service_period_as_string[0:2])
+
+    def __add_current_legislature_term_if_missing(self, current_term):
+        term_interval = 4
+        if current_term not in NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.keys():
+            previous_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR[current_term - 1]
+            NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR[current_term] = previous_year + term_interval
+
     def get_data_from_all_links(self, function, all_links):
         data = []
         with Pool(THREADS_FOR_POOL) as pool:
@@ -56,6 +111,36 @@ class Main_Functions:
 
     def get_mla_data(self, mla_url):
         return MLA_Site_Scraper(mla_url).get_rows()
+
+    def scrape_main_wiki_link(self, wiki_link):
+        wiki_urls = []
+        page_soup = self.get_page_as_soup(wiki_link)
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+        for tr in table:
+            td = tr.findAll("td")[1]
+            url = 'https://en.wikipedia.org' + (td.a["href"])
+
+            wiki_urls.append(url)
+        return wiki_urls
+
+    def configure_data(self, mla_data, wiki_data):
+        mla_df = pd.DataFrame(mla_data)
+        mla_df = mla_df.drop(columns = columns_not_on_main_site)
+    
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+        ]
+
+        mla_wiki_df = pd.merge(mla_df, wiki_df, 
+                            how='left',
+                            on=['name_first', 'name_last'])
+        mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
+        mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
+        mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
+
+        return mla_wiki_df.to_dict('records')
 
 class Main_Site_Scraper:
     def get_all_mla_links(self, main_page_soup):
@@ -87,6 +172,9 @@ class MLA_Site_Scraper:
         self.__set_party_data()
         self.__set_riding_data()
         self.__set_contact_info()
+        self.__set_most_recent_term_id()
+        self.__set_years_active()
+        self.__set_committee_data()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -111,7 +199,7 @@ class MLA_Site_Scraper:
             self.row.party_id = 0
     
     def __set_riding_data(self):
-        potential_containers_for_electoral_district = self.main_container.findAll('u')
+        potential_containers_for_electoral_district = self.main_container.findAll('p')
         riding = self.__find_electoral_district(potential_containers_for_electoral_district)
         if riding == '':
             potential_containers_for_electoral_district = self.main_container.findAll('strong')
@@ -251,12 +339,83 @@ class MLA_Site_Scraper:
         number = number.replace('867 ', '867-')
         return number[:number_length].strip()
 
+    def __set_most_recent_term_id(self):
+        self.row.most_recent_term_id = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR[CURRENT_LEGISLATURE_TERM]
+
+    def __set_years_active(self):
+        biography_paragraphs = self.__get_biography()
+        terms_worked = self.__find_terms_worked(biography_paragraphs)
+        self.row.years_active = self.__get_service_periods_as_years(terms_worked)
+
+    def __get_biography(self):
+        all_paragraphs_in_main_container = self.main_container.findAll('p')
+        for index, paragraph in enumerate(all_paragraphs_in_main_container):
+            text = paragraph.text
+            if 'Biography' in text:
+                biography_paragraphs = all_paragraphs_in_main_container[index + 1:]
+        for index, paragraph in enumerate(biography_paragraphs):
+            text = paragraph.text
+            if 'Oath of Office' in text:
+                return biography_paragraphs[:index]
+
+    def __get_service_periods_as_years(self, service_periods_as_int):
+        service_periods_as_years = []
+        for period in service_periods_as_int:
+            self.__add_periods_as_years(period, service_periods_as_years)
+        return service_periods_as_years
+        
+    def __add_periods_as_years(self, period, return_list):
+        last_period = list(NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR)[-1]
+        current_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period)
+        if period != last_period:
+            next_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period + 1)
+            for i in range(current_term_year, next_term_year):
+                return_list.append(i)
+        elif CURRENT_YEAR > period:
+            for i in range(current_term_year, CURRENT_YEAR + 1):
+                return_list.append(i)
+    
+    def __find_terms_worked(self, paragraphs):
+        terms_worked = set({})
+        for paragraph in paragraphs:
+            self.__add_term_if_exists(paragraph.text, terms_worked)
+        return terms_worked
+    
+    def __add_term_if_exists(self, paragraph, set_to_add_to):
+        service_periods_as_string = re.findall('\d\d[a-z]{2}', paragraph)
+        for period in service_periods_as_string:
+            set_to_add_to.add(int(period[0:2]))
+
+    def __set_committee_data(self):
+        committees_container = self.__get_committee_paragraph()
+        try:
+            list_of_committees = self.__get_committees_list(committees_container)
+            self.row.committees = [self.__extract_committee_data(committee) for committee in list_of_committees]
+        except Exception:
+            self.row.committees = []
+            return
+
+    def __get_committee_paragraph(self):
+        all_paragraphs_in_main_container = self.main_container.findAll('p')
+        for index, paragraph in enumerate(all_paragraphs_in_main_container):
+            text = paragraph.text
+            if 'Committees' in text:
+                return all_paragraphs_in_main_container[index + 1]
+    
+    def __get_committees_list(self, container):
+        text = container.text
+        return text.split('\n')
+
+    def __extract_committee_data(self, committee):
+        committee_name = committee.split(' - ')[0]
+        role = committee.split(' - ')[1]
+        return {'role' : role,
+                'committee' : committee_name}
 
 
-# #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(7) > a > strong > u
-# #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(7) > u > strong > a
-# #content > div > div.field.field-name-body.field-type-text-with-summary.field-label-hidden > div > div > p:nth-child(6) > strong > u
+# updates global variables for nth term and current legislature year
+main_page_soup = Main_Functions().get_page_as_soup(MLA_URL)
+Main_Functions().update_term_and_legislature_dict(main_page_soup)
 
 if __name__ == '__main__':
     program_driver()
-    

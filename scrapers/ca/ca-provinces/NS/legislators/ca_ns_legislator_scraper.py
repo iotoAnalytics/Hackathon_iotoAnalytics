@@ -96,16 +96,19 @@ def get_phone_number(bio_container, row):
     office = "office"
     #phone = "phone number"
     phone_detail = bio_container.findAll('dd', {'class': 'numbers'})
-    phone_number = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)
-
-    print(phone_number)
+    for phone in phone_detail:
+        phone_number = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone.text)[0]
+        print(phone_number)
     #phone_number = [{'office': '', 'number': phone_number}]
 
     #row.phone_numbers = phone_number
 
     #phone_info = {"office": office, "number": phone}
     #phone_numbers.append(phone_info)
-
+    try:
+        office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[0].text)[0]
+    except Exception:
+        pass
 def scrape(url):
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -144,12 +147,12 @@ def scrape(url):
     get_phone_number(bio_container, row)
 
 
-    # Get phone number
-    bio_text = bio_container.text
-    phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
-    phone_number = [{'office': '', 'number': phone_number}]
+    # # Get phone number
+    # bio_text = bio_container.text
+    # phone_number = re.findall(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', bio_text)[0]
+    # phone_number = [{'office': '', 'number': phone_number}]
 
-    row.phone_numbers = phone_number
+    # row.phone_numbers = phone_number
 
     # There's other stuff we can gather on the page, but this will do for demo purposes
 

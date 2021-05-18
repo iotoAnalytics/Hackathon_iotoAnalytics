@@ -156,7 +156,7 @@ def get_name_and_role(main_div, row):
     name_full = name_line
 
     if " - " in name_line:
-        name_full = name_full[:name_full.index("-")]
+        name_full = name_full[:name_full.index(" - ")]
     if "Senator" in name_full:
         name_full = name_full.replace('Senator ', '')
         current_role = "Senator"
@@ -252,7 +252,14 @@ def get_years_active(contact_sidebar, row):
             term = int(term)
             terms.append(term)
     except Exception:
-        pass
+        try:
+            years_block = contact_sidebar.find_all('p')[3]
+            years_text = re.findall(r'[0-9]{4}', years_block.text)
+            for term in years_text:
+                term = int(term)
+                terms.append(term)
+        except Exception:
+            pass
 
     # Convert term length to actual years
 
@@ -307,37 +314,24 @@ def get_committees(main_div, row):
 
 
 def get_areas_served(big_df_data):
-    #big_df_data = big_df_data.drop(columns="areas_served")
+
     url = "http://www.kslegislature.org/li/b2021_22/members/csv/"
     members_data = requests.get(url)
     m_data = StringIO(members_data.text)
     df = pd.read_csv(m_data)[
         ['County', 'Firstname', 'Lastname']]
-    print(df)
     for i in df.index:
-        area = []
+
+        areas = []
         firstname = df.loc[i, "Firstname"]
         lastname = df.loc[i, "Lastname"]
-        area = df.loc[i, "County"]
-
-        print(firstname)
+        area = str(df.loc[i, "County"])
+        areas.append(str(area))
         big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname),
-                        'areas_served'] = area
-       # row_index = big_df_data.loc[(df['name_first'] == firstname) & (df['name_last'] == lastname)]
+                        'areas_served'] = pd.Series([areas]).values
 
-
-    # column = df["County"]
-    # for column_val in column.values:
-    #     c_val = [column_val]
-    #     print(c_val)
-    #     df = df.replace(column_val, c_val)
-
-    # df2 = df.rename(columns={'Firstname': 'name_first', 'Lastname': 'name_last',
-    #                          'County': 'areas_served'}, inplace=False)
-    #
-    # f_df = pd.merge(big_df_data, df2, how='left',
-    #                 on=["name_first", "name_last"])
     return big_df_data
+
 
 def scrape(url):
     '''
@@ -436,7 +430,6 @@ if __name__ == '__main__':
     all_wiki_links = reps_wiki + sens_wiki
 
     with Pool() as pool:
-
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
         ['birthday', 'education', 'name_first', 'name_last']]
@@ -452,11 +445,11 @@ if __name__ == '__main__':
 
     print('Scraping complete')
 
-    big_list_of_dicts = big_df.to_dict('records')
-    #print(big_list_of_dicts)
+    big_list_of_dicts = final_df.to_dict('records')
+
 
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
