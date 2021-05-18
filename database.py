@@ -34,16 +34,16 @@ class Database:
     """
     _connection = None
 
-    @staticmethod
-    def initialise():
-        """
-        Generates database connection token then connects to database via
-        connection pooling. Must be run before attempting to connect to
-        the database.
-        """
-        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+    # @staticmethod
+    # def initialise():
+    #     """
+    #     Generates database connection token then connects to database via
+    #     connection pooling. Must be run before attempting to connect to
+    #     the database.
+    #     """
+    #     db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
 
-        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
+    #     Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod
     def get_connection(cls):
@@ -53,6 +53,9 @@ class Database:
         Returns:
             connection: a psycopg2 connection to the database.
         """
+        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+
+        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
         return cls._connection
 
     # @classmethod
@@ -73,9 +76,9 @@ class Database:
         Database._connection.close()
 
     
-    def __del__(self):
-        if Database._connection:
-            Database.close_connection()
+    # def __del__(self):
+    #     if Database._connection:
+    #         Database.close_connection()
 
 
 class CursorFromConnectionFromPool:
@@ -122,7 +125,7 @@ class CursorFromConnectionFromPool:
         else:
             self.cursor.close()
             self.connection.commit()
-        # Database.close_connection()
+        Database.close_connection()
 
 
 class Persistence:

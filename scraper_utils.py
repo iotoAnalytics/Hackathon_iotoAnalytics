@@ -86,7 +86,7 @@ class ScraperUtils:
 
     def __init__(self, country, database_table_name, row_type):
 
-        Database.initialise()
+        # Database.initialise()
         # atexit.register(Database.close_all_connections)
 
         with CursorFromConnectionFromPool() as cur:
@@ -890,6 +890,10 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
         # data = self.add_topics(data)
+        df = pd.DataFrame(data)
+        df['topic'] = self.add_topics(df['bill_text'])
+        data = df.to_dict('records')
+
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
@@ -1043,6 +1047,10 @@ class CAProvinceTerrLegislationScraperUtils(CAFedLegislationScraperUtils):
         Takes care of inserting legislation data into database. Must be a list of Row objects or dictionaries.
         """
         # data = self.add_topics(data)
+        df = pd.DataFrame(data)
+        df['topic'] = self.add_topics(df['bill_text'])
+        data = df.to_dict('records')
+
         table = database_table if database_table else self.database_table_name
         Persistence.write_ca_prov_terr_legislation(data, table)
 # endregion
