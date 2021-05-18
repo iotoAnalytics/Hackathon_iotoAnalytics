@@ -48,8 +48,8 @@ BASE_URL = 'http://webserver1.lsb.state.ok.us/WebApplication3/WebForm1.aspx'
 SOUP_PARSER_TYPE = 'lxml'
 
 STATE_ABBREVIATION = 'OK'
-DATABASE_TABLE_NAME = 'us_ok_legislation_test'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+DATABASE_TABLE_NAME = 'us_ok_legislation'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
 DEBUG_MODE = True
 NUM_POOL_THREADS = 10

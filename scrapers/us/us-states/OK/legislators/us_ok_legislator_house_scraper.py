@@ -24,7 +24,7 @@ WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
 STATE_ABBREVIATION = 'OK'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
 DEBUG_MODE = False
 NUM_POOL_THREADS = 10

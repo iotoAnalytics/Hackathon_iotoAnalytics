@@ -19,8 +19,8 @@ class OKLegislationVotesParser:
     """
 
     STATE_ABBREVIATION = 'OK'
-    DATABASE_TABLE_NAME = 'us_ok_legislation_test'
-    LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+    DATABASE_TABLE_NAME = 'us_ok_legislation'
+    LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
     scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION, DATABASE_TABLE_NAME, LEGISLATOR_TABLE_NAME)
 
