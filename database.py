@@ -4,7 +4,7 @@ Author: Justin Tendeck
 """
 
 from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+# from psycopg2 import pool
 import psycopg2
 import configparser
 import boto3
@@ -32,21 +32,18 @@ class Database:
     Author: Jose Salvatierra
     Source: https://www.udemy.com/course/the-complete-python-postgresql-developer-course
     """
-    __connection_pool = None
+    _connection = None
 
-    @staticmethod
-    def initialise():
-        """
-        Generates database connection token then connects to database via
-        connection pooling. Must be run before attempting to connect to
-        the database.
-        """
-        db_token = client.generate_db_auth_token(
-            db_host, db_port, db_user, Region=db_region)
+    # @staticmethod
+    # def initialise():
+    #     """
+    #     Generates database connection token then connects to database via
+    #     connection pooling. Must be run before attempting to connect to
+    #     the database.
+    #     """
+    #     db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
 
-        Database.__connection_pool = pool.SimpleConnectionPool(1,
-                                                               10,
-                                                               database=db_name, host=db_host, user=db_user, password=db_token)
+    #     Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod
     def get_connection(cls):
@@ -56,24 +53,32 @@ class Database:
         Returns:
             connection: a psycopg2 connection to the database.
         """
-        return cls.__connection_pool.getconn()
+        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+
+        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
+        return cls._connection
+
+    # @classmethod
+    # def return_connection(cls, connection):
+    #     """
+    #     Returns a database connection back to the database connection pool.
+
+    #     Args:
+    #         connection: Psycopg2 database connection to be returned.
+    #     """
+    #     Database._connection.putconn(connection)
 
     @classmethod
-    def return_connection(cls, connection):
-        """
-        Returns a database connection back to the database connection pool.
-
-        Args:
-            connection: Psycopg2 database connection to be returned.
-        """
-        Database.__connection_pool.putconn(connection)
-
-    @classmethod
-    def close_all_connections(cls):
+    def close_connection(cls):
         """
         Closes all connections in the connection pool.
         """
-        Database.__connection_pool.closeall()
+        Database._connection.close()
+
+    
+    # def __del__(self):
+    #     if Database._connection:
+    #         Database.close_connection()
 
 
 class CursorFromConnectionFromPool:
@@ -120,7 +125,7 @@ class CursorFromConnectionFromPool:
         else:
             self.cursor.close()
             self.connection.commit()
-        Database.return_connection(self.connection)
+        Database.close_connection()
 
 
 class Persistence:
@@ -203,7 +208,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
@@ -220,6 +225,9 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
+                for v in row:
+                    print(v, type(v))
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -234,6 +242,8 @@ class Persistence:
                     cur.execute(insert_legislator_query, tup)
 
                 except Exception as e:
+                    import traceback
+                    print(traceback.format_exc())
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
 
@@ -709,7 +719,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
@@ -830,7 +840,7 @@ class Persistence:
                     goverlytics_id = excluded.goverlytics_id,
                     source_id = excluded.source_id,
                     committees = excluded.committees,
-                    cosponsors = excluded.sponsors,
+                    cosponsors = excluded.cosponsors,
                     cosponsors_id = excluded.cosponsors_id,
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
@@ -845,6 +855,8 @@ class Persistence:
             for row in data:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
+
+                
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,

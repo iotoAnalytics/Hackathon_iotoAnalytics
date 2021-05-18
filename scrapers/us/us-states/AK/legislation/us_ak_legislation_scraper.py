@@ -247,7 +247,7 @@ def scrape(data_dict):
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
-    dictionaries = get_dictionaries()[0:5]
+    dictionaries = get_dictionaries()
     print('grabbed dictionaries')
 
     # Next, we'll scrape the data we want to collect from those URLs.

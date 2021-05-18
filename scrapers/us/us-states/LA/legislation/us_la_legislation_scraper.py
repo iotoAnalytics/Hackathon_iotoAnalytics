@@ -25,6 +25,12 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 import boto3
+from selenium import webdriver
+from selenium.webdriver.support.select import Select
+from time import sleep
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 
 # Other import statements
@@ -32,7 +38,7 @@ import boto3
 
 state_abbreviation = 'LA'
 database_table_name = 'legislation_template_test'
-legislator_table_name = 'us_la_legislators'
+legislator_table_name = 'us_la_legislators_test'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
@@ -47,20 +53,68 @@ def get_urls():
     Insert logic here to get all URLs you will need to scrape_rep from the page.
     '''
     urls = []
+    WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
+    url = "https://legis.la.gov/legis/BillSearch.aspx?sid=LAST&e=P1"
+    driver = webdriver.Chrome(WEBDRIVER_PATH)
+    select_index = 0
+    types_of_bills = 8
 
-    # Logic goes here! Some sample code:
+    driver.get(url)
+    driver.maximize_window()
+    search_by_range_btn = driver.find_element_by_id("ctl00_ctl00_PageBody_PageContent_btnHeadRange")
+    search_by_range_btn.click()
+    sleep(1)
 
-    path = '/test-sites/e-commerce/allinone'
-    scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    urls = [base_url + prod_path['href']
-            for prod_path in soup.findAll('a', {'class': 'title'})]
+    while select_index < types_of_bills:
+        bill_lists_prep_automation(driver, url, select_index)
+        sleep(2)
+        urls = scrape_urls(driver, urls)
+        back_to_search = driver.find_element_by_xpath("//a[contains(text(), '< Back to Search')]")
+        back_to_search.click()
+        select_index += 1
+        sleep(2)
+
+    print("All urls collected")
 
     # Delay so we don't overburden web servers
     scraper_utils.crawl_delay(crawl_delay)
 
     return urls
+
+
+def scrape_urls(driver, urls):
+    while True:
+        next_page = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), ' > ')]")))
+        if next_page.get_attribute(
+                "href") == "javascript:__doPostBack('ctl00$ctl00$PageBody$PageContent$DataPager1$ctl02$ctl00','')":
+            current_page_urls = driver.find_elements_by_xpath("//a[contains(text(), 'more...')]")
+            for item in current_page_urls:
+                urls_per_page = item.get_attribute("href")
+                urls.append(urls_per_page)
+            print("collected")
+            sleep(2)
+            next_page.click()
+            print("clicked")
+            sleep(6)
+        else:
+            current_page_urls = driver.find_elements_by_xpath("//a[contains(text(), 'more...')]")
+            for item in current_page_urls:
+                urls_per_page = item.get_attribute("href")
+                urls.append(urls_per_page)
+            print("all collected for current type of bills")
+            sleep(2)
+            return urls
+
+
+def bill_lists_prep_automation(driver, url, select_index):
+    # insert bill type index later
+
+    options_select_element = driver.find_element_by_id("ctl00_ctl00_PageBody_PageContent_ddlInstTypes2")
+    options_select = Select(options_select_element)
+    options_select.select_by_index(select_index)
+    submit_btn = driver.find_element_by_id("ctl00_ctl00_PageBody_PageContent_btnSearchByInstRange")
+    submit_btn.click()
 
 
 def scrape(url):
@@ -150,15 +204,16 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape_rep:
     urls = get_urls()
+    pprint
 
     # Next, we'll scrape_rep the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape_rep(url) for url in urls]
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
-
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    #
+    # # Once we collect the data, we'll write it to the database.
+    # scraper_utils.write_data(data)
 
     print('Complete!')
