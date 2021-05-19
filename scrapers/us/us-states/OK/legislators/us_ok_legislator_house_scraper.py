@@ -1,5 +1,3 @@
-# TODO - Try/Exception
-
 # Unavailable data - SourceID, seniority, military exp
 # Wiki data - birthday, occupation, education 
 
@@ -24,7 +22,7 @@ WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
 STATE_ABBREVIATION = 'OK'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
 DEBUG_MODE = False
 NUM_POOL_THREADS = 10
@@ -179,6 +177,7 @@ def _set_source_url(row, url):
 
 def _set_name(row, soup):
     name_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblName'}).text
+    name_str = name_str.replace('\'', '')
     name = name_str.split(' ', 1)[1]
     human_name = HumanName(name)
 
@@ -197,6 +196,10 @@ def _set_role(row, soup):
     role_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblName'}).text
     pattern = re.compile('[a-zA-Z]+')
     role = pattern.search(role_str).group(0)
+
+    if 'Speaker' in role:
+        role = 'Representative'
+
     row.role = role
 
 def _set_years_active(row, soup):
@@ -262,12 +265,9 @@ def _format_address_str(original_str):
     address = re.sub(' +', ' ', address)
     address = re.sub('\([0-9]+\) [0-9]{3}-[0-9]{4}|\r|\xa0', '', address)
 
-    # TODO - Refactor this weird bug fix
     address = address.split('\n')
-
     new_address = [re.sub('\r|\xa0', '', a)
         for a in address]
-    
     new_address = ','.join(new_address[:-1])
 
     new_address = re.sub(', Room, [0-9]{3}|\.', '', new_address)
@@ -364,6 +364,14 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
         if most_recent_term_id == True:
             legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
 
+def _fix_oddities(legislator_data):
+    # Manually fixes odd data
+
+    # District 41 - Change name - Crosswhite Hader together forms the last name
+    legislator_row = _get_legislator_row(legislator_data, 'Denise Crosswhite Hader', '41')
+    legislator_row.name_middle = ''
+    legislator_row.name_last = 'CrosswhiteHader'
+
 def scrape_house_legislators():
     # Collect house legislators urls
     print(DEBUG_MODE and 'Collecting house legislator URLs...\n' or '', end='')
@@ -373,8 +381,6 @@ def scrape_house_legislators():
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
     with Pool(NUM_POOL_THREADS) as pool:
         data = list(tqdm(pool.imap(scrape, urls)))
-
-    # pprint(data[0:2])
 
     # Collect committee urls
     print(DEBUG_MODE and 'Collecting committee URLs...\n' or '', end='')
@@ -387,18 +393,19 @@ def scrape_house_legislators():
     # Collect wiki urls
     print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
     wiki_urls = get_wiki_urls_with_district()
-    # pprint(wiki_urls[0:5])
 
     # Merge data from wikipedia
     print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
     merge_all_wiki_data(data, wiki_urls)
 
+    # Manually fix any oddities
+    print(DEBUG_MODE and 'Manually fixing oddities...\n' or '', end='')
+    _fix_oddities(data)
+
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if DEBUG_MODE == False:
         scraper_utils.write_data(data)
-
-    # pprint(data[0:2])
 
 # if __name__ == '__main__':
 #     main()
