@@ -183,10 +183,10 @@ class SessionScraper:
         return "Bill-" + bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Name.value].text
     
     def __get_goveryltics_id(self, data_row):
-        prov = PROV_TERR_ABBREVIATION
-        session = data_row.session.split('-')[1]
+        session_split = data_row.session.split('-')
+        session = session_split[0] + '(' + session_split[1] + ')'
         bill_name = data_row.bill_name.replace('-', '').upper()
-        return prov + '_' + session + '_' + bill_name
+        return PROV_TERR_ABBREVIATION + '_' + session + '_' + bill_name
 
     def __get_date(self, bill_row):
         first_reading = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.First_Reading.value].text
