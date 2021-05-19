@@ -107,6 +107,7 @@ def get_most_recent_term_id(row):
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
     assembly = soup.find('h2', {'class': 'paragraph-header'}).text
+
     scraper_utils.crawl_delay(crawl_delay)
     row.most_recent_term_id = assembly
 
@@ -297,6 +298,10 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
+    # dropping rows with vacant seat
+    vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
+    for index in vacant_index:
+        leg_df = leg_df.drop(index)
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
@@ -320,7 +325,6 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = big_df.to_dict('records')
-    print(big_list_of_dicts)
     print('Writing data to database...')
 
     scraper_utils.write_data(big_list_of_dicts)

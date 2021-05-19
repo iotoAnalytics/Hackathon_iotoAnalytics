@@ -38,23 +38,17 @@ from tqdm import tqdm
 
 
 
-# Other import statements
-
 
 state_abbreviation = 'NV'
 database_table_name = 'us_nv_legislation'
 legislator_table_name = 'us_nv_legislator'
-
-
 options = Options()
 options.headless = False 
 driver = webdriver.Chrome(executable_path=r'C:\Users\DCYUM\Downloads\chromedriver_win32\chromedriver.exe', options=options)
 driver.switch_to.default_content()
 
-
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
-
 
 base_url = 'https://www.leg.state.nv.us'
 bills_url = 'https://www.leg.state.nv.us/App/NELIS/REL/81st2021/Bills/List'
@@ -64,6 +58,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 session_id = '2021'
 
+#collects all the urls that need to be scraped
 def get_urls():
     driver.get(bills_url)
     driver.maximize_window()
@@ -90,38 +85,41 @@ def get_urls():
 
 
 def get_history():
-    actions = []
+    
     action_list = driver.find_element_by_xpath("//*[contains(text(), 'Bill History')][1]/following-sibling::tbody")
     action_list = action_list.find_elements_by_css_selector('tr')
     first_introduced = None
-    
-    
 
+    actions = []
     for act in action_list :
         
         coloumns = (act.find_elements_by_css_selector('td'))
         if first_introduced is None :
             first_introduced = coloumns[0].get_attribute('textContent')
+
         action = {
             'date': coloumns[0].get_attribute('textContent'),
             'action_by':coloumns[1].get_attribute('textContent'),
-            'description':coloumns[2].get_attribute('textContent')
+            'description':coloumns[2].get_attribute('textContent').strip()
         }
         
         actions.insert(0,action)
 
     history = {
-        'actions' : action,
+        'actions' : actions,
         'introduced' : first_introduced 
     }
     return history
 
+#takes in a web element and returns the number of votes 
 def get_votes_number(info):
     vote_number = info.find_element_by_css_selector("a").get_attribute('textContent')
     vote_number = vote_number.split(': ')[1]
     vote_number = int(vote_number)
     return(vote_number)
 
+#helper function for get_votes
+#retrieves voter name, goverlytics id and what they voted and returns them in a dict
 def get_voters(driver):
     driver.click()
     voter_list = []
@@ -158,7 +156,8 @@ def get_voters(driver):
 
     return voter_list
 
-def get_votes() :
+#returns a list of dict with vote information
+def get_votes():
     votes_page = driver.find_element_by_css_selector('#tabVotes > span.k-link')
     votes_page.click()
     sleep(1)
@@ -220,6 +219,7 @@ def get_votes() :
     driver.find_element_by_id('tabOverview').click()
     return votes
 
+
 def get_sponsors(list):
     id_list = []
     name_list = []
@@ -243,19 +243,21 @@ def get_sponsors(list):
     return sponsor_info
         
 
-
+#gets the locations of sponsors and calls the get_sponsors helper function
 def get_primary_sponsors():
     sponsor_url = driver.find_element_by_id('primarySponsors')
     sponsor_list = sponsor_url.find_elements_by_css_selector('ul > li')
 
     return get_sponsors(sponsor_list)
 
+#gets the locations of cosponsors and calls the get_sponsors helper function
 def get_cosponsors():
     cosponsor_url = driver.find_element_by_id('cosponsors')
     cosponsor_list = cosponsor_url.find_elements_by_css_selector('ul > li')
 
     return get_sponsors(cosponsor_list)
 
+#returns the origin type and bill_id of the bill
 def get_bill_info() :
     bill_id = driver.find_element_by_css_selector('#bills-container > div > div.col-lg-9.pt-lg-4.main-content > div:nth-child(3) > div > h1').get_attribute('textContent')
     origin = None
@@ -274,47 +276,47 @@ def get_bill_info() :
         type  = "Resoultion"
     
 
-
     bill_info = {
         'origin':origin,
-        'type': type
+        'type': type,
+        'ID': bill_id
     }
     
     return bill_info
 
+#gets the text of the bill from a pdf
 def get_text():
     driver.find_element_by_css_selector('#tabText').click()
     sleep(1)
     pdf_link = driver.find_element_by_css_selector('#divText > div.d-md-none > div > div > ul > li:last-child > div > p > a').get_attribute('href')
-    #divText > div.d-md-none > div > div > ul > li:nth-child(5) > div > p > a
-    
 
     r = requests.get(pdf_link)
     f = io.BytesIO(r.content)
 
     reader = PdfFileReader(f)
-    contents = reader.getPage(0).extractText().split('\n')
-   
+    contents = reader.getPage(0).extractText()
     
     
+    driver.find_element_by_css_selector('#tabOverview').click()
     return contents
 
+#gets the committe involved in the bill
 def get_committes():
     committees = []
     main_committee = driver.find_element_by_css_selector('#divOverview > div > div:nth-child(4) > div.col > a').get_attribute('textContent')
     chamber = 'House'
     if 'Senate' in main_committee:
         chamber = 'Senate'
-    
-    
+    print(main_committee.strip().split(' ',3)[3])
     comittee = {
         'chamber':chamber,
         'committee':main_committee.split(' ',3)[3]
     }
 
     committees.append(comittee)
-    return None
+    return committees
 
+#scrapes from all collected urls and inserts into the database
 def scrape(url):
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -338,35 +340,39 @@ def scrape(url):
     # like so:
     row.source_url = url
 
-    #goverlytics_id = f'{state_abbreviation}_{session_id}_{bill_name}'
-    #row.goverlytics_id = goverlytics_id
-    row.goverlytics_id = url
-    row.session = session_id
+    
     
     driver.get(url)
     driver.maximize_window()
     sleep(3)
+
+    bill_info = get_bill_info()
+    goverlytics_id = f'{state_abbreviation}_{session_id}_{bill_info["ID"]}'
+    row.goverlytics_id = goverlytics_id
+    
+    row.session = session_id
+    row.source_id = bill_info['ID']
+    row.chamber_origin = bill_info['origin']
+    row.bill_type = bill_info['type']
     try :
 
         history = get_history()
         row.actions = history['actions']
-        row.date_intoduced = history['introduced']
+        row.date_introduced = history['introduced']
     except:
         print('No History')
 
     try :
-        bill_info = get_bill_info()
-        row.chamber_origin = bill_info['origin']
-        row.bill_type = bill_info['type']
+        
         row.bill_title = driver.find_element_by_id('title').get_attribute('textContent')
         row.bill_summary = driver.find_element_by_css_selector('#divOverview > div > div:nth-child(1) > div.col').text
     except:
         print('No info')
 
-    #try:
-    #    row.committees = get_committes
-    #except:
-    #    print('No committees')
+    try:
+        row.committees = get_committes()
+    except:
+       print('No committees')
     try:
         row.bill_text = get_text()
     except:
@@ -413,5 +419,5 @@ if __name__ == '__main__':
     # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
     
-
+    driver.quit()
     print('Complete!')
