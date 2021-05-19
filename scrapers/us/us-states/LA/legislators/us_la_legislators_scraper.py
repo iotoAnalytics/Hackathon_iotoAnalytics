@@ -32,7 +32,7 @@ configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 
 state_abbreviation = 'LA'
-database_table_name = 'us_la_legislators_test'
+database_table_name = 'us_la_legislators'
 country = 'US'
 
 scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
@@ -133,8 +133,13 @@ def get_occupation(row, soup):
     """
     #occupation
 
-    occupation = soup.find('span', {'id': re.compile("body_FormView4_OCCUPATIONLabel")}).text
-    row.occupation = occupation
+    try:
+        occupation = []
+        occ = soup.find('span', {'id': re.compile("body_FormView4_OCCUPATIONLabel")}).text
+        occupation.append(occ)
+        row.occupation = occupation
+    except Exception:
+        pass
 
 
 def get_committees(row, soup):

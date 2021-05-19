@@ -2,6 +2,8 @@ import sys
 import os
 from pathlib import Path
 
+from requests.sessions import Session
+
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -13,6 +15,7 @@ import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
+import re
 
 # These two will be updated by the program.
 CURRENT_SESSION = 0
@@ -41,6 +44,7 @@ def program_driver():
     bill_pdf_links = bill_info_scraper.get_bill_pdf_links()
 
     bill_data = main.get_data_from_all_links(main.get_bill_data, bill_pdf_links)
+    print(bill_data)
 
 class Main_Functions:
     def set_main_page_soup_global(self, url):
@@ -98,10 +102,6 @@ class Bill_PDF_Scraper:
         self.__set_row_data()
 
     def get_bill_data(self):
-        try:
-            print(self.pdf_reader.get_eng_half(self.pdf_pages[3]))
-        except Exception:
-            print(f'Missing page 4 from: {self.bill_url}')
         return self.row
 
     def __initialize_pdf_reader(self):
@@ -119,6 +119,44 @@ class Bill_PDF_Scraper:
         self.row.session = CURRENT_SESSION
         self.row.source_url = self.bill_url
         self.row.chamber_origin = 'Legislative Assembly'
+        self.row.bill_name = self.__get_bill_name()
+        self.row.goverlytics_id = self.__get_goveryltics_id()
+        self.row.bill_title = self.__get_bill_title()
+
+    def __get_bill_name(self):
+        return 'Bill' + self.__extract_bill_number_from_url()
+
+    def __extract_bill_number_from_url(self):
+        bill = re.findall(r'[A-Za-z]{4}_[0-9]{1,3}', self.bill_url)[0]
+        return re.findall(r'[0-9]{1,3}', bill)[0].strip()
+
+    def __get_goveryltics_id(self):
+        session_split = CURRENT_SESSION.split('-')
+        session = session_split[0] + '(' + session_split[1] + ')'
+        return PROV_TERR_ABBREVIATION + '_' + session + '_' + self.row.bill_name
+    
+    def __get_bill_title(self):
+        first_page = self.pdf_pages[0]
+        first_page_text = self.__get_pdf_text(first_page)
+        bill_title = self.__extract_bill_title(first_page_text)
+        return bill_title.lower().capitalize()
+
+    def __extract_bill_title(self, text):
+        return_text = re.split(r'BILL [0-9]{1,3}', text)
+        return_text = return_text[1].split('Summary')[0]
+        return_text = return_text.split('DISPOSI')[0]
+        return self.__clean_up_text(return_text)
+            
+    def __get_pdf_text(self, page):
+        if self.pdf_reader.is_column(page):
+            return self.pdf_reader.get_eng_half(page)
+        else:
+            return page.extract_text()
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', ' ')
+        text = text.replace('  ', ' ')
+        return text.strip()
 
 Main_Functions().set_main_page_soup_global(BILLS_URL)
 Bill_Main_Page_Scraper().set_current_session_global()
