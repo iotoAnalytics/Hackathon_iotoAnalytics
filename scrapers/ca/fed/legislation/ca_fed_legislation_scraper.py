@@ -327,7 +327,7 @@ if __name__ == '__main__':
             wr = csv.writer(result_file)
             wr.writerow(xml_urls)
 
-    xml_urls = xml_urls if len(xml_urls) > 0 else []
+    xml_urls = xml_urls[:1] if len(xml_urls) > 0 else []
     # xml_urls = xml_urls if len(xml_urls) > 0 else []
 
     xml_data = [scrape(xml_url) for xml_url in xml_urls]
