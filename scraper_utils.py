@@ -1062,12 +1062,16 @@ class PDF_Reader():
     This class requires you to set the page width and page height ratio by specifying the
     width/height of the page (in inches).
     '''
-    def get_pdf_pages(self, pdf_url_response_content):
-        pdf = pdfplumber.open(io.BytesIO(pdf_url_response_content))  
+    def get_pdf_pages(self, pdf_url, headers):
+        pdf_url_response = self.__initialize_pdf_reader(pdf_url, headers)
+        pdf = pdfplumber.open(io.BytesIO(pdf_url_response.content))
         pdf_pages = pdf.pages
         self.page_width = float(pdf_pages[0].width)
         self.page_height = float(pdf_pages[0].height)
         return pdf_pages
+
+    def __initialize_pdf_reader(self, pdf_url, headers):
+        return requests.get(pdf_url, headers, stream=True)
 
     def set_page_width_ratio(self, width_in_inch):
         self.page_width_to_inch_ratio = self.page_width / float(width_in_inch)
@@ -1078,18 +1082,18 @@ class PDF_Reader():
     def set_page_height_ratio(self, height_in_inch):
         self.page_height_to_inch_ratio = self.page_height / float(height_in_inch)
 
-    def set_page_top_margin_in_inch(self, top_margin_in_inch):
-        self.top_margin = float(top_margin_in_inch) * self.page_height_to_inch_ratio
+    def set_page_top_spacing_in_inch(self, top_spacing_in_inch):
+        self.top_spacing = float(top_spacing_in_inch) * self.page_height_to_inch_ratio
 
-    def set_bottom_margin_where_page_number_is_in_inch(self, bottom_margin_in_inch):
-        self.bottom_margin = float(bottom_margin_in_inch) * self.page_height_to_inch_ratio
+    def set_page_bottom_spacing_in_inch(self, bottom_spacing_in_inch):
+        self.bottom_spacing = float(bottom_spacing_in_inch) * self.page_height_to_inch_ratio
 
     def set_left_column_end_and_right_column_start(self, column1_end, column2_start):
         self.left_column_end = column1_end * self.page_width_to_inch_ratio
         self.right_column_start = column2_start * self.page_width_to_inch_ratio
 
     def is_column(self, page):
-        margin_top = page.crop((self.left_column_end, 0, self.right_column_start, self.top_margin))
+        margin_top = page.crop((self.left_column_end, 0, self.right_column_start, self.top_spacing))
         text = margin_top.extract_text()
         if text == None:
             return True
@@ -1112,9 +1116,17 @@ class PDF_Reader():
             return False
 
     def get_eng_half(self, page):
-        eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_margin))
+        eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_spacing))
         return eng_half.extract_text()
 
     def remove_page_number(self, page):
-        page_number_removed = page.crop((0, 0, self.page_width, self.page_height - self.bottom_margin))
+        page_number_removed = page.crop((0, 0, self.page_width, self.page_height - self.bottom_spacing))
         return page_number_removed.extract_text()
+
+class PDF_Table_Reader(PDF_Reader):
+    def get_table(self, pages):
+        tables = []
+        for page in pages:
+            table_only_in_page = page.crop((0, self.top_spacing, self.page_width, self.page_height - self.bottom_spacing))
+            tables.append(table_only_in_page.extract_table())
+        return tables

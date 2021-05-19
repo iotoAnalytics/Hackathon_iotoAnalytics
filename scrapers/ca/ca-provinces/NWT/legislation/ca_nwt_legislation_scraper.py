@@ -2,14 +2,14 @@ import sys
 import os
 from pathlib import Path
 
-from requests.sessions import Session
+from pandas.core.reshape.merge import merge
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 import pandas as pd
-from scraper_utils import CAProvinceTerrLegislationScraperUtils
+from scraper_utils import CAProvinceTerrLegislationScraperUtils, PDF_Table_Reader
 from scraper_utils import PDF_Reader
 import requests
 from bs4 import BeautifulSoup as soup
@@ -44,6 +44,35 @@ def program_driver():
     bill_pdf_links = bill_info_scraper.get_bill_pdf_links()
 
     bill_data = main.get_data_from_all_links(main.get_bill_data, bill_pdf_links)
+    print('Writing data to database...')
+    scraper_utils.write_data(bill_data)
+    print("Complete")
+
+class Status_Of_Bills:
+    def __init__(self):
+        self.status_of_bills_link = self.__get_status_of_bills_link()
+        self.columns = ['bill_number', 'name_of_act', 'notice', 'first_reading', 'second_reading', 'to_standing_committee',
+                        'amendment_date', 'reported', 'third_reading', 'assent']
+        self.table_reader = PDF_Table_Reader()
+
+    def __get_status_of_bills_link(self):
+        status_div = MAIN_PAGE_SOUP.find('div', {'class' : 'view-status-of-bills'})
+        return status_div.a['href']
+    
+    def get_status_of_bills_data(self):
+        pdf_pages = self.table_reader.get_pdf_pages(self.status_of_bills_link, scraper_utils._request_headers)
+        self.__initialize_pdf_reader()
+        tables = self.table_reader.get_table(pdf_pages)
+        # print(pd.DataFrame(tables, columns=self.columns))
+        tables_in_df = [pd.DataFrame(table, columns=self.columns) for table in tables]
+        merged_df = pd.concat(tables_in_df)
+        return merged_df.drop(0)
+
+    def __initialize_pdf_reader(self):
+        self.table_reader.set_page_width_ratio(width_in_inch=11)
+        self.table_reader.set_page_height_ratio(height_in_inch=8.5)
+        self.table_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.15)
+        self.table_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=1.45)
 
 class Main_Functions:
     def set_main_page_soup_global(self, url):
@@ -105,16 +134,14 @@ class Bill_PDF_Scraper:
         return self.row
 
     def __initialize_pdf_reader(self):
-        pdf_response = requests.get(self.bill_url, headers=scraper_utils._request_headers, stream=True)
-        scraper_utils.crawl_delay(crawl_delay)
-
-        self.pdf_pages = self.pdf_reader.get_pdf_pages(pdf_response.content)
+        self.pdf_pages = self.pdf_reader.get_pdf_pages(self.bill_url, scraper_utils._request_headers)
         self.pdf_reader.set_page_width_ratio(width_in_inch=8.5)
         self.pdf_reader.set_page_half(page_half_in_inch=4.32)
         self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
-        self.pdf_reader.set_page_top_margin_in_inch(top_margin_in_inch=1.15)
+        self.pdf_reader.set_page_top_spacing_in_inch(top_margin_in_inch=1.15)
         self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.28, column2_start=4.40)
-        self.pdf_reader.set_bottom_margin_where_page_number_is_in_inch(bottom_margin_in_inch=1.15)
+        self.pdf_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=1.15)
+        scraper_utils.crawl_delay(crawl_delay)
 
     def __set_row_data(self):
         self.row.session = CURRENT_SESSION
@@ -134,9 +161,7 @@ class Bill_PDF_Scraper:
         return re.findall(r'[0-9]{1,3}', bill)[0].strip()
 
     def __get_goveryltics_id(self):
-        session_split = CURRENT_SESSION.split('-')
-        session = session_split[0] + '(' + session_split[1] + ')'
-        return PROV_TERR_ABBREVIATION + '_' + session + '_' + self.row.bill_name
+        return PROV_TERR_ABBREVIATION + '_' + CURRENT_SESSION + '_' + self.row.bill_name
     
     def __get_bill_title(self):
         first_page = self.pdf_pages[0]
@@ -148,6 +173,7 @@ class Bill_PDF_Scraper:
         return_text = re.split(r'BILL [0-9]{1,3}', text)
         return_text = return_text[1].split('Summary')[0]
         return_text = return_text.split('DISPOSI')[0]
+        return_text = return_text.split('REPRINT')[0]
         return self.__clean_up_text(return_text)
 
     def __get_bill_summary(self):
@@ -171,7 +197,6 @@ class Bill_PDF_Scraper:
         for page in pages_to_get:
             text = self.__get_pdf_text(page)
             return_text += self.__clean_up_text(text)
-            print(return_text)
         return return_text
 
     def __get_pdf_text(self, page):
@@ -184,6 +209,7 @@ class Bill_PDF_Scraper:
 
 Main_Functions().set_main_page_soup_global(BILLS_URL)
 Bill_Main_Page_Scraper().set_current_session_global()
+BILL_STATUS_DATA_FRAME = Status_Of_Bills().get_status_of_bills_data()
 
-if __name__ == '__main__':
-    program_driver()
+# if __name__ == '__main__':
+#     program_driver()
