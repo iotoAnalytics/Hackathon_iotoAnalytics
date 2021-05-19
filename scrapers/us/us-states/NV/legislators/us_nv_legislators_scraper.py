@@ -44,12 +44,15 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
     #print(name)
    # return name
 
+
+#gets the district
 def get_district(content) :
     district = content.find_all('td')[3].find('a').text
     district = re.findall("\d+", district)
     print(district)
     return district
 
+#gets the party
 def get_party(content) :
     party = content.find_all('td')[2].find('a').text
     if party == "Democratic" :
@@ -57,18 +60,20 @@ def get_party(content) :
     print(party)
     return party
 
+#gets the county
 def get_county(content) :
     county = content.find_all('td')[4].find('a')
     print(county)
     return county.text
 
+#gets the link
 def get_link(content) :
     link = content.find_all('td')[0].find('a')
     link = link.get('href')
     print(link)
     return link
 
-
+#splits the name 
 def get_split_name(full_name) :
     name_parts = full_name.split(' ',1)
     position = name_parts[0]
@@ -89,6 +94,7 @@ def get_split_name(full_name) :
 
     return name
 
+#gets all the urls to scrape and returns a dict with urls and extra information
 def get_urls(url) : 
     sentate = 0
     if ('Senate' in url) :
@@ -167,6 +173,7 @@ def get_urls(url) :
 
     return legislators
 
+#gets the active years from 
 def get_years(content):
     active_years = []
     year_ranges = re.findall("\d{4}-Present", content.text)
@@ -184,12 +191,10 @@ def get_years(content):
         year = re.findall("\d{4}", content.text)
         active_years.append(int(year[0]))
 
-        
-
     return active_years
 
 
-
+#helper function that takes a range of years and returns a list of years
 def get_range(years):
     year_range = []
 
@@ -201,6 +206,7 @@ def get_range(years):
 
     return list(year_range)
 
+# gets the committes the legislator is affiliated with
 def get_committees(content):
     committees = []
     com_soup = content.find_all('li')
@@ -216,6 +222,7 @@ def get_committees(content):
         committees.append(committee)
     return committees
 
+#gets the education from the legislator
 def get_education(content):
     print (content)
     level = None
@@ -247,6 +254,7 @@ def get_education(content):
 
     return education
 
+#returns the occupation of the legislator
 def get_occupation(content) :
     occupations = []
     content = content.find_all('div')[1].text.strip()
@@ -261,6 +269,7 @@ def get_occupation(content) :
             occupations.append(job)
     return occupations
 
+#gets the personal informations of the legislator
 def get_personal(content) :
     active_years = []
     education = []
@@ -292,6 +301,7 @@ def get_personal(content) :
     }
     return personal
 
+#returns a list of areas served by the legislator
 def get_area_served(content) :
     areas_served = []
     area_list = content.find_all('h4')
@@ -301,6 +311,7 @@ def get_area_served(content) :
         areas_served.append(area.replace('(Part)',''))
     return areas_served
 
+#scrapes the urls and inserts data into the DB
 def scrape(legislator):
 
     committees = []
