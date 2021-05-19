@@ -44,7 +44,6 @@ def program_driver():
     bill_pdf_links = bill_info_scraper.get_bill_pdf_links()
 
     bill_data = main.get_data_from_all_links(main.get_bill_data, bill_pdf_links)
-    print(bill_data)
 
 class Main_Functions:
     def set_main_page_soup_global(self, url):
@@ -98,6 +97,7 @@ class Bill_PDF_Scraper:
         self.row = scraper_utils.initialize_row()
         self.bill_url = link
         self.pdf_reader = PDF_Reader()
+        self.summary_page_number = 0 #This is updated in extract summary. This value is index 1, not index 0
         self.__initialize_pdf_reader()
         self.__set_row_data()
 
@@ -113,7 +113,8 @@ class Bill_PDF_Scraper:
         self.pdf_reader.set_page_half(page_half_in_inch=4.32)
         self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
         self.pdf_reader.set_page_top_margin_in_inch(top_margin_in_inch=1.15)
-        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.24, column2_start=4.60)
+        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.28, column2_start=4.40)
+        self.pdf_reader.set_bottom_margin_where_page_number_is_in_inch(bottom_margin_in_inch=1.15)
 
     def __set_row_data(self):
         self.row.session = CURRENT_SESSION
@@ -122,6 +123,8 @@ class Bill_PDF_Scraper:
         self.row.bill_name = self.__get_bill_name()
         self.row.goverlytics_id = self.__get_goveryltics_id()
         self.row.bill_title = self.__get_bill_title()
+        self.row.bill_summary = self.__get_bill_summary()
+        self.row.bill_text = self.__get_bill_text()
 
     def __get_bill_name(self):
         return 'Bill' + self.__extract_bill_number_from_url()
@@ -146,12 +149,33 @@ class Bill_PDF_Scraper:
         return_text = return_text[1].split('Summary')[0]
         return_text = return_text.split('DISPOSI')[0]
         return self.__clean_up_text(return_text)
-            
+
+    def __get_bill_summary(self):
+        # The summary is likely in the first few pages
+        pages_to_search_for = self.pdf_pages[0:2]
+        return self.__extract_bill_summary(pages_to_search_for)
+        
+    def __extract_bill_summary(self, pages):
+        for page in pages:
+            text = self.__get_pdf_text(page)
+            if 'Summary' in text:
+                return_text = text.split('Summary')[1]
+                return_text = return_text.split('DISPOSI')[0]
+                self.summary_page_number = page.page_number
+                return self.__clean_up_text(return_text)
+        return None
+
+    def __get_bill_text(self):
+        pages_to_get = self.pdf_pages[self.summary_page_number:]
+        return_text = ""
+        for page in pages_to_get:
+            text = self.__get_pdf_text(page)
+            return_text += self.__clean_up_text(text)
+            print(return_text)
+        return return_text
+
     def __get_pdf_text(self, page):
-        if self.pdf_reader.is_column(page):
-            return self.pdf_reader.get_eng_half(page)
-        else:
-            return page.extract_text()
+        return self.pdf_reader.get_text(page)
 
     def __clean_up_text(self, text):
         text = text.replace('\n', ' ')

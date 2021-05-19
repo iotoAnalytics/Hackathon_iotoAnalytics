@@ -1081,6 +1081,9 @@ class PDF_Reader():
     def set_page_top_margin_in_inch(self, top_margin_in_inch):
         self.top_margin = float(top_margin_in_inch) * self.page_height_to_inch_ratio
 
+    def set_bottom_margin_where_page_number_is_in_inch(self, bottom_margin_in_inch):
+        self.bottom_margin = float(bottom_margin_in_inch) * self.page_height_to_inch_ratio
+
     def set_left_column_end_and_right_column_start(self, column1_end, column2_start):
         self.left_column_end = column1_end * self.page_width_to_inch_ratio
         self.right_column_start = column2_start * self.page_width_to_inch_ratio
@@ -1092,14 +1095,26 @@ class PDF_Reader():
             return True
         else:
             return False
-        
+
+    def get_text(self, page):
+        if self.is_page_empty(page):
+            return ""
+        if self.is_column(page) and not self.is_page_empty(page):
+            return self.get_eng_half(page)
+        if not self.is_column(page) and not self.is_page_empty(page):
+            return self.remove_page_number(page)
+
     def is_page_empty(self, page):
-        text = page.extract_text()
+        text = self.remove_page_number(page)
         if text == None:
             return True
         else:
             return False
 
     def get_eng_half(self, page):
-        eng_half = page.crop((0, 0, self.page_half, page.height))
+        eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_margin))
         return eng_half.extract_text()
+
+    def remove_page_number(self, page):
+        page_number_removed = page.crop((0, 0, self.page_width, self.page_height - self.bottom_margin))
+        return page_number_removed.extract_text()
