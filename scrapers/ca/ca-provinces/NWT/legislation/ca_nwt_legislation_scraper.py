@@ -44,6 +44,7 @@ def program_driver():
     bill_pdf_links = bill_info_scraper.get_bill_pdf_links()
 
     bill_data = main.get_data_from_all_links(main.get_bill_data, bill_pdf_links)
+    print(BILL_STATUS_DATA_FRAME)
     print('Writing data to database...')
     scraper_utils.write_data(bill_data)
     print("Complete")
@@ -138,7 +139,7 @@ class Bill_PDF_Scraper:
         self.pdf_reader.set_page_width_ratio(width_in_inch=8.5)
         self.pdf_reader.set_page_half(page_half_in_inch=4.32)
         self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
-        self.pdf_reader.set_page_top_spacing_in_inch(top_margin_in_inch=1.15)
+        self.pdf_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.15)
         self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.28, column2_start=4.40)
         self.pdf_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=1.15)
         scraper_utils.crawl_delay(crawl_delay)
@@ -211,5 +212,5 @@ Main_Functions().set_main_page_soup_global(BILLS_URL)
 Bill_Main_Page_Scraper().set_current_session_global()
 BILL_STATUS_DATA_FRAME = Status_Of_Bills().get_status_of_bills_data()
 
-# if __name__ == '__main__':
-#     program_driver()
+if __name__ == '__main__':
+    program_driver()
