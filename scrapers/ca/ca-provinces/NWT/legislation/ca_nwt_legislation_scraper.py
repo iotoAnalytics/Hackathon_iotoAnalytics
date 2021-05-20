@@ -154,6 +154,9 @@ class Bill_PDF_Scraper:
         self.row.bill_summary = self.__get_bill_summary()
         self.row.bill_text = self.__get_bill_text()
         self.row.actions = self.__get_bill_actions()
+        self.row.current_status = self.__get_current_status(self.row.actions)
+        self.row.bill_type = self.__get_bill_type()
+        self.row.date_introduced = self.__get_date_introduced()
 
     def __get_bill_name(self):
         return 'Bill' + self.__extract_bill_number_from_url()
@@ -278,6 +281,20 @@ class Bill_PDF_Scraper:
         if 'Committee' in action_description:
             return 'Committee'
         return 'Legislative Assembly'
+
+    def __get_current_status(self, actions):
+        return actions[0]['description']
+
+    def __get_bill_type(self):
+        if 'amend' in self.row.bill_title.lower():
+            return 'Amendment'
+        else:
+            return 'Bill'
+
+    def __get_date_introduced(self):
+        for action in self.row.actions[::-1]:
+            if action['description'] == 'First Reading':
+                return action['date']
 
 Main_Functions().set_main_page_soup_global(BILLS_URL)
 Bill_Main_Page_Scraper().set_current_session_global()
