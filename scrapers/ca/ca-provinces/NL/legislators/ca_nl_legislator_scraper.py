@@ -1,4 +1,4 @@
-# Unavailable data - SourceID, seniority, military exp
+# Unavailable data - source_url, source_id, addresses, seniority, military_exp
 # Wiki data - birthday, education, occupation, years_active, most_recent_term_id 
 
 import sys
@@ -17,7 +17,6 @@ import re
 from tqdm import tqdm
 import datetime
 
-import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from time import sleep
@@ -61,25 +60,6 @@ def scrape(url):
     for table_row in table_rows:
         row = scraper_utils.initialize_row()
 
-        # TODO - source_id
-        # most_recent_term_id
-        # source_url
-        # name (full, last, first, middle, suffix)
-        # party_id & party
-        # role
-        # years_active
-        # TODO - committees
-        # phone_number
-        # TODO - addresses
-        # email
-        # birthday
-        # TODO - seniority
-        # occupation
-        # education
-        # military_experience
-        # region
-        # riding
-
         # Name, District(Areas Served), Party, Phone, Email
         fields = table_row.find_all('td')
         
@@ -92,11 +72,76 @@ def scrape(url):
 
         data.append(row)
 
-    roles_data = _get_roles()
-    _set_all_legislator_roles(data, roles_data)
+    # roles_data = _get_roles()
+    # _set_all_legislator_roles(data, roles_data)
 
     driver.quit()
     return data
+
+def get_roles():
+    url = BASE_URL + MEMBER_PATH + '/OfficeHolders.aspx'
+    soup = _create_soup(url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    lists = soup.find_all('ul', {'style': 'list-style:none;'})
+    
+    # Legislative Branch
+    list_items = lists[0].find_all('li')
+    roles_data = [_format_roles(li.text) for li in list_items]
+    
+    # Executive Branch
+    roles_data.append(_format_roles(lists[1].find('li').text))
+    
+    return roles_data
+
+def get_committee_urls():
+    committee_url_path = '/Committees/StandingCommittees/'
+    committee_url = BASE_URL + committee_url_path
+
+    soup = _create_soup(committee_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+    
+    links = soup.find('ul', {'class': 'list-unstyled'}).find_all('a')
+    urls = [BASE_URL + committee_url_path + link.get('href') for link in links]
+
+    return urls
+
+def update_legislator_roles(legislator_data, roles_data):
+    # Default all role to MHA
+    for legislator in legislator_data:
+        legislator.role = 'Member of the House Assembly'
+
+    # Set specific roles
+    for role_data in roles_data:
+        legislator = _get_legislator_row(legislator_data, role_data['name'])
+        if legislator != None:
+            legislator.role = role_data['role']
+
+def scrape_committee(url):
+    # Go to list of committee sessions
+    soup = _create_soup(url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    content = soup.find_all('div', {'class': 'container'})[3]
+    committee_name = content.find('h1').text
+    
+    committee_members_url = url + content.find('ul').find('a').get('href')
+
+    # Go to committee members for most recent session
+    soup = _create_soup(committee_members_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    members = _get_committee_list(soup, committee_name)
+
+    return members
+
+def update_house_committees(data, urls):
+    with Pool(NUM_POOL_THREADS) as pool:
+        committees_data_list = list(tqdm(pool.imap(scrape_committee, urls)))
+
+    for row in data:
+        committees = _get_committees(committees_data_list, row.name_full, row.riding)
+        row.committees = committees
 
 def get_wiki_urls():
     wiki_url_path = '/wiki/Newfoundland_and_Labrador_House_of_Assembly'
@@ -125,7 +170,6 @@ def scrape_wiki(url):
     scraper_utils.crawl_delay(wiki_crawl_delay)
 
     return wiki_data
-
 
 def merge_all_wiki_data(legislator_data, wiki_urls):
     with Pool(NUM_POOL_THREADS) as pool:
@@ -162,17 +206,6 @@ def _set_party(row, text):
     row.party = text
     row.party_id = scraper_utils.get_party_id(text)
 
-def _set_all_legislator_roles(legislator_data, roles_data):
-    # Default all role to MHA
-    for legislator in legislator_data:
-        legislator.role = 'Member of the House Assembly'
-
-    # Set specific roles
-    for role_data in roles_data:
-        legislator = _get_legislator_row(legislator_data, role_data['name'])
-        if legislator != None:
-            legislator.role = role_data['role']
-
 def _set_phone_numbers(row, text):
     match = re.search('\(([0-9]{3})\)\s([0-9]{3})\-([0-9]{4})', text)
     if match:
@@ -189,23 +222,6 @@ def _set_email(row, text):
 def _set_riding(row, text):
     row.riding = text
 
-def _get_roles():
-    url = BASE_URL + MEMBER_PATH + '/OfficeHolders.aspx'
-    soup = _create_soup(url, SOUP_PARSER_TYPE)
-    scraper_utils.crawl_delay(crawl_delay)
-
-    lists = soup.find_all('ul', {'style': 'list-style:none;'})
-    
-    # Legislative Branch
-    list_items = lists[0].find_all('li')
-    # pprint(list_items)
-    roles_data = [_format_roles(li.text) for li in list_items]
-    
-    # Executive Branch
-    roles_data.append(_format_roles(lists[1].find('li').text))
-    
-    return roles_data
-
 def _format_roles(text):
     text = re.split('-|–', text)
     role_data = {
@@ -213,6 +229,39 @@ def _format_roles(text):
         'name': text[1].strip(),
     }
     return role_data
+
+def _get_committee_list(soup, committee_name):
+    content = soup.find_all('div', {'class': 'container'})[3]
+    members = content.find('ul').find_all('li')
+    
+    committee_members = []
+    for member in members:
+        member_data = member.text.replace('–', '-').split('-', 1)
+        
+        # Currently, there are no roles listed
+        committee_member = {
+            'name': member_data[0].strip(),
+            'riding': member_data[1].strip(),
+            'role': 'member',
+            'committee': committee_name,
+        }
+        committee_members.append(committee_member)
+
+    return committee_members
+
+def _get_committees(committees_data_list, full_name, riding):
+    committees = []
+
+    for committee_members in committees_data_list:
+        for member in committee_members:
+            if member['name'] == full_name and  member['riding'] == riding:
+                committee = {
+                    'role': member['role'],
+                    'committee': member['committee'],
+                }
+                committees.append(committee)
+
+    return committees
 
 def _get_legislator_row(legislator_data, name_full):
     for row in legislator_data:
@@ -242,18 +291,49 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
             legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
 
 def main():
-    # Scrape roster
+    print('NEWFOUNDLAND AND LABRADOR!')
+    print('She\'s a rocky isle in the ocean ♫ ♫ ♫')
+    print('And she\'s pounded by wind from the sea ♫ ♫ ♫')
+    print('You might think that she\'s rugged and cold ♫ ♫ ♫')
+    print('But she\'s home sweet home to me. ♫ ♫ ♫')
+
+    print('\nSCRAPING NEWFOUNDLAND AND LABRADOR LEGISLATORS\n')
+
+    # Scrape assembly members
+    print(DEBUG_MODE and 'Scraping assembly members...\n' or '', end='')
     url = BASE_URL + MEMBER_PATH
     data = scrape(url)
-    pprint(data[1])
+
+    print(DEBUG_MODE and 'Collecting assembly members roles...\n' or '', end='')
+    # Collect all roles of assembly
+    roles_data = get_roles()
+
+    # Update roles of assembly
+    print(DEBUG_MODE and 'Updating assembly members roles...\n' or '', end='')
+    update_legislator_roles(data, roles_data)
+
+    # Collect committee urls
+    print(DEBUG_MODE and 'Collecting committee URLs...\n' or '', end='')
+    committee_urls = get_committee_urls()
+
+    # Update committee data
+    print(DEBUG_MODE and 'Updating house legislators committees...\n' or '', end='')
+    update_house_committees(data, committee_urls)
 
     # Collect wiki urls
+    print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
     wiki_urls = get_wiki_urls()
 
     # Merge data from wikipedia
+    print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
     merge_all_wiki_data(data, wiki_urls)
 
-    pprint(data)
+    # Write to database
+    if DEBUG_MODE == False:
+        print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
+        scraper_utils.write_data(data)
+
+    print('\nCOMPLETE!\n')
 
 if __name__ == '__main__':
     main()
