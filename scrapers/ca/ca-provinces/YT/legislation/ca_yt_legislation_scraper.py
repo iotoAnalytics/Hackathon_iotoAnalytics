@@ -232,7 +232,7 @@ class SessionScraper:
             return
         cell = self.__remove_unneccessary_text(cell)
         date = datetime.datetime.strptime(cell, '%B %d, %Y')
-        date = date.strftime('%Y-%b-%d')
+        date = date.strftime('%Y-%m-%d')
         description = self.__match_cell_position_to_action(cell_position)
         action_by = self.__get_action_by(description)
         return {'date' : date, 'action_by' : action_by, 'description' : description}

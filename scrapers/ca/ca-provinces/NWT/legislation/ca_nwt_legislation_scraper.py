@@ -1,3 +1,4 @@
+import enum
 import sys
 import os
 from pathlib import Path
@@ -16,6 +17,7 @@ from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
 import re
+import datetime
 
 # These two will be updated by the program.
 CURRENT_SESSION = 0
@@ -44,7 +46,6 @@ def program_driver():
     bill_pdf_links = bill_info_scraper.get_bill_pdf_links()
 
     bill_data = main.get_data_from_all_links(main.get_bill_data, bill_pdf_links)
-    print(BILL_STATUS_DATA_FRAME)
     print('Writing data to database...')
     scraper_utils.write_data(bill_data)
     print("Complete")
@@ -64,7 +65,6 @@ class Status_Of_Bills:
         pdf_pages = self.table_reader.get_pdf_pages(self.status_of_bills_link, scraper_utils._request_headers)
         self.__initialize_pdf_reader()
         tables = self.table_reader.get_table(pdf_pages)
-        # print(pd.DataFrame(tables, columns=self.columns))
         tables_in_df = [pd.DataFrame(table, columns=self.columns) for table in tables]
         merged_df = pd.concat(tables_in_df)
         return merged_df.drop(0)
@@ -153,6 +153,7 @@ class Bill_PDF_Scraper:
         self.row.bill_title = self.__get_bill_title()
         self.row.bill_summary = self.__get_bill_summary()
         self.row.bill_text = self.__get_bill_text()
+        self.row.actions = self.__get_bill_actions()
 
     def __get_bill_name(self):
         return 'Bill' + self.__extract_bill_number_from_url()
@@ -207,6 +208,76 @@ class Bill_PDF_Scraper:
         text = text.replace('\n', ' ')
         text = text.replace('  ', ' ')
         return text.strip()
+
+    def __get_bill_actions(self):
+        bill_name_that_matches_status_of_bills = self.__adjust_bill_name_to_match_status_of_bills()
+        bill_row_from_df = self.__get_bill_row_from_df(bill_name_that_matches_status_of_bills)
+        relevant_cells = bill_row_from_df[:1:-1]
+        actions = []
+        for index, cell in enumerate(relevant_cells):
+            action = (self.__add_action_attribute(cell, index))
+            if action:
+                actions.append(action)
+        return actions
+    
+    def __adjust_bill_name_to_match_status_of_bills(self):
+        bill_number = self.row.bill_name.split('Bill')[1]
+        session_split = CURRENT_SESSION.split('-')
+        session = session_split[0] + '(' + session_split[1] + ')'
+        return bill_number + '-' + session
+
+    def __get_bill_row_from_df(self, bill_name):
+        row = BILL_STATUS_DATA_FRAME.loc[BILL_STATUS_DATA_FRAME['bill_number'] == bill_name]
+        return row.values[0]
+
+    def __add_action_attribute(self, cell, cell_position):
+        if (len(cell) == 0 or cell == 'N/A'):
+            return
+        cell = self.__remove_unneccessary_text(cell)
+        try:
+            date = datetime.datetime.strptime(cell, '%B %d, %Y')
+        except Exception:
+            date = datetime.datetime.strptime(cell, '%b. %d, %Y')
+        date = date.strftime('%Y-%m-%d')
+        description = self.__match_cell_position_to_action(cell_position)
+        action_by = self.__get_action_by(description)
+        return {'date' : date, 'action_by' : action_by, 'description' : description}
+
+    def __remove_unneccessary_text(self, cell):
+        cell = cell.replace('\n', '')
+        cell = cell.replace('RV', '').strip()
+        cell_dates = re.findall(r'[A-Za-z]{3}\. [0-9]{1,2}, [0-9]{4}', cell)
+        if len(cell_dates) >= 1:
+            return cell_dates[-1]
+
+        cell_dates = re.findall(r'[A-Za-z]{3,12} [0-9]{1,2}, [0-9]{4}', cell)
+        if len(cell_dates) >= 1:
+            return cell_dates[-1]
+
+    def __match_cell_position_to_action(self, position):
+        if position == 0:
+            return 'Assent'
+        if position == 1:
+            return 'Third Reading'
+        if position == 2:
+            return 'Reported From C of W'
+        if position == 3:
+            return 'Amendment'
+        if position == 4:
+            return 'To Standing Committee'
+        if position == 5:
+            return 'Second Reading'
+        if position == 6:
+            return 'First Reading'
+        if position == 7:
+            return 'Notice'
+
+    def __get_action_by(self, action_description):
+        if action_description == 'Assent':
+            return 'Commissioner'
+        if 'Committee' in action_description:
+            return 'Committee'
+        return 'Legislative Assembly'
 
 Main_Functions().set_main_page_soup_global(BILLS_URL)
 Bill_Main_Page_Scraper().set_current_session_global()
