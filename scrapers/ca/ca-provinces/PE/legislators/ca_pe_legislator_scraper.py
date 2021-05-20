@@ -145,18 +145,31 @@ def get_riding(bio_container, row):
 def get_phone_number(bio_container, row):
     phone_numbers = []
 
-    phone_detail = bio_container.findAll('dd', {'class': 'numbers'})
-    try:
-        office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[0].text)[0]
-        phone = {'office': 'Constituency office', 'number': office_phone}
+    phone_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
+
+    if "To contact" in phone_detail.text:
+        try:
+            location_one = phone_detail.findAll('p')[0].text
+            location_one = location_one[location_one.index("Minister"): location_one.index(":")]
+            location_two = "MLA Office"
+        except Exception:
+            pass
+        try:
+            office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[0]
+            phone = {'office': location_one, 'number': office_phone}
+            phone_numbers.append(phone)
+        except Exception:
+            pass
+        try:
+            business_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[2]
+            phone_numbers.append({'office': location_two, 'number': business_phone})
+        except Exception:
+            pass
+    else:
+        office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[0]
+        phone = {'office': "office", 'number': office_phone}
         phone_numbers.append(phone)
-    except Exception:
-        pass
-    try:
-        business_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[1].text)[0]
-        phone_numbers.append({'office': 'Business', 'number': business_phone})
-    except Exception:
-        pass
+
     row.phone_numbers = phone_numbers
 
 
@@ -178,34 +191,45 @@ def get_addresses(bio_container, row):
     addresses.append(c_address)
     addresses.append(b_address)
 
+    print(addresses)
     row.addresses = addresses
 
 
 def get_email(bio_container, row):
-    contact_detail = bio_container.find('dd', {'class': 'numbers'})
+    contact_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     email = contact_detail.find('a').get('href')
     email = email.split('mailto:')[1]
-    row.email = email
+    if "assembly" in email:
+        row.email = email
 
 
 def get_years_active(bio_container, row):
-    time_periods = bio_container.findAll('td', {'class': 'views-field-field-time-period'})
+    table = bio_container.find('div', {'class': 'view-member-history-table'})
+    table_body = table.find('tbody')
     years_active = []
+    table_rows = table_body.findAll('tr')
+    for tr in table_rows:
+        print(tr)
 
-    for time_period in time_periods:
-        if ' - ' not in time_period.text:
-            start_year = time_period.text.strip()
-            years = 2021 - int(start_year)
-        else:
-            start_year = time_period.text.split(' - ')[0].strip()
-            end_year = time_period.text.split(' - ')[1].strip()
-            years = int(end_year) - int(start_year)
-        year_counter = int(start_year)
-        for i in range(0, years + 1):
-            years_active.append(year_counter)
-            year_counter += 1
-    years_active.sort()
-    row.years_active = years_active
+        # start_date = tr.findAll('td')[2].text
+        # end_date = tr.findAll('td')[3].text
+        # print(start_date)
+        # print(end_date)
+
+    # for time_period in time_periods:
+    #     if ' - ' not in time_period.text:
+    #         start_year = time_period.text.strip()
+    #         years = 2021 - int(start_year)
+    #     else:
+    #         start_year = time_period.text.split(' - ')[0].strip()
+    #         end_year = time_period.text.split(' - ')[1].strip()
+    #         years = int(end_year) - int(start_year)
+    #     year_counter = int(start_year)
+    #     for i in range(0, years + 1):
+    #         years_active.append(year_counter)
+    #         year_counter += 1
+    # years_active.sort()
+    # row.years_active = years_active
 
 
 def get_committees(bio_container, row):
@@ -259,10 +283,10 @@ def scrape(url):
     get_party(bio_container, row)
     get_name(bio_container, row)
     get_riding(bio_container, row)
-    # get_phone_number(bio_container, row)
-    # get_addresses(bio_container, row)
-    # get_email(bio_container, row)
-    # get_years_active(bio_container, row)
+    get_phone_number(bio_container, row)
+    #get_addresses(bio_container, row)
+    get_email(bio_container, row)
+    get_years_active(bio_container, row)
     # get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
@@ -293,31 +317,31 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="occupation")
-    # dropping rows with vacant seat
-    vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
-    for index in vacant_index:
-        leg_df = leg_df.drop(index)
-
-    # getting urls from wikipedia
-    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    # leg_df = leg_df.drop(columns="birthday")
+    # leg_df = leg_df.drop(columns="education")
+    # leg_df = leg_df.drop(columns="occupation")
+    # # dropping rows with vacant seat
+    # vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
+    # for index in vacant_index:
+    #     leg_df = leg_df.drop(index)
+    #
+    # # getting urls from wikipedia
+    # wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
+    # mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_first", "name_last"])
+    #
+    # isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    # big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
 
     print('Scraping complete')
 
