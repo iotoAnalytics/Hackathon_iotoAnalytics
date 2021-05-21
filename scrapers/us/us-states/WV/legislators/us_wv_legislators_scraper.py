@@ -15,6 +15,7 @@ from tqdm import tqdm
 import datetime
 
 BASE_URL = 'https://www.wvlegislature.gov'
+HOUSE_PATH = '/House'
 WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
@@ -45,19 +46,21 @@ def get_urls():
     return urls
 
 def scrape(url):
-    senate_roster_path = '/Senate1/roster.cfm'
-    senate_roster_url = BASE_URL + senate_roster_path
-
-    soup = _create_soup(senate_roster_url, SOUP_PARSER_TYPE)
+    soup = _create_soup(url, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
     row = scraper_utils.initialize_row()
 
     # TODO - source_id
-    _set_source_id(row, soup)
+    
+    # most_recent_term_id
+    _set_most_recent_term_id(row, soup)
 
-    # TODO - most_recent_term_id
-    # TODO - source_url
+    # source_url
+    _set_source_url(row, url)
+
     # TODO - name (full, last, first, middle, suffix)
+    _set_name(row, soup)
+    
     # TODO - party_id
     # TODO - party
     # TODO - role
@@ -71,8 +74,8 @@ def scrape(url):
     # TODO - occupation
     # TODO - education
     # TODO - military_experience
-
-    _set_source_id(row, soup)
+    # TODO - areas_served
+    # TODO - district
 
     return row
 
@@ -82,8 +85,23 @@ def _create_soup(url, soup_parser_type):
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
 
-def _set_source_id(row, soup):
-    pass
+def _set_most_recent_term_id(row, soup):
+    most_recent_term_id_str = soup.find('table', {'class': 'tabborder'}).find('tr').find('h1').text
+    most_recent_term_id = re.search('[0-9]+', most_recent_term_id).group(0)
+    row.most_recent_term_id = most_recent_term_id
+
+def _set_source_url(row, url):
+    row.source_url = url
+
+# def _set_name(row, soup):
+#     soup.find('div', {'id': 'wrapleftcolr'}).find('hr')
+#     human_name = HumanName(name)
+
+#     row.name_first = human_name.first
+#     row.name_last = human_name.last
+#     row.name_middle = human_name.middle
+#     row.name_suffix = human_name.suffix
+#     row.name_full = human_name.full_name
 
 def _get_legislator_row(data, name_full, district):
     for row in data:
@@ -95,5 +113,8 @@ def _get_legislator_row(data, name_full, district):
 def main():
     urls = get_urls()
 
+    # data = [scrape(url) for url in urls[0:1]]
+    data = scrape('https://www.wvlegislature.gov/House/lawmaker.cfm?member=Delegate%20Anderson')
+    
 if __name__ == '__main__':
     main()
