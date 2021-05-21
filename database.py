@@ -225,9 +225,6 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                for v in row:
-                    print(v, type(v))
-
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -598,38 +595,42 @@ class Persistence:
                 if isinstance(item, dict):
                     item = utils.DotDict(item)
 
-                tup = (
-                    item.source_id,
-                    item.most_recent_term_id,
-                    date_collected,
-                    item.source_url,
-                    item.name_full,
-                    item.name_last,
-                    item.name_first,
-                    item.name_middle,
-                    item.name_suffix,
-                    item.country_id,
-                    item.country,
-                    item.province_territory_id,
-                    item.province_territory,
-                    item.party_id,
-                    item.party,
-                    item.role,
-                    item.riding,
-                    item.years_active,
-                    json.dumps(item.committees, default=utils.json_serial),
-                    json.dumps(item.phone_numbers, default=utils.json_serial),
-                    json.dumps(item.addresses, default=utils.json_serial),
-                    item.email,
-                    item.birthday,
-                    item.seniority,
-                    item.occupation,
-                    json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience,
-                    item.region
-                )
+                try:
+                    tup = (
+                        item.source_id,
+                        item.most_recent_term_id,
+                        date_collected,
+                        item.source_url,
+                        item.name_full,
+                        item.name_last,
+                        item.name_first,
+                        item.name_middle,
+                        item.name_suffix,
+                        item.country_id,
+                        item.country,
+                        item.province_territory_id,
+                        item.province_territory,
+                        item.party_id,
+                        item.party,
+                        item.role,
+                        item.riding,
+                        item.years_active,
+                        json.dumps(item.committees, default=utils.json_serial),
+                        json.dumps(item.phone_numbers, default=utils.json_serial),
+                        json.dumps(item.addresses, default=utils.json_serial),
+                        item.email,
+                        item.birthday,
+                        item.seniority,
+                        item.occupation,
+                        json.dumps(item.education, default=utils.json_serial),
+                        item.military_experience,
+                        item.region
+                    )
 
-                cur.execute(insert_legislator_query, tup)
+                    cur.execute(insert_legislator_query, tup)
+                except Exception:
+                    print(f'Exception occurred inserting the following data:\n{tup}')
+
 
     @staticmethod
     def write_ca_fed_legislation(data, table):
