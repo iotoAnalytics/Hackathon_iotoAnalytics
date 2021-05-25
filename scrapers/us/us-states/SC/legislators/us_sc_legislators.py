@@ -27,7 +27,7 @@ wiki_link = 'https://en.wikipedia.org/wiki/South_Carolina_General_Assembly'
 base_wiki = 'https://en.wikipedia.org/'
 
 state_abbreviation = 'SC'
-database_table_name = 'us_sc_legislators_test'
+database_table_name = 'us_sc_legislators'
 
 #Put most recent year here
 present = 2021
