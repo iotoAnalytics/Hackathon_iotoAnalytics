@@ -74,14 +74,13 @@ def find_mla_wiki(mlalink):
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
     people = tables[1].findAll("tr")
-    for person in people[1:]:
+    for person in people[0:]:
         info = person.findAll("td")
         try:
-            biolink = "https://en.wikipedia.org" + (info[2].a["href"])
+            biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_links.append(biolink)
         except Exception:
             pass
-    print(bio_links)
     scraper_utils.crawl_delay(crawl_delay)
     return bio_links
 
@@ -103,6 +102,8 @@ def get_party(bio_container, row):
 
 def get_name(bio_container, row):
     name_full = bio_container.find('span', {'class': 'field--name-title'}).text
+    if "," in name_full:
+        name_full = name_full.split(',')[0]
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -153,26 +154,38 @@ def get_addresses(bio_container, row):
     contact = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     address_details = contact.findAll('p')
     for address in address_details:
-        if "Office" in address.text:
-            address = address.text.split(':')[1]
-        elif "Mailing" in address.text:
-            address = address.text.split(':')[1]
-        try:
-            address = address.replace('\n', ' ')
-            address = address.replace('\xa0', '')
-            addresses.append(address)
-        except Exception:
-            pass
+        if "Office" or "Mailing" in address.text:
+            if "Office" in address.text:
+                location = "Office"
+            if "Mailing" in address.text:
+                location = "mailing address"
 
+            address = address.text.split(':')[1].strip()
+            try:
+                address = address.replace('\n', ' ')
+                address = address.replace('\xa0', '')
+                #address = ','.join(address)
+            except Exception:
+                pass
+            if "Phone" not in address:
+                try:
+                    office_address = {"location": location, "address": address}
+                    addresses.append(office_address)
+                except Exception:
+                    pass
     row.addresses = addresses
 
 
 def get_email(bio_container, row):
     contact_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
-    email = contact_detail.find('a').get('href')
-    email = email.split('mailto:')[1]
-    if "assembly" in email:
-        row.email = email
+    emails = contact_detail.findAll('a')
+    for email in emails:
+        email = email.get('href')
+        email = email.split('mailto:')[1]
+        if "assembly" in email:
+            row.email = email
+        if "premier" in email:
+            row.email = email
 
 
 def get_most_recent_term_id(years_active, row):
@@ -253,14 +266,14 @@ def scrape(url):
 
     bio_container = soup.find('section', {'class': 'section'})
 
-    # get_party(bio_container, row)
-    # get_name(bio_container, row)
-    # get_riding(bio_container, row)
-    # get_phone_number(bio_container, row)
-    # get_addresses(bio_container, row)
-    # get_email(bio_container, row)
-    # get_years_active(bio_container, row)
-    # get_committees(bio_container, row)
+    get_party(bio_container, row)
+    get_name(bio_container, row)
+    get_riding(bio_container, row)
+    get_phone_number(bio_container, row)
+    get_addresses(bio_container, row)
+    get_email(bio_container, row)
+    get_years_active(bio_container, row)
+    get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
@@ -297,14 +310,13 @@ if __name__ == '__main__':
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+    mla_wikis = find_mla_wiki(wiki_general_assembly_link)
 
     with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
     wiki_df = pd.DataFrame(wiki_data)[
         ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
 
-    print(wiki_df)
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
 
@@ -319,6 +331,6 @@ if __name__ == '__main__':
     big_list_of_dicts = big_df.to_dict('records')
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
