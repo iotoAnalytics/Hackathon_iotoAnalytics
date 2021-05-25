@@ -94,7 +94,7 @@ def scrape(url):
         _set_principal_sponsor(row, bill_text_list)
 
         # bill_text
-        # _set_bill_text(row, bill_text_list)
+        _set_bill_text(row, bill_text_list)
 
         # bill_summary
         _set_bill_summary(row, bill_text_list)
@@ -307,7 +307,9 @@ def main():
 
     # Scrape urls
     print(DEBUG_MODE and 'Begin scraping each urls...\n' or '', end='')
-    data = [scrape(url) for url in urls]
+    data = []
+    for url in urls:
+        data.extend(scrape(url))
 
     # Write to database
     if not DEBUG_MODE:
