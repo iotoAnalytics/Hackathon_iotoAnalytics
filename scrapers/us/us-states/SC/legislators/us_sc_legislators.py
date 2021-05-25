@@ -6,6 +6,7 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
+sys.setrecursionlimit(5000)
 
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
@@ -27,6 +28,9 @@ base_wiki = 'https://en.wikipedia.org/'
 
 state_abbreviation = 'SC'
 database_table_name = 'us_sc_legislators'
+
+#Put most recent year here
+present = 2021
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
@@ -54,6 +58,26 @@ def match_wiki_link(wiki_url, dict_item_list):
                     print(f'done finding wiki link for {hn.first}')
     scraper_utils.crawl_delay(crawl_delay)
     return dict_item_list
+
+
+def edit_years_range(years_range_lst):
+    first = years_range_lst[0].strip()
+    if ',' in first:
+        first = first.split(',')[1]
+    elif ' ' in first:
+        first = first.split(' ')[1]
+    first = int(first.strip())
+    if years_range_lst[1].strip() == 'Present':
+        years_active = list(range(first, present)) + [present]
+    else:
+        last = years_range_lst[1].strip()
+        if ',' in last:
+            last = last.split(',')[1]
+        elif ' ' in last:
+            last = last.split(' ')[1]
+        last = int(last.strip())
+        years_active = list(range(first, last)) + [last]
+    return years_active
 
 
 def get_legislator_links(url):
@@ -132,10 +156,11 @@ def scrape_info(dict_item):
             }]
     row.phone_numbers = phone
 
+    table_html = url_soup.find('table', {'style': 'margin: 0 10px 10px 10px; padding: 0; width: 100%;'}).find_all(
+        'td', {'width': '50%', 'valign': 'top'})[1]
+
     coms_lst = []
-    coms_html = url_soup.find('table', {'style': 'margin: 0 10px 10px 10px; padding: 0; width: 100%;'}).find_all('td', {
-        'width': '50%', 'valign': 'top'
-    })[1].find('ul').find_all('li')
+    coms_html = table_html.find('ul').find_all('li')
     for item in coms_html:
         coms = item.text.split(',')
         if len(coms) > 1 and coms[0] != 'Fish':
@@ -154,6 +179,20 @@ def scrape_info(dict_item):
                 'committee': coms[0]
             })
     row.committees = coms_lst
+
+    try:
+        service_html = table_html.find_all('ul')[-1].find_all('li')
+        years_active = []
+        for row in service_html:
+            text = row.text
+            if 'Senate' in text or 'Representative' in text:
+                years_active += edit_years_range(text.split(',', 1)[1].split('-'))
+        years_active = sorted(list(dict.fromkeys(years_active)))
+        row.years_active = years_active
+
+        row.most_recent_term_id = years_active[-1]
+    except IndexError:
+        pass
 
     # for scraping wikipedia, need to check if wiki_link is a valid key in the dictionary
     if wiki_link in dict_item:
@@ -178,13 +217,13 @@ if __name__ == '__main__':
     # much, so splitting the scraping process into 2 with a resting time in the middle seemed to help
     data = []
     with Pool(processes=5) as pool:
-        data += pool.map(scrape_info, legis_dicts[:len(legis_dicts)//2])
+        data += pool.map(scrape_info, legis_dicts[:len(legis_dicts) // 2])
 
     time.sleep(3)
     print('resting...')
 
     with Pool(processes=5) as pool:
-        data += pool.map(scrape_info, legis_dicts[len(legis_dicts)//2:])
+        data += pool.map(scrape_info, legis_dicts[len(legis_dicts) // 2:])
 
     scraper_utils.write_data(data)
     print('Complete!')
