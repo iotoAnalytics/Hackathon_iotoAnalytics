@@ -290,7 +290,7 @@ def get_committees(main_div, row):
         rows = committee_leadership.find_all('tr')
         for r in rows:
             row_details = r.find_all('td')
-            role = row_details[0].text
+            role = row_details[0].text.strip()
             committee = row_details[1].text
             committee = committee[:committee.index(" -")].replace('\n', '')
             committee_detail = {"role": role, "committee": committee}
@@ -446,7 +446,6 @@ if __name__ == '__main__':
     print('Scraping complete')
 
     big_list_of_dicts = final_df.to_dict('records')
-
 
     print('Writing data to database...')
 
