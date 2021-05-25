@@ -23,6 +23,8 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
+print(os.path.dirname(os.path.realpath(__file__)))
+
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 from multiprocessing.dummy import Pool

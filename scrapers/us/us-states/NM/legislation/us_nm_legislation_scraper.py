@@ -1,3 +1,4 @@
+from selenium.common.exceptions import NoSuchElementException
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
@@ -14,6 +15,9 @@ from tqdm import tqdm
 import pandas as pd
 from datetime import datetime
 import tabula
+import requests
+import io
+from tika import parser
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -29,13 +33,20 @@ base_url = 'https://www.nmlegis.gov/Legislation/Legislation_List'
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
-def open_driver():
+def open_driver(url):
+    """
+    Opens webdriver and returns driver object.
+
+    :param url: URL of page to scrape
+    :return: driver object
+    """
+
     options = Options()
-    options.headless = True
-    driver = webdriver.Chrome(
-        executable_path='H:\Projects\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe',
-        options=options)
-    driver.get(base_url)
+    options.headless = False
+    driver = webdriver.Chrome(executable_path=os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24',
+                                                           'chromedriver.exe'), options=options)
+    driver.get(url)
+    scraper_utils.crawl_delay(crawl_delay)
     driver.maximize_window()
     return driver
 
@@ -63,7 +74,7 @@ def get_urls():
     """
 
     urls = []
-    driver = open_driver()
+    driver = open_driver(base_url)
     button = driver.find_element_by_id('MainContent_btnSearch')
     button.click()
     table = driver.find_element_by_css_selector('#MainContent_gridViewLegislation > tbody').find_elements_by_tag_name(
@@ -112,7 +123,7 @@ def get_bill_name(url, row):
     soup = make_soup(url)
     header = soup.find('span', {'id': 'MainContent_formViewLegislationTitle_lblBillID'}).text
     session = soup.find('span', {'id': 'MainContent_formViewLegislationTitle_lblSession'}).text.split()[1][0]
-    bill_name = header.replace(' ', '')
+    bill_name = header.replace(' ', '').replace('*', '')
     row.bill_name = f'{bill_name}{session}'
 
 
@@ -191,8 +202,9 @@ def get_bill_actions(url, row):
     """
     bill_actions = []
 
-    driver = open_driver()
-    driver.get(url)
+    driver = open_driver(url)
+    # driver.get(url)
+    scraper_utils.crawl_delay(crawl_delay)
     button = driver.find_element_by_css_selector('#MainContent_tabContainerLegislation_tabPanelActions_tab')
     button.click()
     table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelActions_dataListActions')
@@ -249,8 +261,9 @@ def get_bill_votes(url, row):
     :param row: legislation row
     """
 
-    driver = open_driver()
-    driver.get(url)
+    driver = open_driver(url)
+    # driver.get(url)
+    # scraper_utils.crawl_delay(crawl_delay)
     vote_button = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_lblVotes')
     vote_button.click()
     vote_table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_dataListVotes')
@@ -310,18 +323,192 @@ def get_bill_votes(url, row):
     driver.quit()
 
 
+def get_date_introduced(url, row):
+    """
+    Gets the date the bill was introduced.
+
+    :param url: legislation url
+    :param row: legislation row
+    """
+
+    soup = make_soup(url)
+    try:
+        date_intro = soup.find('span', {'id': 'id="MainContent_formViewLegislationTextIntroduced_lblDateRead"'}).text
+        row.date_introduced = date_intro
+    except AttributeError:
+        date_intro = soup.find('span', {'id': 'MainContent_formViewLegislationTextIntroduced_lblDateReadHTML'}).text
+        row.date_introduced = date_intro
+
+
+def get_bill_type(url, row):
+    """
+    Gets the bill type from bill name.
+
+    :param url: legislation url
+    :param row: legislation row
+    """
+
+    bill_type = []
+    abbreviations = {'H': 'House',
+                     'S': 'Senate',
+                     'B': 'Bill',
+                     'M': 'Memorial',
+                     'J': 'Joint',
+                     'R': 'Resolution'}
+
+    soup = make_soup(url)
+    bill_name = soup.find('span', {'id': 'MainContent_formViewLegislation_lblBillID'}).text.split()[0].replace('*', '')
+    letters = list(bill_name)
+    for letter in letters:
+        translation = abbreviations.get(letter)
+        bill_type.append(translation)
+
+    try:
+        row.bill_type = " ".join(bill_type)
+    except TypeError:
+        pass
+
+
+def get_committees(url, row):
+    """
+    Gets the committees from bill actions.
+
+    :param url: legislation url
+    :param row: legislation row
+    """
+
+    committees_abbreviations = {'HAFC': 'House Appropriations & Finance',
+                                'HAGC': 'House Agriculture & Water Resources Committee',
+                                'HAWC': 'House Agriculture, Water & Wildlife Committee',
+                                'HBEC': 'House Business & Employment Committee',
+                                'HBIC': 'House Business & Industry Committee',
+                                'HCEDC': 'House Commerce & Economic Development Committee',
+                                'HCPAC': 'House Consumer & Public Affairs Committee',
+                                'HCW': 'House Committee of the Whole',
+                                'HE & EC': 'House Enrolling & Engrossing Committee',
+                                'HEC': 'House Education Committee',
+                                'HEEC': 'House Enrolling & Engrossing Committee',
+                                'HEENC': 'House Energy, Environment & Natural Resources(former) Committee',
+                                'HENRC': 'House Energy, Environment & Natural Resources Committee',
+                                'HGEIC': 'House Government, Elections & Indian Affairs Committee',
+                                'HGUAC': 'House Government & Urban Affairs Committee',
+                                'HHC': 'House Health Committee',
+                                'HHGAC': 'House Health & Government Affairs Committee',
+                                'HHGIC': 'House Health, Government & Indian Affairs Committee',
+                                'HHHC': 'House Health & Human Services Committee',
+                                'HJC': 'House Judiciary Committee',
+                                'HLC': 'House Labor & Human Resources Committee',
+                                'HLEDC': 'HOUSE LABOR & ECONOMIC DEVELOPMENT Committee',
+                                'HLELC': 'HOUSE LOCAL GOVERNMENT, ELECTIONS, LAND GRANTS & CULTURAL AFFAIRS Committee',
+                                'HLLC': 'House LOCAL GOVERNMENT, LAND GRANTS & CULTURAL AFFAIRS Committee',
+                                'HLVMC': 'House LABOR, VETERANS AND MILITARY AFFAIRS COMMITTEE',
+                                'HPSC': 'House Printing & Supplies Committee',
+                                'HRC': 'House Rules & Order of Business Committee',
+                                'HRPAC': 'House Regulatory & Public Affairs Committee',
+                                'HSCAC': 'House Safety & Civil Affairs Committee',
+                                'HSEIC': 'House STATE GOVERNMENT, ELECTIONS & INDIAN AFFAIRS COMMITTEE',
+                                'HSIVC': "HOUSE STATE GOVERNMENT, INDIAN & VETERANS' AFFAIRS Committee",
+                                'HTC': 'House Transportation Committee',
+                                'HTPWC': 'House Transportation & Public Works Committee',
+                                'HTRC': 'House Taxation & Revenue Committee',
+                                'HVEC': 'House Voters & Elections Committee',
+                                'HWMC': 'House Ways & Means Committee',
+                                'HXPSC': 'House Printing & Supplies Committee',
+                                'HXRC': 'HOUSE RULES & ORDER OF BUSINESS Committee',
+                                'SEC': 'Senate Education Committee',
+                                'SFC': 'Senate Finance Committee',
+                                'SGC': 'Senate Select Gaming Committee',
+                                'SIRC': 'Senate Indian, Rural and Cultural Affairs',
+                                'SJC': 'Senate Judiciary Committee',
+                                'SPAC': 'Senate Public Affairs Committee',
+                                'SRC': 'Senate Rules Committee',
+                                'STBTC': 'Senate Tax, Business and Transportation Committee',
+                                'SWMC': 'Senate Ways & Means Committee'}
+    committees = []
+    driver = open_driver(url)
+    # driver.get(url)
+    # scraper_utils.crawl_delay(crawl_delay)
+    button = driver.find_element_by_css_selector('#MainContent_tabContainerLegislation_tabPanelActions_tab')
+    button.click()
+    table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelActions_dataListActions')
+
+    actions = table.find_elements_by_tag_name('span')
+    for action in actions:
+        action_text = action.text.split('\n')[-1]
+        for word in action_text.split():
+            if word.isupper():
+                translate = committees_abbreviations.get(word)
+                if translate:
+                    committees.append({'chamber': 'Senate' if word[0] == 'S' else 'House', 'committee': translate.title()})
+
+    row.committees = committees
+
+
+def get_bill_text(url, row):
+    """
+    Gets bill text from latest available HTML or PDF.
+
+    :param url: legislation url
+    :param row: legislation row
+    """
+
+    try:
+        driver = open_driver(url)
+        final_version = driver.find_element_by_id('MainContent_formViewLegislationTextFinal_linkPDF')
+        final_version.click()
+        driver.switch_to.window(driver.window_handles[1])
+        response = requests.get(driver.current_url)
+        byte = io.BytesIO(response.content)
+        parsed = parser.from_file(driver.current_url)
+        bill_text = parsed['content'].replace('\n', '').replace('=', '')\
+            .replace('12345678910111213141516171819202122232425', '')\
+            .replace('1  2  3  4  5  6  7  8  9  10  11  12  13  14 15  16  17  18  19  20  21  22  23  24  25', '')
+        row.bill_text = bill_text
+        driver.quit()
+    except NoSuchElementException:
+        page = scraper_utils.request(url)
+        soup = BeautifulSoup(page.content, 'html.parser', from_encoding='utf-8')
+        scraper_utils.crawl_delay(crawl_delay)
+        introduced = soup.find('a', {'id': 'MainContent_formViewLegislationTextIntroduced_linkLegislationTextIntroducedHTML'})
+        link = introduced.get('href')
+        html_page = make_soup('https://www.nmlegis.gov/' + link)
+        bill_text = html_page.get_text(strip=True).replace('\r', '').replace('\n', ' ')
+        row.bill_text = bill_text
+
+
+def get_current_status(url, row):
+    """
+    Gets the current status from bill actions.
+
+    :param url: legislation url
+    :param row: legislation row
+    """
+
+    driver = open_driver(url)
+    button = driver.find_element_by_css_selector('#MainContent_tabContainerLegislation_tabPanelActions_tab')
+    button.click()
+    table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelActions_dataListActions')
+    current_status = table.find_elements_by_tag_name('span')[-1].text
+    row.current_status = current_status
+
+
 def scrape(url):
     row = scraper_utils.initialize_row()
     row.source_url = url
 
     get_goverlytics_id(url, row)
     get_bill_title(url, row)
-    get_bill_name(url, row)
     get_bill_sponsor_info(url, row)
     get_session(url, row)
     get_bill_actions(url, row)
     get_bill_votes(url, row)
-
+    get_bill_name(url, row)
+    get_date_introduced(url, row)
+    get_bill_type(url, row)
+    get_committees(url, row)
+    get_current_status(url, row)
+    get_bill_text(url, row)
+    pprint(url)
     return row
 
 
@@ -329,10 +516,10 @@ def main():
     urls = get_urls()
 
     # tabula doesn't work with pool
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
 
-    data = [scrape(url) for url in urls]
+    # data = [scrape(url) for url in urls]
     scraper_utils.write_data(data, 'us_nm_legislation')
 
 
