@@ -510,7 +510,6 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
-    # urls = urls[:5]
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
