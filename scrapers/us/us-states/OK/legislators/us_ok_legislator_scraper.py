@@ -6,11 +6,12 @@ def main():
     print('We know we belong to the land ♫ ♫ ♫')
     print('And the land we belong to is grand! ♫ ♫ ♫\n')
 
+    print('\nSCRAPING OKLAHOMA LEGISLATORS\n')
+
     senate_scraper.scrape_senate_legislators()
     house_scraper.scrape_house_legislators()
 
-    print('\nCOMPLETE!')
-
+    print('\nCOMPLETE!\n')
 
 if __name__ == '__main__':
     main()

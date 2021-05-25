@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.options import Options
 
 '''
 Change the current legislature to the most recent
-This scraper will not work if the current session isn't populated with 4~5 bills
+This scraper will not work if the current session isn't populated with 4 bills
     for government and non-government bills
 '''
 CURRENT_LEGISLATURE = 35
@@ -183,10 +183,8 @@ class SessionScraper:
         return "Bill-" + bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Name.value].text
     
     def __get_goveryltics_id(self, data_row):
-        prov = PROV_TERR_ABBREVIATION
-        session = data_row.session.split('-')[1]
         bill_name = data_row.bill_name.replace('-', '').upper()
-        return prov + '_' + session + '_' + bill_name
+        return PROV_TERR_ABBREVIATION + '_' + data_row.session + '_' + bill_name
 
     def __get_date(self, bill_row):
         first_reading = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.First_Reading.value].text
@@ -234,7 +232,7 @@ class SessionScraper:
             return
         cell = self.__remove_unneccessary_text(cell)
         date = datetime.datetime.strptime(cell, '%B %d, %Y')
-        date = date.strftime('%Y-%b-%d')
+        date = date.strftime('%Y-%m-%d')
         description = self.__match_cell_position_to_action(cell_position)
         action_by = self.__get_action_by(description)
         return {'date' : date, 'action_by' : action_by, 'description' : description}

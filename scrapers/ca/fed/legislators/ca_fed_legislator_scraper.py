@@ -37,6 +37,7 @@ import xml.etree.ElementTree as ET
 import traceback
 from tqdm import tqdm
 
+
 scraper_utils = CAFedLegislatorScraperUtils()
 
 
@@ -86,7 +87,7 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:5]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:3]:
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')

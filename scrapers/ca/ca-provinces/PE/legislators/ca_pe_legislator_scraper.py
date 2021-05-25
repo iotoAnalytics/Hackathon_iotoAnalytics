@@ -29,13 +29,13 @@ import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 
-prov_abbreviation = 'NS'
-database_table_name = 'ca_ns_legislators'
+prov_abbreviation = 'PE'
+database_table_name = 'ca_pe_legislators'
 
 scraper_utils = CAProvTerrLegislatorScraperUtils(
     prov_abbreviation, database_table_name)
 
-base_url = 'https://nslegislature.ca'
+base_url = 'https://www.assembly.pe.ca'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
@@ -47,21 +47,20 @@ def get_urls():
     urls = []
 
     # Logic goes here! Url we are scraping: https://nslegislature.ca/members/profiles
-    path = '/members/profiles'
+    path = '/members'
     scrape_url = base_url + path
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    members_view = soup.find('div', {'class': 'view-content'})
+    members_list = soup.find_all('span', {'class': 'member-title'})
 
     # We'll collect only the first 10 to keep things simple. Need to skip first record
-    for tr in members_view.findAll('a'):
-        a = tr
-        urls.append(base_url + a['href'])
+    for member in members_list:
+        a = member.find('a').get('href')
+        urls.append(base_url + a)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
-
     return urls
 
 
@@ -113,8 +112,8 @@ def get_most_recent_term_id(row):
 
 
 def get_party(bio_container, row):
+    party = bio_container.find('div', {'class': 'views-field-field-member-pol-affiliation'}).text.strip()
     try:
-        party = bio_container.find('span', {'class': 'party-name'}).text
 
         if party == 'PC':
             party = 'Progressive Conservative'
@@ -128,7 +127,7 @@ def get_party(bio_container, row):
 
 
 def get_name(bio_container, row):
-    name_full = bio_container.find('div', {'class': 'views-field-field-last-name'}).text
+    name_full = bio_container.find('span', {'class': 'field--name-title'}).text
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -139,26 +138,38 @@ def get_name(bio_container, row):
 
 
 def get_riding(bio_container, row):
-    riding = bio_container.find('td', {'class': 'views-field-field-constituency'}).text.strip()
-    riding = riding.replace('\n', '')
+    riding = bio_container.find('div', {'class': 'views-field-field-member-constituency'}).text.strip()
     row.riding = riding
 
 
 def get_phone_number(bio_container, row):
     phone_numbers = []
 
-    phone_detail = bio_container.findAll('dd', {'class': 'numbers'})
-    try:
-        office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[0].text)[0]
-        phone = {'office': 'Constituency office', 'number': office_phone}
+    phone_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
+
+    if "To contact" in phone_detail.text:
+        try:
+            location_one = phone_detail.findAll('p')[0].text
+            location_one = location_one[location_one.index("Minister"): location_one.index(":")]
+            location_two = "MLA Office"
+        except Exception:
+            pass
+        try:
+            office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[0]
+            phone = {'office': location_one, 'number': office_phone}
+            phone_numbers.append(phone)
+        except Exception:
+            pass
+        try:
+            business_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[2]
+            phone_numbers.append({'office': location_two, 'number': business_phone})
+        except Exception:
+            pass
+    else:
+        office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail.text)[0]
+        phone = {'office': "office", 'number': office_phone}
         phone_numbers.append(phone)
-    except Exception:
-        pass
-    try:
-        business_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[1].text)[0]
-        phone_numbers.append({'office': 'Business', 'number': business_phone})
-    except Exception:
-        pass
+
     row.phone_numbers = phone_numbers
 
 
@@ -180,34 +191,45 @@ def get_addresses(bio_container, row):
     addresses.append(c_address)
     addresses.append(b_address)
 
+    print(addresses)
     row.addresses = addresses
 
 
 def get_email(bio_container, row):
-    contact_detail = bio_container.find('dd', {'class': 'numbers'})
+    contact_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     email = contact_detail.find('a').get('href')
     email = email.split('mailto:')[1]
-    row.email = email
+    if "assembly" in email:
+        row.email = email
 
 
 def get_years_active(bio_container, row):
-    time_periods = bio_container.findAll('td', {'class': 'views-field-field-time-period'})
+    table = bio_container.find('div', {'class': 'view-member-history-table'})
+    table_body = table.find('tbody')
     years_active = []
+    table_rows = table_body.findAll('tr')
+    for tr in table_rows:
+        print(tr)
 
-    for time_period in time_periods:
-        if ' - ' not in time_period.text:
-            start_year = time_period.text.strip()
-            years = 2021 - int(start_year)
-        else:
-            start_year = time_period.text.split(' - ')[0].strip()
-            end_year = time_period.text.split(' - ')[1].strip()
-            years = int(end_year) - int(start_year)
-        year_counter = int(start_year)
-        for i in range(0, years + 1):
-            years_active.append(year_counter)
-            year_counter += 1
-    years_active.sort()
-    row.years_active = years_active
+        # start_date = tr.findAll('td')[2].text
+        # end_date = tr.findAll('td')[3].text
+        # print(start_date)
+        # print(end_date)
+
+    # for time_period in time_periods:
+    #     if ' - ' not in time_period.text:
+    #         start_year = time_period.text.strip()
+    #         years = 2021 - int(start_year)
+    #     else:
+    #         start_year = time_period.text.split(' - ')[0].strip()
+    #         end_year = time_period.text.split(' - ')[1].strip()
+    #         years = int(end_year) - int(start_year)
+    #     year_counter = int(start_year)
+    #     for i in range(0, years + 1):
+    #         years_active.append(year_counter)
+    #         year_counter += 1
+    # years_active.sort()
+    # row.years_active = years_active
 
 
 def get_committees(bio_container, row):
@@ -255,17 +277,17 @@ def scrape(url):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
-
-    get_most_recent_term_id(row)
+    bio_container = soup.find('section', {'class': 'section'})
+    #
+    # get_most_recent_term_id(row)
     get_party(bio_container, row)
     get_name(bio_container, row)
     get_riding(bio_container, row)
     get_phone_number(bio_container, row)
-    get_addresses(bio_container, row)
+    #get_addresses(bio_container, row)
     get_email(bio_container, row)
     get_years_active(bio_container, row)
-    get_committees(bio_container, row)
+    # get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
@@ -295,38 +317,37 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="occupation")
-    # dropping rows with vacant seat
-    vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
-    for index in vacant_index:
-        leg_df = leg_df.drop(index)
-
-    # getting urls from wikipedia
-    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
-    wiki_mla_link = get_current_general_assembly_link(wiki_general_assembly_link)
-    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_mla_link)
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    # leg_df = leg_df.drop(columns="birthday")
+    # leg_df = leg_df.drop(columns="education")
+    # leg_df = leg_df.drop(columns="occupation")
+    # # dropping rows with vacant seat
+    # vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
+    # for index in vacant_index:
+    #     leg_df = leg_df.drop(index)
+    #
+    # # getting urls from wikipedia
+    # wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
+    # mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_first", "name_last"])
+    #
+    # isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    # big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
 
     print('Scraping complete')
 
     big_list_of_dicts = big_df.to_dict('records')
     print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+    #scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')

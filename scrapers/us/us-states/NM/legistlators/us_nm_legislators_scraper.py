@@ -5,6 +5,7 @@ from nameparser import HumanName
 from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislatorScraperUtils
 from tqdm import tqdm
+import re
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -43,6 +44,7 @@ def get_urls(path):
     urls = []
     scrape_url = base_url + path
     page = scraper_utils.request(scrape_url)
+    scraper_utils.crawl_delay(crawl_delay)
     soup = BeautifulSoup(page.content, 'lxml')
     content_table = soup.find('div', {'class': 'panel-body'})
     links = content_table.find_all('a', {'class': 'thumbnail text-center'})
@@ -50,7 +52,6 @@ def get_urls(path):
     pbar = tqdm(links)
     for link in pbar:
         urls.append(base_url + '/Members/' + link.get('href'))
-        scraper_utils.crawl_delay(crawl_delay)
 
     return urls
 
@@ -241,7 +242,8 @@ def set_addresses(row, soup):
     :param soup: soup object using respective legislator url
     """
 
-    content = soup.find('span', {'id': 'MainContent_formViewLegislator_lblAddress'}).text
+    content = soup.find('span', {'id': 'MainContent_formViewLegislator_lblAddress'}).get_text(separator=', ')
+    content = str(content)
     address = {'address': content, 'location': ''}
 
     if address['address'].strip() != ',':
@@ -258,8 +260,8 @@ def set_email(row, soup):
     """
 
     content = soup.find('a', {'id': 'MainContent_formViewLegislator_linkEmail'}).text
-
-    row.email = content
+    if '@' in content:
+        row.email = content.lower()
 
 
 def set_committees(row, soup):
@@ -290,6 +292,20 @@ def set_committees(row, soup):
     row.committees = all_committees
 
 
+def set_areas_served(row, soup):
+    """
+    Mutate legislator row and sets area served values.
+
+    :param row: row of legislator
+    :param soup: soup object using respective legislator url
+    """
+
+    counties = soup.find('span', {'id': 'MainContent_formViewLegislator_lblCounty'}).text
+    counties_list = re.split(', |&| and |[^a-zA-Z ]+', counties)
+
+    row.areas_served = [county.strip() for county in counties_list]
+
+
 def create_rows(length):
     """
     Create rows for each legislator.
@@ -311,10 +327,11 @@ def scrape_gov_site(all_gov_urls, rows):
     """
 
     pbar = tqdm(range(len(rows)))
-    pbar_test = tqdm(range(15))
 
     for item in pbar:
-        soup = make_soup(all_gov_urls[item])
+        scrape_url = all_gov_urls[item]
+        page = scraper_utils.request(scrape_url)
+        soup = BeautifulSoup(page.content, 'lxml')
         set_source_id(all_gov_urls[item], rows[item])
         set_source_url(all_gov_urls[item], rows[item])
         set_name_info(rows[item], soup)
@@ -326,6 +343,8 @@ def scrape_gov_site(all_gov_urls, rows):
         set_email(rows[item], soup)
         set_addresses(rows[item], soup)
         set_committees(rows[item], soup)
+        set_areas_served(rows[item], soup)
+        print(rows[item])
 
     return sorted(rows, key=lambda row: (row.role, int(row.district)))
 

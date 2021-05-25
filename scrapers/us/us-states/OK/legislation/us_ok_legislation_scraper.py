@@ -1,8 +1,4 @@
-# TODO - check if OK can have multiple sponsors
-# TODO - check for different cases
-    # Senate Bill, Senate Resolution, Senate Concurrent Resolution, House Bill, House Concurrent Resolution, House Resolution
-    # 1R - Regular Session, 2R - 2nd Regular Session, 1S - Special Session
-# TODO - Consider removing ' from lastname (O'Donnell) 
+# Unavailable data - source_id, committees, source_topic
 
 from pathlib import Path
 import os
@@ -11,32 +7,44 @@ import sys
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-# import boto3
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-# import requests
 from multiprocessing import Pool
 from pprint import pprint
-# from database import Database
 from nameparser import HumanName
 import re
 from datetime import datetime
+from tqdm import tqdm
 
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from time import sleep
 
-from us_ok_legislation_utils import OKLegislationUtils, OKLegislationParser
+import pdfplumber
+import requests
+import io
+
+import us_ok_legislation_utils as OKLegislationUtils
+from us_ok_legislation_votes_parser import OKLegislationVotesParser
+
+# These urls shouldn't be in the OK database
+ODDITIES = [
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=SR1&session=2100',
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB9001&session=2100',
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB9999&session=2100',
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB10852&session=2100',
+    'http://www.oklegislature.gov/BillInfo.aspx?Bill=HB9999&session=2100',
+]
 
 BASE_URL = 'http://webserver1.lsb.state.ok.us/WebApplication3/WebForm1.aspx'
 SOUP_PARSER_TYPE = 'lxml'
 
 STATE_ABBREVIATION = 'OK'
-DATABASE_TABLE_NAME = 'us_ok_legislation_test'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators_test'
+DATABASE_TABLE_NAME = 'us_ok_legislation'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 NUM_POOL_THREADS = 10
 CURRENT_YEAR = datetime.now().year
 
@@ -68,8 +76,7 @@ def scrape_regular_session():
     scraper_utils.crawl_delay(crawl_delay)
 
     table = regular_session_soup.find('table').find('tbody')
-    table_rows = table.find_all('tr')[2:]
-    # pprint(table_rows[0])
+    table_rows = table.find_all('tr')[1:]
 
     data = []
 
@@ -90,77 +97,41 @@ def scrape_regular_session():
 
     return data
 
-def get_urls(data):
-    urls = []
-
-    return
-
 def scrape(url):
     soup = _create_soup(url, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
     row = scraper_utils.initialize_row()
 
-    # TODO - source_id
-
-    # bill_name
+    _set_goverlytics_id(row, url)
     _set_bill_name(row, soup)
-
-    # session
-    _set_session(row, url)
-
-    # date_introduced
-    _set_date_introduced(row, soup)
-
-    # source_url (U)
-    _set_source_url(row, url)
-
-    # chamber_origin
-    _set_chamber_origin(row, soup)
-
-    # TODO - committees
-
-    #  bill_type
-    _set_bill_type(row, soup)
-
-    # bill_title (Performed by merge method)
-
-    # current_status (Performed by merge method)
-
-    # principal_sponsor_id & principal_sponsor
-    _set_principal_sponsor(row, soup)
-
-    # sponsors & sponsors_id
-    _set_sponsors(row, soup)
-
-    # cosponsors &cosponsors_id
-    _set_cosponsors(row, soup)
-
-    # TODO - bill_text
-
-    # bill_description
-    _set_bill_description(row, soup)
-
-    # TODO - bill_summary
-
-    # actions (lots of data, uncomment for production)
-    # _set_actions(row, soup)
-
-    # TODO - votes
-    _set_votes(row, soup)
-
-    # TODO - source_topic
     
-    pprint(row)
+    try:
+        _set_session(row, url)
+        _set_date_introduced(row, soup)
+        _set_source_url(row, url)
+        _set_chamber_origin(row, soup)
+        _set_bill_type(row, soup)
+        _set_principal_sponsor(row, soup)
+        _set_sponsors(row, soup)
+        _set_cosponsors(row, soup)
 
-    return row
+        _set_bill_text(row, soup)
+        _set_bill_description(row, soup)
+        _set_bill_summary(row, soup)
+        _set_actions(row, soup)
+        _set_votes(row, soup)
+    except:
+        print(f'Error occurred with {row.bill_name}')
+        pass
+    finally:
+        return row
 
-# Merge data obtained from scrape_regular_session (current status, title)
 def merge_all_scrape_regular_session_data(legislation_data, scrape_regular_session_data):
+    # Merge data obtained from scrape_regular_session (current status, title)
     for data in scrape_regular_session_data:
         source_url = data['url']
         legislation_row = _get_legislation_row(legislation_data, source_url)
         if legislation_row != None:
-            # print(legislation_row)
             _merge_scrape_regular_session_data(legislation_row, data)
 
 def _create_soup(url, soup_parser_type):
@@ -169,14 +140,23 @@ def _create_soup(url, soup_parser_type):
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
 
+def _set_goverlytics_id(row, url):
+    pattern = re.compile('Bill=([A-Za-z0-9]+)\&session=([A-Za-z0-9]+)')
+    bill_name = pattern.search(url).group(1)
+    session_code = pattern.search(url).group(2)
+
+    goverlytics_id = STATE_ABBREVIATION + '_' + session_code + '_' + bill_name
+    row.goverlytics_id = goverlytics_id
+    
 def _set_bill_name(row, soup):
     bill_name = soup.find('a', {'id': 'ctl00_ContentPlaceHolder1_lnkIntroduced'}).text
+    bill_name = bill_name.replace(' ', '')
     row.bill_name = bill_name
 
 def _set_session(row, url):
     pattern = re.compile('session=[A-Za-z0-9]+')
     session_code = pattern.search(url).group(0)
-    session_code = int(session_code.replace('session=', ''))
+    session_code = session_code.replace('session=', '')
     session = OKLegislationUtils.get_session(session_code)
     row.session = session
 
@@ -197,8 +177,6 @@ def _set_chamber_origin(row, soup):
     chamber_origin = OKLegislationUtils.get_chamber(chamber_origin_code)
     row.chamber_origin = chamber_origin
 
-# Committees
-
 def _set_bill_type(row, soup):
     bill_name = soup.find('a', {'id': 'ctl00_ContentPlaceHolder1_lnkIntroduced'}).text
     bill_code = bill_name.split(' ')[0]
@@ -209,8 +187,7 @@ def _set_bill_title(row, title):
     row.bill_title = title
 
 def _set_current_status(row, status_code):
-    current_status = OKLegislationUtils.get_status(status_code)
-    row.current_status = current_status
+    row.current_status = status_code
 
 def _set_principal_sponsor(row, soup):
     # OK has only one principal sponsor for a legislation
@@ -240,15 +217,16 @@ def _set_sponsors(row, soup):
     row.sponsors_id = [sponsor_data['id']]
 
 def _set_cosponsors(row, soup):
+    # Has the minimum two lines:
+    # Authors/Co Authors for
+    # ***To be added when the next official action is taken on the measure.***
+
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel6_tblCoAuth'})
-    table_rows = table.find_all('tr')[1:-2]
+    # table_rows = table.find_all('tr')[1:-2]
+    table_rows = table.find_all('td', {'align': 'left'})[1:-2]
 
-    # Remove rows with odd whitespace only
-    table_rows = list(filter(lambda x: x.text != '\n\n', table_rows))
-
-    # pprint(table_rows)
     # Return if table is not populated yet
-    if len(table_rows) == 0:
+    if len(table_rows) < 3:
         return
 
     cosponsors = []
@@ -256,58 +234,127 @@ def _set_cosponsors(row, soup):
 
     for table_row in table_rows:
         sponsor_data = _get_sponsor_data(table_row.text)
+
+        if sponsor_data == None:
+            continue
+        
         cosponsors.append(sponsor_data['name'])
         cosponsors_id.append(sponsor_data['id'])
 
     row.cosponsors = cosponsors
     row.cosponsors_id = cosponsors_id
 
+def _set_bill_text(row, soup):
+    table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel4_tblVersions'})
+    table_rows = table.find_all('a')
+
+    # Return if no data exists
+    if len(table_rows) < 1:
+        return
+
+    # Get url (PDF) of bill text
+    url = None
+    for table_row in table_rows:
+        if 'final version' in table_row.text:
+            url = table_row.get('href')
+    else:
+        if url == None:
+            version_soup = table_rows[0]
+            url = table_row.get('href')
+
+    # Read from PDF
+    response = requests.get(url, stream = True)
+    pdf = pdfplumber.open(io.BytesIO(response.content))
+
+    if len(pdf.pages) > 100:
+        return
+
+    bill_text = ''
+    for page in pdf.pages:
+        page_text = page.extract_text()
+        if page_text != None:
+            bill_text += page_text
+
+    row.bill_text = bill_text
+
 def _set_bill_description(row, soup):
     bill_description = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_txtST'}).text
     row.bill_description = bill_description
 
+def _set_bill_summary(row, soup):
+    table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel3_tblBillSum'})
+    table_rows = table.find_all('a')
+
+    # Return if no data exists
+    if len(table_rows) < 1:
+        return
+
+    # Get url (PDF) of bill text
+    url = None
+    for table_row in table_rows:
+        if 'Engrossed' in table_row.text:
+            url = table_row.get('href')
+    else:
+        if url == None:
+            version_soup = table_rows[0]
+            url = table_row.get('href')
+
+    # Read from PDF
+    response = requests.get(url, stream = True)
+    pdf = pdfplumber.open(io.BytesIO(response.content))
+
+    bill_summary = ''
+    for page in pdf.pages:
+        page_text = page.extract_text()
+        if page_text != None:
+            bill_summary += page_text
+
+    row.bill_summary = bill_summary
+
 def _set_actions(row, soup):
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel1_tblHouseActions'})
     table_rows = table.find_all('tr')[2:]
+
+    # Remove rows with odd whitespace only
+    table_rows = list(filter(lambda x: x.text != '\n\n', table_rows))
+
+    # Return if no actions data exists
+    if len(table_rows) < 1:
+        return
 
     actions = []
 
     for table_row in table_rows:
         fields = table_row.find_all('td')
 
-        # Action, Journal Page, Date, Chamber
-        num_fields = len(fields)
-        if num_fields == 4:
-            # print(datetime.strptime(columns[2].text, '%m/%d/%Y'))
-            action = {
-                'date': datetime.strptime(fields[2].text.strip(), '%m/%d/%Y'),
-                'action_by': OKLegislationUtils.get_chamber(fields[3].text),
-                'description': fields[0].text,
-            }
-            actions.append(action)
+        action = {
+            'date': datetime.strptime(fields[2].text.strip(), '%m/%d/%Y'),
+            'action_by': OKLegislationUtils.get_chamber(fields[3].text),
+            'description': fields[0].text,
+        }
+        actions.append(action)
 
     row.actions = actions
 
 def _set_votes(row, soup):
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel5_tblVotes'})
-    table_rows = table.find_all('tr')[1:]
+    table_rows = table.find_all('a')
 
-    # Remove rows with odd whitespace only
-    table_rows = list(filter(lambda x: x.text != '\n\n', table_rows))
-
-    # pprint(table_rows)
-
+    # Return if no vote data exists
     if len(table_rows) < 1:
         return
 
     votes = []
 
     for table_row in table_rows:
-        url = table_row.find('a').get('href')
-        vote_soup = _create_soup(url, SOUP_PARSER_TYPE)
-        chamber_votes = OKLegislationParser().format_votes(vote_soup)
-        votes.append(chamber_votes)
-
+        try:
+            url = table_row.get('href')
+            vote_soup = _create_soup(url, SOUP_PARSER_TYPE)
+            chamber_votes = OKLegislationVotesParser().get_votes_data(vote_soup)
+            votes = votes + chamber_votes
+        except:
+            print(f'Could not get all votes data for {row.bill_name}')
+    
     row.votes = votes
 
 def _get_sponsor_data(sponsor_str, sponsor_url=None):
@@ -317,7 +364,7 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
     Notes:
         sponsor_str must be one of the following form:
             Dossett (J.J.)
-            Dossett (J.J.) (S)
+            Hardin (David) (H)
             Luttrell (H)
 
     Parameters:
@@ -333,6 +380,9 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
 
     sponsor = _format_sponsor_data(sponsor_str, sponsor_url)
 
+    if sponsor == None:
+        return
+
     sponsor_last_name = sponsor['last']
     sponsor_first_name = sponsor['first']
     sponsor_name = sponsor['name']
@@ -345,7 +395,7 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
     }
 
     if sponsor_first_name != None:
-        search_query['first'] = sponsor_first_name
+        search_query['name_first'] = sponsor_first_name
 
     gov_id = scraper_utils.get_legislator_id(**search_query)
 
@@ -356,23 +406,49 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
 
     return sponsor_data
 
-def _format_sponsor_data(sponsor_str, sponsor_url=None):        
-    sponsor_str = re.sub('[/(/)\n]', '', sponsor_str)
-    sponsor_data = sponsor_str.split()
+def _format_sponsor_data(sponsor_str, sponsor_url=None): 
+    sponsor_str = sponsor_str.replace('\n', '')
 
-    is_common_name = len(sponsor_data) > 2
+    if sponsor_str == '' or sponsor_str == None:
+        return
 
+    # Match last name
+    last_name_match = re.search('[A-Za-z\s]+', sponsor_str)
+    if last_name_match:
+        last_name = last_name_match.group(0)
+        last_name = last_name.replace(' ', '')
+
+    # Match first name
+    first_name_match = re.search('\s\(([A-Za-z\.]+)\)\s', sponsor_str)
+    if first_name_match:
+        first_name = first_name_match.group(1)
+
+    # Match chamber
+    chamber_match = re.search('\((H|S)\)', sponsor_str)
+    if chamber_match:
+        chamber = chamber_match.group(1)
+
+    # Format data
     sponsor = {
-        'last': sponsor_data[0],
-        'first': sponsor_data[1] if is_common_name else None,
-        'name': f'{sponsor_data[1]} {sponsor_data[0]}' if is_common_name else sponsor_data[0],
+        'last': last_name,
+        'first': first_name if first_name_match else None,
+        'name': f'{first_name} {last_name}' if first_name_match else last_name,
     }
 
+    # Get role
     if sponsor_url == None:
-        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_abbr(sponsor_data[2]) if is_common_name else OKLegislationUtils.get_sponsor_role_from_abbr(sponsor_data[1])
+        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_abbr(chamber)
     else:
         sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_url(sponsor_url)
-
+    
+    # Manually fix oddities
+    if sponsor['first'] != None and sponsor['first'] == 'J.A.':
+        sponsor['first'] = 'JoAnna'
+    
+    if 'McCall and McBride' in sponsor_str or 'McCall and O\'Donnell' in sponsor_str:
+        sponsor['last'] = 'McCall'
+        sponsor['name'] = 'McCall'
+        
     return sponsor
 
 def _merge_scrape_regular_session_data(legislation_row, scrape_regular_session_data):
@@ -388,43 +464,34 @@ def _get_legislation_row(legislation_data, source_url):
             return row
 
 def main():
+    print('\nSCRAPING OKLAHOMA LEGISLATIONS\n')
 
-    # regular_session_data = scrape_regular_session()
+    # Collect current status, title, and urls of regular session 2021
+    print(DEBUG_MODE and 'Collecting scraping data for regular session 2021...\n' or '', end='')
+    regular_session_data = scrape_regular_session()
 
-    # urls = [data['url']
-    #     for data in regular_session_data] 
-    # pprint(data[0])
+    # Remove oddities
+    regular_session_data[:] = [data for data in regular_session_data if data['url'] not in ODDITIES]
 
-    # test_url = 'http://www.oklegislature.gov/BillInfo.aspx?Bill=SR6&session=2100'
-    # test_url = 'http://www.oklegislature.gov/BillInfo.aspx?Bill=SB49&session=2100'
-    # data = [scrape(test_url)]
+    # Retrieve urls into one list
+    print(DEBUG_MODE and 'Collecting all urls for OK legislation...\n' or '', end='')
+    urls = [data['url']
+        for data in regular_session_data] 
+
+    # Scrape each url
+    print(DEBUG_MODE and 'Begin scraping each urls...\n' or '', end='')
+    with Pool(NUM_POOL_THREADS) as pool:
+        data = list(tqdm(pool.imap(scrape, urls)))
 
     # Merge current status and title
-    # merge_all_scrape_regular_session_data(data, regular_session_data[0:10])
+    print(DEBUG_MODE and 'Merging current status and title...\n' or '', end='')
+    merge_all_scrape_regular_session_data(data, regular_session_data)
 
-    # TEST VOTE SCRAPING
-    # Test - House Committee Only
-    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/HB1005_VOTES.HTM#RCS0003'
+    # Write to database
+    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
+    scraper_utils.write_data(data)
 
-    # Test - House + Committee
-    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/SB49_VOTES.HTM#RCS0059'
-    test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/House/HB2122_VOTES.HTM'
-
-    # Test - Senate + Committee
-    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB49_VOTES.HTM#SB49_SCRDR1'
-
-    # Test - Senate + Committee (ALT)
-    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB273_VOTES.HTM'
-
-    # Test - Senate + Committee (FAIL)
-    # test_url = 'http://webserver1.lsb.state.ok.us/cf/2021-22%20SUPPORT%20DOCUMENTS/votes/Senate/SB595_votes.htm'
-
-    soup = _create_soup(test_url, SOUP_PARSER_TYPE)
-    # OKHouseLegislation._format_votes(soup)
-    # test = OKHouseLegislation()
-    test = OKLegislationParser()
-    test.format_votes(soup)
-
+    print('\nCOMPLETE!\n')
 
 if __name__ == '__main__':
     main()

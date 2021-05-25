@@ -34,16 +34,16 @@ class Database:
     """
     _connection = None
 
-    @staticmethod
-    def initialise():
-        """
-        Generates database connection token then connects to database via
-        connection pooling. Must be run before attempting to connect to
-        the database.
-        """
-        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+    # @staticmethod
+    # def initialise():
+    #     """
+    #     Generates database connection token then connects to database via
+    #     connection pooling. Must be run before attempting to connect to
+    #     the database.
+    #     """
+    #     db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
 
-        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
+    #     Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod
     def get_connection(cls):
@@ -53,6 +53,9 @@ class Database:
         Returns:
             connection: a psycopg2 connection to the database.
         """
+        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+
+        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
         return cls._connection
 
     # @classmethod
@@ -73,9 +76,9 @@ class Database:
         Database._connection.close()
 
     
-    def __del__(self):
-        if Database._connection:
-            Database.close_connection()
+    # def __del__(self):
+    #     if Database._connection:
+    #         Database.close_connection()
 
 
 class CursorFromConnectionFromPool:
@@ -122,7 +125,7 @@ class CursorFromConnectionFromPool:
         else:
             self.cursor.close()
             self.connection.commit()
-        # Database.close_connection()
+        Database.close_connection()
 
 
 class Persistence:
@@ -221,9 +224,6 @@ class Persistence:
 
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
-
-                for v in row:
-                    print(v, type(v))
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
@@ -595,38 +595,42 @@ class Persistence:
                 if isinstance(item, dict):
                     item = utils.DotDict(item)
 
-                tup = (
-                    item.source_id,
-                    item.most_recent_term_id,
-                    date_collected,
-                    item.source_url,
-                    item.name_full,
-                    item.name_last,
-                    item.name_first,
-                    item.name_middle,
-                    item.name_suffix,
-                    item.country_id,
-                    item.country,
-                    item.province_territory_id,
-                    item.province_territory,
-                    item.party_id,
-                    item.party,
-                    item.role,
-                    item.riding,
-                    item.years_active,
-                    json.dumps(item.committees, default=utils.json_serial),
-                    json.dumps(item.phone_numbers, default=utils.json_serial),
-                    json.dumps(item.addresses, default=utils.json_serial),
-                    item.email,
-                    item.birthday,
-                    item.seniority,
-                    item.occupation,
-                    json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience,
-                    item.region
-                )
+                try:
+                    tup = (
+                        item.source_id,
+                        item.most_recent_term_id,
+                        date_collected,
+                        item.source_url,
+                        item.name_full,
+                        item.name_last,
+                        item.name_first,
+                        item.name_middle,
+                        item.name_suffix,
+                        item.country_id,
+                        item.country,
+                        item.province_territory_id,
+                        item.province_territory,
+                        item.party_id,
+                        item.party,
+                        item.role,
+                        item.riding,
+                        item.years_active,
+                        json.dumps(item.committees, default=utils.json_serial),
+                        json.dumps(item.phone_numbers, default=utils.json_serial),
+                        json.dumps(item.addresses, default=utils.json_serial),
+                        item.email,
+                        item.birthday,
+                        item.seniority,
+                        item.occupation,
+                        json.dumps(item.education, default=utils.json_serial),
+                        item.military_experience,
+                        item.region
+                    )
 
-                cur.execute(insert_legislator_query, tup)
+                    cur.execute(insert_legislator_query, tup)
+                except Exception:
+                    print(f'Exception occurred inserting the following data:\n{tup}')
+
 
     @staticmethod
     def write_ca_fed_legislation(data, table):

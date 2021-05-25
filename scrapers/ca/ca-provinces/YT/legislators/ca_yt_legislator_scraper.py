@@ -264,9 +264,11 @@ class ScraperForMLAs:
   def __set_address(self):
     full_address = self.__get_address()
     address_location = full_address[0]
-    street_address = full_address[1] + full_address[2]
-    address_info = {'location' :  address_location, 'address' : street_address}
-    self.row.addresses = address_info
+    street_address = full_address[1] + " Y1A 1B2" #This is the address that's in the contact page. This may need to be changed if address is updated.
+    street_address_info = {'location' :  address_location, 'address' : street_address}
+    mailing_address = full_address[2]
+    mailing_address_info = {'location' : "Mailing Address", 'address' : mailing_address}
+    self.row.addresses = [street_address_info, mailing_address_info]
   
   def __get_address(self):
     '''

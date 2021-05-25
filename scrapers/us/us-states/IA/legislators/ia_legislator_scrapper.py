@@ -124,10 +124,11 @@ def scrape(dict_item):
     name_first = hn.first
     name_middle = hn.middle
     name_last = hn.last
-    row.name_full = name_full
-    row.name_first = name_first
-    row.name_middle = name_middle
-    row.name_last = name_last
+
+    row.name_full = name_full.title()
+    row.name_first = name_first.title()
+    row.name_middle = name_middle.title()
+    row.name_last = name_last.title()
 
     row.district = dict_item['District']
     row.party = dict_item['Party']
