@@ -136,6 +136,7 @@ def get_name(bio_container, row):
     row.name_first = hn.first
     row.name_middle = hn.middle
     row.name_suffix = hn.suffix
+    return hn.first + ' ' + hn.last
 
 
 def get_riding(bio_container, row):
@@ -210,18 +211,36 @@ def get_years_active(bio_container, row):
     row.years_active = years_active
 
 
-def get_committees(bio_container, row):
+def get_committee_role(name, link):
+    role = "member"
+    page = scraper_utils.request(base_url + link)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    members = soup.findAll('div', {'class': 'views-row'})
+    for member in members:
+        if name in member.text:
+            try:
+                role = member.find('span', {'class': 'mla-committee-title'}).text
+            except Exception:
+                pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return role
+
+
+def get_committees(bio_container, row, name):
     committees = []
     try:
         committee_div = bio_container.find('div', {'class': 'view-committee-listings'})
         committee_list = committee_div.findAll('li')
         for committee in committee_list:
+            link = committee.find('a').get('href')
+            role = get_committee_role(name, link)
             committee = committee.text.replace('\n', '')
             committee_name = "Standing Committee on" + committee
-            committees.append(committee_name)
+            committee_detail = {"role": role, "committee": committee_name}
+            committees.append(committee_detail)
     except Exception:
         pass
-
+    print(committees)
     row.committees = committees
 
 
@@ -259,13 +278,13 @@ def scrape(url):
 
     get_most_recent_term_id(row)
     get_party(bio_container, row)
-    get_name(bio_container, row)
+    name = get_name(bio_container, row)
     get_riding(bio_container, row)
     get_phone_number(bio_container, row)
     get_addresses(bio_container, row)
     get_email(bio_container, row)
     get_years_active(bio_container, row)
-    get_committees(bio_container, row)
+    get_committees(bio_container, row, name)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
