@@ -128,8 +128,7 @@ def get_party(bio_container, row):
 
 
 def get_name(bio_container, row):
-    name_full = bio_container.find('div', {'class': 'views-field-field-last-name'}).text
-
+    name_full = bio_container.find('div', {'class': 'views-field-field-last-name'}).text.strip()
     hn = HumanName(name_full)
     row.name_full = name_full
     row.name_last = hn.last
@@ -175,6 +174,13 @@ def get_addresses(bio_container, row):
     bus_add = bus_office.split('\n')
     address = bus_add[1:]
     location = bus_add[0]
+    try:
+        const_office = ','.join(address)
+        address = ','.join(address)
+    except Exception:
+        pass
+    const_office = const_office.replace('\n', ', ')
+    address = address.replace('\n', ', ')
 
     c_address = {"location": "Constituency office", "address": const_office}
     b_address = {"location": location, "address": address}
@@ -234,13 +240,12 @@ def get_committees(bio_container, row, name):
         for committee in committee_list:
             link = committee.find('a').get('href')
             role = get_committee_role(name, link)
-            committee = committee.text.replace('\n', '')
-            committee_name = "Standing Committee on" + committee
+            committee = committee.text.replace('\n', '').strip()
+            committee_name = "Standing Committee on " + committee
             committee_detail = {"role": role, "committee": committee_name}
             committees.append(committee_detail)
     except Exception:
         pass
-    print(committees)
     row.committees = committees
 
 
@@ -317,10 +322,7 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
-    # dropping rows with vacant seat
-    vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
-    for index in vacant_index:
-        leg_df = leg_df.drop(index)
+
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
@@ -340,6 +342,12 @@ if __name__ == '__main__':
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+
+    # dropping rows with vacant seat
+    vacant_index = big_df.index[big_df['name_first'] == "Vacant"].tolist()
+    for index in vacant_index:
+        print(index)
+        big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')
 

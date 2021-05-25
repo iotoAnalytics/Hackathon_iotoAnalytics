@@ -65,21 +65,6 @@ def get_urls():
     return urls
 
 
-def get_current_general_assembly_link(general_assembly_link):
-    uClient = uReq(general_assembly_link)
-    page_html = uClient.read()
-    uClient.close()
-    # # html parsing
-    page_soup = BeautifulSoup(page_html, "lxml")
-    table = page_soup.find("table", {'class': 'wikitable'})
-    current_assembly_row = table.findAll('tr')[1]
-    current_assembly = current_assembly_row.findAll('td')[0]
-    link = current_assembly.find('a').get('href')
-
-    scraper_utils.crawl_delay(crawl_delay)
-    return link
-
-
 def find_mla_wiki(mlalink):
     bio_links = []
     uClient = uReq(mlalink)
@@ -96,7 +81,7 @@ def find_mla_wiki(mlalink):
             bio_links.append(biolink)
         except Exception:
             pass
-
+    print(bio_links)
     scraper_utils.crawl_delay(crawl_delay)
     return bio_links
 
@@ -165,23 +150,20 @@ def get_phone_number(bio_container, row):
 
 def get_addresses(bio_container, row):
     addresses = []
-    contact = bio_container.find('div', {'class': 'mla-current-profile-contact'})
+    contact = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     address_details = contact.findAll('p')
-    const_office = address_details[0].text
-    const_office = const_office.split('address:')[1]
-    bus_office = address_details[2].text
-    if re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', bus_office):
-        bus_office = address_details[3].text
-    bus_add = bus_office.split('\n')
-    address = bus_add[1:]
-    location = bus_add[0]
+    for address in address_details:
+        if "Office" in address.text:
+            address = address.text.split(':')[1]
+        elif "Mailing" in address.text:
+            address = address.text.split(':')[1]
+        try:
+            address = address.replace('\n', ' ')
+            address = address.replace('\xa0', '')
+            addresses.append(address)
+        except Exception:
+            pass
 
-    c_address = {"location": "Constituency office", "address": const_office}
-    b_address = {"location": location, "address": address}
-    addresses.append(c_address)
-    addresses.append(b_address)
-
-    print(addresses)
     row.addresses = addresses
 
 
@@ -271,14 +253,14 @@ def scrape(url):
 
     bio_container = soup.find('section', {'class': 'section'})
 
-    get_party(bio_container, row)
-    get_name(bio_container, row)
-    get_riding(bio_container, row)
-    get_phone_number(bio_container, row)
-    #get_addresses(bio_container, row)
-    get_email(bio_container, row)
-    get_years_active(bio_container, row)
-    get_committees(bio_container, row)
+    # get_party(bio_container, row)
+    # get_name(bio_container, row)
+    # get_riding(bio_container, row)
+    # get_phone_number(bio_container, row)
+    # get_addresses(bio_container, row)
+    # get_email(bio_container, row)
+    # get_years_active(bio_container, row)
+    # get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
@@ -308,31 +290,29 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    # leg_df = leg_df.drop(columns="birthday")
-    # leg_df = leg_df.drop(columns="education")
-    # leg_df = leg_df.drop(columns="occupation")
-    # # dropping rows with vacant seat
-    # vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
-    # for index in vacant_index:
-    #     leg_df = leg_df.drop(index)
-    #
-    # # getting urls from wikipedia
-    # wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    # mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
-    #
-    # with Pool() as pool:
-    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
-    # wiki_df = pd.DataFrame(wiki_data)[
-    #     ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
-    #
-    # big_df = pd.merge(leg_df, wiki_df, how='left',
-    #                   on=["name_first", "name_last"])
-    #
-    # isna = big_df['education'].isna()
-    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
-    # big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    leg_df = leg_df.drop(columns="birthday")
+    leg_df = leg_df.drop(columns="education")
+    leg_df = leg_df.drop(columns="occupation")
+
+
+    # getting urls from wikipedia
+    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
+    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+
+    print(wiki_df)
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_first", "name_last"])
+
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
 
     print('Scraping complete')
 
