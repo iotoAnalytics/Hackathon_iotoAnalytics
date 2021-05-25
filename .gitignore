@@ -9,3 +9,5 @@ test.*
 .vscode/
 scrapers/us/us-states/templates/
 .pytest_cache/
+Tester.ipynb
+.ipynb_checkpoints/

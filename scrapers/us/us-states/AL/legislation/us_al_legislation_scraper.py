@@ -9,7 +9,7 @@ Issues:
         
 
 Notes:
-    - Url field isn't very useful as the Alabama website requires a session and will redirect you if you don't have one, it is also NOT UNIQUE, 
+    - IMPORTANT: Url field isn't very useful as the Alabama website requires a session and will redirect you if you don't have one, it is also NOT UNIQUE, 
         the page depends on the session year you have chosen.
 
     - Website server is not always reliable and you will occasionally get a missing page error, I've put solutions in place for bills but this could 
@@ -82,14 +82,6 @@ reso_sponsor_senate_url = 'http://alisondb.legislature.state.al.us/Alison/SESSRe
 state_abbreviation = 'AL'
 database_table_name = 'us_al_legislation_test'
 legislator_table_name = 'us_al_legislators'
-
-# #Initialize database and scraper utils
-# db_user = str(configParser.get('databaseConfig', 'db_user'))
-# db_pass = str(configParser.get('databaseConfig', 'db_pass'))
-# db_host = str(configParser.get('databaseConfig', 'db_host'))
-# db_name = str(configParser.get('databaseConfig', 'db_name'))
-
-# Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
 
 
 scraper_utils = USStateLegislationScraperUtils(
