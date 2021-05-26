@@ -1,30 +1,31 @@
 # Unavailable data: source_id, date_introduced, committees, bill_type, sponsors, sponsors_id, cosponsors, cosponsors_id, bill_description, votes, source_topic
 
-from pathlib import Path
 import os
+import re
 import sys
+import unicodedata
+from tqdm import tqdm
+
+from bs4 import BeautifulSoup
+from multiprocessing import Pool
+from nameparser import HumanName
+from pathlib import Path
+from pprint import pprint
+from datetime import datetime
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
-from bs4 import BeautifulSoup
-from multiprocessing import Pool
-from pprint import pprint
-from nameparser import HumanName
-import re
-from datetime import datetime
-from tqdm import tqdm
-import unicodedata
+
+DEBUG_MODE = False
+
+PROV_ABBREVIATION = 'NL'
+DATABASE_TABLE_NAME = 'ca_nl_legislation'
+LEGISLATOR_TABLE_NAME = 'ca_nl_legislators'
 
 BASE_URL = 'https://assembly.nl.ca/'
 SOUP_PARSER_TYPE = 'lxml'
-
-PROV_ABBREVIATION = 'NL'
-DATABASE_TABLE_NAME = 'ca_nl_legislation_test'
-LEGISLATOR_TABLE_NAME = 'ca_nl_legislators_test'
-
-DEBUG_MODE = False
 
 scraper_utils = CAProvinceTerrLegislationScraperUtils(PROV_ABBREVIATION, DATABASE_TABLE_NAME, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -66,46 +67,22 @@ def scrape(url):
         fields = table_row.find_all('td')
         
         # Get bill text in list form
-        path = fields[1].find('a').get('href')
-        source_url = url + path
+        source_url = url + fields[1].find('a').get('href')
         bill_soup = _create_soup(source_url, SOUP_PARSER_TYPE)
         scraper_utils.crawl_delay(crawl_delay)
         bill_text_list = _get_bill_text_from_soup(bill_soup)
 
-        # bill_name
-        _set_bill_name(row, fields[0])
-        
-        # session
+        _set_bill_name(row, fields)
         _set_session(row, soup)
-        
-        # source_url
         _set_source_url(row, source_url)
-
-        # chamber_origin
         _set_chamber_origin(row)
-
-        # bill_title
-        _set_bill_title(row, fields[1])
-
-        # current_status
+        _set_bill_title(row, fields)
         _set_current_status(row, fields)
-
-        # principal_sponsor + principal_sponsor_id
         _set_principal_sponsor(row, bill_text_list)
-
-        # bill_text
         _set_bill_text(row, bill_text_list)
-
-        # bill_summary
         _set_bill_summary(row, bill_text_list)
-
-        # actions
         _set_actions(row, fields)
-
-        # region
         _set_region(row)
-
-        # goverlytics_id
         _set_goverlytics_id(row)
 
         data.append(row)
@@ -119,8 +96,9 @@ def _create_soup(url, soup_parser_type):
     return soup
 
 def _set_bill_name(row, soup):
-    bill_no = soup.text.replace('.', '')
-    bill_name = 'BILL' + bill_no
+    bill_no_idx = 0
+    bill_no_str = soup[bill_no_idx].text.replace('.', '')
+    bill_name = 'BILL' + bill_no_str
     row.bill_name = bill_name
 
 def _set_session(row, soup):
@@ -140,16 +118,18 @@ def _set_chamber_origin(row):
     row.chamber_origin = 'House of Assembly'
 
 def _set_bill_title(row, soup):
-    bill_title = re.sub('\r|\n|\t', '', soup.text)
+    bill_title_idx = 1
+    bill_title_str = soup[bill_title_idx].text
+    bill_title = re.sub('\r|\n|\t', '', bill_title_str)
     row.bill_title = bill_title
 
 def _set_current_status(row, fields):
     # Bill No, Title, First Reading, Second Reading, Committee, Amendments, Third Reading, Royal Assent, Act        
-    first_reading_date = _remove_non_break_space(fields[2].text)
-    second_reading_date = _remove_non_break_space(fields[3].text)
-    committee_reading_date = _remove_non_break_space(fields[4].text)
-    third_reading_date = _remove_non_break_space(fields[6].text)
-    royal_assent_date = _remove_non_break_space(fields[7].text)
+    first_reading_date = _remove_nonbreak_space(fields[2].text)
+    second_reading_date = _remove_nonbreak_space(fields[3].text)
+    committee_reading_date = _remove_nonbreak_space(fields[4].text)
+    third_reading_date = _remove_nonbreak_space(fields[6].text)
+    royal_assent_date = _remove_nonbreak_space(fields[7].text)
 
     current_status = ''
 
@@ -180,44 +160,38 @@ def _set_principal_sponsor(row, bill_text_list):
 
 def _set_actions(row, fields):
     # Bill No, Title, First Reading, Second Reading, Committee, Amendments, Third Reading, Royal Assent, Act        
-    first_reading_date = _remove_non_break_space(fields[2].text)
-    second_reading_date = _remove_non_break_space(fields[3].text)
-    committee_reading_date = _remove_non_break_space(fields[4].text)
-    third_reading_date = _remove_non_break_space(fields[6].text)
-    royal_assent_date = _remove_non_break_space(fields[7].text)
+    first_reading_date = _remove_nonbreak_space(fields[2].text)
+    second_reading_date = _remove_nonbreak_space(fields[3].text)
+    committee_reading_date = _remove_nonbreak_space(fields[4].text)
+    third_reading_date = _remove_nonbreak_space(fields[6].text)
+    royal_assent_date = _remove_nonbreak_space(fields[7].text)
 
     actions = []
 
+    action = {
+        'date': '',
+        'action_by': 'House of Assembly',
+        'description': ''
+    }
+
     if first_reading_date:
-        action = {
-            'date': datetime.strptime(first_reading_date, '%b. %d, %Y'),
-            'action_by': 'House of Assembly',
-            'description': 'First Reading'
-        }
+        action['date'] = datetime.strptime(first_reading_date, '%b. %d, %Y')
+        action['description'] = 'First Reading'
         actions.append(action)
 
     if second_reading_date:
-        action = {
-            'date': datetime.strptime(second_reading_date, '%b. %d, %Y'),
-            'action_by': 'House of Assembly',
-            'description': 'Second Reading'
-        }
+        action['date'] = datetime.strptime(second_reading_date, '%b. %d, %Y')
+        action['description'] = 'Second Reading'
         actions.append(action)
 
     if committee_reading_date:
-        action = {
-            'date': datetime.strptime(committee_reading_date, '%b. %d, %Y'),
-            'action_by': 'House of Assembly',
-            'description': 'Committee Reading'
-        }
+        action['date'] = datetime.strptime(committee_reading_date, '%b. %d, %Y')
+        action['description'] = 'Committee Reading'
         actions.append(action)
 
     if third_reading_date:
-        action = {
-            'date': datetime.strptime(third_reading_date, '%b. %d, %Y'),
-            'action_by': 'House of Assembly',
-            'description': 'Third Reading'
-        }
+        action['date'] = datetime.strptime(third_reading_date, '%b. %d, %Y')
+        action['description'] = 'Third Reading'
         actions.append(action)
 
     if royal_assent_date:
@@ -225,11 +199,8 @@ def _set_actions(row, fields):
         if royal_assent_date == 'Ar. 23, 2021':
             royal_assent_date = 'Apr. 23, 2021'
 
-        action = {
-            'date': datetime.strptime(royal_assent_date, '%b. %d, %Y'),
-            'action_by': 'House of Assembly',
-            'description': 'Royal Assent'
-        }
+        action['date'] = datetime.strptime(royal_assent_date, '%b. %d, %Y')
+        action['description'] = 'Royal Assent'
         actions.append(action)
 
     row.actions = actions
@@ -271,13 +242,12 @@ def _format_session_str(text):
 
     return formatted_session
 
-def _remove_non_break_space(text):
-    nonBreakSpace = u'\xa0'
-    text = text.replace(nonBreakSpace, '')
+def _remove_nonbreak_space(text):
+    nonbreak_space = u'\xa0'
+    text = text.replace(nonbreak_space, '')
     return text
 
 def _get_bill_text_from_soup(soup):
-    # Gets bill text from soup
     text_list_soup = soup.find('div', {'class': 'Section1'}).find_all('p')
     text_list = _normalize_text(text_list_soup)
 
@@ -296,7 +266,7 @@ def _format_bill_text_list(bill_text_list):
     for line in bill_text_list:
         bill_text += line + '\n'
 
-    return bill_text
+    return bill_text.strip()
 
 def main():
     print('\nSCRAPING NEWFOUNDLAND AND LABRADOR LEGISLATIONS\n')
@@ -312,8 +282,8 @@ def main():
         data.extend(scrape(url))
 
     # Write to database
+    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if not DEBUG_MODE:
-        print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
         scraper_utils.write_data(data)
 
     print('\nCOMPLETE!\n')
