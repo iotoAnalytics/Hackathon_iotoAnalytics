@@ -15,6 +15,7 @@ from datetime import date, datetime
 import json
 import utils
 import sys
+import numpy as np
 
 db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
 db_port = 5432
@@ -181,6 +182,7 @@ class Persistence:
             except Exception as e:
                 print(
                     f'An exception occurred creating {table}:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
                 INSERT INTO {table}
@@ -225,8 +227,10 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                for v in row:
-                    print(v, type(v))
+                if not np.isnan(row.principal_sponsor_id):
+                    row.principal_sponsor_id = int(row.principal_sponsor_id)
+                else:
+                    row.principal_sponsor_id = None
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
@@ -242,10 +246,9 @@ class Persistence:
                     cur.execute(insert_legislator_query, tup)
 
                 except Exception as e:
-                    import traceback
-                    print(traceback.format_exc())
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                    cur.connection.rollback()
 
     @staticmethod
     def write_us_fed_legislators(data, table):
@@ -297,6 +300,7 @@ class Persistence:
 
             except Exception as e:
                 print(f'An exception occurred executing a query:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
             
@@ -425,6 +429,7 @@ class Persistence:
                 cur.connection.commit()
             except Exception as e:
                 print(f'An exception occurred executing a query:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
@@ -555,6 +560,7 @@ class Persistence:
                 cur.connection.commit()
             except Exception as e:
                 print(f'An exception occurred executing a query:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
                     
@@ -598,38 +604,43 @@ class Persistence:
                 if isinstance(item, dict):
                     item = utils.DotDict(item)
 
-                tup = (
-                    item.source_id,
-                    item.most_recent_term_id,
-                    date_collected,
-                    item.source_url,
-                    item.name_full,
-                    item.name_last,
-                    item.name_first,
-                    item.name_middle,
-                    item.name_suffix,
-                    item.country_id,
-                    item.country,
-                    item.province_territory_id,
-                    item.province_territory,
-                    item.party_id,
-                    item.party,
-                    item.role,
-                    item.riding,
-                    item.years_active,
-                    json.dumps(item.committees, default=utils.json_serial),
-                    json.dumps(item.phone_numbers, default=utils.json_serial),
-                    json.dumps(item.addresses, default=utils.json_serial),
-                    item.email,
-                    item.birthday,
-                    item.seniority,
-                    item.occupation,
-                    json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience,
-                    item.region
-                )
+                try:
+                    tup = (
+                        item.source_id,
+                        item.most_recent_term_id,
+                        date_collected,
+                        item.source_url,
+                        item.name_full,
+                        item.name_last,
+                        item.name_first,
+                        item.name_middle,
+                        item.name_suffix,
+                        item.country_id,
+                        item.country,
+                        item.province_territory_id,
+                        item.province_territory,
+                        item.party_id,
+                        item.party,
+                        item.role,
+                        item.riding,
+                        item.years_active,
+                        json.dumps(item.committees, default=utils.json_serial),
+                        json.dumps(item.phone_numbers, default=utils.json_serial),
+                        json.dumps(item.addresses, default=utils.json_serial),
+                        item.email,
+                        item.birthday,
+                        item.seniority,
+                        item.occupation,
+                        json.dumps(item.education, default=utils.json_serial),
+                        item.military_experience,
+                        item.region
+                    )
 
-                cur.execute(insert_legislator_query, tup)
+                    cur.execute(insert_legislator_query, tup)
+                except Exception:
+                    print(f'Exception occurred inserting the following data:\n{tup}')
+                    cur.connection.rollback()
+
 
     @staticmethod
     def write_ca_fed_legislation(data, table):
@@ -691,6 +702,7 @@ class Persistence:
             except Exception as e:
                 print(
                     f'An exception occurred creating {table}:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
                 INSERT INTO {table}
@@ -740,6 +752,11 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
+                if not np.isnan(row.principal_sponsor_id):
+                    row.principal_sponsor_id = int(row.principal_sponsor_id)
+                else:
+                    row.principal_sponsor_id = None
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -761,6 +778,7 @@ class Persistence:
             except Exception as e:
                 print(
                     f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                cur.connection.rollback()
 
     @staticmethod
     def write_ca_prov_terr_legislation(data, table):
@@ -813,6 +831,7 @@ class Persistence:
             except Exception as e:
                 print(
                     f'An exception occurred creating {table}:\n{e}')
+                cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
                 INSERT INTO {table}
@@ -856,7 +875,10 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                
+                if not np.isnan(row.principal_sponsor_id):
+                    row.principal_sponsor_id = int(row.principal_sponsor_id)
+                else:
+                    row.principal_sponsor_id = None
 
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
@@ -875,3 +897,4 @@ class Persistence:
                 except Exception as e:
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                    cur.connection.rollback()

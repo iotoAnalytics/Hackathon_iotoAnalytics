@@ -67,7 +67,7 @@ def get_urls():
 def get_bill_name(url, row):
     bill_number = url.split('bill-')[1]
     zero_filled_number = bill_number.zfill(3)
-    bill_name = 'b' + zero_filled_number
+    bill_name = 'B' + zero_filled_number
     row.bill_name = bill_name
     return bill_name
 
@@ -75,10 +75,10 @@ def get_bill_name(url, row):
 def get_session(main_div, row):
     table = main_div.find('table', {'class': 'views-table'})
     session = table.findAll('td')[2].text
-    row.session = session
     session = session.replace(',', '')
     session = session.split(' ')
-    return_session = session[1] + "({s})".format(s=session[3])
+    return_session = session[1] + "-{s}".format(s=session[3])
+    row.session = return_session
     return return_session
 
 
@@ -151,8 +151,7 @@ def get_bill_description(main_div, row):
 def get_bill_text(url, row):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    bill_text = soup.find('div', {'class': 'bill_text'}).text
-
+    bill_text = soup.find('div', {'class': 'bill_text'}).text.strip()
     scraper_utils.crawl_delay(crawl_delay)
     row.bill_text = bill_text
 

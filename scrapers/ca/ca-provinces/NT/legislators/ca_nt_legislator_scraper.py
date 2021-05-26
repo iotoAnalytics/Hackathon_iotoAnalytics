@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import re
 import datetime
-from time import sleep
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -18,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 BASE_URL = 'https://www.ntassembly.ca'
-MLA_URL = 'https://www.ntassembly.ca/members'
+MLA_URL = BASE_URL + '/members'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_the_Northwest_Territories'
 THREADS_FOR_POOL = 12
 
@@ -43,8 +42,6 @@ columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 def program_driver():
     main_functions = Main_Functions()
-    
-    main_page_soup = main_functions.get_page_as_soup(MLA_URL)
 
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
@@ -298,6 +295,7 @@ class MLA_Site_Scraper:
             return [m_office_number_to_add, c_office_number_to_add]
         if not c_office_number_to_add:
             return [m_office_number_to_add, mobile_number_to_add]
+
     def __get_member_office_number(self, container):
         a_tag = container.a
         a_tag.decompose()

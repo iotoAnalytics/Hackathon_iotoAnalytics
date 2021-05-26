@@ -258,12 +258,18 @@ def get_name(row, soup):
     """
     # name
     name_full = soup.find('span', {'id': re.compile("body_FormView5_FULLNAMELabel")}).text
-    hn = HumanName(name_full)
-    row.name_full = name_full
-    row.name_last = hn.last
-    row.name_first = hn.first
-    row.name_middle = hn.middle
-    row.name_suffix = hn.suffix
+    if "Jonathan Goudeau, I" not in name_full:
+        hn = HumanName(name_full)
+        row.name_full = name_full
+        row.name_last = hn.last
+        row.name_first = hn.first
+        row.name_middle = hn.middle
+        row.name_suffix = hn.suffix
+    elif "Jonathan Goudeau, I" in name_full:
+        row.name_full = name_full
+        row.name_last = "Goudeau"
+        row.name_first = "Jonathan"
+        row.name_suffix = "I"
 
 
 def get_senate_urls():

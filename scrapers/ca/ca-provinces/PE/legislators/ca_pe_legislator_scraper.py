@@ -28,6 +28,7 @@ from bs4 import BeautifulSoup
 import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
+from datetime import datetime
 
 prov_abbreviation = 'PE'
 database_table_name = 'ca_pe_legislators'
@@ -64,21 +65,6 @@ def get_urls():
     return urls
 
 
-def get_current_general_assembly_link(general_assembly_link):
-    uClient = uReq(general_assembly_link)
-    page_html = uClient.read()
-    uClient.close()
-    # # html parsing
-    page_soup = BeautifulSoup(page_html, "lxml")
-    table = page_soup.find("table", {'class': 'wikitable'})
-    current_assembly_row = table.findAll('tr')[1]
-    current_assembly = current_assembly_row.findAll('td')[0]
-    link = current_assembly.find('a').get('href')
-
-    scraper_utils.crawl_delay(crawl_delay)
-    return link
-
-
 def find_mla_wiki(mlalink):
     bio_links = []
     uClient = uReq(mlalink)
@@ -95,20 +81,9 @@ def find_mla_wiki(mlalink):
             bio_links.append(biolink)
         except Exception:
             pass
-
+    print(bio_links)
     scraper_utils.crawl_delay(crawl_delay)
     return bio_links
-
-
-def get_most_recent_term_id(row):
-    path = '/members/profiles'
-    scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    assembly = soup.find('h2', {'class': 'paragraph-header'}).text
-
-    scraper_utils.crawl_delay(crawl_delay)
-    row.most_recent_term_id = assembly
 
 
 def get_party(bio_container, row):
@@ -175,23 +150,20 @@ def get_phone_number(bio_container, row):
 
 def get_addresses(bio_container, row):
     addresses = []
-    contact = bio_container.find('div', {'class': 'mla-current-profile-contact'})
+    contact = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     address_details = contact.findAll('p')
-    const_office = address_details[0].text
-    const_office = const_office.split('address:')[1]
-    bus_office = address_details[2].text
-    if re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', bus_office):
-        bus_office = address_details[3].text
-    bus_add = bus_office.split('\n')
-    address = bus_add[1:]
-    location = bus_add[0]
+    for address in address_details:
+        if "Office" in address.text:
+            address = address.text.split(':')[1]
+        elif "Mailing" in address.text:
+            address = address.text.split(':')[1]
+        try:
+            address = address.replace('\n', ' ')
+            address = address.replace('\xa0', '')
+            addresses.append(address)
+        except Exception:
+            pass
 
-    c_address = {"location": "Constituency office", "address": const_office}
-    b_address = {"location": location, "address": address}
-    addresses.append(c_address)
-    addresses.append(b_address)
-
-    print(addresses)
     row.addresses = addresses
 
 
@@ -203,47 +175,49 @@ def get_email(bio_container, row):
         row.email = email
 
 
+def get_most_recent_term_id(years_active, row):
+    year = years_active[-1]
+    row.most_recent_term_id = year
+
+
 def get_years_active(bio_container, row):
     table = bio_container.find('div', {'class': 'view-member-history-table'})
     table_body = table.find('tbody')
     years_active = []
     table_rows = table_body.findAll('tr')
     for tr in table_rows:
-        print(tr)
+        start_date = tr.findAll('td')[2].text
+        start_year = re.findall(r'[0-9]{4}', start_date)[0]
+        end_date = tr.findAll('td')[3].text
+        if "Current" in end_date:
+            end_year = datetime.now().year
+        else:
+            end_year = re.findall(r'[0-9]{4}', end_date)[0]
 
-        # start_date = tr.findAll('td')[2].text
-        # end_date = tr.findAll('td')[3].text
-        # print(start_date)
-        # print(end_date)
-
-    # for time_period in time_periods:
-    #     if ' - ' not in time_period.text:
-    #         start_year = time_period.text.strip()
-    #         years = 2021 - int(start_year)
-    #     else:
-    #         start_year = time_period.text.split(' - ')[0].strip()
-    #         end_year = time_period.text.split(' - ')[1].strip()
-    #         years = int(end_year) - int(start_year)
-    #     year_counter = int(start_year)
-    #     for i in range(0, years + 1):
-    #         years_active.append(year_counter)
-    #         year_counter += 1
-    # years_active.sort()
-    # row.years_active = years_active
+        years = int(end_year) - int(start_year)
+        year_counter = int(start_year)
+        for i in range(0, years + 1):
+            years_active.append(year_counter)
+            year_counter += 1
+    years_active.sort()
+    years_active = list(dict.fromkeys(years_active))
+    get_most_recent_term_id(years_active, row)
+    row.years_active = years_active
 
 
 def get_committees(bio_container, row):
     committees = []
     try:
-        committee_div = bio_container.find('div', {'class': 'view-committee-listings'})
-        committee_list = committee_div.findAll('li')
+        committee_div = bio_container.find('div', {'class': 'view-member-committees-table'})
+        committee_table = committee_div.find('tbody')
+        committee_list = committee_table.findAll('tr')
         for committee in committee_list:
-            committee = committee.text.replace('\n', '')
-            committee_name = "Standing Committee on" + committee
-            committees.append(committee_name)
+            committee_name = committee.findAll('td')[0].text.strip()
+            role = committee.findAll('td')[1].text.strip()
+            committee_detail = {"role": role, "committee": committee_name}
+            committees.append(committee_detail)
     except Exception:
         pass
-
     row.committees = committees
 
 
@@ -278,15 +252,14 @@ def scrape(url):
     soup = BeautifulSoup(page.content, 'html.parser')
 
     bio_container = soup.find('section', {'class': 'section'})
-    #
-    # get_most_recent_term_id(row)
-    get_party(bio_container, row)
-    get_name(bio_container, row)
-    get_riding(bio_container, row)
-    get_phone_number(bio_container, row)
-    #get_addresses(bio_container, row)
-    get_email(bio_container, row)
-    get_years_active(bio_container, row)
+
+    # get_party(bio_container, row)
+    # get_name(bio_container, row)
+    # get_riding(bio_container, row)
+    # get_phone_number(bio_container, row)
+    # get_addresses(bio_container, row)
+    # get_email(bio_container, row)
+    # get_years_active(bio_container, row)
     # get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
@@ -317,31 +290,29 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    # leg_df = leg_df.drop(columns="birthday")
-    # leg_df = leg_df.drop(columns="education")
-    # leg_df = leg_df.drop(columns="occupation")
-    # # dropping rows with vacant seat
-    # vacant_index = leg_df.index[leg_df['name_first'] == "Vacant"].tolist()
-    # for index in vacant_index:
-    #     leg_df = leg_df.drop(index)
-    #
-    # # getting urls from wikipedia
-    # wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    # mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
-    #
-    # with Pool() as pool:
-    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
-    # wiki_df = pd.DataFrame(wiki_data)[
-    #     ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
-    #
-    # big_df = pd.merge(leg_df, wiki_df, how='left',
-    #                   on=["name_first", "name_last"])
-    #
-    # isna = big_df['education'].isna()
-    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
-    # big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    leg_df = leg_df.drop(columns="birthday")
+    leg_df = leg_df.drop(columns="education")
+    leg_df = leg_df.drop(columns="occupation")
+
+
+    # getting urls from wikipedia
+    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
+    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+
+    print(wiki_df)
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_first", "name_last"])
+
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
 
     print('Scraping complete')
 

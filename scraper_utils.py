@@ -894,7 +894,20 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         # data = self.add_topics(data)
         df = pd.DataFrame(data)
         df['topic'] = self.add_topics(df['bill_text'])
+        # df['principal_sponsor_id'] = df['principal_sponsor_id'].fillna(0)
+        df['principal_sponsor_id'] = pd.Series(df['principal_sponsor_id'], dtype=int)
+        # df['principal_sponsor_id'] = df['principal_sponsor_id'].replace(0, None)
+
+        # print(df['principal_sponsor_id'])
+
         data = df.to_dict('records')
+
+        # for d in data[:5]:
+        #     for k, v in d.items():
+        #         if k in {'bill_text'}:
+        #             continue
+        #         print(k, v, type(v))
+
 
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
