@@ -1,14 +1,14 @@
 # Unavailable data - email, seniority, military_experience
 # Wiki data - birthday, occupation, education
 
+import datetime
+import multiprocessing
 import os
 import re
 import sys
-
-import datetime
-import multiprocessing
-from bs4 import BeautifulSoup
 from multiprocessing import Pool
+
+from bs4 import BeautifulSoup
 from nameparser import HumanName
 from pathlib import Path
 from pprint import pprint
