@@ -262,8 +262,6 @@ def get_bill_votes(url, row):
     """
 
     driver = open_driver(url)
-    # driver.get(url)
-    # scraper_utils.crawl_delay(crawl_delay)
     vote_button = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_lblVotes')
     vote_button.click()
     vote_table = driver.find_element_by_id('MainContent_tabContainerLegislation_tabPanelVotes_dataListVotes')
@@ -282,7 +280,6 @@ def get_bill_votes(url, row):
                              'chamber': '', 'description': '', 'votes': []}
 
             tables = tabula.io.read_pdf(link, pages=1, silent=True)
-
             if chamber == 'S':
                 first_table = tables[0].iloc[:, 0:6]
                 first_table.columns = ['legislator', 'yea', 'nay', 'absent', 'exc', 'rec']
@@ -457,8 +454,6 @@ def get_bill_text(url, row):
         final_version = driver.find_element_by_id('MainContent_formViewLegislationTextFinal_linkPDF')
         final_version.click()
         driver.switch_to.window(driver.window_handles[1])
-        response = requests.get(driver.current_url)
-        byte = io.BytesIO(response.content)
         parsed = parser.from_file(driver.current_url)
         bill_text = parsed['content'].replace('\n', '').replace('=', '')\
             .replace('12345678910111213141516171819202122232425', '')\

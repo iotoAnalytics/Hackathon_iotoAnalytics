@@ -183,8 +183,8 @@ def scrape_info(dict_item):
     try:
         service_html = table_html.find_all('ul')[-1].find_all('li')
         years_active = []
-        for row in service_html:
-            text = row.text
+        for item in service_html:
+            text = item.text
             if 'Senate' in text or 'Representative' in text:
                 years_active += edit_years_range(text.split(',', 1)[1].split('-'))
         years_active = sorted(list(dict.fromkeys(years_active)))
@@ -206,6 +206,7 @@ def scrape_info(dict_item):
 
     scraper_utils.crawl_delay(crawl_delay)
     print(f'done row for {hn.first} {hn.last}')
+    # print(row)
     return row
 
 
@@ -215,6 +216,9 @@ if __name__ == '__main__':
 
     # Was running into connection problems with the south carolina servers, and the crawl delays didnt seem to help too
     # much, so splitting the scraping process into 2 with a resting time in the middle seemed to help
+    # with Pool(processes=5) as pool:
+    #     data = pool.map(scrape_info, legis_dicts[0:10])
+
     data = []
     with Pool(processes=5) as pool:
         data += pool.map(scrape_info, legis_dicts[:len(legis_dicts) // 2])
