@@ -1,32 +1,42 @@
 # Unavailable data - source_id, committees, source_topic
 
-from pathlib import Path
+import io
+import multiprocessing
 import os
+import re
 import sys
+from datetime import datetime
+from multiprocessing import Pool
+from time import sleep
+
+import pdfplumber
+import requests
+from bs4 import BeautifulSoup
+from nameparser import HumanName
+from pathlib import Path
+from pprint import pprint
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from tqdm import tqdm
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 from scraper_utils import USStateLegislationScraperUtils
-from bs4 import BeautifulSoup
-from multiprocessing import Pool
-from pprint import pprint
-from nameparser import HumanName
-import re
-from datetime import datetime
-from tqdm import tqdm
-
-import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from time import sleep
-
-import pdfplumber
-import requests
-import io
-
-import us_ok_legislation_utils as OKLegislationUtils
+from us_ok_legislation_utils import SESSIONS, CHAMBERS, BILL_TYPES, SPONSOR_ROLES, get_sponsor_role_from_url
 from us_ok_legislation_votes_parser import OKLegislationVotesParser
+
+DEBUG_MODE = False
+
+STATE_ABBREVIATION = 'OK'
+DATABASE_TABLE_NAME = 'us_ok_legislation'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
+
+BASE_URL = 'http://webserver1.lsb.state.ok.us/WebApplication3/WebForm1.aspx'
+SOUP_PARSER_TYPE = 'lxml'
+
+NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
+WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
 
 # These urls shouldn't be in the OK database
 ODDITIES = [
@@ -37,28 +47,14 @@ ODDITIES = [
     'http://www.oklegislature.gov/BillInfo.aspx?Bill=HB9999&session=2100',
 ]
 
-BASE_URL = 'http://webserver1.lsb.state.ok.us/WebApplication3/WebForm1.aspx'
-SOUP_PARSER_TYPE = 'lxml'
-
-STATE_ABBREVIATION = 'OK'
-DATABASE_TABLE_NAME = 'us_ok_legislation'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
-
-DEBUG_MODE = False
-NUM_POOL_THREADS = 10
-CURRENT_YEAR = datetime.now().year
-
-PATH = '../../../../../web_drivers/chrome_win_90.0.4430.24/chromedriver.exe'
-
-header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-options = Options()
-options.headless = True
-
 scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION, DATABASE_TABLE_NAME, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape_regular_session():
-    driver = webdriver.Chrome(PATH, options=options)
+    options = Options()
+    options.headless = True
+
+    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL)
     driver.maximize_window()
@@ -131,7 +127,7 @@ def merge_all_scrape_regular_session_data(legislation_data, scrape_regular_sessi
     for data in scrape_regular_session_data:
         source_url = data['url']
         legislation_row = _get_legislation_row(legislation_data, source_url)
-        if legislation_row != None:
+        if legislation_row:
             _merge_scrape_regular_session_data(legislation_row, data)
 
 def _create_soup(url, soup_parser_type):
@@ -157,13 +153,13 @@ def _set_session(row, url):
     pattern = re.compile('session=[A-Za-z0-9]+')
     session_code = pattern.search(url).group(0)
     session_code = session_code.replace('session=', '')
-    session = OKLegislationUtils.get_session(session_code)
+    session = SESSIONS.get(session_code)
     row.session = session
 
 def _set_date_introduced(row, soup):
-    table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel1_tblHouseActions'})
-    date_introduced_row = table.find_all('tr')[2]
-    date_introduced_str = date_introduced_row.find_all('td')[2].text
+    table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel4_tblVersions'})
+    date_introduced_row = table.find_all('tr')[1]
+    date_introduced_str = date_introduced_row.find_all('td')[1].text
     date_introduced = datetime.strptime(date_introduced_str, '%m/%d/%Y')
     row.date_introduced = date_introduced
 
@@ -174,13 +170,13 @@ def _set_chamber_origin(row, soup):
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel1_tblHouseActions'})
     chamber_origin_row = table.find_all('tr')[2]
     chamber_origin_code = chamber_origin_row.find_all('td')[3].text
-    chamber_origin = OKLegislationUtils.get_chamber(chamber_origin_code)
+    chamber_origin = CHAMBERS.get(chamber_origin_code)
     row.chamber_origin = chamber_origin
 
 def _set_bill_type(row, soup):
     bill_name = soup.find('a', {'id': 'ctl00_ContentPlaceHolder1_lnkIntroduced'}).text
     bill_code = bill_name.split(' ')[0]
-    bill_type = OKLegislationUtils.get_bill_type(bill_code)
+    bill_type = BILL_TYPES.get(bill_code)
     row.bill_type = bill_type
 
 def _set_bill_title(row, title):
@@ -205,7 +201,7 @@ def _set_sponsors(row, soup):
     # OK can have at most one sponsor for a legislation
     sponsor_soup = soup.find('a', {'id': 'ctl00_ContentPlaceHolder1_lnkOtherAuth'})
     
-    if sponsor_soup == None:
+    if not sponsor_soup:
         return
     
     sponsor_str = sponsor_soup.text
@@ -217,12 +213,11 @@ def _set_sponsors(row, soup):
     row.sponsors_id = [sponsor_data['id']]
 
 def _set_cosponsors(row, soup):
-    # Has the minimum two lines:
+    # Has the following minimum two lines:
     # Authors/Co Authors for
     # ***To be added when the next official action is taken on the measure.***
 
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_TabContainer1_TabPanel6_tblCoAuth'})
-    # table_rows = table.find_all('tr')[1:-2]
     table_rows = table.find_all('td', {'align': 'left'})[1:-2]
 
     # Return if table is not populated yet
@@ -235,7 +230,7 @@ def _set_cosponsors(row, soup):
     for table_row in table_rows:
         sponsor_data = _get_sponsor_data(table_row.text)
 
-        if sponsor_data == None:
+        if not sponsor_data:
             continue
         
         cosponsors.append(sponsor_data['name'])
@@ -255,12 +250,12 @@ def _set_bill_text(row, soup):
     # Get url (PDF) of bill text
     url = None
     for table_row in table_rows:
-        if 'final version' in table_row.text:
+        if 'final version' in table_row.text or 'Engrossed' in table_row.text:
             url = table_row.get('href')
     else:
-        if url == None:
+        if not url:
             version_soup = table_rows[0]
-            url = table_row.get('href')
+            url = version_soup.get('href')
 
     # Read from PDF
     response = requests.get(url, stream = True)
@@ -272,7 +267,7 @@ def _set_bill_text(row, soup):
     bill_text = ''
     for page in pdf.pages:
         page_text = page.extract_text()
-        if page_text != None:
+        if page_text:
             bill_text += page_text
 
     row.bill_text = bill_text
@@ -292,12 +287,12 @@ def _set_bill_summary(row, soup):
     # Get url (PDF) of bill text
     url = None
     for table_row in table_rows:
-        if 'Engrossed' in table_row.text:
+        if 'final version' in table_row.text or 'Engrossed' in table_row.text:
             url = table_row.get('href')
     else:
-        if url == None:
+        if not url:
             version_soup = table_rows[0]
-            url = table_row.get('href')
+            url = version_soup.get('href')
 
     # Read from PDF
     response = requests.get(url, stream = True)
@@ -306,7 +301,7 @@ def _set_bill_summary(row, soup):
     bill_summary = ''
     for page in pdf.pages:
         page_text = page.extract_text()
-        if page_text != None:
+        if page_text:
             bill_summary += page_text
 
     row.bill_summary = bill_summary
@@ -329,7 +324,7 @@ def _set_actions(row, soup):
 
         action = {
             'date': datetime.strptime(fields[2].text.strip(), '%m/%d/%Y'),
-            'action_by': OKLegislationUtils.get_chamber(fields[3].text),
+            'action_by': CHAMBERS.get(fields[3].text),
             'description': fields[0].text,
         }
         actions.append(action)
@@ -380,7 +375,7 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
 
     sponsor = _format_sponsor_data(sponsor_str, sponsor_url)
 
-    if sponsor == None:
+    if not sponsor:
         return
 
     sponsor_last_name = sponsor['last']
@@ -394,7 +389,7 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
         'role': sponsor_role,
     }
 
-    if sponsor_first_name != None:
+    if sponsor_first_name:
         search_query['name_first'] = sponsor_first_name
 
     gov_id = scraper_utils.get_legislator_id(**search_query)
@@ -409,7 +404,7 @@ def _get_sponsor_data(sponsor_str, sponsor_url=None):
 def _format_sponsor_data(sponsor_str, sponsor_url=None): 
     sponsor_str = sponsor_str.replace('\n', '')
 
-    if sponsor_str == '' or sponsor_str == None:
+    if not sponsor_str:
         return
 
     # Match last name
@@ -436,13 +431,13 @@ def _format_sponsor_data(sponsor_str, sponsor_url=None):
     }
 
     # Get role
-    if sponsor_url == None:
-        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_abbr(chamber)
+    if not sponsor_url:
+        sponsor['role'] = SPONSOR_ROLES.get(chamber)
     else:
-        sponsor['role'] = OKLegislationUtils.get_sponsor_role_from_url(sponsor_url)
+        sponsor['role'] = get_sponsor_role_from_url(sponsor_url)
     
     # Manually fix oddities
-    if sponsor['first'] != None and sponsor['first'] == 'J.A.':
+    if sponsor['first'] and sponsor['first'] == 'J.A.':
         sponsor['first'] = 'JoAnna'
     
     if 'McCall and McBride' in sponsor_str or 'McCall and O\'Donnell' in sponsor_str:
@@ -480,7 +475,7 @@ def main():
 
     # Scrape each url
     print(DEBUG_MODE and 'Begin scraping each urls...\n' or '', end='')
-    with Pool(NUM_POOL_THREADS) as pool:
+    with Pool(NUM_POOL_PROCESSES) as pool:
         data = list(tqdm(pool.imap(scrape, urls)))
 
     # Merge current status and title
@@ -489,7 +484,8 @@ def main():
 
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
-    scraper_utils.write_data(data)
+    if not DEBUG_MODE:
+        scraper_utils.write_data(data)
 
     print('\nCOMPLETE!\n')
 
