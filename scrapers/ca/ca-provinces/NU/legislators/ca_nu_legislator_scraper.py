@@ -23,11 +23,11 @@ WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Nunavut'
 ELECTIONS_HISTORY_URL = 'https://www.elections.nu.ca/en/documents/election-results-and-financial-returns'
 THREADS_FOR_POOL = 12
 
-YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY = {
-                                    1999 : 1,
-                                    2004 : 2,
-                                    2008 : 3,
-                                    2013 : 4,
+NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY = {
+                                    1 : 1999,
+                                    2 : 2004,
+                                    3 : 2008,
+                                    4 : 2013,
                                     }
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NU', 'ca_nu_legislators')
@@ -41,7 +41,7 @@ def program_driver():
     print('Getting data from MLA pages...')
     all_mla_links = MainSiteScraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
-    print(mla_data)
+    # print(mla_data)
 
 class PreProgramFunctions:
     def set_legislative_office_address(self):
@@ -81,13 +81,13 @@ class PreProgramFunctions:
         return int(year)
 
     def __add_current_legislature_term_if_missing(self, year):
-        if YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY.get(year) == None:
-            all_nth_assemblies = YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY.values()
+        if year not in NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.values():
+            all_nth_assemblies = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.keys()
             most_recent_term = list(all_nth_assemblies)[-1]
-            YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY.setdefault(year, most_recent_term + 1)
+            NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.setdefault(most_recent_term + 1, year)
 
     def __get_current_legislature(self):
-        all_nth_assemblies = YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY.values()
+        all_nth_assemblies = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.keys()
         return list(all_nth_assemblies)[-1]
 
 class MainFunctions:        
@@ -143,6 +143,7 @@ class MLASiteScraper:
         self.__set_party_data()
         self.__set_contact_info()
         self.__set_most_recent_term_id()
+        self.__set_years_active()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -259,7 +260,52 @@ class MLASiteScraper:
         return number.strip()
 
     def __set_most_recent_term_id(self):
-        self.row.most_recent_term_id = list(YEAR_TO_NTH_LEGISLATIVE_ASSEMBLY.keys())[-1]
+        self.row.most_recent_term_id = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY[CURRENT_LEGISLATURE_TERM]
+        print(self.row.most_recent_term_id)
+
+    def __set_years_active(self):
+        member_information = self.main_container.find('div', {'class' : 'content clear-block'})
+        return_set = set({})
+        for child in member_information.children:
+            if child.name == 'p':
+                return_set.update(self.__find_years_active(child.text)) 
+        self.row.years_active = self.__get_service_periods_as_years(return_set)
+
+    def __find_years_active(self, string):
+        return_list = []
+        terms = self.__extract_terms_worked(string, 'Legislative Assembly')
+        terms.extend(self.__extract_terms_worked(string, 'Legislative Assemblies'))
+        return_list.extend(terms)
+        return set(return_list)
+
+    def __extract_terms_worked(self, string, split_word):
+        split_paragraphs = string.split(split_word)
+        relevant_texts = split_paragraphs[:-1] # The last paragraph contains the unnecessary split part
+        if 'Assembly' in split_word:
+            return [text.split()[-1] for text in relevant_texts]
+        elif 'Assemblies' in split_word:
+            return_list = []
+            for text in relevant_texts:
+                return_list.extend(text.split()[-4:])
+            return return_list
+
+    # TODO
+    # def __get_service_periods_as_years(self, service_periods):
+    #     service_periods_as_years = []
+    #     for period in service_periods:
+    #         self.__add_periods_as_years(period, service_periods_as_years)
+    #     return service_periods_as_years
+
+    # def __add_periods_as_years(self, period, return_list):
+    #     last_period = list(NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR)[-1]
+    #     current_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period)
+    #     if period != last_period:
+    #         next_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period + 1)
+    #         for i in range(current_term_year, next_term_year):
+    #             return_list.append(i)
+    #     elif CURRENT_YEAR > period:
+    #         for i in range(current_term_year, CURRENT_YEAR + 1):
+    #             return_list.append(i)
 
 PreProgramFunctions().set_legislative_office_address()
 elections_page_soup = MainFunctions().get_page_as_soup(ELECTIONS_HISTORY_URL)

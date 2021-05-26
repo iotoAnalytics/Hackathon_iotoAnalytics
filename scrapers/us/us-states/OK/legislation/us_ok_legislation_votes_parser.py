@@ -1,8 +1,10 @@
-from scraper_utils import USStateLegislationScraperUtils
 import re
 import unicodedata
-from pprint import pprint
 from datetime import datetime
+
+from pprint import pprint
+
+from scraper_utils import USStateLegislationScraperUtils
 
 class OKLegislationVotesParser:
     """
@@ -230,7 +232,6 @@ class OKLegislationVotesParser:
         else:
             # Special case for Mr/Mrs.Speaker
             if 'Speaker' in voter_data['name_last']:
-                # voter_data['name_last'] = self.scraper_utils.get_attribute('legislator', 'role', 'Representative', 'name_last')
                 voter_data['name_last'] = 'McCall'
 
             # Special case for CrosswhiteHader
@@ -475,9 +476,6 @@ class OKSenateVotesParser(OKLegislationVotesParser):
             if line == sections_dict['description']:
                 vote_data['description'] = self._get_description(page, i)
 
-            # elif line == sections_dict['status']:
-            #     vote_data['passed'] = self._get_passed(page, i)
-
             elif line == sections_dict['vote_outcome']:
                 vote_data['date'] = self._get_date(page, i)
 
@@ -576,8 +574,6 @@ class OKSenateVotesParser(OKLegislationVotesParser):
 
             elif cp_count:= re.match('VACANT:\s+([0-9]+)', line):
                 sections_dict['vac_count'] = line
-                # if cp_count.group(1) != '0':
-                #     sections_dict['vac_voters'] = first_line_of_sections[i + 1]
 
         return sections_dict
 

@@ -1,51 +1,52 @@
-# Unavailable data - source_url, source_id, addresses, seniority, military_exp
-# Wiki data - birthday, education, occupation, years_active, most_recent_term_id 
+# Unavailable data - source_url, source_id, addresses, seniority, military_experience
+# Wiki data - birthday, education, occupation, years_active
 
-import sys
+import datetime
+import multiprocessing
 import os
+import re
+import sys
+from multiprocessing import Pool
+
+from bs4 import BeautifulSoup
+from nameparser import HumanName
 from pathlib import Path
+from pprint import pprint
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from time import sleep
+from tqdm import tqdm
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvTerrLegislatorScraperUtils
-from bs4 import BeautifulSoup
-from multiprocessing import Pool
-from pprint import pprint
-from nameparser import HumanName
-import re
-from tqdm import tqdm
-import datetime
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from time import sleep
+DEBUG_MODE = False
+
+PROV_ABBREVIATION = 'NL'
+LEGISLATOR_TABLE_NAME = 'ca_nl_legislators'
+CURRENT_GENERAL_ASSEMBLY = '50'
 
 BASE_URL = 'https://www.assembly.nl.ca'
 MEMBER_PATH = '/members'
 WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
-PROV_ABBREVIATION = 'NL'
-LEGISLATOR_TABLE_NAME = 'ca_nl_legislators_test'
-
-DEBUG_MODE = False
-NUM_POOL_THREADS = 10
-CURRENT_YEAR = datetime.datetime.now().year
-
-PATH = '../../../../../web_drivers/chrome_win_90.0.4430.24/chromedriver.exe'
-
-header = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-options = Options()
-options.headless = False
+NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
+WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
+GENERAL_ASSEMBLY_YEAR = {
+    '50': '2021'
+}
 
 scraper_utils = CAProvTerrLegislatorScraperUtils(PROV_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
-    data = []
+    options = Options()
+    options.headless = False
 
-    driver = webdriver.Chrome(PATH, options=options)
+    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL + MEMBER_PATH + '/members.aspx')
     driver.maximize_window()
@@ -55,6 +56,8 @@ def scrape(url):
     soup = BeautifulSoup(html, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
 
+    data = []
+    
     table_rows = soup.find('table', {'id': 'table'}).find('tbody').find_all('tr')
 
     for table_row in table_rows:
@@ -63,6 +66,7 @@ def scrape(url):
         # Name, District(Areas Served), Party, Phone, Email
         fields = table_row.find_all('td')
         
+        _set_most_recent_term_id(row, soup)
         _set_source_url(row, fields[4].text)
         _set_name(row, fields[0].text)
         _set_riding(row, fields[1].text)
@@ -72,14 +76,13 @@ def scrape(url):
 
         data.append(row)
 
-    # roles_data = _get_roles()
-    # _set_all_legislator_roles(data, roles_data)
-
     driver.quit()
+
     return data
 
 def get_roles():
-    url = BASE_URL + MEMBER_PATH + '/OfficeHolders.aspx'
+    members_list_path = '/OfficeHolders.aspx'
+    url = BASE_URL + MEMBER_PATH + members_list_path
     soup = _create_soup(url, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -90,7 +93,8 @@ def get_roles():
     roles_data = [_format_roles(li.text) for li in list_items]
     
     # Executive Branch
-    roles_data.append(_format_roles(lists[1].find('li').text))
+    formatted_roles = _format_roles(lists[1].find('li').text)
+    roles_data.append(formatted_roles)
     
     return roles_data
 
@@ -114,7 +118,7 @@ def update_legislator_roles(legislator_data, roles_data):
     # Set specific roles
     for role_data in roles_data:
         legislator = _get_legislator_row(legislator_data, role_data['name'])
-        if legislator != None:
+        if legislator:
             legislator.role = role_data['role']
 
 def scrape_committee(url):
@@ -136,7 +140,7 @@ def scrape_committee(url):
     return members
 
 def update_house_committees(data, urls):
-    with Pool(NUM_POOL_THREADS) as pool:
+    with Pool(NUM_POOL_PROCESSES) as pool:
         committees_data_list = list(tqdm(pool.imap(scrape_committee, urls)))
 
     for row in data:
@@ -172,17 +176,25 @@ def scrape_wiki(url):
     return wiki_data
 
 def merge_all_wiki_data(legislator_data, wiki_urls):
-    with Pool(NUM_POOL_THREADS) as pool:
+    with Pool(NUM_POOL_PROCESSES) as pool:
         wiki_data = list(tqdm(pool.imap(scrape_wiki, wiki_urls)))
 
     for data in wiki_data:
-        _merge_wiki_data(legislator_data, data)
+        _merge_wiki_data(legislator_data, data, most_recent_term_id=False)
 
 def _create_soup(url, soup_parser_type):
     scrape_url = url
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
+
+def _set_most_recent_term_id(row, soup):
+    content = soup.find_all('div', {'class': 'container'})[3]
+    general_assembly_str = content.find('strong').text
+    
+    if CURRENT_GENERAL_ASSEMBLY in general_assembly_str:
+        most_recent_term_id = GENERAL_ASSEMBLY_YEAR.get(CURRENT_GENERAL_ASSEMBLY)
+        row.most_recent_term_id = most_recent_term_id
 
 def _set_source_url(row, text):
     # Note: Members do not have a unique source url so email is used instead
@@ -207,14 +219,21 @@ def _set_party(row, text):
     row.party_id = scraper_utils.get_party_id(text)
 
 def _set_phone_numbers(row, text):
+    phone_numbers = []
+    
+    # Match format (###) ###-####
     match = re.search('\(([0-9]{3})\)\s([0-9]{3})\-([0-9]{4})', text)
+    
     if match:
+        # Format to ###-###-####
         number = match.group(1) + '-' + match.group(2) + '-' + match.group(3)
         phone_number = {
             'office': '',
             'number': number
         }
-        row.phone_numbers = [phone_number]
+        phone_numbers.append(phone_number)
+
+    row.phone_numbers = phone_numbers
 
 def _set_email(row, text):
     row.email = text
@@ -223,6 +242,8 @@ def _set_riding(row, text):
     row.riding = text
 
 def _format_roles(text):
+    # Format given text into role and name
+    # e.g. Loyola O’Driscoll – Ferryland
     text = re.split('-|–', text)
     role_data = {
         'role': text[0].replace('The ', '').strip(),
@@ -238,7 +259,7 @@ def _get_committee_list(soup, committee_name):
     for member in members:
         member_data = member.text.replace('–', '-').split('-', 1)
         
-        # Currently, there are no roles listed
+        # Currently, there are no special roles listed for committees
         committee_member = {
             'name': member_data[0].strip(),
             'riding': member_data[1].strip(),
@@ -275,19 +296,19 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
 
     legislator_row = _get_legislator_row(legislator_data, full_name)
 
-    if legislator_row == None:
+    if not legislator_row:
         return
 
     for bio_info in wiki_data:
-        if birthday == True:
+        if birthday:
             legislator_row.birthday = wiki_data['birthday']
-        if education == True:
+        if education:
             legislator_row.education = wiki_data['education']
-        if occupation == True:
+        if occupation:
             legislator_row.occupation = wiki_data['occupation']
-        if years_active == True:
+        if years_active:
             legislator_row.years_active = wiki_data['years_active']
-        if most_recent_term_id == True:
+        if most_recent_term_id:
             legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
 
 def main():
@@ -329,7 +350,7 @@ def main():
     merge_all_wiki_data(data, wiki_urls)
 
     # Write to database
-    if DEBUG_MODE == False:
+    if not DEBUG_MODE:
         print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
         scraper_utils.write_data(data)
 

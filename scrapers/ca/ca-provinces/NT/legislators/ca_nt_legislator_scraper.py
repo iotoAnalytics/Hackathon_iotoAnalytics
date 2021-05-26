@@ -356,6 +356,17 @@ class MLA_Site_Scraper:
             if 'Oath of Office' in text:
                 return biography_paragraphs[:index]
 
+    def __find_terms_worked(self, paragraphs):
+        terms_worked = set({})
+        for paragraph in paragraphs:
+            self.__add_term_if_exists(paragraph.text, terms_worked)
+        return terms_worked
+    
+    def __add_term_if_exists(self, paragraph, set_to_add_to):
+        service_periods_as_string = re.findall('\d\d[a-z]{2}', paragraph)
+        for period in service_periods_as_string:
+            set_to_add_to.add(int(period[0:2]))
+
     def __get_service_periods_as_years(self, service_periods_as_int):
         service_periods_as_years = []
         for period in service_periods_as_int:
@@ -372,17 +383,6 @@ class MLA_Site_Scraper:
         elif CURRENT_YEAR > period:
             for i in range(current_term_year, CURRENT_YEAR + 1):
                 return_list.append(i)
-    
-    def __find_terms_worked(self, paragraphs):
-        terms_worked = set({})
-        for paragraph in paragraphs:
-            self.__add_term_if_exists(paragraph.text, terms_worked)
-        return terms_worked
-    
-    def __add_term_if_exists(self, paragraph, set_to_add_to):
-        service_periods_as_string = re.findall('\d\d[a-z]{2}', paragraph)
-        for period in service_periods_as_string:
-            set_to_add_to.add(int(period[0:2]))
 
     def __set_committee_data(self):
         committees_container = self.__get_committee_paragraph()
