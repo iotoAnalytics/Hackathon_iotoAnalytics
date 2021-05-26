@@ -1,9 +1,6 @@
-import enum
 import sys
 import os
 from pathlib import Path
-
-from pandas.core.reshape.merge import merge
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -12,7 +9,6 @@ sys.path.insert(0, str(path_to_root))
 import pandas as pd
 from scraper_utils import CAProvinceTerrLegislationScraperUtils, PDF_Table_Reader
 from scraper_utils import PDF_Reader
-import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
