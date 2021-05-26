@@ -12,6 +12,7 @@ from transformers import BertTokenizer
 from torch.utils.data import TensorDataset
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
+import functools
 
 import sys
 import pandas as pd
@@ -216,9 +217,22 @@ class ScraperUtils:
         row.country_id = self.country_id
         row.country = self.country
         return row
+
+    class Timer:
+        """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to
+        time your function."""
+        def __call__(self, func):
+            @functools.wraps(func)
+            def wrapper_timer(*args, **kwargs):
+                start = time.perf_counter()
+                value = func(*args, **kwargs)
+                end = time.perf_counter()
+                run_time = end - start
+                print(f'Finished {func.__name__} in {run_time:.4f} secs')
+                return value
+
+            return wrapper_timer
     
-
-
 
 class LegislatorScraperUtils(ScraperUtils):
     """Base scraper class. Contains methods common to all legislator scrapers."""
@@ -894,7 +908,20 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
         # data = self.add_topics(data)
         df = pd.DataFrame(data)
         df['topic'] = self.add_topics(df['bill_text'])
+        # df['principal_sponsor_id'] = df['principal_sponsor_id'].fillna(0)
+        df['principal_sponsor_id'] = pd.Series(df['principal_sponsor_id'], dtype=int)
+        # df['principal_sponsor_id'] = df['principal_sponsor_id'].replace(0, None)
+
+        # print(df['principal_sponsor_id'])
+
         data = df.to_dict('records')
+
+        # for d in data[:5]:
+        #     for k, v in d.items():
+        #         if k in {'bill_text'}:
+        #             continue
+        #         print(k, v, type(v))
+
 
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
@@ -1130,3 +1157,6 @@ class PDF_Table_Reader(PDF_Reader):
             table_only_in_page = page.crop((0, self.top_spacing, self.page_width, self.page_height - self.bottom_spacing))
             tables.append(table_only_in_page.extract_table())
         return tables
+
+
+

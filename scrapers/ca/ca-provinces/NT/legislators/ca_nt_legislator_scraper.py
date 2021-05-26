@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import re
 import datetime
-from time import sleep
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -18,7 +17,7 @@ import pandas as pd
 import numpy as np
 
 BASE_URL = 'https://www.ntassembly.ca'
-MLA_URL = 'https://www.ntassembly.ca/members'
+MLA_URL = BASE_URL + '/members'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_the_Northwest_Territories'
 THREADS_FOR_POOL = 12
 
@@ -43,8 +42,6 @@ columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 def program_driver():
     main_functions = Main_Functions()
-    
-    main_page_soup = main_functions.get_page_as_soup(MLA_URL)
 
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
@@ -298,6 +295,7 @@ class MLA_Site_Scraper:
             return [m_office_number_to_add, c_office_number_to_add]
         if not c_office_number_to_add:
             return [m_office_number_to_add, mobile_number_to_add]
+
     def __get_member_office_number(self, container):
         a_tag = container.a
         a_tag.decompose()
@@ -358,6 +356,17 @@ class MLA_Site_Scraper:
             if 'Oath of Office' in text:
                 return biography_paragraphs[:index]
 
+    def __find_terms_worked(self, paragraphs):
+        terms_worked = set({})
+        for paragraph in paragraphs:
+            self.__add_term_if_exists(paragraph.text, terms_worked)
+        return terms_worked
+    
+    def __add_term_if_exists(self, paragraph, set_to_add_to):
+        service_periods_as_string = re.findall('\d\d[a-z]{2}', paragraph)
+        for period in service_periods_as_string:
+            set_to_add_to.add(int(period[0:2]))
+
     def __get_service_periods_as_years(self, service_periods_as_int):
         service_periods_as_years = []
         for period in service_periods_as_int:
@@ -374,17 +383,6 @@ class MLA_Site_Scraper:
         elif CURRENT_YEAR > period:
             for i in range(current_term_year, CURRENT_YEAR + 1):
                 return_list.append(i)
-    
-    def __find_terms_worked(self, paragraphs):
-        terms_worked = set({})
-        for paragraph in paragraphs:
-            self.__add_term_if_exists(paragraph.text, terms_worked)
-        return terms_worked
-    
-    def __add_term_if_exists(self, paragraph, set_to_add_to):
-        service_periods_as_string = re.findall('\d\d[a-z]{2}', paragraph)
-        for period in service_periods_as_string:
-            set_to_add_to.add(int(period[0:2]))
 
     def __set_committee_data(self):
         committees_container = self.__get_committee_paragraph()
