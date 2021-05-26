@@ -12,6 +12,7 @@ from transformers import BertTokenizer
 from torch.utils.data import TensorDataset
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
+import functools
 
 import sys
 import pandas as pd
@@ -216,9 +217,22 @@ class ScraperUtils:
         row.country_id = self.country_id
         row.country = self.country
         return row
+
+    class Timer:
+        """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to
+        time your function."""
+        def __call__(self, func):
+            @functools.wraps(func)
+            def wrapper_timer(*args, **kwargs):
+                start = time.perf_counter()
+                value = func(*args, **kwargs)
+                end = time.perf_counter()
+                run_time = end - start
+                print(f'Finished {func.__name__} in {run_time:.4f} secs')
+                return value
+
+            return wrapper_timer
     
-
-
 
 class LegislatorScraperUtils(ScraperUtils):
     """Base scraper class. Contains methods common to all legislator scrapers."""
@@ -1143,3 +1157,6 @@ class PDF_Table_Reader(PDF_Reader):
             table_only_in_page = page.crop((0, self.top_spacing, self.page_width, self.page_height - self.bottom_spacing))
             tables.append(table_only_in_page.extract_table())
         return tables
+
+
+
