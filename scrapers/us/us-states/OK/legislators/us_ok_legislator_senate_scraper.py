@@ -1,32 +1,39 @@
-# Unavailable data - email, seniority, military exp
-# Wiki data - birthday, occupation, education 
+# Unavailable data - email, seniority, military_experience
+# Wiki data - birthday, occupation, education
 
-import sys
 import os
+import re
+import sys
+
+import datetime
+import multiprocessing
+from bs4 import BeautifulSoup
+from multiprocessing import Pool
+from nameparser import HumanName
 from pathlib import Path
+from pprint import pprint
+from tqdm import tqdm
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 from scraper_utils import USStateLegislatorScraperUtils
-from bs4 import BeautifulSoup
-from multiprocessing import Pool
-from pprint import pprint
-from nameparser import HumanName
-import re
-from tqdm import tqdm
-import datetime
+
+DEBUG_MODE = False
+
+STATE_ABBREVIATION = 'OK'
+LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
+CURRENT_LEGISLATURE = '58'
 
 BASE_URL = 'https://oksenate.gov'
 WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
-STATE_ABBREVIATION = 'OK'
-LEGISLATOR_TABLE_NAME = 'us_ok_legislators'
-
-DEBUG_MODE = False
-NUM_POOL_THREADS = 10
+NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 CURRENT_YEAR = datetime.datetime.now().year
+LEGISLATURE_YEAR = {
+    '58': '2020'
+}
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -52,7 +59,7 @@ def scrape(url):
     bio_info = _retrieve_biography_info(soup)
 
     _set_source_id(row, soup)
-    _set_most_recent_term_id(row, bio_info)
+    _set_most_recent_term_id(row)
     _set_source_url(row, url)
     _set_name(row, soup)
     _set_party(row, bio_info)
@@ -84,9 +91,6 @@ def get_committee_urls():
         subcommittee_urls_list = _get_subcommittee_urls(url)
         subcommittee_urls = subcommittee_urls + subcommittee_urls_list
 
-    # with Pool(NUM_POOL_THREADS) as pool:
-        # subcommittee_urls = list(tqdm(pool.imap(_get_subcommittee_urls, committee_urls)))
-
     urls = committee_urls + subcommittee_urls
 
     return urls
@@ -107,8 +111,6 @@ def scrape_committee(url):
 
 def update_senate_committees(data, urls):
     committees_data_list = [scrape_committee(url) for url in tqdm(urls)]
-    # with Pool(NUM_POOL_THREADS) as pool:
-    #     committees_data_list = list(tqdm(pool.imap(scrape_committee, urls)))
 
     for row in data:
         committees = _get_committees(committees_data_list, row.name_full, row.source_id, row.district)
@@ -140,7 +142,7 @@ def get_wiki_urls_with_district():
 
 def scrape_wiki(url):
     wiki_data = scraper_utils.scrape_wiki_bio(url['url'])
-    wiki_crawl_delay = scraper_utils.get_crawl_delay(url['url'])
+    wiki_crawl_delay = scraper_utils.get_crawl_delay(WIKI_URL)
     scraper_utils.crawl_delay(wiki_crawl_delay)
 
     return {
@@ -150,12 +152,12 @@ def scrape_wiki(url):
 
 def merge_all_wiki_data(legislator_data, wiki_urls):
     print(DEBUG_MODE and 'Scraping wikipedia...\n' or '', end='')
-    with Pool(NUM_POOL_THREADS) as pool:
+    with Pool(NUM_POOL_PROCESSES) as pool:
         wiki_data = list(tqdm(pool.imap(scrape_wiki, wiki_urls)))
 
     print(DEBUG_MODE and 'Merging wikipedia data...\n' or '', end='')
     for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, years_active = False, most_recent_term_id = False)
+        _merge_wiki_data(legislator_data, data, years_active=False, most_recent_term_id=False)
 
 def _create_soup(url, soup_parser_type):
     scrape_url = url
@@ -169,9 +171,9 @@ def _set_source_id(row, soup):
     sid = re.compile('[0-9]+').search(sid_str).group(0)
     row.source_id = sid
 
-def _set_most_recent_term_id(row, bio_info):
-    # Senate website only showcase current senators
-    row.most_recent_term_id = CURRENT_YEAR
+def _set_most_recent_term_id(row):
+    # Senate website only showcase current legislators
+    row.most_recent_term_id = LEGISLATURE_YEAR.get(CURRENT_LEGISLATURE)
 
 def _set_source_url(row, url):
     row.source_url = url
@@ -211,25 +213,32 @@ def _set_phone_numbers(row, soup):
     phone_number = re.sub('[()]', '', phone_number_str)
     phone_number = re.sub(' ', '-', phone_number)
 
+    phone_numbers = []
+
     phone_number = {
         'office': 'district office',
         'number': phone_number,
     }
 
-    row.phone_numbers = [phone_number]
+    phone_numbers.append(phone_number)
+    row.phone_numbers = phone_numbers
 
 def _set_addresses(row, soup):
     address_str = soup.find('div', {'class': 'bSenBio__address'}).find('p').text
-    address = re.sub(' Rm. [0-9]+', '', address_str)
-    address = re.sub('[.]+', '', address)
+    address = re.sub(' Rm.', ' Room ', address_str)
+    address = re.sub('Blvd.', 'Blvd', address)
+    address = re.sub(' Oklahoma City', ', Oklahoma City', address)
     address = re.sub('OK ', 'OK, ', address)
-    
+
+    addresses = []
+
     address = {
         'location': 'district office',
-        'adddress': address,
+        'address': address,
     }
 
-    row.addresses = [address]
+    addresses.append(address)
+    row.addresses = addresses
 
 def _set_areas_served(row, soup):
     areas_served_content = soup.find('div', {'class', 'bDistrict'}).find_all('div', {'class', 'bDistrict__tr'})[1]
@@ -293,7 +302,7 @@ def _get_subcommittee_urls(committee_url):
 
     subcommittee_options = soup.find_all('a', {'class', 'bDrop__item select2-results__option'})
 
-    if subcommittee_options != None:
+    if subcommittee_options:
         urls = [BASE_URL + path.get('href')
             for path in subcommittee_options]
 
@@ -323,14 +332,14 @@ def _get_committee_member_list(soup, committee_name):
     committee_members = _format_committee_regular_members_list(regular_members, committee=committee_name)
     return committee_members
 
-def _get_committees(committees_data_list, full_name, source_id, district):
+def _get_committees(committees_data_list, name_full, source_id, district):
     committees = []
 
     for committee_members in committees_data_list:
         for member in committee_members:
             if ('source_id' in member and member['source_id'] == source_id or
                 'district' in member and member['district'] == district) and \
-                member['name'] == full_name:
+                member['name'] == name_full:
 
                 committee = {
                     'role': member['role'],
@@ -392,20 +401,19 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
 
     legislator_row = _get_legislator_row(legislator_data, full_name, district)
 
-    if legislator_row == None:
+    if not legislator_row:
         return
 
-    for bio_info in wiki_data:
-        if birthday == True:
-            legislator_row.birthday = wiki_data['data']['birthday']
-        if education == True:
-            legislator_row.education = wiki_data['data']['education']
-        if occupation == True:
-            legislator_row.occupation = wiki_data['data']['occupation']
-        if years_active == True:
-            legislator_row.years_active = wiki_data['data']['years_active']
-        if most_recent_term_id == True:
-            legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
+    if birthday:
+        legislator_row.birthday = wiki_data['data']['birthday']
+    if education:
+        legislator_row.education = wiki_data['data']['education']
+    if occupation:
+        legislator_row.occupation = wiki_data['data']['occupation']
+    if years_active:
+        legislator_row.years_active = wiki_data['data']['years_active']
+    if most_recent_term_id:
+        legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
 
 def _fix_oddities(legislator_data):
     # Manually fixes odd data
@@ -422,7 +430,7 @@ def scrape_senate_legislators():
 
     # Scrape data from collected URLs
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
-    with Pool(NUM_POOL_THREADS) as pool:
+    with Pool(NUM_POOL_PROCESSES) as pool:
         data = list(tqdm(pool.imap(scrape, urls)))
 
     # Collect committee urls
@@ -447,8 +455,5 @@ def scrape_senate_legislators():
 
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
-    if DEBUG_MODE == False:
+    if not DEBUG_MODE:
         scraper_utils.write_data(data)
-
-# if __name__ == '__main__':
-#     main()
