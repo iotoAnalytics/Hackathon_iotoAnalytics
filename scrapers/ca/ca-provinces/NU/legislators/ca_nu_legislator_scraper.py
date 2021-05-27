@@ -23,6 +23,7 @@ WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Nunavut'
 ELECTIONS_HISTORY_URL = 'https://www.elections.nu.ca/en/documents/election-results-and-financial-returns'
 THREADS_FOR_POOL = 12
 
+CURRENT_YEAR = datetime.datetime.now().year
 NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY = {
                                     1 : 1999,
                                     2 : 2004,
@@ -41,7 +42,7 @@ def program_driver():
     print('Getting data from MLA pages...')
     all_mla_links = MainSiteScraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
-    # print(mla_data)
+    print(mla_data)
 
 class PreProgramFunctions:
     def set_legislative_office_address(self):
@@ -261,21 +262,21 @@ class MLASiteScraper:
 
     def __set_most_recent_term_id(self):
         self.row.most_recent_term_id = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY[CURRENT_LEGISLATURE_TERM]
-        print(self.row.most_recent_term_id)
 
     def __set_years_active(self):
         member_information = self.main_container.find('div', {'class' : 'content clear-block'})
-        return_set = set({})
+        terms_worked = set({})
         for child in member_information.children:
             if child.name == 'p':
-                return_set.update(self.__find_years_active(child.text)) 
-        self.row.years_active = self.__get_service_periods_as_years(return_set)
+                terms_worked.update(self.__find_years_active(child.text)) 
+        self.row.years_active = self.__get_service_periods_as_years(terms_worked)
 
     def __find_years_active(self, string):
         return_list = []
         terms = self.__extract_terms_worked(string, 'Legislative Assembly')
         terms.extend(self.__extract_terms_worked(string, 'Legislative Assemblies'))
         return_list.extend(terms)
+        return_list.append('5th')
         return set(return_list)
 
     def __extract_terms_worked(self, string, split_word):
@@ -290,22 +291,62 @@ class MLASiteScraper:
             return return_list
 
     # TODO
-    # def __get_service_periods_as_years(self, service_periods):
-    #     service_periods_as_years = []
-    #     for period in service_periods:
-    #         self.__add_periods_as_years(period, service_periods_as_years)
-    #     return service_periods_as_years
+    def __get_service_periods_as_years(self, terms_worked):
+        service_periods_as_years = []
+        for term in terms_worked:
+            self.__add_periods_as_years(term, service_periods_as_years)
+        service_periods_as_years.sort()
+        return service_periods_as_years
 
-    # def __add_periods_as_years(self, period, return_list):
-    #     last_period = list(NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR)[-1]
-    #     current_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period)
-    #     if period != last_period:
-    #         next_term_year = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR.get(period + 1)
-    #         for i in range(current_term_year, next_term_year):
-    #             return_list.append(i)
-    #     elif CURRENT_YEAR > period:
-    #         for i in range(current_term_year, CURRENT_YEAR + 1):
-    #             return_list.append(i)
+    def __add_periods_as_years(self, period, return_list):
+        if not self.__is_period(period):
+            return
+        period_as_int = self.__convert_period_to_int(period)
+        last_period = list(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY)[-1]
+        current_term_year = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.get(period_as_int)
+        if period_as_int != last_period:
+            next_term_year = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY.get(period_as_int + 1)
+            for i in range(current_term_year, next_term_year):
+                return_list.append(i)
+        elif CURRENT_YEAR > period_as_int:
+            for i in range(current_term_year, CURRENT_YEAR + 1):
+                return_list.append(i)
+            # print(f'{self.row.name_full}: current term: {current_term_year}; next_term_year: {next_term_year}')
+
+    def __is_period(self, period):
+        if 'the' in period or 'and' in period:
+            return False
+        return True
+
+    def __convert_period_to_int(self, period):
+        period = period.lower()
+        if period == '1st' or period == 'first':
+            return 1
+        elif period == '2nd' or period == 'second':
+            return 2
+        elif period == '3rd' or period == 'third':
+            return 3
+        elif period == '4th' or period == 'fourth':
+            return 4
+        elif period == '5th' or period == 'fifth':
+            return 5
+        elif period == '6th' or period == 'sixth':
+            return 6
+        elif period == '7th' or period == 'seventh':
+            return 7
+        elif period == '8th' or period == 'eigth':
+            return 8
+        elif period == '9th' or period == 'ninth':
+            return 9
+        elif period == '10th' or period == 'tenth':
+            return 10
+        elif period == '11th' or period == 'eleventh':
+            return 11
+        else:
+            return 0
+            
+            
+
 
 PreProgramFunctions().set_legislative_office_address()
 elections_page_soup = MainFunctions().get_page_as_soup(ELECTIONS_HISTORY_URL)
