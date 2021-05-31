@@ -12,6 +12,7 @@ sys.path.insert(0, str(path_to_root))
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
+from bs4 import NavigableString
 from multiprocessing import Pool
 from nameparser import HumanName
 import pandas as pd
@@ -20,6 +21,7 @@ import numpy as np
 BASE_URL = 'https://www.assembly.nu.ca'
 MLA_URL = BASE_URL + '/members/mla'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Nunavut'
+COMMITTEE_URL = BASE_URL + '/standing-and-special-committees'
 ELECTIONS_HISTORY_URL = 'https://www.elections.nu.ca/en/documents/election-results-and-financial-returns'
 THREADS_FOR_POOL = 12
 
@@ -36,7 +38,7 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
-COLUMNS_NOT_ON_MAIN_SITE = ['birthday', 'education', 'occupation']
+COLUMNS_NOT_ON_MAIN_SITE = ['birthday', 'education', 'occupation', 'committees']
 
 def program_driver():
     main_functions = MainFunctions()
@@ -51,7 +53,15 @@ def program_driver():
     all_wiki_links = main_functions.scrape_main_wiki_link(WIKI_URL)
     wiki_data = main_functions.get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
-    complete_data_set = main_functions.configure_data(mla_data, wiki_data)
+    print("Getting committee data from committee pages...")
+    main_committees_page_soup = main_functions.get_page_as_soup(COMMITTEE_URL)
+    all_committee_links = CommitteeMainSiteScraper().get_all_committee_links(main_committees_page_soup)
+    index_where_committees_end = 4
+    unprocessed_committee_data = main_functions.get_data_from_all_links(main_functions.get_committee_data, 
+                                                                        all_committee_links[:index_where_committees_end + 1])
+    committee_data = main_functions.organize_unproccessed_committee_data(unprocessed_committee_data)
+
+    complete_data_set = main_functions.configure_data(mla_data, wiki_data, committee_data)
     print('Writing data to database...')
     scraper_utils.write_data(complete_data_set)
     print("Complete")
@@ -138,7 +148,38 @@ class MainFunctions:
             wiki_urls.append(url)
         return wiki_urls
 
-    def configure_data(self, mla_data, wiki_data):
+    def get_committee_data(self, committee_url):
+        return CommitteeSiteScraper(committee_url).get_committee_data()
+
+    def organize_unproccessed_committee_data(self, raw_data):
+        restructured_data = {}
+        return_data = []
+        for committee in raw_data:
+            self.__restructure_committee_data(committee, restructured_data)
+        self.__add_to_return_data(restructured_data, return_data)
+        return return_data
+
+    def __restructure_committee_data(self, committee, restructured_data):
+        committee_name = list(committee.keys())[0]
+        list_of_members = committee[committee_name]
+        for member in list_of_members:
+            self.__add_member_committee_data(member, committee_name, restructured_data)
+
+    def __add_member_committee_data(self, member, committee_name, restructured_data):
+        member_full_name = list(member.keys())[0]
+        role = member[member_full_name]
+        restructured_data.setdefault(member_full_name, [])
+        list_of_member_committees = restructured_data[member_full_name]
+        list_of_member_committees.append({'role' : role, 'committee' : committee_name})
+
+    def __add_to_return_data(self, dict_of_members_and_committees, return_data):
+        for member in dict_of_members_and_committees.keys():
+            name_first = member.split(' ')[0]
+            name_last = member.split(' ')[1]
+            committees = dict_of_members_and_committees[member]
+            return_data.append({'name_first' : name_first, 'name_last' : name_last, 'committees' : committees})
+
+    def configure_data(self, mla_data, wiki_data, committee_data):
         mla_df = pd.DataFrame(mla_data)
         mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
     
@@ -153,7 +194,15 @@ class MainFunctions:
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
 
-        return mla_wiki_df.to_dict('records')
+        committee_df = pd.DataFrame(committee_data)
+
+        big_df = pd.merge(mla_wiki_df, committee_df,
+                          how='left',
+                          on=['name_first', 'name_last'])
+        isna = big_df['committees'].isna()
+        big_df.loc[isna, 'committees'] = pd.Series([[]] * isna.sum()).values
+
+        return big_df.to_dict('records')
 
 class MainSiteScraper:
     def get_all_mla_links(self, main_page_soup):
@@ -387,8 +436,81 @@ class MLASiteScraper:
         else:
             return 0
             
-            
+class CommitteeMainSiteScraper:
+    def get_all_committee_links(self, soup):
+        content = soup.find('div', {'class' : 'content-container-inner'})
+        return self.__get_all_committee_links(content)
 
+    def __get_all_committee_links(self, container):
+        committee_lists = container.findAll('li')
+        return self.__extract_link(committee_lists)
+
+    def __extract_link(self, list_of_committtees):
+        return [BASE_URL + list_element.a['href'] for list_element in list_of_committtees]
+
+class CommitteeSiteScraper:
+    def __init__(self, committee_url):
+        self.url = committee_url
+        self.soup = MainFunctions().get_page_as_soup(self.url)
+        self.main_container = self.soup.find('div', {'class' : 'content-container-inner'})
+        self.data = {}
+        self.__colect_data()
+
+    def get_committee_data(self):
+        return self.data
+
+    def __colect_data(self):
+        committee_name = self.__get_committee_name()
+        membership = self.__get_committee_membership()
+        self.data = {committee_name : membership}
+        
+    def __get_committee_name(self):
+        return self.main_container.find('h1').text.title()
+
+    def __get_committee_membership(self):
+        membership_information = self.main_container.findAll('p', {'style' : 'text-align: center;'})
+        membership = []
+        for role_member_container in membership_information:
+            self.__extract_members(role_member_container, membership)
+        return membership
+
+    def __extract_members(self, container, return_list):
+        for child in container.children:
+            role = container.find('span').text
+            child_text = self.__get_text_from_navigable_string(child)
+
+            if not child_text:
+                pass
+            elif role != 'Staff':
+                data = self.__get_name_and_role(role, child_text)
+                return_list.append(data)
+            elif role == 'Staff':
+                self.__get_name_and_role_from_staff(role, child_text, return_list)
+
+    def __get_text_from_navigable_string(self, child):
+        if type(child) == NavigableString:
+            child = str(child.string)
+            return self.__clean_up_text(child)
+        else:
+            return None
+
+    def __clean_up_text(self, text):
+        return text.replace('\n', '').replace('\xa0', '')
+
+    def __get_name_and_role(self, role, text):
+        if role == 'Members':
+            role = 'Member'
+        return {text : role} 
+
+    def __get_name_and_role_from_staff(self, role, text, return_list):
+        role = text.split(': ')[0]
+        name = text.split(': ')[1]
+        if 'and' in name:
+            names = name.split(' and ')
+            for actual_name in names:
+                return_list.append({actual_name : role})
+        else:
+            return_list.append({name : role})
 
 PreProgramFunctions().set_legislative_office_address()
 elections_page_soup = MainFunctions().get_page_as_soup(ELECTIONS_HISTORY_URL)
