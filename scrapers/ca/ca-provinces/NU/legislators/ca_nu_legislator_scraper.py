@@ -402,7 +402,6 @@ class MLASiteScraper:
         elif CURRENT_YEAR > period_as_int:
             for i in range(current_term_year, CURRENT_YEAR + 1):
                 return_list.append(i)
-            # print(f'{self.row.name_full}: current term: {current_term_year}; next_term_year: {next_term_year}')
 
     def __is_period(self, period):
         if 'the' in period or 'and' in period:
