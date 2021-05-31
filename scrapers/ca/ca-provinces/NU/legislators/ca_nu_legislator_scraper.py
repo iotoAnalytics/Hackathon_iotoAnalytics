@@ -34,6 +34,10 @@ NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY = {
 scraper_utils = CAProvTerrLegislatorScraperUtils('NU', 'ca_nu_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+pd.set_option('display.max_rows', None)
+pd.set_option('display.max_columns', None)
+COLUMNS_NOT_ON_MAIN_SITE = ['birthday', 'education', 'occupation']
+
 def program_driver():
     main_functions = MainFunctions()
 
@@ -42,7 +46,15 @@ def program_driver():
     print('Getting data from MLA pages...')
     all_mla_links = MainSiteScraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
-    print(mla_data)
+
+    print('Getting data from wiki pages...')
+    all_wiki_links = main_functions.scrape_main_wiki_link(WIKI_URL)
+    wiki_data = main_functions.get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
+
+    complete_data_set = main_functions.configure_data(mla_data, wiki_data)
+    print('Writing data to database...')
+    scraper_utils.write_data(complete_data_set)
+    print("Complete")
 
 class PreProgramFunctions:
     def set_legislative_office_address(self):
@@ -112,6 +124,36 @@ class MainFunctions:
 
     def get_mla_data(self, mla_url):
         return MLASiteScraper(mla_url).get_rows()
+
+    def scrape_main_wiki_link(self, wiki_link):
+        wiki_urls = []
+        page_soup = self.get_page_as_soup(wiki_link)
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+        for tr in table:
+            td = tr.findAll("td")[1]
+            url = 'https://en.wikipedia.org' + (td.a["href"])
+
+            wiki_urls.append(url)
+        return wiki_urls
+
+    def configure_data(self, mla_data, wiki_data):
+        mla_df = pd.DataFrame(mla_data)
+        mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
+    
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+        ]
+
+        mla_wiki_df = pd.merge(mla_df, wiki_df, 
+                               how='left',
+                               on=['name_first', 'name_last'])
+        mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
+        mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
+        mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
+
+        return mla_wiki_df.to_dict('records')
 
 class MainSiteScraper:
     def get_all_mla_links(self, main_page_soup):
