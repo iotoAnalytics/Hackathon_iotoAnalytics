@@ -50,12 +50,15 @@ def get_rep_urls():
     """
     urls = []
     # Logic goes here! Some sample code:
+    # !! 1.
     base_url = 'https://house.louisiana.gov'
     path = '/H_Reps/H_Reps_FullInfo'
     scrape_url = base_url + path
 
     # request and soup
+    # !! 3.
     page = requests.get(scrape_url)
+    # !! 2.
     soup = BeautifulSoup(page.content, 'html.parser')
 
     # urls = {base_url + prod_path['href'] for prod_path in soup.findAll('a', {'href': re.compile("H_Reps/members")})}
@@ -95,7 +98,9 @@ def scrape_rep(url):
 
     row.source_url = url
 
+    # !! 3.
     page = requests.get(url)
+    # !! 2.
     soup = BeautifulSoup(page.content, 'html.parser')
 
     row.role = 'Representative'
@@ -152,6 +157,7 @@ def get_committees(row, soup):
     committees = []
     committees_html = soup.find('span', {'id': re.compile("body_FormView1_COMMITTEEASSIGNMENTS2Label")})
     for committee in committees_html.stripped_strings:
+        # !! 4.
         if 'Chairman' in committee:
             committee_name = committee.replace(', Chairman', '')
             committee_dict = {'role': 'chairman', 'committee': committee_name.lower()}
@@ -195,6 +201,7 @@ def get_years_active(row, soup):
     year_elected = soup.find('span', {'id': re.compile("body_FormView4_YEARELECTEDLabel")}).text
     if year_elected != "":
         try:
+            # !! 5.
             years_active = list(range(int(year_elected), 2022))
             row.years_active = list(range(int(year_elected), 2022))
         except Exception:
@@ -258,6 +265,7 @@ def get_name(row, soup):
     """
     # name
     name_full = soup.find('span', {'id': re.compile("body_FormView5_FULLNAMELabel")}).text
+    # !! 6.
     if "Jonathan Goudeau, I" not in name_full:
         hn = HumanName(name_full)
         row.name_full = name_full
@@ -285,7 +293,9 @@ def get_senate_urls():
     scrape_url = base_url + path
 
     # request and soup
+    # !! 3.
     page = requests.get(scrape_url)
+    # !! 2.
     soup = BeautifulSoup(page.content, 'html.parser')
 
     legislator_list = soup.find_all('div', {'class': 'media-body'})
@@ -324,7 +334,9 @@ def scrape_senate(url):
 
     row.source_url = url
 
+    # !! 3.
     page = requests.get(url)
+    # !! 2.
     soup = BeautifulSoup(page.content, 'html.parser')
 
     row.role = 'Senator'
@@ -388,7 +400,9 @@ def get_wiki_urls(path):
     print("If the tqdm bar seems stucked at 100%, please wait a bit longer, Thanks!")
     urls = []
     scrape_url = wiki_url + path
+    # !! 3.
     page = scraper_utils.request(scrape_url)
+    # !! 2.
     soup = BeautifulSoup(page.content, 'lxml')
     content_table = soup.find('table', {'class': 'wikitable sortable'})
     rows = content_table.find('tbody').find_all('tr')
