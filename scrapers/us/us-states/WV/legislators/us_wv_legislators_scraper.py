@@ -32,7 +32,7 @@ WIKI_HOUSE_PATH = '/wiki/West_Virginia_House_of_Delegates'
 WIKI_SENATE_PATH = '/wiki/West_Virginia_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
-NUM_POOL_PROCESSES = 10
+NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
