@@ -89,7 +89,7 @@ def find_reps_wiki(repLink):
     uClient = uReq(repLink)
     page_html = uClient.read()
     uClient.close()
-    # # html parsing
+
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
     people = tables[3].findAll("tr")
@@ -143,14 +143,11 @@ def find_party_and_district(main_div, row):
     row.party_id = scraper_utils.get_party_id(party)
     row.party = party
 
-    # Get district
     district = party_block.split(' ')[1]
-    #  print(district)
     row.district = district
 
 
 def get_name_and_role(main_div, row):
-    # Get names and current roll (House or Senate)
     current_role = ""
     name_line = main_div.find('h1').text
     name_full = name_line
@@ -205,13 +202,11 @@ def get_phone_numbers(capitol_office, home, business, row):
 
 
 def get_email(capitol_office, row):
-    # get email
     capitol_email = capitol_office.a.text
     row.email = capitol_email
 
 
 def get_address(capitol_office, row):
-    # get address room number for capitol office
     addresses = []
     room_number = capitol_office.text.split("Room: ")[1].strip()
     room_number = room_number[:room_number.index('\n')]
@@ -222,7 +217,6 @@ def get_address(capitol_office, row):
 
 
 def get_occupation(business, row):
-    # get occupation
     jobs = []
     try:
         job = business.text.split("Occupation: ")[1].strip()
@@ -242,7 +236,6 @@ def get_occupation(business, row):
 
 
 def get_years_active(contact_sidebar, row):
-    # get years active
     terms = []
     years = []
     try:
@@ -260,8 +253,6 @@ def get_years_active(contact_sidebar, row):
                 terms.append(term)
         except Exception:
             pass
-
-    # Convert term length to actual years
 
     # Converting terms from the form year-year eg. 2012-2014
     if len(terms) > 1:
@@ -334,34 +325,11 @@ def get_areas_served(big_df_data):
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
-    state, and state_id values, as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
 
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url
-    # like so:
     row.source_url = url
 
-    # The only thing to be wary of is collecting the party and party_id. You'll first have to collect
-    # the party name from the website, then get the party_id from scraper_utils
-    # This can be done like so:
-
-    # Replace with your logic to collect party for legislator.
-    # Must be full party name. Ie: Democrat, Republican, etc.
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
@@ -399,7 +367,6 @@ def scrape(url):
 
 
 if __name__ == '__main__':
-    # Getting URLs from gov't website
     start = time.time()
     print(
         f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) since the crawl delay is very large (ie: {crawl_delay} seconds). If you need to abort, press ctrl + c.')
@@ -407,10 +374,6 @@ if __name__ == '__main__':
     urls = get_urls()
     print('URLs Collected.')
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
     print('Scraping data...')
 
     with Pool() as pool:

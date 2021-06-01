@@ -14,6 +14,7 @@ from selenium import webdriver
 import time
 from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 import pandas as pd
+from multiprocessing import Pool
 
 p = Path(os.path.abspath(__file__)).parents[5]
 
@@ -171,6 +172,7 @@ def get_bill_text(url, row):
         for page in pages:
             page_text = page.extract_text()
             text += page_text.strip()
+        text = text.replace('\n', '')
         row.bill_text = text
     except Exception:
         row.bill_text = ""
@@ -209,6 +211,18 @@ def get_principal_sponsor(row):
             row.principal_sponsor_id = get_sponsor_id(name_first, name_last)
 
 
+def clear_none_value_rows(data):
+    df = pd.DataFrame(data)
+    list_of_dicts = df.to_dict('records')
+    print(list_of_dicts)
+    for i in range(len(list_of_dicts)):
+        value = list_of_dicts[i]['goverlytics_id']
+        print(value)
+        if 'None' in value:
+            del list_of_dicts[i]
+    return list_of_dicts
+
+
 def scrape(url):
 
     row = scraper_utils.initialize_row()
@@ -245,15 +259,13 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    data = [scrape(url) for url in urls]
-    df = pd.DataFrame(data)
-    no_content_index = df.index['None' in df['goverlytics_id']].tolist()
-    for index in no_content_index:
-        print(index)
-        df = df.drop(df.index[index])
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
+    #data = [scrape(url) for url in urls]
+    with Pool(processes=4) as pool:
+        data = pool.map(scrape, urls)
+    list_of_dicts = clear_none_value_rows(data)
+    print(list_of_dicts)
 
-    scraper_utils.write_data(df)
+
+    #scraper_utils.write_data(data)
 
     print('Complete!')
