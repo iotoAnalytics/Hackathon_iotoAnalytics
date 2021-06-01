@@ -414,8 +414,8 @@ def get_principal_sponsor_and_id(driver, row):
     if principal_sponsor_name_parser != 'Troy Carter':
         # special case: vacant senator
         principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                               name_first=principal_sponsor_name_parser.first,
-                                                               state_id=22)
+                                                            name_first=principal_sponsor_name_parser.first,
+                                                            state_id=22)
         row.principal_sponsor_id = principal_sponsor_id
     row.principal_sponsor = principal_sponsor
 
