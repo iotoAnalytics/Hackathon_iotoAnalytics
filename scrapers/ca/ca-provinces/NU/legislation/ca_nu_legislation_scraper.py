@@ -134,7 +134,9 @@ class BillScraper:
         self.row.session = CURRENT_SESSION
         self.row.goverlytics_id = self.__get_goverlytics_id()
         self.row.chamber_origin = 'Legislative Assembly'
-        self.actions = self.__get_actions()
+        self.row.actions = self.__get_actions()
+        self.row.date_introduced = self.__get_date_introduced()
+        print(self.row.date_introduced)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
@@ -161,8 +163,42 @@ class BillScraper:
     def __get_actions(self):
         actions = []
         for index, cell in enumerate(self.column_description_to_index):
-            pass
+            action = self.__add_action_attribute(index, cell)
+            if action:
+                actions.append(action)
+        return actions
 
+    def __add_action_attribute(self, index, cell):
+        if index == 0:
+            return
+            
+        text = self.bill_columns_from_site[index].text
+        text = self.__clean_up_text(text)
+        if len(text) == 0:
+            return
+
+        date = datetime.datetime.strptime(text, '%B %d, %Y')
+        date = date.strftime('%Y-%m-%d')
+
+        description = cell
+        action_by = self.__get_action_by(description)
+        return {'date' : date, 'action_by' : action_by, 'description' : description}
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', '')
+        return text.strip()
+
+    def __get_action_by(self, description):
+        if 'Committee' in description:
+            return 'Standing Committee'
+        if 'Assent' in description:
+            return 'Commissioner'
+        return 'Legislative Assembly'
+
+    def __get_date_introduced(self):
+        index_of_first_reading_in_actions = 1
+        first_reading = self.row.actions[index_of_first_reading_in_actions]
+        return first_reading['date']
 
 PreProgramFunctions().set_current_session()
 
