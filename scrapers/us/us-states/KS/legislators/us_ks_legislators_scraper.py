@@ -1,35 +1,22 @@
-'''
-Before beginning, be sure to update values in the config file.
 
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
 import sys
 import os
 from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 from scraper_utils import USStateLegislatorScraperUtils
-import boto3
 import re
 import numpy as np
 from nameparser import HumanName
-from pprint import pprint
 from multiprocessing import Pool
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
-from urllib.request import Request
 import time
 from io import StringIO
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 state_abbreviation = 'KS'
 database_table_name = 'us_ks_legislators'
@@ -43,9 +30,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
+
     urls = []
     # Url we are scraping: http://www.kslegislature.org/li/b2021_22/chamber/senate/roster/
     path_senate = '/li/chamber/senate/roster/'
