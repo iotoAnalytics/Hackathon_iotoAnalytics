@@ -29,18 +29,7 @@ scraper_utils = USStateLegislatorScraperUtils('VT', 'us_vt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 
-def timer(func):
-    def wrapper_timer(*args, **kwargs):
-        start_time = time.perf_counter()
-        value = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        run_time = end_time - start_time
-        pprint(f'Finished {func.__name__} in {run_time:.4f} secs')
-        return value
-    return wrapper_timer
-
-
-@timer
+@scraper_utils.Timer()
 def make_soup(url):
     """
     Takes senator and representative paths and returns soup object.
@@ -56,7 +45,6 @@ def make_soup(url):
     return soup
 
 
-@timer
 def open_driver():
     options = Options()
     options.headless = True
@@ -67,7 +55,6 @@ def open_driver():
     return driver
 
 
-@timer
 def get_urls(path):
     """
     Takes base URL of gov site, combine with senate OR house paths to get individual representative page URLS.
@@ -95,7 +82,6 @@ def get_urls(path):
     return urls
 
 
-@timer
 def get_role(url, row):
     """
     Find legislator role and set row value.
@@ -110,7 +96,6 @@ def get_role(url, row):
     row.role = role
 
 
-@timer
 def get_name(url, row):
     """
     Find legislator name and set row values for first, middle, suffix, last name.
@@ -133,7 +118,6 @@ def get_name(url, row):
     row.name_full = hn.full_name
 
 
-@timer
 def get_email(url, row):
     """
     Find legislator email and set row value.
@@ -148,7 +132,6 @@ def get_email(url, row):
     row.email = email
 
 
-@timer
 def get_addresses(url, row):
     """
     Find legislator address and set row value.
@@ -167,7 +150,6 @@ def get_addresses(url, row):
     row.addresses = addresses
 
 
-@timer
 def get_phone_numbers(url, row):
     """
     Find legislator phone number[s] and set row value.
@@ -185,7 +167,6 @@ def get_phone_numbers(url, row):
     row.addresses = phone_numbers
 
 
-@timer
 def get_committees(url, row):
     """
     Find legislator committee info and set row value.
@@ -213,7 +194,6 @@ def get_committees(url, row):
     row.committees = all_committee_info
 
 
-@timer
 def get_district(url, row):
     """
     Find legislator district info and set row value.
@@ -228,7 +208,6 @@ def get_district(url, row):
     row.district = district
 
 
-@timer
 def get_party(url, row):
     """
     Find legislator district info and set row value.
@@ -243,7 +222,6 @@ def get_party(url, row):
     row.party = party
 
 
-@timer
 def get_source_id(url, row):
     """
     Find source id  info and set row value.
@@ -256,7 +234,6 @@ def get_source_id(url, row):
     row.source_id = source_id
 
 
-@timer
 def get_wiki_info(row):
     """
     Grab auxillary(birthday, education, etc) info from wikipedia.
