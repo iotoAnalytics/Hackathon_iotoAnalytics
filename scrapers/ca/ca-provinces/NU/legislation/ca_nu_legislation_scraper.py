@@ -136,7 +136,7 @@ class BillScraper:
         self.row.chamber_origin = 'Legislative Assembly'
         self.row.actions = self.__get_actions()
         self.row.date_introduced = self.__get_date_introduced()
-        print(self.row.date_introduced)
+        self.row.current_status = self.__get_current_status(sel)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
