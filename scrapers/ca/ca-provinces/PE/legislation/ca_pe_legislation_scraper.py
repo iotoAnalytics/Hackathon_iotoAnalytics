@@ -259,13 +259,15 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    #data = [scrape(url) for url in urls]
-    with Pool(processes=4) as pool:
-        data = pool.map(scrape, urls)
-    list_of_dicts = clear_none_value_rows(data)
-    print(list_of_dicts)
+    data = [scrape(url) for url in urls]
+    df = pd.DataFrame(data)
+    no_content_index = df.index['None' in df['goverlytics_id']].tolist()
+    for index in no_content_index:
+        print(index)
+        df = df.drop(df.index[index])
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
-
-    #scraper_utils.write_data(data)
+    scraper_utils.write_data(df)
 
     print('Complete!')
