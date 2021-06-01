@@ -5,6 +5,7 @@ import os
 import re
 import sys
 
+import multiprocessing
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -33,6 +34,7 @@ WIKI_SENATE_PATH = '/wiki/West_Virginia_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
+PEM_PATH = os.path.join('..', 'us_wv.pem')
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -119,7 +121,7 @@ def _scrape_wiki(url):
 
 def _create_soup(url, soup_parser_type):
     headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'}
-    page = requests.get(url, headers=headers, verify='us_wv_legislators.pem')
+    page = requests.get(url, headers=headers, verify=PEM_PATH)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
 
