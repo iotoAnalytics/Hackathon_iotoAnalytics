@@ -3,6 +3,8 @@ import sys
 import os
 from pathlib import Path
 
+import pdfplumber
+
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -13,7 +15,6 @@ from scraper_utils import PDF_Reader
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
-from enum import Enum
 import re
 import datetime
 
@@ -40,7 +41,7 @@ def program_driver():
     main_page_soup = main_functions.get_page_as_soup(BILLS_URL)
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
-    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows)
+    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[:2])
     # print(bill_data)
     # print('Writing data to database...')
     # scraper_utils.write_data(bill_data)
@@ -113,12 +114,16 @@ class BillScraper:
         'Reported from Standing Committee' : 4,
         'Reported from Committee of the Whole' : 5,
         'Third Reading' : 6,
-        'Date of Assent' : 7,
+        'Assent' : 7,
     }
 
     def __init__(self, bill_row_soup):
         self.row = scraper_utils.initialize_row()
         self.bill_columns_from_site = self.__get_columns(bill_row_soup)
+        self.row.source_url = self.__get_source_url()
+        self.pdf_reader = PDF_Reader()
+        self.summary_page_index = 0 #this value will get updated
+        self.__initialize_pdf_reader()
         self.__set_row_data()
 
     def __get_columns(self, bill_row_soup):
@@ -127,16 +132,28 @@ class BillScraper:
     def get_bill_data(self):
         return self.row
 
+    def __initialize_pdf_reader(self):
+        self.pdf_pages = self.pdf_reader.get_pdf_pages(self.row.source_url, scraper_utils._request_headers)
+        self.pdf_reader.set_page_width_ratio(width_in_inch=8.5)
+        self.pdf_reader.set_page_half(page_half_in_inch=4.25)
+        self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
+        self.pdf_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.19)
+        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.25, column2_start=4.30)
+        self.pdf_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=0.90)
+        scraper_utils.crawl_delay(crawl_delay)
+
     def __set_row_data(self):
         self.row.bill_name = self.__get_bill_name()
         self.row.bill_title = self.__get_bill_title()
-        self.row.source_url = self.__get_source_url()
         self.row.session = CURRENT_SESSION
         self.row.goverlytics_id = self.__get_goverlytics_id()
         self.row.chamber_origin = 'Legislative Assembly'
         self.row.actions = self.__get_actions()
         self.row.date_introduced = self.__get_date_introduced()
-        self.row.current_status = self.__get_current_status(sel)
+        self.row.current_status = self.__get_current_status()
+        self.row.bill_summary = self.__get_bill_summary()
+        # TODO
+        # self.row.bill_type = self.__get_bill_type() 
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
@@ -199,6 +216,32 @@ class BillScraper:
         index_of_first_reading_in_actions = 1
         first_reading = self.row.actions[index_of_first_reading_in_actions]
         return first_reading['date']
+
+    def __get_current_status(self):
+        last_action = self.row.actions[-1]
+        return last_action['description']
+
+    def __get_bill_summary(self):
+        pages_to_search_for = self.pdf_pages[0:2]
+        return self.__extract_bill_summary(pages_to_search_for[::-1])
+
+## TODO
+## First find a robust way of figuring out whether a page is column or not.
+## If the page is column, you can separate teh text by splitting with '  '
+
+    def __extract_bill_summary(self, pages):
+        for page in pages:
+            page_text = self.__get_page_text(page)
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', ' ')
+        text = text.replace('  ', ' ')
+        return text.strip()
+
+    def __get_bill_type(self):
+        if 'amend' in self.row.bill_title.lower():
+            return 'Ammendment'
+        return 'Bill'
 
 PreProgramFunctions().set_current_session()
 
