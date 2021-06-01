@@ -1122,7 +1122,7 @@ class PDF_Reader():
     def is_column(self, page):
         margin_top = page.crop((self.left_column_end, 0, self.right_column_start, self.top_spacing))
         text = margin_top.extract_text()
-        if text == None:
+        if text == None or len(text.strip()) == 0:
             return True
         else:
             return False

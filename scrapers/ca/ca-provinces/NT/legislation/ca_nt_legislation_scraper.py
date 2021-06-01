@@ -150,7 +150,7 @@ class Bill_PDF_Scraper:
         self.row.bill_summary = self.__get_bill_summary()
         self.row.bill_text = self.__get_bill_text()
         self.row.actions = self.__get_bill_actions()
-        self.row.current_status = self.__get_current_status(self.row.actions)
+        self.row.current_status = self.__get_current_status()
         self.row.bill_type = self.__get_bill_type()
         self.row.date_introduced = self.__get_date_introduced()
 
@@ -214,7 +214,7 @@ class Bill_PDF_Scraper:
         relevant_cells = bill_row_from_df[:1:-1]
         actions = []
         for index, cell in enumerate(relevant_cells):
-            action = (self.__add_action_attribute(cell, index))
+            action = self.__add_action_attribute(cell, index)
             if action:
                 actions.append(action)
         return actions
@@ -278,8 +278,8 @@ class Bill_PDF_Scraper:
             return 'Committee'
         return 'Legislative Assembly'
 
-    def __get_current_status(self, actions):
-        return actions[0]['description']
+    def __get_current_status(self):
+        return self.row.actions[0]['description']
 
     def __get_bill_type(self):
         if 'amend' in self.row.bill_title.lower():
