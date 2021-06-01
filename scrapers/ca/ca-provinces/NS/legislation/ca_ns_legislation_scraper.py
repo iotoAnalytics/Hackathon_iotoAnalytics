@@ -1,12 +1,4 @@
-'''
-Before beginning, be sure to update values in the config file.
 
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
 import sys
 import os
 from pathlib import Path
@@ -16,17 +8,8 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import boto3
-import datetime
-from pprint import pprint
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
 from nameparser import HumanName
-import configparser
-from database import Database
 from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import dateutil.parser as dparser
@@ -192,26 +175,9 @@ def get_principal_sponsor(main_div, row):
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the date_collected, state, and state_id values,
-    as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
 
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
-    # like so:
     source_url = base_url + url
     row.source_url = source_url
     row.region = scraper_utils.get_region(prov_terr_abbreviation)
@@ -248,17 +214,11 @@ if __name__ == '__main__':
 If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
-    # First we'll get the URLs we wish to scrape:
     urls = get_urls()
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
 
-    # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
 
     print('Complete!')

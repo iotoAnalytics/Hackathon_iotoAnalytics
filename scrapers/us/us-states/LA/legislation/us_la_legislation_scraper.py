@@ -55,6 +55,8 @@ scraper_utils = USStateLegislationScraperUtils(
 base_url = 'https://legis.la.gov/'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
+# !! 1.
 legislator_name_special_cases = ["Amedee", "Beryl Amedee", "Beryl A. Amedee", "Johnson,T.", "Pat Moore", "Ken Brass",
                                  "Samuel Jenkins", "Larry Bagley", "Larry Frieman", "Gabe Firment", "Ray Garofalo",
                                  "Daryl Adams", "Robert Carter","Scott McKnight", "Joe Stagni", "Beau Beaullieu",
@@ -75,7 +77,9 @@ def get_urls():
     return: a list of urls of bills.
     '''
     urls = []
+    # !! 2.
     WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
+    # !! 3.
     url = "https://legis.la.gov/legis/BillSearch.aspx?sid=LAST&e=P1"
     driver = webdriver.Chrome(WEBDRIVER_PATH)
     select_index = 0
@@ -86,6 +90,7 @@ def get_urls():
     search_by_range_btn.click()
     sleep(2)
 
+    # !! 4.
     while select_index < types_of_bills:
         bill_lists_prep_automation(driver, url, select_index)
         sleep(3)
@@ -117,6 +122,7 @@ def scrape_urls(driver, urls):
             EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), ' > ')]")))
         if next_page.get_attribute(
                 "href") == "javascript:__doPostBack('ctl00$ctl00$PageBody$PageContent$DataPager1$ctl02$ctl00','')":
+            # !! 5.
             try:
                 current_page_urls = WebDriverWait(driver, 60).until(
                     EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
@@ -188,10 +194,12 @@ def scrape(url):
 
     row = scraper_utils.initialize_row()
 
+    # !! 2.
     WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
 
     driver = webdriver.Chrome(WEBDRIVER_PATH)
 
+    # !! 6.
     driver.get(url)
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
@@ -340,6 +348,7 @@ def get_chamber_origin_and_bill_type(bill_name, row):
     """
     chamber_origin and bill_type is determined by the id tag in bill_name.
     """
+    # !! 6.
     if "HB" in bill_name:
         chamber_origin = 'House'
         bill_type = 'Bill'
@@ -393,17 +402,20 @@ def get_principal_sponsor_and_id(driver, row):
      their id in database with get_legislator_id.
     """
     principal_sponsor = driver.find_element_by_id("ctl00_PageBody_LinkAuthor").text
+
+    # !! 8.
     for name in legislator_name_special_cases:
         if principal_sponsor == name:
             principal_sponsor = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
 
     principal_sponsor_name_parser = HumanName(principal_sponsor)
 
+    # !! 7.
     if principal_sponsor_name_parser != 'Troy Carter':
         # special case: vacant senator
         principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                               name_first=principal_sponsor_name_parser.first,
-                                                               state_id=22)
+                                                            name_first=principal_sponsor_name_parser.first,
+                                                            state_id=22)
         row.principal_sponsor_id = principal_sponsor_id
     row.principal_sponsor = principal_sponsor
 
@@ -426,6 +438,8 @@ def get_sponsors_and_sponsors_id(driver, row):
         for url in soup.find_all('a', {'href': re.compile("members")}):
             sponsor_name = url.text
             sponsors.append(sponsor_name)
+
+            # !! 8.
             for name in legislator_name_special_cases:
                 if sponsor_name == name:
                     sponsor_name = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
@@ -477,6 +491,7 @@ def get_bill_text(driver, row):
                 bill_text += text
         bill_text = bill_text.replace("\n", " ")
         row.bill_text = bill_text
+    # !! 9.
     else:
         pass
 
@@ -497,6 +512,8 @@ def get_action(driver, row, session):
     actions = []
     count = 1
     number_of_actions = len(driver.find_elements_by_xpath('//*[@id="ctl00_PageBody_PanelBillInfo"]/table[3]/tbody/tr'))
+    
+    # !! 10.
     while count <= number_of_actions:
         try:
             date_short = driver.find_element_by_xpath(
