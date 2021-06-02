@@ -1127,11 +1127,11 @@ class PDF_Reader():
         else:
             return False
 
-    def get_text(self, page):
+    def get_text(self, page, bilingual_separated_by_double_space=False):
         if self.is_page_empty(page):
             return ""
         if self.is_column(page) and not self.is_page_empty(page):
-            return self.get_eng_half(page)
+            return self.get_eng_half(page, bilingual_separated_by_double_space)
         if not self.is_column(page) and not self.is_page_empty(page):
             return self.remove_page_number(page)
 
@@ -1142,9 +1142,29 @@ class PDF_Reader():
         else:
             return False
 
-    def get_eng_half(self, page):
+    def get_eng_half(self, page, is_double_space_separator):
+        if is_double_space_separator:
+            page_entire_text =  self.remove_page_number(page)
+            page_lines = page_entire_text.split('\n')
+            return_string = ''
+            for text_block in page_lines:
+                if '  ' in text_block:
+                    text_block = re.split(r'  \S', text_block)
+                    if len(text_block) == 1:
+                        text_block = ''
+                    elif len(text_block) > 2:
+                        text_block = ' '.join(text_block[:-1])
+                    else:
+                        text_block = text_block[0]
+                    return_string = return_string + ' ' + text_block
+                    return_string = self.__clean_up_text(return_string)
+            return return_string
         eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_spacing))
         return eng_half.extract_text()
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', '')
+        return text.strip()
 
     def remove_page_number(self, page):
         page_number_removed = page.crop((0, 0, self.page_width, self.page_height - self.bottom_spacing))

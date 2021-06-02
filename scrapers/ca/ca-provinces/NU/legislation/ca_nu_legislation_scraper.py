@@ -41,7 +41,7 @@ def program_driver():
     main_page_soup = main_functions.get_page_as_soup(BILLS_URL)
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
-    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[:2])
+    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows)
     # print(bill_data)
     # print('Writing data to database...')
     # scraper_utils.write_data(bill_data)
@@ -152,6 +152,7 @@ class BillScraper:
         self.row.date_introduced = self.__get_date_introduced()
         self.row.current_status = self.__get_current_status()
         self.row.bill_summary = self.__get_bill_summary()
+        print(f'{self.row.bill_name}: {self.row.bill_summary}')
         # TODO
         # self.row.bill_type = self.__get_bill_type() 
     
@@ -223,20 +224,40 @@ class BillScraper:
 
     def __get_bill_summary(self):
         pages_to_search_for = self.pdf_pages[0:2]
+        if self.row.bill_name == 'Bill75':
+            return self.__extract_bill_summary(pages_to_search_for)
         return self.__extract_bill_summary(pages_to_search_for[::-1])
 
 ## TODO
-## First find a robust way of figuring out whether a page is column or not.
-## If the page is column, you can separate teh text by splitting with '  '
+## FIX THIS UP
 
     def __extract_bill_summary(self, pages):
         for page in pages:
-            page_text = self.__get_page_text(page)
+            text = self.__get_pdf_text(page)
+            if re.search('Summary', text):
+                return self.__get_summary_text(text)
 
-    def __clean_up_text(self, text):
-        text = text.replace('\n', ' ')
-        text = text.replace('  ', ' ')
-        return text.strip()
+            # page_entire_text = page.extract_text()
+            # page_lines = page_entire_text.split('\n')
+            # return_string = ''
+            # for text_block in page_lines:
+            #     text_block = text_block.split('  ')[0]
+            #     return_string = return_string + ' ' + text_block
+            #     return_string = self.__clean_up_text(return_string)
+            # print(return_string)
+            # page_text = page.extract_text()
+
+    def __get_pdf_text(self, page):
+        return self.pdf_reader.get_text(page, True)
+
+    def __get_summary_text(self, text):
+        if self.row.bill_name == 'Bill75':
+            text = text.split('Summary')[1:]
+            text = ''.join(text)
+        else:
+            text = text.split('Summary')[1]
+        text = text.split('Date')[0]
+        return text
 
     def __get_bill_type(self):
         if 'amend' in self.row.bill_title.lower():
