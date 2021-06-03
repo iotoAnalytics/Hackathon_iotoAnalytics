@@ -29,9 +29,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
+
     urls = []
 
     # Logic goes here! Url we are scraping: https://nslegislature.ca/members/profiles
@@ -268,7 +266,6 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
-
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'

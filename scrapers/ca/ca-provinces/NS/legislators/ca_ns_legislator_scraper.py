@@ -2,7 +2,6 @@
 import sys
 import os
 from pathlib import Path
-
 import re
 import numpy as np
 from nameparser import HumanName

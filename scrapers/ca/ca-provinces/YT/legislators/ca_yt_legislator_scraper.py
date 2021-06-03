@@ -144,7 +144,6 @@ def organize_unproccessed_committee_data(raw_data):
     return_data = []
     for committee in raw_data:
         restructure_committee_data(committee, restructured_data)
-    print(restructured_data)
     add_to_return_data(restructured_data, return_data)
     return return_data
 
