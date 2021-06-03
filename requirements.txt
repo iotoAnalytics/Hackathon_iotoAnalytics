@@ -47,3 +47,4 @@ setuptools~=47.1.0
 pycparser~=2.20
 sacremoses~=0.0.45
 packaging~=20.9
+tika==1.24

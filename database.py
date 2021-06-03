@@ -16,6 +16,7 @@ import json
 import utils
 import sys
 import numpy as np
+import pandas as pd
 
 db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
 db_port = 5432
@@ -227,7 +228,7 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                if not np.isnan(row.principal_sponsor_id):
+                if pd.notna(row.principal_sponsor_id):
                     row.principal_sponsor_id = int(row.principal_sponsor_id)
                 else:
                     row.principal_sponsor_id = None
@@ -752,7 +753,7 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                if not np.isnan(row.principal_sponsor_id):
+                if pd.notna(row.principal_sponsor_id):
                     row.principal_sponsor_id = int(row.principal_sponsor_id)
                 else:
                     row.principal_sponsor_id = None
@@ -875,7 +876,7 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                if not np.isnan(row.principal_sponsor_id):
+                if pd.notna(row.principal_sponsor_id):
                     row.principal_sponsor_id = int(row.principal_sponsor_id)
                 else:
                     row.principal_sponsor_id = None

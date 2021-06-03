@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 from nameparser import HumanName
 from bs4 import BeautifulSoup
-from scraper_utils import USStateLegislationScraperUtils
 from tqdm import tqdm
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -18,6 +17,8 @@ from tika import parser
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
+
+from scraper_utils import USStateLegislationScraperUtils
 
 BASE_URL = 'https://legislature.vermont.gov'
 BILL_PATH = '/bill/introduced/2022'
