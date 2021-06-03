@@ -916,13 +916,6 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
 
         data = df.to_dict('records')
 
-        # for d in data[:5]:
-        #     for k, v in d.items():
-        #         if k in {'bill_text'}:
-        #             continue
-        #         print(k, v, type(v))
-
-
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
