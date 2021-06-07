@@ -9,11 +9,13 @@ filelock==3.0.12
 geotext==0.4.0
 idna==2.10
 joblib==1.0.0
+langdetect==1.0.9
 lxml==4.6.2
 nameparser==1.0.6
 nltk==3.6.2
 numpy==1.20.0
 pandas==1.2.0
+pdf_plumber==0.1.2
 psycopg2==2.8.6
 pyparsing==2.4.7
 PyPDF2==1.26.0
