@@ -164,18 +164,21 @@ def get_get_date_introduced(row, actions):
 
 
 def get_bill_text(url, row):
+    text = ""
     try:
         response = requests.get(url, stream=True)
         pdf = pdfplumber.open(io.BytesIO(response.content))
         pages = pdf.pages
-        text = ""
         for page in pages:
-            page_text = page.extract_text()
-            text += page_text.strip()
+            try:
+                page_text = page.extract_text()
+                text += page_text.strip()
+            except Exception:
+                pass
         text = text.replace('\n', '')
         row.bill_text = text
     except Exception:
-        row.bill_text = ""
+        row.bill_text = text
 
 
 def get_bill_link(row):
@@ -266,8 +269,9 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
     # with Pool(processes=4) as pool:
     #     data = pool.map(scrape, urls)
-    data = clear_none_value_rows(data)
+    # data = clear_none_value_rows(data)
     big_list_of_dicts = clear_none_value_rows(data)
+
     scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
