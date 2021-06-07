@@ -1137,23 +1137,26 @@ class PDF_Reader():
 
     def get_eng_half(self, page, is_double_space_separator):
         if is_double_space_separator:
-            page_entire_text =  self.remove_page_number(page)
-            page_lines = page_entire_text.split('\n')
-            return_string = ''
-            for text_block in page_lines:
-                if '  ' in text_block:
-                    text_block = re.split(r'  \S', text_block)
-                    if len(text_block) == 1:
-                        text_block = ''
-                    elif len(text_block) > 2:
-                        text_block = ' '.join(text_block[:-1])
-                    else:
-                        text_block = text_block[0]
-                    return_string = return_string + ' ' + text_block
-                    return_string = self.__clean_up_text(return_string)
-            return return_string
+            return self.__get_eng_half_with_double_space_separator(page)
         eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_spacing))
         return eng_half.extract_text()
+
+    def __get_eng_half_with_double_space_separator(self, page):
+        page_entire_text =  self.remove_page_number(page)
+        page_lines = page_entire_text.split('\n')
+        return self.__get_separated_text(page_lines)
+
+    def __get_separated_text(self, page_lines):
+        for text_line in page_lines:
+            text_line = text_line.strip().split('  ')
+            if text_line[0] == "•" and len(text_line) != 2 and len(text_line) != 1:
+                return_string += ' ' + ' '.join(text_line[:2])
+            elif len(text_line) == 1:
+                text_line = ''
+            else:
+                text_line = text_line[0]
+                return_string += ' ' + ''.join(text_line)
+        return self.__clean_up_text(return_string)
 
     def __clean_up_text(self, text):
         text = text.replace('\n', '')
