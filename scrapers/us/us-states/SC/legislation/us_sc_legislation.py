@@ -162,10 +162,12 @@ def scrape(url):
         row.bill_type = bill_type
 
     if bill_name[0] == 'S':
-        row.chamber_origin = 'Senate'
+        chamber_origin = 'Senate'
+        row.chamber_origin = chamber_origin
         role = 'Senator'
     elif bill_name[0] == 'H':
-        row.chamber_origin = 'House'
+        chamber_origin = 'House'
+        row.chamber_origin = chamber_origin
         role = 'Representative'
 
     td_list = soup.find('table').find_all('td')
@@ -205,17 +207,23 @@ def scrape(url):
 
     p_list = soup1.find_all('p')
     sponsors = []
+    # MIGHT NEED TO GET THE SPONSOR INFO FROM THE WEBSITE RATHER THAN FULL TEXT PAGE
     for item in p_list:
         if item.text.strip().lower() == 'status information':
             num = p_list.index(item) + 1
             sponsors_list = p_list[num].text.split('\n')
-
             for el in sponsors_list:
                 if 'Sponsors:' in el:
                     sponsors_raw = el.replace('Sponsors:', ' ').strip().replace('\r', ' ')
-                    sponsors = edit_sponsors(sponsors_raw)
+                    if 'Committee' in el:
+                        row.committee = [{
+                            'chamber': chamber_origin,
+                            'committee': sponsors_raw.replace('Committee', '')
+                        }]
+                    else:
+                        sponsors = edit_sponsors(sponsors_raw)
 
-    if sponsors == []:
+    if not sponsors:
         pass
     elif len(sponsors) == 1:
         principal_sponsor = sponsors[0].title()
@@ -296,16 +304,15 @@ if __name__ == '__main__':
         bill_links = pool.map(get_bill_links, daily_bills)
     bill_links = list(chain(*bill_links))
 
-    print(bill_links)
-    print(f'TIME: {time.time() - start_time} SECONDS')
+    # print(len(bill_links))
+    # print(f'TIME: {time.time() - start_time} SECONDS')
+    #
+    # data = []
+    # split_bill_links = list(split(bill_links, 10))
 
-    data = []
-    split_bill_links = list(split(bill_links, 10))
-    for bill_list in split_bill_links:
-        with Pool() as pool:
-            data += pool.map(scrape, bill_list)
-        print('Resting...')
-        time.sleep(3)
+    with Pool() as pool:
+        data = pool.map(scrape, bill_links)
+    # data = [scrape(x) for x in bill_links]
 
     # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)

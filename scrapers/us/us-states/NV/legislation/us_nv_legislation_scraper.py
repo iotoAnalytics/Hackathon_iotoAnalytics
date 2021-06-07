@@ -44,12 +44,14 @@ database_table_name = 'us_nv_legislation'
 legislator_table_name = 'us_nv_legislator'
 options = Options()
 options.headless = False 
+# !! 1.
 driver = webdriver.Chrome(executable_path=r'C:\Users\DCYUM\Downloads\chromedriver_win32\chromedriver.exe', options=options)
 driver.switch_to.default_content()
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
 
+# !! 2.
 base_url = 'https://www.leg.state.nv.us'
 bills_url = 'https://www.leg.state.nv.us/App/NELIS/REL/81st2021/Bills/List'
 
@@ -194,9 +196,6 @@ def get_votes():
             nv = get_votes_number(specific_votes[4])
             absent = get_votes_number(specific_votes[5])
             people_votes = get_voters(specific_votes[0])
-            
-
-
 
             vote_details = {
                 'date' :date,
@@ -213,6 +212,7 @@ def get_votes():
         
             print("No vote data")
             votes.append(vote_details)
+        # !! 4.
         except:
             print('No specific voting data')
     
@@ -261,6 +261,8 @@ def get_cosponsors():
 def get_bill_info() :
     bill_id = driver.find_element_by_css_selector('#bills-container > div > div.col-lg-9.pt-lg-4.main-content > div:nth-child(3) > div > h1').get_attribute('textContent')
     origin = None
+
+    # !! 3.
     type = None
     if 'S' in bill_id :
         
@@ -290,6 +292,7 @@ def get_text():
     sleep(1)
     pdf_link = driver.find_element_by_css_selector('#divText > div.d-md-none > div > div > ul > li:last-child > div > p > a').get_attribute('href')
 
+    # !! 5.
     r = requests.get(pdf_link)
     f = io.BytesIO(r.content)
 
@@ -359,6 +362,7 @@ def scrape(url):
         history = get_history()
         row.actions = history['actions']
         row.date_introduced = history['introduced']
+    # !! 4.
     except:
         print('No History')
 
@@ -366,19 +370,23 @@ def scrape(url):
         
         row.bill_title = driver.find_element_by_id('title').get_attribute('textContent')
         row.bill_summary = driver.find_element_by_css_selector('#divOverview > div > div:nth-child(1) > div.col').text
+    # !! 4.
     except:
         print('No info')
 
     try:
         row.committees = get_committes()
+    # !! 4.
     except:
        print('No committees')
     try:
         row.bill_text = get_text()
+    # !! 4.
     except:
         print('No current text')
     try:
         row.votes = get_votes()
+    # !! 4.
     except:
         print('No vote data')
     
@@ -387,6 +395,7 @@ def scrape(url):
     
         row.sponsors = sponsors['names']
         row.sponsors_id = sponsors['ids']
+    # !! 4.
     except:
         print('no sponsors')
 
@@ -394,6 +403,7 @@ def scrape(url):
         cosponsor = get_cosponsors()
         row.cosponsors = cosponsor['names']
         row.cosponsors_id = cosponsor['ids']
+    # !! 4.
     except:
         print('no cosponsors')
     
