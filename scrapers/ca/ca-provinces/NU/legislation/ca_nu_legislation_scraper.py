@@ -1,16 +1,15 @@
-import enum
 import sys
 import os
 from pathlib import Path
 
-import pdfplumber
+from langdetect import detect
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 import pandas as pd
-from scraper_utils import CAProvinceTerrLegislationScraperUtils, PDF_Table_Reader
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 from scraper_utils import PDF_Reader
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
@@ -41,8 +40,7 @@ def program_driver():
     main_page_soup = main_functions.get_page_as_soup(BILLS_URL)
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
-    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows)
-    # print(bill_data)
+    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[3:5])
     # print('Writing data to database...')
     # scraper_utils.write_data(bill_data)
     # print("Complete")
@@ -126,19 +124,23 @@ class BillScraper:
         self.__initialize_pdf_reader()
         self.__set_row_data()
 
+    def get_bill_data(self):
+        return self.row
+
     def __get_columns(self, bill_row_soup):
         return bill_row_soup.findAll('td')
 
-    def get_bill_data(self):
-        return self.row
+    def __get_source_url(self):
+        first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
+        return first_column.find('a')['href'] 
 
     def __initialize_pdf_reader(self):
         self.pdf_pages = self.pdf_reader.get_pdf_pages(self.row.source_url, scraper_utils._request_headers)
         self.pdf_reader.set_page_width_ratio(width_in_inch=8.5)
         self.pdf_reader.set_page_half(page_half_in_inch=4.25)
         self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
-        self.pdf_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.19)
-        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.25, column2_start=4.30)
+        self.pdf_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.56)
+        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.10, column2_start=4.13)
         self.pdf_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=0.90)
         scraper_utils.crawl_delay(crawl_delay)
 
@@ -152,9 +154,9 @@ class BillScraper:
         self.row.date_introduced = self.__get_date_introduced()
         self.row.current_status = self.__get_current_status()
         self.row.bill_summary = self.__get_bill_summary()
-        print(f'{self.row.bill_name}: {self.row.bill_summary}')
-        # TODO
-        # self.row.bill_type = self.__get_bill_type() 
+        self.row.bill_text = self.__get_bill_text()
+        self.row.bill_type = self.__get_bill_type()
+        print(self.row.bill_text)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
@@ -170,10 +172,6 @@ class BillScraper:
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
         title = first_column.find('a').text
         return title.title()
-
-    def __get_source_url(self):
-        first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
-        return first_column.find('a')['href']
 
     def __get_goverlytics_id(self):
         return f'{PROV_TERR_ABBREVIATION}_{CURRENT_SESSION}_{self.row.bill_name}'
@@ -224,31 +222,16 @@ class BillScraper:
 
     def __get_bill_summary(self):
         pages_to_search_for = self.pdf_pages[0:2]
-        if self.row.bill_name == 'Bill75':
+        if self.row.bill_name == 'Bill75': # Bill 75 for assembly has the word 'summary' in the bill title messing things up.
             return self.__extract_bill_summary(pages_to_search_for)
         return self.__extract_bill_summary(pages_to_search_for[::-1])
 
-## TODO
-## FIX THIS UP
-
     def __extract_bill_summary(self, pages):
-        for page in pages:
+        for index, page in enumerate(pages):
             text = self.__get_pdf_text(page)
             if re.search('Summary', text):
+                self.summary_page_index = 1 if index == 0 else 0
                 return self.__get_summary_text(text)
-
-            # page_entire_text = page.extract_text()
-            # page_lines = page_entire_text.split('\n')
-            # return_string = ''
-            # for text_block in page_lines:
-            #     text_block = text_block.split('  ')[0]
-            #     return_string = return_string + ' ' + text_block
-            #     return_string = self.__clean_up_text(return_string)
-            # print(return_string)
-            # page_text = page.extract_text()
-
-    def __get_pdf_text(self, page):
-        return self.pdf_reader.get_text(page, True)
 
     def __get_summary_text(self, text):
         if self.row.bill_name == 'Bill75':
@@ -257,12 +240,37 @@ class BillScraper:
         else:
             text = text.split('Summary')[1]
         text = text.split('Date')[0]
-        return text
+        return text.strip()
+
+    def __get_bill_text(self):
+        pages_to_search_for = self.pdf_pages[self.summary_page_index + 1:]
+        return self.__extract_bill_text(pages_to_search_for)
+    
+    def __extract_bill_text(self, pages):
+        bill_text = ''
+        for page in pages:
+            text = self.__get_pdf_text(page).strip()
+            bill_text += self.__add_text_if_english(text)
+        return bill_text.strip()
+
+    def __get_pdf_text(self, page):
+        return self.pdf_reader.get_text(page, True)
+
+    def __add_text_if_english(self, text):
+        try:
+            if detect(text) == 'fr':
+                return ''
+            else:
+                return ' ' + text
+        except:
+            return ''
 
     def __get_bill_type(self):
-        if 'amend' in self.row.bill_title.lower():
-            return 'Ammendment'
-        return 'Bill'
+        first_page = self.pdf_pages[0]
+        page_text = self.__get_pdf_text(first_page)
+        page_text = page_text.split('BILL')[0].strip()
+        bill_type = page_text.split(' ')[-1]
+        return bill_type.title()
 
 PreProgramFunctions().set_current_session()
 
