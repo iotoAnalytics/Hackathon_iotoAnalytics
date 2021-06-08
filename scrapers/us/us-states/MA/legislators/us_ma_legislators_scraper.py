@@ -43,10 +43,9 @@ def get_urls():
     table = soup.find('table', {'id': 'legislatorTable'})
     items = table.find_all('tr')
 
-    for tr in items[1:15]:
+    for tr in items[1:]:
         td = tr.find_all('td')[2]
         link = base_url + td.find('a').get('href')
-        print(link)
         urls.append(link)
 
     # Delay so we do not overburden servers
@@ -59,10 +58,9 @@ def get_urls():
     table = soup.find('table', {'id': 'legislatorTable'})
     items = table.find_all('tr')
 
-    for tr in items[1:15]:
+    for tr in items[1:]:
         td = tr.find_all('td')[2]
         link = base_url + td.find('a').get('href')
-        print(link)
         urls.append(link)
 
     # Delay so we do not overburden servers
@@ -71,20 +69,19 @@ def get_urls():
     return urls
 
 
-def find_reps_wiki(repLink):
+def find_individual_wiki(wiki_page_link):
     bio_lnks = []
-    uClient = uReq(repLink)
+    uClient = uReq(wiki_page_link)
     page_html = uClient.read()
     uClient.close()
 
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
-    people = tables[3].findAll("tr")
+    people = tables[3].findAll("tr") + tables[4].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
         try:
             biolink = "https://en.wikipedia.org" + (info[1].a["href"])
-
             bio_lnks.append(biolink)
         except Exception:
             pass
@@ -93,48 +90,42 @@ def find_reps_wiki(repLink):
     return bio_lnks
 
 
-def find_sens_wiki(repLink):
-    bio_links = []
-    uClient = uReq(repLink)
-    page_html = uClient.read()
-    uClient.close()
-    # # html parsing
-    page_soup = BeautifulSoup(page_html, "html.parser")
-    tables = page_soup.findAll("tbody")
-    people = tables[3].findAll("tr")
-    for person in people[1:]:
-        info = person.findAll("td")
-        try:
-            biolink = "https://en.wikipedia.org" + (info[2].a["href"])
-
-            bio_links.append(biolink)
-        except Exception:
-            pass
-
-    scraper_utils.crawl_delay(crawl_delay)
-    return bio_links
-
-
 def get_most_recent_term_id(soup, row):
-    term_title = soup.find('span', {'class': 'headNumber'}).text
-    term_id = term_title.split(' ')[1].strip()
-    term_id = re.findall(r'[0-9]', term_id)
-    term_id = "".join(term_id)
-    row.most_recent_term_id = term_id
+    try:
+        term_title = soup.find('span', {'class': 'headNumber'}).text
+        term_id = term_title.split(' ')[1].strip()
+        term_id = re.findall(r'[0-9]', term_id)
+        term_id = "".join(term_id)
+        row.most_recent_term_id = term_id
+    except Exception:
+        pass
 
 
 def find_party_and_district(soup, row):
     party_block = soup.find('span', {'class': 'subTitle'}).text
     try:
-        party = party_block.split(' -')[0]
-        row.party_id = scraper_utils.get_party_id(party)
-        row.party = party
+        party = party_block.split(' -')[0].strip()
     except Exception:
         pass
 
+    row.party = party
+    try:
+        row.party_id = scraper_utils.get_party_id(party)
+    except Exception:
+        pass
+    areas_served = []
     try:
         district = party_block.split('- ')[1]
         row.district = district
+        areas = district.split(', ')
+        for area in areas:
+            if 'and' in area:
+                a = area.split(' and ')
+                areas_served = areas_served + a
+            else:
+                areas_served.append(area)
+        row.areas_served = areas_served
+
     except Exception:
         pass
 
@@ -167,10 +158,9 @@ def get_phone_numbers(soup, row):
             number = contact.find('div', {'class': 'col-xs-12 col-lg-9'}).text.strip()
             phone_number = {"office": location, "number": number}
             phone_numbers.append(phone_number)
-
-        row.phone_numbers = phone_numbers
     except Exception:
         pass
+    row.phone_numbers = phone_numbers
 
 
 def get_email(soup, row):
@@ -194,7 +184,8 @@ def get_biography(url, row):
     page = scraper_utils.request(bio_url)
     soup = BeautifulSoup(page.content, 'lxml')
     get_occupation(soup, row)
-    get_education(soup, row)
+    scraper_utils.crawl_delay(crawl_delay)
+
 
 def get_occupation(soup, row):
     jobs = []
@@ -213,113 +204,32 @@ def get_occupation(soup, row):
         pass
 
 
-def get_education(soup, row):
-    education = []
-    bio_section = soup.find('div', {'class': 'active tab-pane customFade in'})
-    education_list= bio_section.find_all('li')
-    for item in education_list:
-        item = item.text
-        if "University" in item:
-            education.append(item)
-        elif "College" in item:
-            education.append(item)
-        elif "Academy" in item:
-            education.append(item)
-        elif "School" in item:
-            education.append(item)
-        school = item.split(","[0])
-        print(school)
-    #print(education)
-    print()
+def get_committees_page(url, row):
+    c_url = url + '/Committees'
+    page = scraper_utils.request(c_url)
+    soup = BeautifulSoup(page.content, 'lxml')
+    get_committees(soup, row)
+    scraper_utils.crawl_delay(crawl_delay)
 
 
-def get_years_active(contact_sidebar, row):
-    terms = []
-    years = []
-    try:
-        years_block = contact_sidebar.find_all('p')[4]
-        years_text = re.findall(r'[0-9]{4}', years_block.text)
-        for term in years_text:
-            term = int(term)
-            terms.append(term)
-    except Exception:
-        try:
-            years_block = contact_sidebar.find_all('p')[3]
-            years_text = re.findall(r'[0-9]{4}', years_block.text)
-            for term in years_text:
-                term = int(term)
-                terms.append(term)
-        except Exception:
-            pass
-
-    # Converting terms from the form year-year eg. 2012-2014
-    if len(terms) > 1:
-        j = 0
-        k = -1
-        for i in range(1, len(terms), 2):
-            j += 2
-            k += 2
-            for year in range(terms[len(terms) - j], terms[len(terms) - k] + 1):
-                years.append(year)
-
-    # converting term which is current
-    if len(terms) > 0:
-        for year in range(terms[0], 2021 + 1):
-            years.append(year)
-
-    row.years_active = years
-
-
-def get_committees(main_div, row):
-    # get committees
+def get_committees(soup, row):
     committees_list = []
-    committee_leadership = main_div.find('tbody', {'id': 'commoffice-tab-1'})
-    committee_member = main_div.find('tbody', {'id': 'comm-tab-1'})
-    try:
-        rows = committee_leadership.find_all('tr')
-        for r in rows:
-            row_details = r.find_all('td')
-            role = row_details[0].text.strip()
-            committee = row_details[1].text
-            committee = committee[:committee.index(" -")].replace('\n', '')
-            committee_detail = {"role": role, "committee": committee}
-            committees_list.append(committee_detail)
-
-    except Exception:
-        pass
-    try:
-        member_row = committee_member.find_all('tr')
-        for r in member_row:
-            row_details = r.find_all('td')
-            committee = row_details[0].text
-            committee = committee[:committee.index("-")].strip()
-            committee = committee.replace('\n', '')
-            committee_detail = {"role": "member", "committee": committee}
-            committees_list.append(committee_detail)
-    except Exception:
-        pass
+    role = "member"
+    c_section = soup.find('div', {'class': 'membershipList'})
+    comm_list = c_section.find_all('li')
+    for comm in comm_list:
+        committee = comm.text
+        committee = committee.replace('\n', '')
+        if "Chairperson" in committee:
+            role = "chairperson"
+            committee = committee.split(", ")[1]
+        elif "Vice Chair" in committee:
+            role = "vice chair"
+            committee = committee.split(", ")[1]
+        committee_detail = {"role": role, "committee": committee}
+        committees_list.append(committee_detail)
 
     row.committees = committees_list
-
-
-def get_areas_served(big_df_data):
-
-    url = "http://www.kslegislature.org/li/b2021_22/members/csv/"
-    members_data = requests.get(url)
-    m_data = StringIO(members_data.text)
-    df = pd.read_csv(m_data)[
-        ['County', 'Firstname', 'Lastname']]
-    for i in df.index:
-
-        areas = []
-        firstname = df.loc[i, "Firstname"]
-        lastname = df.loc[i, "Lastname"]
-        area = str(df.loc[i, "County"])
-        areas.append(str(area))
-        big_df_data.loc[(big_df_data['name_first'] == firstname) & (big_df_data['name_last'] == lastname),
-                        'areas_served'] = pd.Series([areas]).values
-
-    return big_df_data
 
 
 def scrape(url):
@@ -338,13 +248,16 @@ def scrape(url):
     get_email(soup, row)
     get_address(soup, row)
     get_biography(url, row)
-    # get_years_active(contact_sidebar, row)
-    # get_committees(main_div, row)
+    get_committees_page(url, row)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
     return row
+
+
+def wiki_link(args):
+    pass
 
 
 if __name__ == '__main__':
@@ -362,37 +275,43 @@ if __name__ == '__main__':
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
+    leg_df = leg_df.drop(columns="years_active")
 
     # getting urls from wikipedia
-    # wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
-    # wiki_sen_link = 'https://en.wikipedia.org/wiki/Kansas_Senate'
-    #
-    # reps_wiki = find_reps_wiki(wiki_rep_link)
-    #
-    # sens_wiki = find_sens_wiki(wiki_sen_link)
-    #
-    # all_wiki_links = reps_wiki + sens_wiki
-    #
-    # with Pool() as pool:
-    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
-    # wiki_df = pd.DataFrame(wiki_data)[
-    #     ['birthday', 'education', 'name_first', 'name_last']]
-    #
-    # big_df = pd.merge(leg_df, wiki_df, how='left',
-    #                   on=["name_first", "name_last"])
-    #
-    # isna = big_df['education'].isna()
-    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    #
-    # final_df = get_areas_served(big_df)
+
+    wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
+
+    all_wiki_links = find_individual_wiki(wikipage_link)
+
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'years_active', 'name_first', 'name_last']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_first", "name_last"])
+
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    #big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    isna = big_df['years_active'].isna()
+    big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
+
+    print(big_df['years_active'])
+    # dropping rows with vacant seat
+    vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
+    for index in vacant_index:
+        print(index)
+        big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')
 
-    # big_list_of_dicts = final_df.to_dict('records')
+    big_list_of_dicts = big_df.to_dict('records')
 
     print('Writing data to database...')
 
-    #.write_data(big_list_of_dicts)
+    #scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
