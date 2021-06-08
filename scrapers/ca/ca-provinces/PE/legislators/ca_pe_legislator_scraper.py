@@ -1,12 +1,13 @@
-'''
-Before beginning, be sure to update values in the config file.
-
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
+import re
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+from bs4 import BeautifulSoup
+import time
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from urllib.request import urlopen as uReq
+from datetime import datetime
 import sys
 import os
 from pathlib import Path
@@ -15,20 +16,6 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-import boto3
-import re
-import numpy as np
-from nameparser import HumanName
-from pprint import pprint
-from multiprocessing import Pool
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-import time
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
-from datetime import datetime
 
 prov_abbreviation = 'PE'
 database_table_name = 'ca_pe_legislators'
@@ -42,9 +29,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
+
     urls = []
 
     # Logic goes here! Url we are scraping: https://nslegislature.ca/members/profiles
@@ -55,7 +40,6 @@ def get_urls():
 
     members_list = soup.find_all('span', {'class': 'member-title'})
 
-    # We'll collect only the first 10 to keep things simple. Need to skip first record
     for member in members_list:
         a = member.find('a').get('href')
         urls.append(base_url + a)
@@ -74,14 +58,13 @@ def find_mla_wiki(mlalink):
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
     people = tables[1].findAll("tr")
-    for person in people[1:]:
+    for person in people[0:]:
         info = person.findAll("td")
         try:
-            biolink = "https://en.wikipedia.org" + (info[2].a["href"])
+            biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_links.append(biolink)
         except Exception:
             pass
-    print(bio_links)
     scraper_utils.crawl_delay(crawl_delay)
     return bio_links
 
@@ -103,6 +86,8 @@ def get_party(bio_container, row):
 
 def get_name(bio_container, row):
     name_full = bio_container.find('span', {'class': 'field--name-title'}).text
+    if "," in name_full:
+        name_full = name_full.split(',')[0]
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -153,26 +138,38 @@ def get_addresses(bio_container, row):
     contact = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
     address_details = contact.findAll('p')
     for address in address_details:
-        if "Office" in address.text:
-            address = address.text.split(':')[1]
-        elif "Mailing" in address.text:
-            address = address.text.split(':')[1]
-        try:
-            address = address.replace('\n', ' ')
-            address = address.replace('\xa0', '')
-            addresses.append(address)
-        except Exception:
-            pass
+        if "Office" or "Mailing" in address.text:
+            if "Office" in address.text:
+                location = "Office"
+            if "Mailing" in address.text:
+                location = "mailing address"
 
+            address = address.text.split(':')[1].strip()
+            try:
+                address = address.replace('\n', ' ')
+                address = address.replace('\xa0', '')
+                #address = ','.join(address)
+            except Exception:
+                pass
+            if "Phone" not in address:
+                try:
+                    office_address = {"location": location, "address": address}
+                    addresses.append(office_address)
+                except Exception:
+                    pass
     row.addresses = addresses
 
 
 def get_email(bio_container, row):
     contact_detail = bio_container.find('div', {'class': 'field--name-field-member-contact-information'})
-    email = contact_detail.find('a').get('href')
-    email = email.split('mailto:')[1]
-    if "assembly" in email:
-        row.email = email
+    emails = contact_detail.findAll('a')
+    for email in emails:
+        email = email.get('href')
+        email = email.split('mailto:')[1]
+        if "assembly" in email:
+            row.email = email
+        if "premier" in email:
+            row.email = email
 
 
 def get_most_recent_term_id(years_active, row):
@@ -222,26 +219,8 @@ def get_committees(bio_container, row):
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
-    state, and state_id values, as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
-
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url
-    # like so:
     row.source_url = url
 
     # get region
@@ -253,14 +232,14 @@ def scrape(url):
 
     bio_container = soup.find('section', {'class': 'section'})
 
-    # get_party(bio_container, row)
-    # get_name(bio_container, row)
-    # get_riding(bio_container, row)
-    # get_phone_number(bio_container, row)
-    # get_addresses(bio_container, row)
-    # get_email(bio_container, row)
-    # get_years_active(bio_container, row)
-    # get_committees(bio_container, row)
+    get_party(bio_container, row)
+    get_name(bio_container, row)
+    get_riding(bio_container, row)
+    get_phone_number(bio_container, row)
+    get_addresses(bio_container, row)
+    get_email(bio_container, row)
+    get_years_active(bio_container, row)
+    get_committees(bio_container, row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
@@ -270,7 +249,6 @@ def scrape(url):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
     start = time.time()
     print(
         f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) '
@@ -280,13 +258,8 @@ if __name__ == '__main__':
     urls = get_urls()
     print('URLs Collected.')
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-
     print('Scraping data...')
 
-    # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
@@ -294,17 +267,15 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
 
-
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_general_assembly_link)
+    mla_wikis = find_mla_wiki(wiki_general_assembly_link)
 
     with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
+        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
     wiki_df = pd.DataFrame(wiki_data)[
         ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
 
-    print(wiki_df)
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
 
@@ -319,6 +290,6 @@ if __name__ == '__main__':
     big_list_of_dicts = big_df.to_dict('records')
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')

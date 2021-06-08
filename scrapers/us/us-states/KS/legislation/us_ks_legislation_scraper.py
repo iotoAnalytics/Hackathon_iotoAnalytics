@@ -1,37 +1,20 @@
-'''
-Before beginning, be sure to update values in the config file.
 
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
 import sys
 import os
 from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
-import boto3
 from datetime import datetime
-from pprint import pprint
-from urllib.parse import parse_qs
-import urllib.parse as urlparse
-import re
 from nameparser import HumanName
-import configparser
-from database import Database
 from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislationScraperUtils
 import pdfplumber
 import requests
 import io
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 state_abbreviation = 'KS'
 database_table_name = 'us_ks_legislation'
@@ -51,10 +34,8 @@ def get_session(soup):
     session = session.split(' ')[0].strip()
     return session
 
+
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
     urls = []
     scrape_url = base_url
     page = scraper_utils.request(scrape_url)
@@ -432,37 +413,20 @@ def get_bill_text(main_div, row):
         pdf_link = "http://www.kslegislature.org" + table_row[1].find('a').get('href')
         response = requests.get(pdf_link, stream=True)
         pdf = pdfplumber.open(io.BytesIO(response.content))
-        page = pdf.pages[0]
-        text = page.extract_text()
-        if text is not None:
-            row.bill_text = text
-        else:
-            row.bill_text = ""
+        pages = pdf.pages
+        text = ""
+        for page in pages:
+            page_text = page.extract_text()
+            text += page_text
+        row.bill_text = text
     except Exception:
         row.bill_text = ""
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the date_collected, state, and state_id values,
-    as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
 
     row = scraper_utils.initialize_row()
 
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url,
-    # like so:
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
@@ -508,13 +472,8 @@ if __name__ == '__main__':
 If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
-    # First we'll get the URLs we wish to scrape:
     urls = get_urls()
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
 

@@ -11,6 +11,7 @@ from selenium.webdriver.support.ui import Select
 import pandas as pd
 from multiprocessing import Pool
 from time import sleep
+import time
 from pprint import pprint
 
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -20,14 +21,15 @@ BASE_URL = 'https://legislature.vermont.gov/'
 REP_PATH = 'people/all/2022/House'
 SENATE_PATH = 'people/all/2022/Senate'
 
-WIKI_URL = 'https://en.wikipedia.org/'
-WIKI_REP_PATH = 'wiki/Vermont_House_of_Representatives'
-WIKI_SENATE_PATH = 'wiki/Vermont_Senate'
+WIKI_URL = 'https://en.wikipedia.org'
+WIKI_REP_PATH = '/wiki/Vermont_House_of_Representatives'
+WIKI_SENATE_PATH = '/wiki/Vermont_Senate'
 
 scraper_utils = USStateLegislatorScraperUtils('VT', 'us_vt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 
+@scraper_utils.Timer()
 def make_soup(url):
     """
     Takes senator and representative paths and returns soup object.
@@ -46,9 +48,8 @@ def make_soup(url):
 def open_driver():
     options = Options()
     options.headless = True
-    driver = webdriver.Chrome(
-        executable_path='H:\Projects\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe',
-        options=options)
+    driver = webdriver.Chrome(executable_path=os.path.join('..', '..', '..', '..', '..', 'web_drivers',
+                                                           'chrome_win_90.0.4430.24', 'chromedriver.exe'), options=options)
     driver.get(BASE_URL)
     driver.maximize_window()
     return driver
@@ -109,6 +110,8 @@ def get_name(url, row):
     name = " ".join(info[1:])
     hn = HumanName(name)
     row.name_first = hn.first
+    if row.name_first == '':
+        row.name_first = name.split()[0]
     row.name_last = hn.last
     row.name_middle = hn.middle
     row.name_suffix = hn.suffix
@@ -190,6 +193,7 @@ def get_committees(url, row):
 
     row.committees = all_committee_info
 
+
 def get_district(url, row):
     """
     Find legislator district info and set row value.
@@ -230,8 +234,35 @@ def get_source_id(url, row):
     row.source_id = source_id
 
 
-def get_wiki_info(url, row):
-    pass
+def get_wiki_info(row):
+    """
+    Grab auxillary(birthday, education, etc) info from wikipedia.
+    :param row: legislator row
+    """
+
+    if row.role == 'Representative':
+        url = WIKI_URL + WIKI_REP_PATH
+        soup = make_soup(url)
+        table = soup.find_all('table', {'class': 'wikitable sortable'})[1].find('tbody').find_all('tr')
+    else:
+        url = WIKI_URL + WIKI_SENATE_PATH
+        soup = make_soup(url)
+        table = soup.find('table', {'class': 'wikitable sortable'}).find('tbody').find_all('tr')
+
+    for tr in table[1:]:
+        name = tr.find('td').text.split()
+        wiki_first, wiki_last = name[0], name[1]
+        if row.name_last == wiki_last and row.name_first[0].startswith(wiki_first[0]):
+            try:
+                link = tr.find('td').find('a').get('href')
+                wiki_info = scraper_utils.scrape_wiki_bio(WIKI_URL + link)
+                row.education = wiki_info['education']
+                row.most_recent_term_id = wiki_info['most_recent_term_id']
+                row.years_active = wiki_info['years_active']
+                if wiki_info['birthday'] is not None:
+                    row.birthday = str(wiki_info['birthday'])
+            except AttributeError:
+                pass
 
 
 def scrape(url):
@@ -251,9 +282,8 @@ def scrape(url):
     get_district(url, row)
     get_party(url, row)
     get_source_id(url, row)
-    # todo get_wiki
-
-    pprint(row)
+    get_wiki_info(row)
+    return row
 
 
 def main():
@@ -264,10 +294,12 @@ def main():
     representatives_urls = get_urls(REP_PATH)
     senate_urls = get_urls(SENATE_PATH)
     urls = representatives_urls + senate_urls
+
     with Pool() as pool:
         data = pool.map(scrape, urls)
-        pprint(data)
+
     scraper_utils.write_data(data, 'us_vt_legislators')
+
 
 if __name__ == '__main__':
     main()

@@ -12,6 +12,7 @@ from transformers import BertTokenizer
 from torch.utils.data import TensorDataset
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
+import functools
 
 import sys
 import pandas as pd
@@ -216,9 +217,22 @@ class ScraperUtils:
         row.country_id = self.country_id
         row.country = self.country
         return row
+
+    class Timer:
+        """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to
+        time your function."""
+        def __call__(self, func):
+            @functools.wraps(func)
+            def wrapper_timer(*args, **kwargs):
+                start = time.perf_counter()
+                value = func(*args, **kwargs)
+                end = time.perf_counter()
+                run_time = end - start
+                print(f'Finished {func.__name__} in {run_time:.4f} secs')
+                return value
+
+            return wrapper_timer
     
-
-
 
 class LegislatorScraperUtils(ScraperUtils):
     """Base scraper class. Contains methods common to all legislator scrapers."""
@@ -902,13 +916,6 @@ class USFedLegislationScraperUtils(LegislationScraperUtils):
 
         data = df.to_dict('records')
 
-        # for d in data[:5]:
-        #     for k, v in d.items():
-        #         if k in {'bill_text'}:
-        #             continue
-        #         print(k, v, type(v))
-
-
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislation(data, table)
 
@@ -1108,16 +1115,16 @@ class PDF_Reader():
     def is_column(self, page):
         margin_top = page.crop((self.left_column_end, 0, self.right_column_start, self.top_spacing))
         text = margin_top.extract_text()
-        if text == None:
+        if text == None or len(text.strip()) == 0:
             return True
         else:
             return False
 
-    def get_text(self, page):
+    def get_text(self, page, bilingual_separated_by_double_space=False):
         if self.is_page_empty(page):
             return ""
         if self.is_column(page) and not self.is_page_empty(page):
-            return self.get_eng_half(page)
+            return self.get_eng_half(page, bilingual_separated_by_double_space)
         if not self.is_column(page) and not self.is_page_empty(page):
             return self.remove_page_number(page)
 
@@ -1128,9 +1135,33 @@ class PDF_Reader():
         else:
             return False
 
-    def get_eng_half(self, page):
+    def get_eng_half(self, page, is_double_space_separator):
+        if is_double_space_separator:
+            return self.__get_eng_half_with_double_space_separator(page)
         eng_half = page.crop((0, 0, self.page_half, self.page_height - self.bottom_spacing))
         return eng_half.extract_text()
+
+    def __get_eng_half_with_double_space_separator(self, page):
+        page_entire_text =  self.remove_page_number(page)
+        page_lines = page_entire_text.split('\n')
+        return self.__get_separated_text(page_lines)
+
+    def __get_separated_text(self, page_lines):
+        return_string = ''
+        for text_line in page_lines:
+            text_line = text_line.strip().split('  ')
+            if text_line[0] == "•" and len(text_line) != 2 and len(text_line) != 1:
+                return_string += ' ' + ' '.join(text_line[:2])
+            elif len(text_line) == 1:
+                text_line = ''
+            else:
+                text_line = text_line[0]
+                return_string += ' ' + ''.join(text_line)
+        return self.__clean_up_text(return_string)
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', '')
+        return text.strip()
 
     def remove_page_number(self, page):
         page_number_removed = page.crop((0, 0, self.page_width, self.page_height - self.bottom_spacing))
@@ -1143,3 +1174,6 @@ class PDF_Table_Reader(PDF_Reader):
             table_only_in_page = page.crop((0, self.top_spacing, self.page_width, self.page_height - self.bottom_spacing))
             tables.append(table_only_in_page.extract_table())
         return tables
+
+
+

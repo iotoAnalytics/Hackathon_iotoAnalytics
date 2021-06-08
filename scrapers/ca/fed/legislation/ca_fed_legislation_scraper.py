@@ -182,7 +182,7 @@ def scrape(xml_url):
     current_session_number = get_current_session_number()
 
     bill_lst = []
-    for bill in tqdm(root.findall('Bill'), "Bill scrapin'"):
+    for bill in tqdm(root.findall('Bill')[:5], "Bill scrapin'"):
 
         parl_session = bill.find('ParliamentSession')
         parl_number = parl_session.attrib["parliamentNumber"]

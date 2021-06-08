@@ -55,16 +55,19 @@ scraper_utils = USStateLegislationScraperUtils(
 base_url = 'https://legis.la.gov/'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
+# !! 1.
 legislator_name_special_cases = ["Amedee", "Beryl Amedee", "Beryl A. Amedee", "Johnson,T.", "Pat Moore", "Ken Brass",
                                  "Samuel Jenkins", "Larry Bagley", "Larry Frieman", "Gabe Firment", "Ray Garofalo",
                                  "Daryl Adams", "Robert Carter","Scott McKnight", "Joe Stagni", "Beau Beaullieu",
-                                 "Mike Johnson"]
+                                 "Mike Johnson", "Ed Price", "Jay Morris", "Cameron Henry", "Jay Luneau"]
 legislator_name_special_cases_reference = ["Amedée", "Beryl Amedée", "Beryl A. Amedée", "Johnson,C.", "Patricia Moore",
                                            'Kendricks "Ken" Brass', "Sam L. Jenkins, Jr.", 'Lawrence A. "Larry" Bagley',
                                            'Lawrence "Larry" Frieman', 'Michael "Gabe" Firment',
                                            'Raymond E. Garofalo, Jr.', 'Roy Daryl Adams', 'Robby Carter',
                                            'Markham Scott McKnight', 'Joseph A. Stagni', 'Gerald "Beau" Beaullieu, IV',
-                                           'Michael T. Johnson']
+                                           'Michael T. Johnson', 'Edward J. "Ed" Price', 'John C. "Jay" Morris, III',
+                                           'J. Cameron Henry, Jr.', 'W. Jay Luneau']
 
 
 def get_urls():
@@ -74,7 +77,9 @@ def get_urls():
     return: a list of urls of bills.
     '''
     urls = []
+    # !! 2.
     WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
+    # !! 3.
     url = "https://legis.la.gov/legis/BillSearch.aspx?sid=LAST&e=P1"
     driver = webdriver.Chrome(WEBDRIVER_PATH)
     select_index = 0
@@ -85,6 +90,7 @@ def get_urls():
     search_by_range_btn.click()
     sleep(2)
 
+    # !! 4.
     while select_index < types_of_bills:
         bill_lists_prep_automation(driver, url, select_index)
         sleep(3)
@@ -116,13 +122,23 @@ def scrape_urls(driver, urls):
             EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), ' > ')]")))
         if next_page.get_attribute(
                 "href") == "javascript:__doPostBack('ctl00$ctl00$PageBody$PageContent$DataPager1$ctl02$ctl00','')":
-            current_page_urls = WebDriverWait(driver, 60).until(
-                EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
-            for item in current_page_urls:
-                urls_per_page = item.get_attribute("href")
-                urls.append(urls_per_page)
-            print("collected")
-            sleep(2)
+            # !! 5.
+            try:
+                current_page_urls = WebDriverWait(driver, 60).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
+                for item in current_page_urls:
+                    urls_per_page = item.get_attribute("href")
+                    urls.append(urls_per_page)
+                print("collected")
+                sleep(2)
+            except Exception:
+                sleep(2)
+                current_page_urls = WebDriverWait(driver, 60).until(
+                    EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
+                for item in current_page_urls:
+                    urls_per_page = item.get_attribute("href")
+                    urls.append(urls_per_page)
+                print("collected")
             try:
                 next_page.click()
                 print("next page clicked")
@@ -178,10 +194,12 @@ def scrape(url):
 
     row = scraper_utils.initialize_row()
 
+    # !! 2.
     WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
 
     driver = webdriver.Chrome(WEBDRIVER_PATH)
 
+    # !! 6.
     driver.get(url)
 
     # Now you can begin collecting data and fill in the row. The row is a dictionary where the
@@ -206,9 +224,9 @@ def scrape(url):
 
     get_date_collected(row)
 
-    get_principal_sponsor_and_id(driver, row, chamber_origin)
+    get_principal_sponsor_and_id(driver, row)
 
-    get_sponsors_and_sponsors_id(driver, row, chamber_origin)
+    get_sponsors_and_sponsors_id(driver, row)
 
     get_bill_text(driver, row)
 
@@ -330,6 +348,7 @@ def get_chamber_origin_and_bill_type(bill_name, row):
     """
     chamber_origin and bill_type is determined by the id tag in bill_name.
     """
+    # !! 6.
     if "HB" in bill_name:
         chamber_origin = 'House'
         bill_type = 'Bill'
@@ -377,68 +396,80 @@ def get_date_collected(row):
     row.date_collected = date_collected
 
 
-def get_principal_sponsor_and_id(driver, row, chamber_origin):
+def get_principal_sponsor_and_id(driver, row):
     """
     principal sponsor is in the author span with the id "ctl00_PageBody_LinkAuthor". their name will be matched with
      their id in database with get_legislator_id.
     """
     principal_sponsor = driver.find_element_by_id("ctl00_PageBody_LinkAuthor").text
+
+    # !! 8.
     for name in legislator_name_special_cases:
         if principal_sponsor == name:
             principal_sponsor = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
 
     principal_sponsor_name_parser = HumanName(principal_sponsor)
-    if chamber_origin == "House":
-        principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                               name_first=principal_sponsor_name_parser.first,
-                                                               state_id=22)
-    elif chamber_origin == "Senate":
-        principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                               name_first=principal_sponsor_name_parser.first,
-                                                               state_id=22)
-    else:
-        principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                               name_first=principal_sponsor_name_parser.first,
-                                                               state_id=22)
 
+    # !! 7.
+    if principal_sponsor_name_parser != 'Troy Carter':
+        # special case: vacant senator
+        principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
+                                                            name_first=principal_sponsor_name_parser.first,
+                                                            state_id=22)
+        row.principal_sponsor_id = principal_sponsor_id
     row.principal_sponsor = principal_sponsor
-    row.principal_sponsor_id = principal_sponsor_id
 
 
-def get_sponsors_and_sponsors_id(driver, row, chamber_origin):
+def get_sponsors_and_sponsors_id(driver, row):
     """
     sponsor is in the hidden dropdown authors table. their name will be matched with
      their id in database with get_legislator_id.
     """
-    sponsors = []
-    sponsors_id = []
-    sponsors_elements = driver.find_elements_by_xpath(
-        '//*[@id="ctl00_PageBody_PanelBillInfo"]/table[2]/tbody/tr/td/div[last()]/table/tbody/tr/td/table/tbody/tr/td/a')
-    for sponsor in sponsors_elements:
-        sponsor_name = sponsor.get_attribute("innerText")
+    item_bar_text = get_item_bar_text(driver)
+    if "Authors" in item_bar_text:
+        sponsors = []
+        sponsors_id = []
 
-        for name in legislator_name_special_cases:
-            if sponsor_name == name:
-                sponsor_name = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
+        authors_url_element = driver.find_element_by_xpath('//*[@id="ctl00_PageBody_MenuDocuments"]/tbody/tr/td[last()-1]/table/tbody/tr/td[1]/a')
+        authors_url = authors_url_element.get_attribute("href")
 
-        if "(primary)" not in sponsor_name:
+        page = requests.get(authors_url)
+        soup = BeautifulSoup(page.content, 'html.parser')
+        for url in soup.find_all('a', {'href': re.compile("members")}):
+            sponsor_name = url.text
             sponsors.append(sponsor_name)
+
+            # !! 8.
+            for name in legislator_name_special_cases:
+                if sponsor_name == name:
+                    sponsor_name = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
+
             sponsor_name_parser = HumanName(sponsor_name)
-            if chamber_origin == "House":
+            if sponsor_name_parser != 'Troy Carter':
+                # special case: vacant senator
                 sponsor_id = scraper_utils.get_legislator_id(name_last=sponsor_name_parser.last,
                                                              name_first=sponsor_name_parser.first,
                                                              state_id=22)
-            elif chamber_origin == "Senate":
-                sponsor_id = scraper_utils.get_legislator_id(name_last=sponsor_name_parser.last,
-                                                             name_first=sponsor_name_parser.first,
-                                                             state_id=22)
-            else:
-                sponsor_id = scraper_utils.get_legislator_id(name_last=sponsor_name_parser.last,
-                                                             name_first=sponsor_name_parser.first,
-                                                             state_id=22)
-            sponsors_id.append(sponsor_id)
-    row.sponsors = sponsors
-    row.sponsors_id = sponsors_id
+                sponsors_id.append(sponsor_id)
+
+        sponsors.pop(0)  # remove principal sponsor
+        sponsors_id.pop(0)  # remove principal sponsor id
+        print(sponsors)
+        print(sponsors_id)
+
+        row.sponsors = sponsors
+        row.sponsors_id = sponsors_id
+
+    else:
+        pass
+
+    # sponsors_elements = driver.find_elements_by_xpath(
+    #     '//*[@id="ctl00_PageBody_PanelBillInfo"]/table[2]/tbody/tr/td/div[last()]/table/tbody/tr/td/table/tbody/tr/td/a')
+    # for sponsor in sponsors_elements:
+    #     sponsor_name = sponsor.get_attribute("innerText")
+    #
+
+
 
 
 def get_bill_text(driver, row):
@@ -446,11 +477,7 @@ def get_bill_text(driver, row):
     the most updated bill text is in the first row in the hidden dropdown text table. It is in pdf file so it will be
     converted to string by pdfplumber.
     """
-    item_bar_text = []
-    item_bar = driver.find_elements_by_xpath(
-        '//*[@id="ctl00_PageBody_MenuDocuments"]/tbody/tr/td/table/tbody/tr/td[1]/a')
-    for item in item_bar:
-        item_bar_text.append(item.text)
+    item_bar_text = get_item_bar_text(driver)
     if "Text" in item_bar_text:
         bill_text = ""
         text_location = driver.find_element_by_xpath(
@@ -464,6 +491,18 @@ def get_bill_text(driver, row):
                 bill_text += text
         bill_text = bill_text.replace("\n", " ")
         row.bill_text = bill_text
+    # !! 9.
+    else:
+        pass
+
+
+def get_item_bar_text(driver):
+    item_bar_text = []
+    item_bar = driver.find_elements_by_xpath(
+        '//*[@id="ctl00_PageBody_MenuDocuments"]/tbody/tr/td/table/tbody/tr/td[1]/a')
+    for item in item_bar:
+        item_bar_text.append(item.text)
+    return item_bar_text
 
 
 def get_action(driver, row, session):
@@ -473,6 +512,8 @@ def get_action(driver, row, session):
     actions = []
     count = 1
     number_of_actions = len(driver.find_elements_by_xpath('//*[@id="ctl00_PageBody_PanelBillInfo"]/table[3]/tbody/tr'))
+    
+    # !! 10.
     while count <= number_of_actions:
         try:
             date_short = driver.find_element_by_xpath(
@@ -645,7 +686,7 @@ def replace_speaker_and_president_name(voters):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape_rep:
+    # # First we'll get the URLs we wish to scrape_rep:
     urls = get_urls()
 
     # Next, we'll scrape_rep the data we want to collect from those URLs.
@@ -653,12 +694,12 @@ if __name__ == '__main__':
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape_rep(url) for url in urls]
     with Pool(7) as pool:
-        data = pool.map(scrape, urls[:100])
+        data = pool.map(scrape, urls)
     # for url in urls:
     #     data = scrape(url)
     #
     # # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
-    # scrape("https://legis.la.gov/legis/BillInfo.aspx?i=240255")
+    # scrape("http://www.legis.la.gov/legis/BillInfo.aspx?i=239780")
 
     print('Complete!')

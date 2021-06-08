@@ -1,33 +1,21 @@
-'''
-Before beginning, be sure to update values in the config file.
 
-This template is meant to serve as a general outline, and will not necessarily work for
-all pages. Feel free to modify the scripts as necessary.
-
-Note that the functions in the scraper_utils.py and database_tables.py file should not
-have to change. Please extend the classes in these files if you need to modify them.
-'''
 import sys
 import os
 from pathlib import Path
+import re
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+from bs4 import BeautifulSoup
+import time
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from urllib.request import urlopen as uReq
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
-
-import boto3
-import re
-import numpy as np
-from nameparser import HumanName
-from pprint import pprint
-from multiprocessing import Pool
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-import time
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
 
 prov_abbreviation = 'NS'
 database_table_name = 'ca_ns_legislators'
@@ -41,12 +29,8 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
     urls = []
 
-    # Logic goes here! Url we are scraping: https://nslegislature.ca/members/profiles
     path = '/members/profiles'
     scrape_url = base_url + path
     page = scraper_utils.request(scrape_url)
@@ -54,7 +38,6 @@ def get_urls():
 
     members_view = soup.find('div', {'class': 'view-content'})
 
-    # We'll collect only the first 10 to keep things simple. Need to skip first record
     for tr in members_view.findAll('a'):
         a = tr
         urls.append(base_url + a['href'])
@@ -69,7 +52,6 @@ def get_current_general_assembly_link(general_assembly_link):
     uClient = uReq(general_assembly_link)
     page_html = uClient.read()
     uClient.close()
-    # # html parsing
     page_soup = BeautifulSoup(page_html, "lxml")
     table = page_soup.find("table", {'class': 'wikitable'})
     current_assembly_row = table.findAll('tr')[1]
@@ -85,7 +67,6 @@ def find_mla_wiki(mlalink):
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
-    # # html parsing
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
     people = tables[1].findAll("tr")
@@ -250,29 +231,10 @@ def get_committees(bio_container, row, name):
 
 
 def scrape(url):
-    '''
-    Insert logic here to scrape all URLs acquired in the get_urls() function.
-
-    Do not worry about collecting the goverlytics_id, date_collected, country, country_id,
-    state, and state_id values, as these have already been inserted by the initialize_row()
-    function, or will be inserted when placed in the database.
-
-    Do not worry about trying to insert missing fields as the initialize_row function will
-    insert empty values for us.
-
-    Be sure to insert the correct data type into each row. Otherwise, you will get an error
-    when inserting data into database. Refer to the data dictionary to see data types for
-    each column.
-    '''
 
     row = scraper_utils.initialize_row()
-
-    # Now you can begin collecting data and fill in the row. The row is a dictionary where the
-    # keys are the columns in the data dictionary. For instance, we can insert the state_url
-    # like so:
     row.source_url = url
 
-    # get region
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
 
@@ -299,7 +261,6 @@ def scrape(url):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
     start = time.time()
     print(
         f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) '
@@ -309,20 +270,14 @@ if __name__ == '__main__':
     urls = get_urls()
     print('URLs Collected.')
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
-
     print('Scraping data...')
 
-    # data = [scrape(url) for url in urls]
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
-
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
