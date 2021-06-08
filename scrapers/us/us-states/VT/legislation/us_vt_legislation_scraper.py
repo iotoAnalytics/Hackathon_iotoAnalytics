@@ -8,14 +8,8 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException, StaleElementReferenceException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-import pandas as pd
 from multiprocessing import Pool
 from time import sleep
-import time
-from pprint import pprint
 from tika import parser
 
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -108,7 +102,9 @@ def get_goverlytics_id(soup, row):
         year = soup.find('dl', {'class': 'summary-table'}).find_all('dd')[-1].find('a').text.split()[1].split('/')[-1]
         row.goverlytics_id = f'{state_abbreviation}_{year}_{bill_name}'
     except AttributeError:
-        pass
+        bill_name = soup.find('div', {'class': 'bill-title'}).text.split()[0].replace('\t', '').replace('\n', '').replace('.', '')
+        year = soup.find('dl', {'class': 'summary-table'}).find_all('dd')[-1].text.split()[1].split('/')[-1]
+        row.goverlytics_id = f'{state_abbreviation}_{year}_{bill_name}'
 
 
 def get_bill_session(soup, row):
@@ -118,8 +114,11 @@ def get_bill_session(soup, row):
     :param row: legislation row
     """
 
-    year = soup.find('dl', {'class': 'summary-table'}).find_all('dd')[-1].find('a').text.split()[1].split('/')[-1]
-    row.session = year
+    try:
+        year = soup.find('dl', {'class': 'summary-table'}).find_all('dd')[-1].find('a').text.split()[1].split('/')[-1]
+        row.session = year
+    except AttributeError:
+        pass
 
 
 def get_bill_summary(soup, row):
@@ -183,7 +182,7 @@ def get_bill_text(soup, row):
     bill_path = soup.find('ul', {'class': 'bill-path'})
     try:
         bill_texts = bill_path.find_all('li')
-        latest_bill_text_endpoint = bill_texts[-1].find('a').get('href').replace(' ', '%20')
+        latest_bill_text_endpoint = bill_texts[-1].find('a').get('href').replace(' ', '%20').replace('/n', '')
         link = BASE_URL + latest_bill_text_endpoint
         parsed = parser.from_file(link)
         row.bill_text = parsed['content']
@@ -211,10 +210,9 @@ def get_bill_actions(url, row):
             actions.append({'action_by': str(r[0].text), 'date': str(r[1].text), 'description': str(r[-1].text)})
         row.actions = actions
         driver.quit()
-    except StaleElementReferenceException:
-        print('STALE ' + url)
-    except IndexError:
-        print('Index ' + url)
+    except (StaleElementReferenceException, IndexError):
+        pass
+
 
 @scraper_utils.Timer()
 def get_bill_votes(url, row):
@@ -248,10 +246,8 @@ def get_bill_votes(url, row):
                           'yea': str(vote_table[2].text), 'nay': vote_table[3].text,
                           'absent': vote_table[4].text, 'passed': vote_table[5].text, 'nv': 0,
                           'chamber': r[0].text, 'votes': individual_votes})
-    except NoSuchElementException:
-        print('NoSuchElementException ' + url)
-    except StaleElementReferenceException:
-        print('StaleElementReferenceException ' + url)
+    except (NoSuchElementException, StaleElementReferenceException):
+        pass
     row.votes = votes
     driver.quit()
 
@@ -281,10 +277,8 @@ def get_bill_committees(url, row):
             if committee_dict not in committees:
                 committees.append(committee_dict)
         row.committees = committees
-    except NoSuchElementException:
-        print('NoSuchElementException ' + url)
-    except StaleElementReferenceException:
-        print('STALE ' + url)
+    except (NoSuchElementException, StaleElementReferenceException):
+        pass
     driver.quit()
 
 
@@ -311,7 +305,6 @@ def scrape(url):
     get_bill_actions(url, row)
     get_bill_votes(url, row)
     get_bill_name(soup, row)
-    # get_date_introduced(url, row)
     get_bill_type(url, row)
     get_bill_committees(url, row)
     get_current_status(soup, row)
