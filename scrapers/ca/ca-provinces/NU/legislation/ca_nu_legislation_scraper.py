@@ -41,9 +41,9 @@ def program_driver():
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
     bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[3:5])
-    # print('Writing data to database...')
-    # scraper_utils.write_data(bill_data)
-    # print("Complete")
+    print('Writing data to database...')
+    scraper_utils.write_data(bill_data)
+    print("Complete")
 
 class PreProgramFunctions:
     def set_current_session(self):
@@ -156,7 +156,6 @@ class BillScraper:
         self.row.bill_summary = self.__get_bill_summary()
         self.row.bill_text = self.__get_bill_text()
         self.row.bill_type = self.__get_bill_type()
-        print(self.row.bill_text)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
