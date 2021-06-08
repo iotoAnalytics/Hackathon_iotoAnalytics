@@ -200,6 +200,10 @@ class MainFunctions:
                           on=['name_first', 'name_last'])
         isna = big_df['committees'].isna()
         big_df.loc[isna, 'committees'] = pd.Series([[]] * isna.sum()).values
+        isna = big_df['occupation'].isna()
+        big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+        isna = big_df['education'].isna()
+        big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
 
         return big_df.to_dict('records')
 
