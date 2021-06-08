@@ -1,9 +1,11 @@
+# Unavailable data - source_id, most_recent_term_id, years_active, seniority, military_experience
+# Wiki data - education, occupation
+
 import os
 import re
 import sys
 
 import multiprocessing
-import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from multiprocessing import Pool
@@ -20,10 +22,14 @@ from scraper_utils import USStateLegislatorScraperUtils
 DEBUG_MODE = False
 
 STATE_ABBREVIATION = 'TN'
-LEGISLATOR_TABLE_NAME = 'us_tn_legislators_test'
+LEGISLATOR_TABLE_NAME = 'us_tn_legislators'
 
 BASE_URL = 'https://www.capitol.tn.gov/'
-WIKI_URL = 'https://en.wikipedia.org'
+HOUSE_PATH = 'house/members/'
+SENATE_PATH = 'senate/members/'
+WIKI_URL = 'https://en.wikipedia.org/'
+WIKI_HOUSE_PATH = 'wiki/Tennessee_House_of_Representatives'
+WIKI_SENATE_PATH = 'wiki/Tennessee_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
@@ -31,28 +37,367 @@ NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+def get_urls():
+    legislator_info_idx = 1
+    
+    # Get house URLs
+    scrape_url = BASE_URL + HOUSE_PATH
+    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    table_rows = soup.find('table', {'class': 'box tan'}).find('tbody').find_all('tr')
+    house_urls = [BASE_URL + HOUSE_PATH + table_row.find_all('td')[legislator_info_idx].find('a').get('href')
+        for table_row in table_rows]
+
+    # Get senate URLs
+    scrape_url = BASE_URL + SENATE_PATH
+    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    table_rows = soup.find('table', {'class': 'box tan'}).find('tbody').find_all('tr')
+    senate_urls = [BASE_URL + SENATE_PATH + table_row.find_all('td')[legislator_info_idx].find('a').get('href')
+        for table_row in table_rows]
+
+    urls = house_urls + senate_urls
+
+    return urls
+
+def scrape(url):
+    soup = _create_soup(url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+    row = scraper_utils.initialize_row()
+
+    try:
+        _set_source_url(row, url)
+        _set_name(row, soup)
+        _set_party(row, soup)
+        _set_role(row, soup)
+        _set_committees(row, soup)
+        _set_phone_numbers(row, soup)
+        _set_addresses(row, soup)
+        _set_email(row, soup)
+        _set_birthday(row, soup)
+        _set_areas_served(row, soup)
+        _set_district(row, soup)
+    except:
+        print(f'Error with: {url}')
+
+    return row
+
+# FIXME: Refactor wiki methods
+def get_wiki_urls_with_district():
+    wiki_urls = []
+    
+    wiki_member_list_url = [WIKI_URL + WIKI_HOUSE_PATH, WIKI_URL + WIKI_SENATE_PATH]
+
+    for url in wiki_member_list_url: 
+        page = scraper_utils.request(url)
+        soup = BeautifulSoup(page.content, SOUP_PARSER_TYPE)
+        scraper_utils.crawl_delay(crawl_delay)
+
+        table_rows = soup.find('table', {'class': 'sortable wikitable'}).find('tbody').find_all('tr')
+
+        for row in table_rows[1:]:
+            try:
+                fields = row.find_all('td')
+                district_idx = 0
+                path_idx = 1
+
+                district = fields[district_idx].text
+                path = fields[path_idx].find('a').get('href')
+
+                if '/wiki' in path:
+                    url = {
+                        'district': district,
+                        'url': WIKI_URL + path
+                    }
+                    wiki_urls.append(url)
+            except:
+                pass
+
+    return wiki_urls
+    
+def merge_all_wiki_data(legislator_data, wiki_urls):
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
+
+    for data in wiki_data:
+        _merge_wiki_data(legislator_data, data, birthday=False)
+
+def _scrape_wiki(url):
+    wiki_data = scraper_utils.scrape_wiki_bio(url['url'])
+    wiki_crawl_delay = scraper_utils.get_crawl_delay(url['url'])
+    scraper_utils.crawl_delay(wiki_crawl_delay)
+
+    return {
+        'data': wiki_data,
+        'district': url['district']
+    }
+
+def _create_soup(url, soup_parser_type):
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, soup_parser_type)
+    return soup
+
+def _set_source_url(row, url):
+    row.source_url = url
+
+def _set_name(row, soup):
+    name_str = soup.select('body > div.row.content > div > h1')[0].text.strip()
+    formatted_name = name_str.split(' ', 1)[1]
+    human_name = HumanName(formatted_name)
+
+    row.name_first = human_name.first
+    row.name_last = human_name.last
+    row.name_middle = human_name.middle
+    row.name_suffix = human_name.suffix
+    row.name_full = human_name.full_name
+
+def _set_party(row, soup):
+    party_str = (
+        soup.select('body > div.row.content > div > div > div.box.black.description > div.one > '
+            'strong')[0].text.strip()
+    )
+
+    row.party = party_str
+    row.party_id = scraper_utils.get_party_id(party_str)
+
+def _set_role(row, soup):
+    role_str = soup.select('body > div.row.content > div > h1')[0].text.strip()
+    role = role_str.split(' ', 1)[0]
+
+    # Fix special abbreviations
+    if role == 'Lt.':
+        role = 'Governor'
+    elif role == 'Rep.':
+        role = 'Representative'
+
+    row.role = role
+
+def _set_committees(row, soup):
+    committees = []
+    
+    try:
+        committees_list = (
+            soup.select('body > div.row.content > div > div > div.padded-25 > div > '
+                'div.large-18.medium-18.columns > ul.tabs-container.box.tan')[0]
+                .find('li', {'data-tab': 'committees'})
+                .find_all('li')
+        )
+
+        for committee in committees_list:
+            committee_info = committee.text.strip().split(', ')
+            committee_item = {
+                'role': committee_info[0],
+                'committee': committee_info[1]
+            }
+            committees.append(committee_item)
+    except:
+        pass
+
+    row.committees = committees
+
+def _set_phone_numbers(row, soup):
+    phone_numbers = []
+
+    phone_number_element = (
+        soup.select('body > div.row.content > div > div > div.padded-25 > div > div.large-6.medium-6.columns.side')[0]
+            .find('div', {'data-mobilehide': 'contact'})
+    )
+
+    office_str = phone_number_element.find('h2').text
+    office = _format_location(office_str)
+
+    phone_number_str = phone_number_element.find('p').text.strip()
+    search = re.search('Phone:? \(?([0-9]{3})\)?\s?\-?([0-9]{3}-[0-9]{4})', phone_number_str)
+    number = search.group(1) + '-' + search.group(2)
+
+    phone_number = {
+        'office': office,
+        'number': number
+    }
+    phone_numbers.append(phone_number)
+
+    row.phone_numbers = phone_numbers
+
+def _set_addresses(row, soup):
+    addresses = []
+
+    address_element = (
+        soup.select('body > div.row.content > div > div > div.padded-25 > div > div.large-6.medium-6.columns.side')[0]
+            .find('div', {'data-mobilehide': 'contact'})
+            .find_all(lambda tag: tag.name == 'h2' and 'Address' in tag.text)
+    )
+
+    for el in address_element:
+        location = _format_location(el.text)
+        address = _format_address(el.next_element.next_element.next_element.text)
+
+        address_item = {
+            'location': location,
+            'address': address
+        }
+        addresses.append(address_item)
+
+    row.addresses = addresses
+
+def _format_location(text):
+    location = text.strip().split()[0]
+    
+    if location == 'Nashville':
+        location = 'Capitol'
+    
+    return location
+
+def _format_address(text):
+    address_str = re.sub('[\r\n]+', '', text)
+    address_str = re.sub('\s{2,}', ' ', address_str)
+    address_str = re.sub('(Phone|Fax) \([0-9]{3}\) [0-9]{3}-[0-9]{4}', '', address_str)
+    address = address_str.strip()
+    return address
+
+def _set_email(row, soup):
+    email_str = (
+        soup.select('body > div.row.content > div > div > div.box.black.description > div.photo > '
+            'p > a.button.email.icon-mail')[0]
+            .get('href')
+    )
+    email = email_str.replace('mailto:', '')
+    row.email = email
+
+def _set_birthday(row, soup):
+    birthday_str = (
+        soup.select('body > div.row.content > div > div > div.padded-25 > div > '
+            'div.large-18.medium-18.columns > ul.tabs-container.box.tan > li:nth-child(1) > ul > '
+            'li:nth-child(1)')[0]
+            .text
+    )
+
+    if 'Born' in birthday_str:
+        row.birthday = _format_birthdate(birthday_str)
+
+def _format_birthdate(text):
+    birthdate_str = re.sub('(st|nd|rd|th)', '', text)
+    birthdate_str = re.sub('Born (on)?', '', birthdate_str)
+    
+    if search:= re.search('([A-Za-z]+) [0-9]+(\, [0-9]{4})?', birthdate_str):
+        birthdate_str = search.group(0).strip()
+        month_str = search.group(1)
+
+        # Fix website's typo
+        if month_str and month_str == 'Augu':
+            birthdate_str = birthdate_str.replace('Augu', 'August')
+
+    birthdate_str = birthdate_str.strip()
+
+    # Match format like March 1, 2021
+    try:
+        birthdate = datetime.strptime(birthdate_str, '%B %d, %Y')
+        return birthdate
+    except ValueError:
+        pass
+
+    # Match format like March 1
+    try:
+        birthdate = datetime.strptime(birthdate_str, '%B %d')
+        return birthdate
+    except ValueError:
+        pass
+
+    # Match format like March 2021
+    try:
+        birthdate = datetime.strptime(birthdate_str, '%B %Y')
+        return birthdate
+    except ValueError:
+        print(f'Cannot set birthdate: {birthdate_str}')
+
+def _set_areas_served(row, soup):
+    areas_served_str = (
+        soup.select('body > div.row.content > div > div > div.box.black.description > div.two > '
+            'br')[0]
+            .next_element
+    )
+
+    areas_served = _format_areas_served(areas_served_str)
+    row.areas_served = areas_served
+
+def _format_areas_served(text):
+    areas_served_str = re.sub('[\r\n]+', '', text)
+    areas_served_str = re.sub('(and|[Pp]art of|Count(ies|y))', '', areas_served_str)
+    areas_served_str = re.sub('\s{2,}', ' ', areas_served_str)
+    areas_served_str = areas_served_str.strip()
+
+    areas_served = re.split(', | ', areas_served_str)
+    return areas_served
+
+def _set_district(row, soup):
+    district_str = (
+        soup.select('body > div.row.content > div > div > div.box.black.description > '
+            'div.two > strong')[0]
+            .text
+    )
+
+    district = district_str.split()[-1]
+    row.district = district
+
+def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True,
+                    years_active=True, most_recent_term_id=True):
+    full_name = wiki_data['data']['name_first'] + ' ' + wiki_data['data']['name_last']
+    district = wiki_data['district']
+
+    legislator_row = _get_legislator_row(legislator_data, full_name, district)
+
+    if not legislator_row:
+        return
+
+    for bio_info in wiki_data:
+        if birthday:
+            legislator_row.birthday = wiki_data['data']['birthday']
+        if education:
+            legislator_row.education = wiki_data['data']['education']
+        if occupation:
+            legislator_row.occupation = wiki_data['data']['occupation']
+        if years_active:
+            legislator_row.years_active = wiki_data['data']['years_active']
+        if most_recent_term_id:
+            legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
+ 
+def _get_legislator_row(data, name_full, district):
+    for row in data:
+        if name_full == row.name_full and district == row.district:
+            return row
+
 def main():
-    # TODO - source_id
-    # TODO - most_recent_term_id
-    # TODO - date_collected
-    # TODO - source_url
-    # TODO - name (full, last, first, middle, suffix)
-    # TODO - party_id
-    # TODO - party
-    # TODO - role
-    # TODO - years_active
-    # TODO - committees
-    # TODO - phone_numbers
-    # TODO - addresses
-    # TODO - email
-    # TODO - birthday
-    # TODO - seniority
-    # TODO - occupation
-    # TODO - education
-    # TODO - military_experience
-    # TODO - areas_served
-    # TODO - district
-    pass
+    print('TENNESSEE!')
+    print('O Tennessee: Fair Tennessee: ♫ ♫ ♫')
+    print('Our love for thee can never die: ♫ ♫ ♫')
+    print('Dear homeland, Tennessee ♫ ♫ ♫\n')
+
+    print('\nSCRAPING TENNESSEE LEGISLATORS\n')
+
+    # Collect legislators urls
+    print(DEBUG_MODE and 'Collecting legislator URLs...\n' or '', end='')
+    urls = get_urls()
+
+    # Scrape data from collected URLs
+    print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        data = list(tqdm(pool.imap(scrape, urls)))
+
+    # Collect wiki urls
+    print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
+    wiki_urls = get_wiki_urls_with_district()
+
+    # Merge data from wikipedia
+    print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
+    merge_all_wiki_data(data, wiki_urls)
+
+    # Write to database
+    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
+    if not DEBUG_MODE:
+        scraper_utils.write_data(data)
+
+    print('\nCOMPLETE!\n')
 
 if __name__ == '__main__':
     main()
