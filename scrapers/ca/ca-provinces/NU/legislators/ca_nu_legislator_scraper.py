@@ -1,4 +1,3 @@
-from operator import add, index
 import sys
 import os
 from pathlib import Path
