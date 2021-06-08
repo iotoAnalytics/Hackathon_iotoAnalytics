@@ -30,6 +30,7 @@ database_table_name = 'us_nv_legislator'
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
 
+# !! 1.
 original_url  = 'https://www.leg.state.nv.us/'
 
 base_url = 'https://www.leg.state.nv.us/App/Legislator/A/Assembly/Current'
@@ -113,7 +114,7 @@ def get_urls(url) :
     county = None
     link = None
 
-
+    # !! 3.
     for item in url_links:
         if(count % 2 == 0 ) :
             
@@ -123,6 +124,7 @@ def get_urls(url) :
             link = get_link(item)
             
         else:
+            # !! 4.
             phoneNumbers = []
             print(county)
             content = item.find_all('td')
@@ -145,6 +147,8 @@ def get_urls(url) :
                 'number' : content[4].text.replace('(','').replace(')','')
                 }
                 phoneNumbers.append(work_no)
+
+            # !! 2.
             except:
                 print("no phone number")
 
@@ -178,7 +182,6 @@ def get_years(content):
     active_years = []
     year_ranges = re.findall("\d{4}-Present", content.text)
 
-    
     for range in year_ranges:
         active_years = active_years + get_range(range)
     
