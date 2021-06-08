@@ -18,13 +18,13 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-state_abbreviation = 'KS'
-database_table_name = 'us_ks_legislators'
+state_abbreviation = 'MA'
+database_table_name = 'us_ma_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
 
-base_url = 'http://www.kslegislature.org'
+base_url = 'https://malegislature.gov'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
@@ -32,20 +32,21 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 def get_urls():
 
     urls = []
-    # Url we are scraping: http://www.kslegislature.org/li/b2021_22/chamber/senate/roster/
-    path_senate = '/li/chamber/senate/roster/'
-    path_house = '/li/chamber/house/roster/'
+
+    path_senate = '/Legislators/Members/Senate'
+    path_house = '/Legislators/Members/House'
 
     # getting urls for senate
     scrape_url = base_url + path_senate
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    table = soup.find('table', {'class': 'bottom'})
+    table = soup.find('table', {'id': 'legislatorTable'})
     items = table.find_all('tr')
 
-    for tr in items[1:]:
-        link = base_url + tr.find('a').get('href')
-        # print(link)
+    for tr in items[1:15]:
+        td = tr.find_all('td')[2]
+        link = base_url + td.find('a').get('href')
+        print(link)
         urls.append(link)
 
     # Delay so we do not overburden servers
@@ -55,12 +56,13 @@ def get_urls():
     scrape_url = base_url + path_house
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
-    table = soup.find('table', {'class': 'bottom'})
+    table = soup.find('table', {'id': 'legislatorTable'})
     items = table.find_all('tr')
 
-    for tr in items[1:]:
-        link = base_url + tr.find('a').get('href')
-        #  print(link)
+    for tr in items[1:15]:
+        td = tr.find_all('td')[2]
+        link = base_url + td.find('a').get('href')
+        print(link)
         urls.append(link)
 
     # Delay so we do not overburden servers
@@ -114,39 +116,39 @@ def find_sens_wiki(repLink):
 
 
 def get_most_recent_term_id(soup, row):
-    header_div = soup.find('div', {'id': 'logo2'})
-    term_id = header_div.find('h5').text
-    term_id = term_id.split(' ')[0].strip()
-
+    term_title = soup.find('span', {'class': 'headNumber'}).text
+    term_id = term_title.split(' ')[1].strip()
+    term_id = re.findall(r'[0-9]', term_id)
+    term_id = "".join(term_id)
     row.most_recent_term_id = term_id
 
 
-def find_party_and_district(main_div, row):
-    party_block = main_div.find('h2').text
-    party = party_block.split(' ')[3]
+def find_party_and_district(soup, row):
+    party_block = soup.find('span', {'class': 'subTitle'}).text
+    try:
+        party = party_block.split(' -')[0]
+        row.party_id = scraper_utils.get_party_id(party)
+        row.party = party
+    except Exception:
+        pass
 
-    row.party_id = scraper_utils.get_party_id(party)
-    row.party = party
+    try:
+        district = party_block.split('- ')[1]
+        row.district = district
+    except Exception:
+        pass
 
-    district = party_block.split(' ')[1]
-    row.district = district
 
+def get_name_and_role(soup, row):
+    name_block = soup.find('h1')
+    role = name_block.find('span').text.strip()
+    name_full = name_block.text.split(role)[1].strip()
+    if "Democrat" in name_full:
+        name_full = name_full.split('Democrat')[0].strip()
+    else:
+        name_full = name_full.split('Republican')[0].strip()
 
-def get_name_and_role(main_div, row):
-    current_role = ""
-    name_line = main_div.find('h1').text
-    name_full = name_line
-
-    if " - " in name_line:
-        name_full = name_full[:name_full.index(" - ")]
-    if "Senator" in name_full:
-        name_full = name_full.replace('Senator ', '')
-        current_role = "Senator"
-    if "Representative" in name_full:
-        current_role = "Representative"
-        name_full = name_full.replace('Representative ', '')
-
-    row.role = current_role
+    row.role = role
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -156,68 +158,79 @@ def get_name_and_role(main_div, row):
     row.name_suffix = hn.suffix
 
 
-def get_phone_numbers(capitol_office, home, business, row):
+def get_phone_numbers(soup, row):
     phone_numbers = []
-
-    number = capitol_office.text.split("Phone: ")[1].strip()
-    phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', number)[0]
-    phone_info = {'office': 'capitol office',
-                  'number': phone_number}
-    phone_numbers.append(phone_info)
-
     try:
-        numbers = home.text.split("Phone: ")[1].strip()
-        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
-        phone_info = {'office': 'home',
-                      'number': phone_number}
-        phone_numbers.append(phone_info)
+        contacts = soup.findAll('div', {'class': 'col-xs-12 col-sm-5'})
+        for contact in contacts:
+            location = contact.find('h4').text.strip()
+            number = contact.find('div', {'class': 'col-xs-12 col-lg-9'}).text.strip()
+            phone_number = {"office": location, "number": number}
+            phone_numbers.append(phone_number)
+
+        row.phone_numbers = phone_numbers
     except Exception:
         pass
 
-    try:
-        numbers = business.text.split("Phone: ")[1].strip()
-        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
-        phone_info = {'office': 'business',
-                      'number': phone_number}
-        phone_numbers.append(phone_info)
-    except Exception:
-        pass
 
-    row.phone_numbers = phone_numbers
+def get_email(soup, row):
+    email = soup.find('address', {'class': 'repEmail'}).text.strip()
+    row.email = email
 
 
-def get_email(capitol_office, row):
-    capitol_email = capitol_office.a.text
-    row.email = capitol_email
-
-
-def get_address(capitol_office, row):
+def get_address(soup, row):
     addresses = []
-    room_number = capitol_office.text.split("Room: ")[1].strip()
-    room_number = room_number[:room_number.index('\n')]
+    contacts = soup.find('div', {'class': 'col-xs-12 col-sm-5'})
+    address = contacts.find('a').text.strip()
+    address = address.replace('  ', '')
     address = {'office': 'capitol office',
-               'address': room_number + ' - 300 SW 10th St. - Topeka, Kansas 66612'}
+               'address': address}
     addresses.append(address)
     row.addresses = addresses
 
 
-def get_occupation(business, row):
+def get_biography(url, row):
+    bio_url = url + '/Biography'
+    page = scraper_utils.request(bio_url)
+    soup = BeautifulSoup(page.content, 'lxml')
+    get_occupation(soup, row)
+    get_education(soup, row)
+
+def get_occupation(soup, row):
     jobs = []
+    bio_section = soup.find('div', {'class': 'active tab-pane customFade in'})
     try:
-        job = business.text.split("Occupation: ")[1].strip()
-
-        if '\n' in job:
-            job = job[:job.index('\n')]
-
-        if '/' in job:
-            jobs.append(job.split('/')[0])
-            jobs.append(job.split('/')[1])
-        else:
+        occupation = bio_section.find('div', {'class': 'col-xs-12 col-sm-9'}).text
+        occupation = occupation.replace(';', '/')
+        occupations = occupation.split('/')
+        for job in occupations:
+            job = job.replace('\n', '')
+            job = job.replace('.', '')
+            job = job.strip()
             jobs.append(job)
+        row.occupation = jobs
     except Exception:
         pass
 
-    row.occupation = jobs
+
+def get_education(soup, row):
+    education = []
+    bio_section = soup.find('div', {'class': 'active tab-pane customFade in'})
+    education_list= bio_section.find_all('li')
+    for item in education_list:
+        item = item.text
+        if "University" in item:
+            education.append(item)
+        elif "College" in item:
+            education.append(item)
+        elif "Academy" in item:
+            education.append(item)
+        elif "School" in item:
+            education.append(item)
+        school = item.split(","[0])
+        print(school)
+    #print(education)
+    print()
 
 
 def get_years_active(contact_sidebar, row):
@@ -318,32 +331,15 @@ def scrape(url):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
-    # getting the main part of the page
-    main_div = soup.find('div', {'id': 'main'})
-
-    # getting the sidebar data
-    contact_sidebar = soup.find('div', {'id': 'sidebar'})
-
-    capitol_office = contact_sidebar.find_all('p')[0]
-    try:
-        home = contact_sidebar.find_all('p')[1]
-    except Exception:
-        home = None
-    try:
-        business = contact_sidebar.find_all('p')[2]
-    except Exception:
-        business = None
-
-    # calling data collection functions
     get_most_recent_term_id(soup, row)
-    find_party_and_district(main_div, row)
-    get_name_and_role(main_div, row)
-    get_phone_numbers(capitol_office, home, business, row)
-    get_email(capitol_office, row)
-    get_address(capitol_office, row)
-    get_occupation(business, row)
-    get_years_active(contact_sidebar, row)
-    get_committees(main_div, row)
+    find_party_and_district(soup, row)
+    get_name_and_role(soup, row)
+    get_phone_numbers(soup, row)
+    get_email(soup, row)
+    get_address(soup, row)
+    get_biography(url, row)
+    # get_years_active(contact_sidebar, row)
+    # get_committees(main_div, row)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -368,35 +364,35 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="education")
 
     # getting urls from wikipedia
-    wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
-    wiki_sen_link = 'https://en.wikipedia.org/wiki/Kansas_Senate'
-
-    reps_wiki = find_reps_wiki(wiki_rep_link)
-
-    sens_wiki = find_sens_wiki(wiki_sen_link)
-
-    all_wiki_links = reps_wiki + sens_wiki
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-
-    final_df = get_areas_served(big_df)
+    # wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
+    # wiki_sen_link = 'https://en.wikipedia.org/wiki/Kansas_Senate'
+    #
+    # reps_wiki = find_reps_wiki(wiki_rep_link)
+    #
+    # sens_wiki = find_sens_wiki(wiki_sen_link)
+    #
+    # all_wiki_links = reps_wiki + sens_wiki
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['birthday', 'education', 'name_first', 'name_last']]
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_first", "name_last"])
+    #
+    # isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    #
+    # final_df = get_areas_served(big_df)
 
     print('Scraping complete')
 
-    big_list_of_dicts = final_df.to_dict('records')
+    # big_list_of_dicts = final_df.to_dict('records')
 
     print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+    #.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')

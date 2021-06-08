@@ -164,18 +164,21 @@ def get_get_date_introduced(row, actions):
 
 
 def get_bill_text(url, row):
+    text = ""
     try:
         response = requests.get(url, stream=True)
         pdf = pdfplumber.open(io.BytesIO(response.content))
         pages = pdf.pages
-        text = ""
         for page in pages:
-            page_text = page.extract_text()
-            text += page_text.strip()
+            try:
+                page_text = page.extract_text()
+                text += page_text.strip()
+            except Exception:
+                pass
         text = text.replace('\n', '')
         row.bill_text = text
     except Exception:
-        row.bill_text = ""
+        row.bill_text = text
 
 
 def get_bill_link(row):
@@ -214,12 +217,17 @@ def get_principal_sponsor(row):
 def clear_none_value_rows(data):
     df = pd.DataFrame(data)
     list_of_dicts = df.to_dict('records')
-    print(list_of_dicts)
+
     for i in range(len(list_of_dicts)):
         value = list_of_dicts[i]['goverlytics_id']
-        print(value)
-        if 'None' in value:
-            del list_of_dicts[i]
+        if "None" in value:
+            print(i)
+            print(value)
+            index = i
+    try:
+        del list_of_dicts[index]
+    except Exception:
+        pass
     return list_of_dicts
 
 
@@ -256,18 +264,14 @@ If this occurs in your scraper, be sure to investigate. Check the database and m
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     urls = get_urls()
 
-    # Next, we'll scrape the data we want to collect from those URLs.
-    # Here we can use Pool from the multiprocessing library to speed things up.
-    # We can also iterate through the URLs individually, which is slower:
     data = [scrape(url) for url in urls]
-    df = pd.DataFrame(data)
-    no_content_index = df.index['None' in df['goverlytics_id']].tolist()
-    for index in no_content_index:
-        print(index)
-        df = df.drop(df.index[index])
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
 
-    scraper_utils.write_data(df)
+
+    # with Pool(processes=4) as pool:
+    #     data = pool.map(scrape, urls)
+    # data = clear_none_value_rows(data)
+    big_list_of_dicts = clear_none_value_rows(data)
+
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

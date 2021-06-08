@@ -2,17 +2,16 @@
 import sys
 import os
 from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
-
 from nameparser import HumanName
 from multiprocessing import Pool
 from bs4 import BeautifulSoup
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import dateutil.parser as dparser
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
 
 prov_terr_abbreviation = 'NS'
 database_table_name = 'ca_ns_legislation'

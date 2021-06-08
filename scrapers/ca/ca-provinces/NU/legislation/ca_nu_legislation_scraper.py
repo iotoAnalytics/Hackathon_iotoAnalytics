@@ -1,19 +1,19 @@
-import enum
 import sys
 import os
 from pathlib import Path
+
+from langdetect import detect
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 import pandas as pd
-from scraper_utils import CAProvinceTerrLegislationScraperUtils, PDF_Table_Reader
+from scraper_utils import CAProvinceTerrLegislationScraperUtils
 from scraper_utils import PDF_Reader
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
-from enum import Enum
 import re
 import datetime
 
@@ -40,8 +40,7 @@ def program_driver():
     main_page_soup = main_functions.get_page_as_soup(BILLS_URL)
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
-    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows)
-    # print(bill_data)
+    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[3:5])
     # print('Writing data to database...')
     # scraper_utils.write_data(bill_data)
     # print("Complete")
@@ -113,28 +112,51 @@ class BillScraper:
         'Reported from Standing Committee' : 4,
         'Reported from Committee of the Whole' : 5,
         'Third Reading' : 6,
-        'Date of Assent' : 7,
+        'Assent' : 7,
     }
 
     def __init__(self, bill_row_soup):
         self.row = scraper_utils.initialize_row()
         self.bill_columns_from_site = self.__get_columns(bill_row_soup)
+        self.row.source_url = self.__get_source_url()
+        self.pdf_reader = PDF_Reader()
+        self.summary_page_index = 0 #this value will get updated
+        self.__initialize_pdf_reader()
         self.__set_row_data()
-
-    def __get_columns(self, bill_row_soup):
-        return bill_row_soup.findAll('td')
 
     def get_bill_data(self):
         return self.row
 
+    def __get_columns(self, bill_row_soup):
+        return bill_row_soup.findAll('td')
+
+    def __get_source_url(self):
+        first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
+        return first_column.find('a')['href'] 
+
+    def __initialize_pdf_reader(self):
+        self.pdf_pages = self.pdf_reader.get_pdf_pages(self.row.source_url, scraper_utils._request_headers)
+        self.pdf_reader.set_page_width_ratio(width_in_inch=8.5)
+        self.pdf_reader.set_page_half(page_half_in_inch=4.25)
+        self.pdf_reader.set_page_height_ratio(height_in_inch=11.0)
+        self.pdf_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.56)
+        self.pdf_reader.set_left_column_end_and_right_column_start(column1_end=4.10, column2_start=4.13)
+        self.pdf_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=0.90)
+        scraper_utils.crawl_delay(crawl_delay)
+
     def __set_row_data(self):
         self.row.bill_name = self.__get_bill_name()
         self.row.bill_title = self.__get_bill_title()
-        self.row.source_url = self.__get_source_url()
         self.row.session = CURRENT_SESSION
         self.row.goverlytics_id = self.__get_goverlytics_id()
         self.row.chamber_origin = 'Legislative Assembly'
-        self.actions = self.__get_actions()
+        self.row.actions = self.__get_actions()
+        self.row.date_introduced = self.__get_date_introduced()
+        self.row.current_status = self.__get_current_status()
+        self.row.bill_summary = self.__get_bill_summary()
+        self.row.bill_text = self.__get_bill_text()
+        self.row.bill_type = self.__get_bill_type()
+        print(self.row.bill_text)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
@@ -151,18 +173,104 @@ class BillScraper:
         title = first_column.find('a').text
         return title.title()
 
-    def __get_source_url(self):
-        first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
-        return first_column.find('a')['href']
-
     def __get_goverlytics_id(self):
         return f'{PROV_TERR_ABBREVIATION}_{CURRENT_SESSION}_{self.row.bill_name}'
 
     def __get_actions(self):
         actions = []
         for index, cell in enumerate(self.column_description_to_index):
-            pass
+            action = self.__add_action_attribute(index, cell)
+            if action:
+                actions.append(action)
+        return actions
 
+    def __add_action_attribute(self, index, cell):
+        if index == 0:
+            return
+            
+        text = self.bill_columns_from_site[index].text
+        text = self.__clean_up_text(text)
+        if len(text) == 0:
+            return
+
+        date = datetime.datetime.strptime(text, '%B %d, %Y')
+        date = date.strftime('%Y-%m-%d')
+
+        description = cell
+        action_by = self.__get_action_by(description)
+        return {'date' : date, 'action_by' : action_by, 'description' : description}
+
+    def __clean_up_text(self, text):
+        text = text.replace('\n', '')
+        return text.strip()
+
+    def __get_action_by(self, description):
+        if 'Committee' in description:
+            return 'Standing Committee'
+        if 'Assent' in description:
+            return 'Commissioner'
+        return 'Legislative Assembly'
+
+    def __get_date_introduced(self):
+        index_of_first_reading_in_actions = 1
+        first_reading = self.row.actions[index_of_first_reading_in_actions]
+        return first_reading['date']
+
+    def __get_current_status(self):
+        last_action = self.row.actions[-1]
+        return last_action['description']
+
+    def __get_bill_summary(self):
+        pages_to_search_for = self.pdf_pages[0:2]
+        if self.row.bill_name == 'Bill75': # Bill 75 for assembly has the word 'summary' in the bill title messing things up.
+            return self.__extract_bill_summary(pages_to_search_for)
+        return self.__extract_bill_summary(pages_to_search_for[::-1])
+
+    def __extract_bill_summary(self, pages):
+        for index, page in enumerate(pages):
+            text = self.__get_pdf_text(page)
+            if re.search('Summary', text):
+                self.summary_page_index = 1 if index == 0 else 0
+                return self.__get_summary_text(text)
+
+    def __get_summary_text(self, text):
+        if self.row.bill_name == 'Bill75':
+            text = text.split('Summary')[1:]
+            text = ''.join(text)
+        else:
+            text = text.split('Summary')[1]
+        text = text.split('Date')[0]
+        return text.strip()
+
+    def __get_bill_text(self):
+        pages_to_search_for = self.pdf_pages[self.summary_page_index + 1:]
+        return self.__extract_bill_text(pages_to_search_for)
+    
+    def __extract_bill_text(self, pages):
+        bill_text = ''
+        for page in pages:
+            text = self.__get_pdf_text(page).strip()
+            bill_text += self.__add_text_if_english(text)
+        return bill_text.strip()
+
+    def __get_pdf_text(self, page):
+        return self.pdf_reader.get_text(page, True)
+
+    def __add_text_if_english(self, text):
+        try:
+            if detect(text) == 'fr':
+                return ''
+            else:
+                return ' ' + text
+        except:
+            return ''
+
+    def __get_bill_type(self):
+        first_page = self.pdf_pages[0]
+        page_text = self.__get_pdf_text(first_page)
+        page_text = page_text.split('BILL')[0].strip()
+        bill_type = page_text.split(' ')[-1]
+        return bill_type.title()
 
 PreProgramFunctions().set_current_session()
 
