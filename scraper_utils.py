@@ -1147,6 +1147,7 @@ class PDF_Reader():
         return self.__get_separated_text(page_lines)
 
     def __get_separated_text(self, page_lines):
+        return_string = ''
         for text_line in page_lines:
             text_line = text_line.strip().split('  ')
             if text_line[0] == "•" and len(text_line) != 2 and len(text_line) != 1:
