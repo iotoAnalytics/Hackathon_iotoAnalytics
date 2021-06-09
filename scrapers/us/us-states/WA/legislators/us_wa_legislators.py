@@ -26,6 +26,7 @@ WASHINGTON_STATE_LEGISLATURE_BASE_URL = 'https://leg.wa.gov/'
 REPRESENTATIVE_PAGE_URL = WASHINGTON_STATE_LEGISLATURE_BASE_URL + 'house/representatives/Pages/default.aspx'
 SENATOR_PAGE_URL = WASHINGTON_STATE_LEGISLATURE_BASE_URL + 'Senate/Senators/Pages/default.aspx'
 ALL_MEMBER_EMAIL_LIST_URL = 'https://app.leg.wa.gov/MemberEmail/Default.aspx?Chamber=H'
+ALL_MEMBER_COUNTY_LIST_URL = 'https://app.leg.wa.gov/Rosters/MembersByDistrictAndCounties'
 
 REPUBLICAN_SENATOR_BASE_URL = 'https://src.wastateleg.org/'
 REPUBLICAN_SENATOR_PAGE_URL = REPUBLICAN_SENATOR_BASE_URL + 'senators/'
@@ -55,10 +56,7 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 def program_driver():
-    # every_email_as_df = PreprogramFunctions().get_emails_as_dataframe()
-    # print(every_email_as_df)
     representative_data = RepresentativeScraper().get_data()
-    print(representative_data)
     
 
 
@@ -67,18 +65,30 @@ def program_driver():
     # print(len(set(every_email_as_df['Name'].to_list())))
 
 class PreprogramFunctions:
-    def __init__(self):
+    def __init__(self, url):
         self.driver_instance = SeleniumDriver()
-        self.driver_instance.start_driver(ALL_MEMBER_EMAIL_LIST_URL,
+        self.driver_instance.start_driver(url,
                                           state_legislature_crawl_delay)
 
     def get_emails_as_dataframe(self):
         html = self.driver_instance.get_html_source()
-        return self.__extract_table_as_df(html)
+        data_table = self.__extract_emails_table_as_df(html)
+        return data_table[['Name', 'Email', 'District']]
 
-    def __extract_table_as_df(self, html):
+    def __extract_emails_table_as_df(self, html):
         html_soup = soup(html, 'html.parser')
         html_email_table = html_soup.find('table', {'id' : 'membertable'})
+        table = pd.read_html(str(html_email_table))
+        return table[0]
+
+    def get_county_as_dataframe(self):
+        html = self.driver_instance.get_html_source()
+        data_table = self.__extract_county_table_as_df(html)
+        return data_table[['Member', 'District', 'Counties']]
+    
+    def __extract_county_table_as_df(self, html):
+        html_soup = soup(html, 'html.parser')
+        html_email_table = html_soup.find('table', {'id' : 'memberbydistrictandcountytable'})
         table = pd.read_html(str(html_email_table))
         return table[0]
 
@@ -157,6 +167,8 @@ class RepresentativeScraper:
         self.__set_name_data(row, representative_web_element)
         self.__set_role(row)
         self.__set_party_data(row, representative_web_element)
+        self.__set_district_and_county(row)
+        self.__set_contact_info(row, representative_web_element)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -194,6 +206,32 @@ class RepresentativeScraper:
             return 'Republican'
         elif 'D' in text:
             return 'Democrat'
+
+    def __set_district_and_county(self, row):
+        name_to_look_for = row.name_last + ', ' + row.name_first
+        row.district = self.__set_district(name_to_look_for)
+        row.areas_served = self.__set_county(name_to_look_for)
+        print(row.areas_served)
+
+    def __set_district(self, name):
+        data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
+        district = data_row['District'].values[0]
+        district = district.split()[1].strip()
+        return int(district)
+
+    def __set_county(self, name):
+        data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
+        counties = data_row['Counties'].values[0]
+        counties = counties.split('Counties ')[1]
+        counties = counties.split(', ')
+        return counties
+
+    def __set_contact_info(self, row, web_element):
+        pass
+
+#global variable
+every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
+every_county_as_df = PreprogramFunctions(ALL_MEMBER_COUNTY_LIST_URL).get_county_as_dataframe()
 
 if __name__ == '__main__':
     program_driver()
