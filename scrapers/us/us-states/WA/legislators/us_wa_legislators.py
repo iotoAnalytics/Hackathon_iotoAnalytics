@@ -1,9 +1,12 @@
+from logging import error
 import sys
 import os
 from pathlib import Path
 import re
 import datetime
 from time import sleep
+
+from selenium.webdriver.remote import webelement
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -46,31 +49,32 @@ republican_representative_crawl_delay = scraper_utils.get_crawl_delay(REPUBLICAN
 democratic_representative_crawl_delay = scraper_utils.get_crawl_delay(DEMOCRATIC_REPRESENTATIVE_BASE_URL)
 
 options = Options()
-options.headless = False
+options.headless = True
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 def program_driver():
-    every_email_as_df = PreprogramFunctions().get_emails_as_dataframe()
+    # every_email_as_df = PreprogramFunctions().get_emails_as_dataframe()
+    # print(every_email_as_df)
+    representative_data = RepresentativeScraper().get_data()
+    print(representative_data)
+    
+
+
+    # # How to match email list to actual person:
+    # # find name in the list of names, find position in list.
+    # print(len(set(every_email_as_df['Name'].to_list())))
 
 class PreprogramFunctions:
-    def get_emails_as_dataframe(self):
-        driver_instance = SeleniumDriver()
-        driver_instance.start_driver(ALL_MEMBER_EMAIL_LIST_URL,
-                                    state_legislature_crawl_delay)
-        html = self.__get_html_source(driver_instance)
+    def __init__(self):
+        self.driver_instance = SeleniumDriver()
+        self.driver_instance.start_driver(ALL_MEMBER_EMAIL_LIST_URL,
+                                          state_legislature_crawl_delay)
 
+    def get_emails_as_dataframe(self):
+        html = self.driver_instance.get_html_source()
         return self.__extract_table_as_df(html)
-        
-    def __get_html_source(self, driver_instance):
-        try:
-            html = driver_instance.driver.page_source
-            return html
-        except:
-            print("Error in getting email table from selenium.")
-        finally:
-            driver_instance.close_driver()
 
     def __extract_table_as_df(self, html):
         html_soup = soup(html, 'html.parser')
@@ -78,25 +82,7 @@ class PreprogramFunctions:
         table = pd.read_html(str(html_email_table))
         return table[0]
 
-class SeleniumDriver():
-    def __init__(self):
-        self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
-        # self.driver.switch_to.default_content()  
-
-    def start_driver(self, url, crawl_delay):
-        self.driver.get(url)
-        self.driver.maximize_window()
-        scraper_utils.crawl_delay(crawl_delay)
-        sleep(2)
-
-    def close_driver(self):
-        self.driver.close()
-        self.driver.quit()
-
-    def get_driver(self):
-        return self.driver
-
-class SoupMaker():
+class SoupMaker:
     def get_page_as_soup(self, url, crawl_delay):
         page_html = self.__get_site_as_html(url, crawl_delay)
         return soup(page_html, 'html.parser')
@@ -107,6 +93,107 @@ class SoupMaker():
         uClient.close()
         scraper_utils.crawl_delay(crawl_delay)
         return page_html
+
+class SeleniumDriver:
+    def __init__(self):
+        self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
+        self.driver.switch_to.default_content()  
+
+    def start_driver(self, url, crawl_delay):
+        try:
+            self.driver.get(url)
+            self.driver.maximize_window()
+        except:
+            error("Error opening the website.")
+            self.close_driver()
+        scraper_utils.crawl_delay(crawl_delay)
+        sleep(5)
+
+    def close_driver(self):
+        self.driver.close()
+        self.driver.quit()
+
+    def get_html_source(self):
+        try:
+            html = self.driver.page_source
+            return html
+        except:
+            error("Error in getting email table from selenium.")
+        finally:
+            self.close_driver()
+
+class RepresentativeScraper:
+    # For each member row
+    # Look for div with class memberDetails
+    # then look for divs with class col-csm-6 col-md-3 memberColumnPad
+    # if the count of divs is 3, then get the first div and find the text of all the anchor tags
+    # if it's 2, return current year
+    def __init__(self):
+        self.driver_instance = SeleniumDriver()
+        self.driver_instance.start_driver(REPRESENTATIVE_PAGE_URL, state_legislature_crawl_delay)
+        try:
+            self.data = self.__get_representative_data()
+        except:
+            error("Error getting representative data.")
+        finally:
+            self.driver_instance.close_driver()
+
+    def get_data(self):
+        '''
+        Returns a list of each representative data (row)
+        '''
+        return self.data
+
+    def __get_representative_data(self):
+        main_div = self.driver_instance.driver.find_element_by_id('memberList')
+        members_web_element = main_div.find_elements_by_class_name('memberInformation')
+        data = []
+        for web_element in members_web_element:
+            data.append(self.__set_data(web_element))
+        return data
+
+    def __set_data(self, representative_web_element):
+        row = scraper_utils.initialize_row()
+        self.__set_name_data(row, representative_web_element)
+        self.__set_role(row)
+        self.__set_party_data(row, representative_web_element)
+        return row
+
+    def __set_name_data(self, row, web_element):
+        human_name = self.__get_name(web_element)
+        row.name_full = human_name.full_name
+        row.name_full = human_name.full_name
+        row.name_last = human_name.last
+        row.name_first = human_name.first
+        row.name_middle = human_name.middle
+        row.name_suffix = human_name.suffix
+
+    def __get_name(self, web_element):
+        name_container = web_element.find_element_by_class_name('memberName')
+        name = self.__extract_name_from_container(name_container)
+        return HumanName(name)
+
+    def __extract_name_from_container(self, container):
+        text = container.text
+        text = text.split('Representative')[1]
+        text = text.split('(')[0]
+        return text.strip()
+
+    def __set_role(self, row):
+        row.role = 'Representative'
+
+    def __set_party_data(self, row, web_element):
+        name_container = web_element.find_element_by_class_name('memberName')
+        row.party = self.__extract_party_from_container(name_container)
+        row.party_id = scraper_utils.get_party_id(row.party)
+
+    def __extract_party_from_container(self, container):
+        text = container.text
+        text = text.split('(')[1]
+        if 'R' in text:
+            return 'Republican'
+        elif 'D' in text:
+            return 'Democrat'
 
 if __name__ == '__main__':
     program_driver()
