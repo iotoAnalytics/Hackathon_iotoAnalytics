@@ -41,22 +41,25 @@ from tqdm import tqdm
 
 state_abbreviation = 'NV'
 database_table_name = 'us_nv_legislation'
-legislator_table_name = 'us_nv_legislator'
+legislator_table_name = 'us_nv_legislators'
 options = Options()
 options.headless = False 
 # !! 1.
-driver = webdriver.Chrome(executable_path=r'C:\Users\DCYUM\Downloads\chromedriver_win32\chromedriver.exe', options=options)
+
+p = Path('./web_drivers/chrome_win_91.0.4472.19/chromedriver.exe')
+driver = webdriver.Chrome(executable_path=p)
+
 driver.switch_to.default_content()
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
 
 # !! 2.
-base_url = 'https://www.leg.state.nv.us'
-bills_url = 'https://www.leg.state.nv.us/App/NELIS/REL/81st2021/Bills/List'
+original_url = 'https://www.leg.state.nv.us'
+bills_url = original_url +'/App/NELIS/REL/81st2021/Bills/List'
 
 # Get the crawl delay specified in the website's robots.txt file
-crawl_delay = scraper_utils.get_crawl_delay(base_url)
+crawl_delay = scraper_utils.get_crawl_delay(original_url)
 
 session_id = '2021'
 
@@ -263,7 +266,7 @@ def get_bill_info() :
     origin = None
 
     # !! 3.
-    type = None
+    bill_type = None
     if 'S' in bill_id :
         
         origin = "Senate"
@@ -273,14 +276,14 @@ def get_bill_info() :
     
     if 'B' in bill_id :
         
-        type = "Bill"
+        bill_type = "Bill"
     elif "R":
-        type  = "Resoultion"
+        bill_type  = "Resoultion"
     
 
     bill_info = {
         'origin':origin,
-        'type': type,
+        'type': bill_type,
         'ID': bill_id
     }
     
@@ -294,6 +297,7 @@ def get_text():
 
     # !! 5.
     r = requests.get(pdf_link)
+    scraper_utils.crawl_delay(crawl_delay)
     f = io.BytesIO(r.content)
 
     reader = PdfFileReader(f)
@@ -363,7 +367,7 @@ def scrape(url):
         row.actions = history['actions']
         row.date_introduced = history['introduced']
     # !! 4.
-    except:
+    except Exception:
         print('No History')
 
     try :
@@ -371,23 +375,23 @@ def scrape(url):
         row.bill_title = driver.find_element_by_id('title').get_attribute('textContent')
         row.bill_summary = driver.find_element_by_css_selector('#divOverview > div > div:nth-child(1) > div.col').text
     # !! 4.
-    except:
+    except Exception:
         print('No info')
 
     try:
         row.committees = get_committes()
     # !! 4.
-    except:
+    except Exception:
        print('No committees')
     try:
         row.bill_text = get_text()
     # !! 4.
-    except:
+    except Exception:
         print('No current text')
     try:
         row.votes = get_votes()
     # !! 4.
-    except:
+    except Exception:
         print('No vote data')
     
     try:
@@ -396,7 +400,7 @@ def scrape(url):
         row.sponsors = sponsors['names']
         row.sponsors_id = sponsors['ids']
     # !! 4.
-    except:
+    except Exception:
         print('no sponsors')
 
     try:
@@ -404,7 +408,7 @@ def scrape(url):
         row.cosponsors = cosponsor['names']
         row.cosponsors_id = cosponsor['ids']
     # !! 4.
-    except:
+    except Exception:
         print('no cosponsors')
     
     
