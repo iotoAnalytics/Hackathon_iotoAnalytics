@@ -58,8 +58,8 @@ pd.set_option('display.max_columns', None)
 def program_driver():
     representative_data = MainScraper("Representative").get_data()
     senator_data = MainScraper("Senator").get_data()
-    print(representative_data[:5])
-    print(senator_data[:5])
+    # print(representative_data[:5])
+    # print(senator_data[:5])
     
 
 
@@ -177,6 +177,7 @@ class MainScraper:
         self.__set_party_data(row, member_web_element)
         self.__set_district_and_county(row)
         self.__set_contact_info(row, member_web_element)
+        self.__set_years_active(row, member_web_element)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -234,7 +235,60 @@ class MainScraper:
         return counties
 
     def __set_contact_info(self, row, web_element):
-        pass
+        member_information_div = web_element.find_element_by_css_selector("div[class='row clearfix']")
+        member_main_columns = member_information_div.find_elements_by_css_selector("div[class='col-csm-6 col-md-3 memberColumnPad']")
+        office_columns = member_main_columns[1:-1] # in between the first and last columns
+        row.addresses = self.__get_addresses(office_columns)
+        row.email = self.__get_email(row)
+        row.phone_numbers = self.__get_numbers(office_columns)
+
+    def __get_addresses(self, offices_web_element):
+        addresses = []
+        for office in offices_web_element:
+            addresses.append(self.__extract_address(office))
+        return addresses
+
+    def __extract_address(self, office_web_element):
+        office_name = office_web_element.find_element_by_class_name('memberColumnTitle').text
+        address = office_web_element.find_element_by_tag_name('span').text
+        address = self.__format_address(address)
+        return {"location": office_name,
+                "address": address}
+        
+    def __format_address(self, address):
+        return address.replace('\n', ', ')
+
+    def __get_email(self, row):
+        name_to_look_for = row.name_full
+        data_row = every_email_as_df.loc[every_email_as_df['Name'].str.contains(name_to_look_for)]
+        email = data_row['Email'].values[0]
+        return email.split()[1].strip()
+
+    def __get_numbers(self, offices_web_element):
+        numbers = []
+        for office in offices_web_element:
+            number = self.__extract_number(office)
+            if number:
+                numbers.append(number)
+        return numbers
+    
+    def __extract_number(self, office_web_element):
+        office_name = office_web_element.find_element_by_class_name('memberColumnTitle').text
+        number = self.__find_number_from_text(office_web_element.text)
+        if number:
+            return {"office": office_name,
+                    "number": number}
+    
+    def __find_number_from_text(self, text):
+        try:
+            number = re.findall(r'\([0-9]{3}\) [0-9]{3}-[0-9]{4}', text)[0]
+        except:
+            return
+        return self.__format_number(number)
+
+    def __format_number(self, number):
+        return number.replace('(', '').replace(')', '').replace(' ', '-').strip()
+
 
 #global variable
 every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
