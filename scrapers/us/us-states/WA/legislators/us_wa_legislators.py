@@ -57,8 +57,8 @@ pd.set_option('display.max_columns', None)
 def program_driver():
     representative_data = MainScraper("Representative").get_data()
     senator_data = MainScraper("Senator").get_data()
-    print(representative_data[:5])
-    print(senator_data[:5])
+    # print(representative_data[:5])
+    # print(senator_data[:5])
 
 class PreprogramFunctions:
     def __init__(self, url):
@@ -172,6 +172,8 @@ class MainScraper:
         self.__set_contact_info(row, member_web_element)
         self.__set_years_active(row, member_web_element)
         self.__set_most_recent_term_id(row)
+        self.__set_source_url(row, member_web_element)
+        # self.__set_committee(row, member_web_element)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -343,7 +345,9 @@ class MainScraper:
         else:
             return str(CURRENT_YEAR - (year_difference % 4))
         
-        
+    def __set_source_url(self, row, web_element):
+        link = web_element.find_element_by_link_text('Home Page').get_attribute("href")
+        row.source_url = link
 
 #global variable
 every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
