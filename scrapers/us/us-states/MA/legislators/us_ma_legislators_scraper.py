@@ -12,6 +12,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 import time
+
+from scraper_utils import LegislatorScraperUtils
 from io import StringIO
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -256,8 +258,10 @@ def scrape(url):
     return row
 
 
-def wiki_link(args):
-    pass
+def scrape_wiki(link):
+    info = scraper_utils.scrape_wiki_bio(link)
+    if info['years_active'] is None:
+        #################do something here################
 
 
 if __name__ == '__main__':
