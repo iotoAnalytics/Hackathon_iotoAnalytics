@@ -36,6 +36,12 @@ SOUP_PARSER_TYPE = 'lxml'
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 PEM_PATH = os.path.join('..', 'us_wv.pem')
 
+# Update for new legislatures
+CURRENT_LEGISLATURE = '85'
+LEGISLATURE_START_YEAR = {
+    '85': '2021'
+}
+
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
@@ -71,6 +77,7 @@ def scrape(url):
     scraper_utils.crawl_delay(crawl_delay)
     row = scraper_utils.initialize_row()
 
+    _set_most_recent_term_id(row)
     _set_source_url(row, url)
     _set_name(row, soup)
     _set_party(row, soup)
@@ -111,7 +118,7 @@ def merge_all_wiki_data(legislator_data, wiki_urls):
         wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
 
     for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, years_active=False, birthday=False)
+        _merge_wiki_data(legislator_data, data, most_recent_term_id=False, years_active=False, birthday=False, occupation=False)
 
 def _scrape_wiki(url):
     wiki_data = scraper_utils.scrape_wiki_bio(url)
@@ -124,6 +131,10 @@ def _create_soup(url, soup_parser_type):
     page = requests.get(url, headers=headers, verify=PEM_PATH)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
+
+def _set_most_recent_term_id(row):
+    most_recent_term_id = LEGISLATURE_START_YEAR.get(CURRENT_LEGISLATURE)
+    row.most_recent_term_id = most_recent_term_id
 
 def _set_source_url(row, url):
     row.source_url = url
@@ -283,15 +294,84 @@ def _set_biography_fields(row, soup):
     # Setup dictionary of fields
     biography_fields = {}
     for element in fields_elements:
-        biography_fields[f'{element.text}'] = element
+        biography_fields[f'{element.text.strip()}'] = element
 
+    most_recent_term_id_key = 'Legislative Service'
     years_active_key = 'Legislative Service'
     birthday_key = 'Born'
+    occupation_key = 'Born'
 
     if years_active_key in biography_fields:
         _set_years_active(row, biography_fields[years_active_key])
     if birthday_key in biography_fields:
         _set_birthday(row, biography_fields[birthday_key])
+    
+    first_key = list(biography_fields)[0]
+    _set_occupation(row, biography_fields[first_key])
+
+def _set_occupation(row, element):
+    occupation_str = str(element.previousSibling).strip()
+    is_fixed = _fix_occupation(row, occupation_str)
+    
+    # No need to run rest of code if already fixed or occupation doesn't exist
+    if is_fixed or occupation_str == 'None':
+        return
+
+    occupation_str = re.sub('\((.*?)\)', '', occupation_str)
+    occupation_list = re.split('/|; |, |and ', occupation_str)
+    
+    occupation = []
+    for job in occupation_list:
+        if ' - ' in job or ' – ' in job or ' — ' in job:
+            job = re.split(' - | – | — ', job, 1)[0]
+        if 'for' in job or 'of' in job or 'with' in job:
+            job = re.split(' for | of | with ', job, 1)[0]
+        
+        if job:
+            occupation.append(job.strip())
+
+    row.occupation = occupation
+
+def _fix_occupation(row, text):
+    # NOTE: This method fixes special cases. Currently, this is the simplest effective way to set
+    #       occupations for the anomalies
+
+    # Evan Hansen - House - 51
+    if 'President, Downstream Strategies' in text:
+        row.occupation = ['President of Downstream Strategies']
+    
+    # John Mandt Jr. - House - 16
+    elif 'Fourth Generation Business Owner' in text:
+        row.occupation = ['Business Owner']
+
+    # Chris Phillips - House - 47
+    elif 'President, CGP Foods, Inc' in text:
+        row.occupation = ['President of CGP Foods Inc']
+
+    # Marty Gearheart - House - 27 
+    elif 'Managing Member, Gearheart Enterprises, LLC' in text:
+        row.occupation = ['Managing Member of Gearheart Enterprises']
+
+    # Ric Griffith - House - 19
+    elif 'Pharmacist/Owner of Griffith and Feil Drug' in text:
+        row.occupation = ['Pharmacist','Owner of Griffith and Feil Drug']
+
+    # Gary G. Howell - House - 56
+    elif 'Small Business Owner/Mail Order Auto Parts' in text:
+        row.occupation = ['Small Business Owner of Mail Order Auto Parts']
+
+    # Shannon Kimes - House - 9
+    elif 'Owner, Kimes Steel and Rail, Inc' in text:
+        row.occupation = ['Owner of Kimes Steel and Rail Inc']
+    
+    # Michael T. Azinger - Senate - 3 
+    elif 'Manager, Azinger Group' in text:
+        row.occupation = ['Manager of Azinger Group']
+    
+    else:
+        return False
+    
+    return True
 
 def _set_years_active(row, element):
     years_active_str = str(element.nextSibling).strip()
