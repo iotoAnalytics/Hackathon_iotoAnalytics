@@ -56,7 +56,10 @@ pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
 def program_driver():
-    representative_data = RepresentativeScraper().get_data()
+    representative_data = MainScraper("Representative").get_data()
+    senator_data = MainScraper("Senator").get_data()
+    print(representative_data[:5])
+    print(senator_data[:5])
     
 
 
@@ -132,29 +135,34 @@ class SeleniumDriver:
         finally:
             self.close_driver()
 
-class RepresentativeScraper:
+class MainScraper:
     # For each member row
     # Look for div with class memberDetails
     # then look for divs with class col-csm-6 col-md-3 memberColumnPad
     # if the count of divs is 3, then get the first div and find the text of all the anchor tags
     # if it's 2, return current year
-    def __init__(self):
+    def __init__(self, identity):
+        self.identity = identity
+        if identity == "Representative":
+            url = REPRESENTATIVE_PAGE_URL
+        else:
+            url = SENATOR_PAGE_URL
         self.driver_instance = SeleniumDriver()
-        self.driver_instance.start_driver(REPRESENTATIVE_PAGE_URL, state_legislature_crawl_delay)
+        self.driver_instance.start_driver(url, state_legislature_crawl_delay)
         try:
-            self.data = self.__get_representative_data()
+            self.data = self.__get_member_data()
         except:
-            error("Error getting representative data.")
+            error("Error getting member data.")
         finally:
             self.driver_instance.close_driver()
 
     def get_data(self):
         '''
-        Returns a list of each representative data (row)
+        Returns a list of each member data (row)
         '''
         return self.data
 
-    def __get_representative_data(self):
+    def __get_member_data(self):
         main_div = self.driver_instance.driver.find_element_by_id('memberList')
         members_web_element = main_div.find_elements_by_class_name('memberInformation')
         data = []
@@ -162,13 +170,13 @@ class RepresentativeScraper:
             data.append(self.__set_data(web_element))
         return data
 
-    def __set_data(self, representative_web_element):
+    def __set_data(self, member_web_element):
         row = scraper_utils.initialize_row()
-        self.__set_name_data(row, representative_web_element)
+        self.__set_name_data(row, member_web_element)
         self.__set_role(row)
-        self.__set_party_data(row, representative_web_element)
+        self.__set_party_data(row, member_web_element)
         self.__set_district_and_county(row)
-        self.__set_contact_info(row, representative_web_element)
+        self.__set_contact_info(row, member_web_element)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -187,12 +195,12 @@ class RepresentativeScraper:
 
     def __extract_name_from_container(self, container):
         text = container.text
-        text = text.split('Representative')[1]
+        text = text.split(self.identity)[1]
         text = text.split('(')[0]
         return text.strip()
 
     def __set_role(self, row):
-        row.role = 'Representative'
+        row.role = self.identity
 
     def __set_party_data(self, row, web_element):
         name_container = web_element.find_element_by_class_name('memberName')
@@ -211,7 +219,6 @@ class RepresentativeScraper:
         name_to_look_for = row.name_last + ', ' + row.name_first
         row.district = self.__set_district(name_to_look_for)
         row.areas_served = self.__set_county(name_to_look_for)
-        print(row.areas_served)
 
     def __set_district(self, name):
         data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
