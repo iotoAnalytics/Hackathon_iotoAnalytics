@@ -13,6 +13,7 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
+from selenium import webdriver
 import requests
 from multiprocessing import Pool
 from database import Database
@@ -23,13 +24,20 @@ import boto3
 import time
 
 
-state_abbreviation = 'AZ'
-database_table_name = 'legislator_template_test'
+PATH = "../../../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
+options = webdriver.ChromeOptions()
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.add_experimental_option('useAutomationExtension', False)
+options.add_argument("--disable-blink-features=AutomationControlled")
+driver = webdriver.Chrome(PATH)
+
+state_abbreviation = 'IN'
+database_table_name = 'us_in_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
 
-base_url = 'https://webscraper.io'
+base_url = 'https://www.in.gov/core/legislative-courts.html'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
@@ -68,16 +76,13 @@ def scrape(url):
 
 
 if __name__ == '__main__':
-    # First we'll get the URLs we wish to scrape:
-    urls = get_urls()
-
-    # Scrape data from collected URLs serially, which is slower:
-    # data = [scrape(url) for url in urls]
-    # Speed things up using pool.
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
-
-    # Once we collect the data, we'll write it to the database:
-    scraper_utils.write_data(data)
-
+    # urls = get_urls()
+    #
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    #
+    # scraper_utils.write_data(data)
+    #
+    test = 'http://iga.in.gov/legislative/2021/legislators/legislator_mike_andrade_1'
+    driver.get(test)
     print('Complete!')
