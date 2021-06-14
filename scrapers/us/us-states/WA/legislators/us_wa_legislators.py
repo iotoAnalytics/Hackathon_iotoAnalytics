@@ -6,8 +6,6 @@ import re
 import datetime
 from time import sleep
 
-from selenium.webdriver.remote import webelement
-
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -39,6 +37,7 @@ DEMOCRATIC_REPRESENTATIVE_BASE_URL = 'http://housedemocrats.wa.gov/'
 DEMOCRATIC_REPRESENTATIVE_PAGE_URL = DEMOCRATIC_REPRESENTATIVE_BASE_URL + 'legislators/'
 
 THREADS_FOR_POOL = 12
+CURRENT_YEAR = datetime.datetime.now().year
 
 scraper_utils = USStateLegislatorScraperUtils('WA', 'ca_wa_legislators')
 
@@ -58,14 +57,8 @@ pd.set_option('display.max_columns', None)
 def program_driver():
     representative_data = MainScraper("Representative").get_data()
     senator_data = MainScraper("Senator").get_data()
-    # print(representative_data[:5])
-    # print(senator_data[:5])
-    
-
-
-    # # How to match email list to actual person:
-    # # find name in the list of names, find position in list.
-    # print(len(set(every_email_as_df['Name'].to_list())))
+    print(representative_data[:5])
+    print(senator_data[:5])
 
 class PreprogramFunctions:
     def __init__(self, url):
@@ -178,6 +171,7 @@ class MainScraper:
         self.__set_district_and_county(row)
         self.__set_contact_info(row, member_web_element)
         self.__set_years_active(row, member_web_element)
+        self.__set_most_recent_term_id(row)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -289,6 +283,67 @@ class MainScraper:
     def __format_number(self, number):
         return number.replace('(', '').replace(')', '').replace(' ', '-').strip()
 
+    def __set_years_active(self, row, web_element):
+        member_detail_container = web_element.find_element_by_class_name('memberDetails')
+        details_container = member_detail_container.find_elements_by_css_selector("div[class='col-csm-6 col-md-3 memberColumnPad']")
+        
+        number_of_columns_when_voting_record_available = 3
+        if len(details_container) < number_of_columns_when_voting_record_available:
+            row.years_active = [CURRENT_YEAR]
+        elif len(details_container) ==number_of_columns_when_voting_record_available:
+            all_voting_years = details_container[0].find_elements_by_tag_name('a')
+            row.years_active = self.__extract_voting_years(all_voting_years)
+
+    def __extract_voting_years(self, years_web_element):
+        years_active = []
+        for year in years_web_element:
+            self.__add_to_list_missing(years_active, year)
+        years_active = list(set(years_active))
+        years_active.sort()
+        return(years_active)
+
+    def __add_to_list_missing(self, return_list, year_web_element):
+        year = year_web_element.get_attribute("text")
+        year = re.findall(r'[0-9]{4}', year)[0]
+        if year not in return_list:
+            return_list.append(int(year))
+
+    def __set_most_recent_term_id(self, row):
+        if row.role == "Representative":
+            self.__set_recent_term_for_representative(row)
+        else:
+            self.__set_recent_term_for_senator(row)
+    
+    def __set_recent_term_for_representative(self, row):
+        if CURRENT_YEAR % 2 == 0:
+            row.most_recent_term_id = str(CURRENT_YEAR)
+        else:
+            row.most_recent_term_id = str(CURRENT_YEAR - 1)
+
+    def __set_recent_term_for_senator(self, row):
+        '''
+        Senates have a staggered election every four years.
+        The last two elections (as of writing this code) was 2018 and 2020.
+        '''
+        districts_that_had_election_in_2020 = [
+            1, 2, 3, 4, 5, 9, 10, 11, 12, 14, 16, 17, 18, 19, 20, 20, 22,
+            23, 24, 25, 27, 28, 39, 40, 41, 49
+        ]
+        districts_that_had_election_in_2020 = set(districts_that_had_election_in_2020)
+
+        if int(row.district) in districts_that_had_election_in_2020:
+            row.most_recent_term_id = self.__calculate_most_recent_term_for_senator(2020)
+        else:
+            row.most_recent_term_id = self.__calculate_most_recent_term_for_senator(2018)
+    
+    def __calculate_most_recent_term_for_senator(self, last_election_recorded_in_code):
+        year_difference = CURRENT_YEAR - last_election_recorded_in_code
+        if year_difference % 4 == 0:
+            return str(CURRENT_YEAR)
+        else:
+            return str(CURRENT_YEAR - (year_difference % 4))
+        
+        
 
 #global variable
 every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
