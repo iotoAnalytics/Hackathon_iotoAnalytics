@@ -22,7 +22,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
 state_abbreviation = 'OH'
-database_table_name = 'us_oh_legislators_test'
+database_table_name = 'us_oh_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
@@ -63,31 +63,34 @@ def get_rep_coms(link):
     com_list_url = f'{split}members/{name}/committees'
     response = requests.get(com_list_url)
     soup = BeautifulSoup(response.content, 'lxml')
-    com_link_html = soup.find('div', {'class': 'gray-block'}).find_all('a')
-    com_links = [split[:-1] + x.get('href') for x in com_link_html]
-    coms_lst = []
-    for link in com_links:
-        response = requests.get(link)
-        soup = BeautifulSoup(response.content, 'lxml')
-        div_lst = soup.find('div', {'class': 'gray-block'}).find_all('div')[1:]
-        for item in div_lst:
-            try:
-                compare_name = item.find('a').get('href')
-                if name in compare_name:
-                    try:
-                        position = item.find('div', {'class': 'committee-member-position'}).text
-                    except:
-                        position = 'member'
-                    coms_lst.append({
-                        'committee': ' '.join(link.split('/')[-1].split('-')),
-                        'role': position
-                    })
-            except AttributeError:
-                pass
-        scraper_utils.crawl_delay(crawl_delay)
+    try:
+        com_link_html = soup.find('div', {'class': 'gray-block'}).find_all('a')
+        com_links = [split[:-1] + x.get('href') for x in com_link_html]
+        coms_lst = []
+        for link in com_links:
+            response = requests.get(link)
+            soup = BeautifulSoup(response.content, 'lxml')
+            div_lst = soup.find('div', {'class': 'gray-block'}).find_all('div')[1:]
+            for item in div_lst:
+                try:
+                    compare_name = item.find('a').get('href')
+                    if name in compare_name:
+                        try:
+                            position = item.find('div', {'class': 'committee-member-position'}).text
+                        except:
+                            position = 'member'
+                        coms_lst.append({
+                            'committee': ' '.join(link.split('/')[-1].split('-')),
+                            'role': position
+                        })
+                except AttributeError:
+                    pass
+            scraper_utils.crawl_delay(crawl_delay)
 
-    scraper_utils.crawl_delay(crawl_delay)
-    return coms_lst
+        scraper_utils.crawl_delay(crawl_delay)
+        return coms_lst
+    except AttributeError:
+        return []
 
 
 def get_sen_coms(url):
@@ -101,7 +104,7 @@ def get_sen_coms(url):
         com = link.split('/')[-1]
         com_soup = BeautifulSoup(requests.get(link).content, 'lxml')
         scraper_utils.crawl_delay(crawl_delay)
-        legis_lst = com_soup.find('div', {'class': 'portraitGroupModule'}).find_all('div')
+        legis_lst = com_soup.find('div', {'class': 'portraitGroupModule'}).find_all('div', {'class':'profileInfo'})
         for item in legis_lst:
             try:
                 name = item.find('div', {'class': 'profileName'}).text
@@ -211,6 +214,7 @@ def scrape(legis_dict):
     # Delay so we don't overburden web servers
     scraper_utils.crawl_delay(crawl_delay)
     print(row)
+
     return row
 
 

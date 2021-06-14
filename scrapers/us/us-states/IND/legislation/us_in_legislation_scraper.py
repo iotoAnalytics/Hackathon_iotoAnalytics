@@ -30,9 +30,9 @@ import boto3
 # Other import statements
 
 
-state_abbreviation = 'IL'
-database_table_name = 'legislation_template_test'
-legislator_table_name = 'us_il_legislators'
+state_abbreviation = 'IND'
+database_table_name = 'us_ind_legislation'
+legislator_table_name = 'us_ind_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
