@@ -136,24 +136,14 @@ def get_bill_type_chamber(bill_name, row):
 
 
 def get_committees(sponsor):
-    committee = sponsor.text
     chamber = ''
-    if "Joint" in committee:
+    if "Joint" in sponsor:
         chamber = "joint"
-    else:
-        link = "http://www.kslegislature.org" + sponsor.get('href')
-        page = scraper_utils.request(link)
-        soup = BeautifulSoup(page.content, 'lxml')
-        # getting sidebar on committee page
-        sidebar = soup.find('div', {'id': 'sidebar'})
-        list_items = sidebar.find_all('li')
-
-        for item in list_items:
-            if "House" in item:
-                chamber = "house"
-            elif "Senate" in item:
-                chamber = "senate"
-    committee_detail = {"chamber": chamber, "committee": committee}
+    elif "House" in sponsor:
+        chamber = "house"
+    elif "Senate" in sponsor:
+        chamber = "senate"
+    committee_detail = {"chamber": chamber, "committee": sponsor}
     return committee_detail
 
 
@@ -172,7 +162,7 @@ def get_sponsor_id(sponsor_name):
     return sponsor_id
 
 
-def get_sponsors(sidebar, row):
+def get_sponsors(soup, row):
     sponsors = []
     sponsor_ids = []
     committees = []
@@ -206,65 +196,66 @@ def get_sponsors(sidebar, row):
     row.sponsors_id = sponsor_ids
 
 
-def get_principal_sponsor(sidebar, row):
-    committees = []
-    sponsors_tabs = sidebar.find(
-        'ul', {'class': 'introduce-tab-content'})
-
+def get_principal_sponsor(soup, row):
+    is_sponsor = ""
+    principal_sponsor = ""
     try:
-        sponsors = sponsors_tabs.find_all('a')
-        if len(sponsors) == 1:
-            sponsor = sponsors[0]
-            name = sponsor.text
+        is_sponsor = soup.find("dt").text
+        principal_sponsor = soup.find("dd").text
+    except:
+        pass
 
-            if "Committee" in name:
-                committee = get_committees(sponsor)
-                committees.append(committee)
-                row.principal_sponsor = name
-            else:
-                link = "http://www.kslegislature.org" + sponsor.get('href')
-                name = get_full_name(link)
-                sponsor_id = get_sponsor_id(name)
-                hn = HumanName(name)
+    if "Sponsor" in is_sponsor:
+        if "Committee" in principal_sponsor:
+            committee_info = get_committees(principal_sponsor)
+            row.principal_sponsor = principal_sponsor
+            row.committees = committee_info
+            print(principal_sponsor)
+        else:
+            try:
+                sponsor_id = get_sponsor_id(principal_sponsor)
+                hn = HumanName(principal_sponsor)
                 name_last = hn.last
                 row.principal_sponsor = name_last
                 row.principal_sponsor_id = sponsor_id
+                print(name_last)
+            except:
+                row.principal_sponsor = principal_sponsor
+                print(principal_sponsor)
+    print()
 
-    except Exception:
+
+def get_bill_description(soup, row):
+    try:
+        description = soup.find("div", {"class": "col-xs-12 col-md-8"})
+        description = description.find("h2")
+        description = description.strip()
+        row.bill_description = description
+    except:
         pass
-    row.committees = committees
 
 
-def get_bill_description(main_div, row):
-    description = main_div.find('div', {'class': 'container'}).text
-    description = description.split('Short Title')[1]
-
-    if "(more)" in description:
-        description = description[:description.index("(more)")]
-    elif "Summary of Legislation" in description:
-        description = description[:description.index("Summary of Legislation")]
-    elif "View Testimony" in description:
-        description = description[:description.index("View")]
-
-    description = description.strip()
-
-    row.bill_description = description
+def get_bill_summary(soup, row):
+    try:
+        summary = soup.find("p", {"id": "pinslip"}).text
+        summary = summary.strip()
+        row.bill_summary = summary
+    except:
+        pass
 
 
 def get_introduced_date(actions_list, row):
-    print("date")
-    oldest_action = actions_list[-1]
-    date = oldest_action['date']
-    print(date)
-    row.date_introduced = date
+    if len(actions_list) > 0:
+        oldest_action = actions_list[-1]
+        date = oldest_action['date']
+        row.date_introduced = date
 
 
 def get_current_status(actions_list, row):
-    print("status")
-    most_recent_action = actions_list[0]
-    current_status = most_recent_action['description']
-    print(current_status)
-    row.current_status = current_status
+    if len(actions_list) > 0:
+        most_recent_action = actions_list[0]
+        current_status = most_recent_action['description']
+        row.current_status = current_status
 
 
 def get_actions(soup, row):
@@ -294,12 +285,12 @@ def get_actions(soup, row):
                 description = description.replace("  ", "")
             row_data = {'date': datetime_date, 'action_by': chamber, 'description': description}
             actions_list.append(row_data)
-        get_current_status(actions_list, row)
-        get_introduced_date(actions_list, row)
-        print(actions_list)
-        row.actions = actions_list
+
     except Exception:
         pass
+    get_current_status(actions_list, row)
+    get_introduced_date(actions_list, row)
+    row.actions = actions_list
 
 
 def get_voter_details_support_func(vote, name):
@@ -446,13 +437,12 @@ def scrape(url):
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
     row.goverlytics_id = goverlytics_id
 
-    # get_sponsors(sidebar, row)
-    # get_principal_sponsor(sidebar, row)
-    # get_bill_description(main_div, row)
-    # get_introduced_date(bottom_div, row)
-    # get_current_status(bottom_div, row)
+    #get_sponsors(soup, row)
+    get_principal_sponsor(soup, row)
+    get_bill_description(soup, row)
+    get_bill_summary(soup, row)
     get_actions(soup, row)
-    print("1234")
+
     #get_vote_data(soup, row)
     # get_bill_text(soup, row)
 

@@ -1,6 +1,7 @@
 
 import sys
 import os
+from datetime import datetime
 from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
 import re
@@ -13,8 +14,6 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 import time
 
-from scraper_utils import LegislatorScraperUtils
-from io import StringIO
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
@@ -71,6 +70,34 @@ def get_urls():
     return urls
 
 
+def get_birthday(wiki_page_link):
+    data = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("tbody")
+    people = tables[3].findAll("tr") + tables[4].findAll("tr")
+    for person in people[1:]:
+        info = person.findAll("td")
+
+        try:
+            name = info[1].text
+            hn = HumanName(name)
+            dob = info[2].text
+            datetime_date = datetime.strptime(dob, '%B %d, %Y')
+            birthday = datetime_date.strftime("%Y-%m-%d")
+            print(hn.first + birthday)
+            info = {'name_first': hn.first, 'name_last': hn.last, 'birthday': birthday}
+            data.append(info)
+        except Exception:
+            pass
+
+    scraper_utils.crawl_delay(crawl_delay)
+
+    return data
+
 def find_individual_wiki(wiki_page_link):
     bio_lnks = []
     uClient = uReq(wiki_page_link)
@@ -82,7 +109,11 @@ def find_individual_wiki(wiki_page_link):
     people = tables[3].findAll("tr") + tables[4].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
+
         try:
+            name = info[1].text
+            dob = info[2].text
+            print(name + dob)
             biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_lnks.append(biolink)
         except Exception:
@@ -258,12 +289,6 @@ def scrape(url):
     return row
 
 
-def scrape_wiki(link):
-    info = scraper_utils.scrape_wiki_bio(link)
-    if info['years_active'] is None:
-        #################do something here################
-
-
 if __name__ == '__main__':
     start = time.time()
     print(
@@ -282,7 +307,6 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="years_active")
 
     # getting urls from wikipedia
-
     wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
 
     all_wiki_links = find_individual_wiki(wikipage_link)
@@ -291,9 +315,13 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'years_active', 'name_first', 'name_last']]
+        ['education', 'years_active', 'name_first', 'name_last']]
+    birthday_data = get_birthday(wikipage_link)
+    birthday_df = pd.DataFrame(birthday_data)
+    new_df = pd.merge(wiki_df, birthday_df, how='left',
+                      on=["name_first", "name_last"])
 
-    big_df = pd.merge(leg_df, wiki_df, how='left',
+    big_df = pd.merge(leg_df, new_df, how='left',
                       on=["name_first", "name_last"])
 
     isna = big_df['education'].isna()
@@ -316,6 +344,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
 
-    #scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
     print(f'Scraper ran successfully!')
