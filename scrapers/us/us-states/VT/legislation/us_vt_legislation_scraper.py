@@ -141,6 +141,7 @@ def get_bill_sponsor(soup, row):
     """
 
     sponsors_names = []
+    sponsor_ids = []
 
     sponsors = soup.find('dl', {'class': 'summary-table'}).find('dd').find_all('li')
     for sponsor in sponsors:
@@ -153,9 +154,11 @@ def get_bill_sponsor(soup, row):
             else:
                 name = sponsor.split()
                 sponsors_names.append(f'{name[-1]}, {name[1]}')
+                sponsor_ids.append(scraper_utils.get_legislator_id(name_last=name[-1], name_first=name[1]))
         except AttributeError:
             pass
 
+    row.sponsors_id = sponsor_ids
     row.sponsors = sponsors_names
 
 
@@ -185,7 +188,7 @@ def get_bill_text(soup, row):
         latest_bill_text_endpoint = bill_texts[-1].find('a').get('href').replace(' ', '%20').replace('/n', '')
         link = BASE_URL + latest_bill_text_endpoint
         parsed = parser.from_file(link)
-        row.bill_text = parsed['content']
+        row.bill_text = parsed['content'].strip()
     except AttributeError:
         pass
 
@@ -210,7 +213,7 @@ def get_bill_actions(url, row):
             actions.append({'action_by': str(r[0].text), 'date': str(r[1].text), 'description': str(r[-1].text)})
         row.actions = actions
         driver.quit()
-    except (StaleElementReferenceException, IndexError):
+    except (IndexError, StaleElementReferenceExceptionUd):
         pass
 
 
@@ -258,15 +261,16 @@ def get_bill_name(soup, row):
     :param soup: soup object
     :param row: bill row
     """
-    row.bill_name = soup.find('div', {'class': 'bill-title'}).find('h1').text
+    bill_name = soup.find('div', {'class': 'bill-title'}).find('h1').text.split()[0]
+    row.chamber_origin = 'Senate' if bill_name[0] == 'S' else 'House'
+    row.bill_name = bill_name
 
 
 @scraper_utils.Timer()
-def get_bill_committees(url, row):
+def get_bill_committees(url, soup, row):
     committees = []
     driver = open_driver(url)
     driver.find_element_by_id('bills-tabs').find_elements_by_tag_name('li')[1].click()
-    sleep(2)
     try:
         committee_table = driver.find_element_by_id('meeting-history-table').find_element_by_tag_name('tbody').find_elements_by_tag_name('tr')
         select = Select(driver.find_element_by_name('meeting-history-table_length'))
@@ -278,16 +282,60 @@ def get_bill_committees(url, row):
                 committees.append(committee_dict)
         row.committees = committees
     except (NoSuchElementException, StaleElementReferenceException):
-        pass
+        print(url)
     driver.quit()
+
+    location = soup.find('dl', {'class': 'summary-table'}).find_all('dd')
+    if len(location) == 3:
+        text = location[1].find('a').text
+        location = text
+        if not text.startswith('Sen.') or not text.startswith('Rep.'):
+            pass
+        else:
+            committees.append({'chamber': '', 'committee': location})
+
+    elif len(location) == 2:
+        text = location[0].find('a').text
+        location = text
+        if text.startswith('Sen.') or text.startswith('Rep.'):
+            pass
+        else:
+            committees.append({'chamber': '', 'committee': location})
+
+        print(committees, url)
 
 
 def get_bill_type(url, row):
     info = url.split('/')
-    bill_name = info[-1]
-    type = info[1]
-    house_or_senate = 'House' if bill_name == 'H' else 'Senate'
-    row.bill_type = f'{house_or_senate} {type.title()}'
+    bill_name = list(info[-1])
+    if 'R' and 'C' in bill_name:
+        row.bill_type = 'Concurrent Resolution'
+    elif 'R' and 'J' in bill_name:
+        row.bill_type = 'Joint Resolution'
+    elif 'R' in bill_name:
+        row.bill_type = 'Resolution'
+    else:
+        row.bill_type = 'Bill'
+
+
+def get_date_introduced(url, row):
+    driver = open_driver(url)
+    table = driver.find_element_by_id('bill-detailed-status-table').find_element_by_tag_name('tbody').find_elements_by_tag_name('tr')
+    first_month = ''
+    try:
+        date_lst = []
+        for tr in table:
+            dates = tr.find_elements_by_tag_name('td')[1].text
+            month = dates.split('/')[0]
+            if first_month == '':
+                first_month = month
+            elif first_month != month:
+                break
+            date_lst.append(dates)
+        row.date_introduced = date_lst[-1]
+        print(row.date_introduced)
+    except (IndexError, StaleElementReferenceException):
+        pass
 
 
 def scrape(url):
@@ -306,18 +354,18 @@ def scrape(url):
     get_bill_votes(url, row)
     get_bill_name(soup, row)
     get_bill_type(url, row)
-    get_bill_committees(url, row)
+    get_bill_committees(url, soup, row)
     get_current_status(soup, row)
     get_bill_summary(soup, row)
+    get_date_introduced(url, row)
 
-    # pprint(row)
     return row
 
 
 def main():
     bills_urls = get_urls(BILL_PATH)
     resolutions_urls = get_urls(RESOLUTIONS_PATH)
-    all_urls = bills_urls + resolutions_urls
+    all_urls = resolutions_urls + bills_urls
 
     with Pool() as pool:
         data = pool.map(scrape, all_urls)
