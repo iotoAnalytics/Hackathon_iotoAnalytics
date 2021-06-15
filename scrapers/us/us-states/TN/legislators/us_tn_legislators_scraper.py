@@ -38,10 +38,10 @@ NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 WIKI_DATA_TO_MERGE = ['years_active', 'education', 'occupation']
 
 # Update for new assemblies
-CURRENT_ASSEMBLY = '111'
+CURRENT_ASSEMBLY = '112'
 ASSEMBLY_START_YEAR = {
+    '112': '2021',
     '111': '2019',
-    '110': '2017',
 }
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
