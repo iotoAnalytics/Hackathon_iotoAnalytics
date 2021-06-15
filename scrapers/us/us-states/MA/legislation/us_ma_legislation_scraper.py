@@ -251,24 +251,20 @@ def get_bill_description(main_div, row):
     row.bill_description = description
 
 
-def get_introduced_date(bottom_div, row):
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-    date_row = table_rows[-1]
-    date = date_row.findAll('td')[0].text
-    datetime_date = datetime.strptime(date, '%a, %b %d, %Y')
-    datetime_date = datetime_date.strftime("%Y-%m-%d")
-    row.date_introduced = datetime_date
+def get_introduced_date(actions_list, row):
+    print("date")
+    oldest_action = actions_list[-1]
+    date = oldest_action['date']
+    print(date)
+    row.date_introduced = date
 
 
-def get_current_status(bottom_div, row):
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-    current_status_row = table_rows[1]
-    status = current_status_row.findAll('td')[2].text.strip()
-    status = status.replace("  ", "")
-    status = status.replace("\n", "")
-    row.current_status = status
+def get_current_status(actions_list, row):
+    print("status")
+    most_recent_action = actions_list[0]
+    current_status = most_recent_action['description']
+    print(current_status)
+    row.current_status = current_status
 
 
 def get_actions(soup, row):
@@ -298,6 +294,9 @@ def get_actions(soup, row):
                 description = description.replace("  ", "")
             row_data = {'date': datetime_date, 'action_by': chamber, 'description': description}
             actions_list.append(row_data)
+        get_current_status(actions_list, row)
+        get_introduced_date(actions_list, row)
+        print(actions_list)
         row.actions = actions_list
     except Exception:
         pass
@@ -355,75 +354,34 @@ def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
     return voter_data_list
 
 
-def get_vote_detail(votes, row):
-    page = scraper_utils.request(votes)
-    soup = BeautifulSoup(page.content, 'lxml')
+def get_vote_detail(vote_links, row):
+    for link in vote_links:
+        url = link[0]
+        pdf_link = base_url + url
 
-    voter_data_list = []
-    passed = 0
+        response = requests.get(pdf_link, stream=True)
+        pdf = pdfplumber.open(io.BytesIO(response.content))
+        pages = pdf.pages
+        text = ""
+        for page in pages:
+            page_text = page.extract_text()
+            text += page_text
+        print(text)
 
-    bill_summary = soup.find('h4').text
-    row.bill_summary = bill_summary
 
-    main_content = soup.find('div', {'id': 'main_content'})
-    getting_votes = main_content.findAll('h3')
-
-    # getting if vote passed 1 or 0
-    if getting_votes[0].text.lower() in {'passed', 'adopted'}:
-        passed = 1
-
-    # getting vote date
-    date_string = getting_votes[0].text.split(' - ')[3]
-    date_string = date_string.strip()
-    date = datetime.strptime(date_string, '%m/%d/%Y')
-    date = date.strftime("%Y-%m-%d")
-
-    # getting Chamber
-    chamber = getting_votes[0].text.split(' - ')[0]
-
-    # getting description
-    description = getting_votes[0].text.split(chamber + ' - ')[1]
-    description = description[:description.index(";")]
-
-    # getting number of Yea
-    yeas = getting_votes[2].text.split("Yea - (")[1]
-    yeas = yeas.split(')')[0]
-    yeas = int(yeas)
-
-    # getting number of Nay
-    nays = getting_votes[3].text.split("Nay - (")[1]
-    nays = nays.split(')')[0]
-    nays = int(nays)
-
-    # getting number of Present and passing
-    pandp = getting_votes[4].text.split("Present and Passing - (")[1]
-    pandp = pandp.split(')')[0]
-    pandp = int(pandp)
-
-    # getting number of absent not voting
-    anv = getting_votes[5].text.split("Absent and Not Voting - (")[1]
-    anv = anv.split(')')[0]
-    anv = int(anv)
-
-    # getting number of Not voting
-    nv = getting_votes[6].text.split("Not Voting - (")[1]
-    nv = nv.split(')')[0]
-    nv = int(nv)
-
-    total = yeas + nays + pandp + anv + nv
-
-    voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
-
-    vote_data = {'date': date, 'description': description,
-                 'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
-                 'chamber': chamber,
-                 'votes': voter_data_list}
-
-    return vote_data
+    # voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
+    #
+    # vote_data = {'date': date, 'description': description,
+    #              'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
+    #              'chamber': chamber,
+    #              'votes': voter_data_list}
+    #
+    # return vote_data
 
 
 def get_vote_data(soup, row):
-    print("vote data")
+    vote_links = []
+    vote_data_link = None
     tables = soup.findAll('table')
     for table in tables:
         row_names = table.find("thead")
@@ -435,22 +393,27 @@ def get_vote_data(soup, row):
             pass
 
     try:
-        table_rows = table.findAll('tr')
+        table_body = table.find('tbody')
+        table_rows = table_body.findAll('tr')
 
         for r in table_rows:
             row_sections = r.findAll('td')
-            print(row_sections)
-            description = row_sections[2]
-            print(description.text)
-            if "Roll call" in description:
-                print('role')
+            description = row_sections[2].text
+            description = description.lower()
+            date = row_sections[0].text
+            datetime_date = datetime.strptime(date, '%m/%d/%Y')
+            datetime_date = datetime_date.strftime("%Y-%m-%d")
+            chamber = row_sections[1].text
+            if "roll call" in description:
                 vote_data_link = row_sections[2].find('a').get('href')
-                print(vote_data_link)
-            elif "YEA" in description:
+            if "yea" in description:
                 vote_data_link = row_sections[2].find('a').get('href')
-                print(vote_data_link)
+            if vote_data_link is not None:
+                votes = [vote_data_link, datetime_date, chamber]
+                vote_links.append(votes)
     except:
         pass
+    get_vote_detail(vote_links, row)
     # row.votes = voting_data
 
 
@@ -489,7 +452,8 @@ def scrape(url):
     # get_introduced_date(bottom_div, row)
     # get_current_status(bottom_div, row)
     get_actions(soup, row)
-    get_vote_data(soup, row)
+    print("1234")
+    #get_vote_data(soup, row)
     # get_bill_text(soup, row)
 
     # Delay so we do not overburden servers
