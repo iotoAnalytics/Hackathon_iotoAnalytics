@@ -1,5 +1,5 @@
 # Unavailable data - source_id, seniority, military_experience
-# Wiki data - education, occupation,
+# Wiki data - education
 
 import os
 import re
