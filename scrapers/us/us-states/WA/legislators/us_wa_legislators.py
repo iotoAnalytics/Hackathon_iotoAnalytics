@@ -26,39 +26,53 @@ SENATOR_PAGE_URL = WASHINGTON_STATE_LEGISLATURE_BASE_URL + 'Senate/Senators/Page
 ALL_MEMBER_EMAIL_LIST_URL = 'https://app.leg.wa.gov/MemberEmail/Default.aspx?Chamber=H'
 ALL_MEMBER_COUNTY_LIST_URL = 'https://app.leg.wa.gov/Rosters/MembersByDistrictAndCounties'
 
-REPUBLICAN_SENATOR_BASE_URL = 'https://src.wastateleg.org/'
-REPUBLICAN_SENATOR_PAGE_URL = REPUBLICAN_SENATOR_BASE_URL + 'senators/'
-DEMOCRATIC_SENATOR_BASE_URL = 'https://senatedemocrats.wa.gov/'
-DEMOCRATIC_SENATOR_PAGE_URL = DEMOCRATIC_SENATOR_BASE_URL + 'senators/'
-
-REPUBLICAN_REPRESENTATIVE_BASE_URL = 'https://houserepublicans.wa.gov/'
-REPUBLICAN_REPRESENTATIVE_PAGE_URL = REPUBLICAN_REPRESENTATIVE_BASE_URL + 'representatives/'
-DEMOCRATIC_REPRESENTATIVE_BASE_URL = 'http://housedemocrats.wa.gov/'
-DEMOCRATIC_REPRESENTATIVE_PAGE_URL = DEMOCRATIC_REPRESENTATIVE_BASE_URL + 'legislators/'
+WIKI_BASE_URL = 'https://en.wikipedia.org'
+WIKI_URL = WIKI_BASE_URL+ '/wiki/Washington_State_Legislature'
 
 THREADS_FOR_POOL = 12
 CURRENT_YEAR = datetime.datetime.now().year
 
-scraper_utils = USStateLegislatorScraperUtils('WA', 'ca_wa_legislators')
+scraper_utils = USStateLegislatorScraperUtils('WA', 'us_wa_legislators')
 
 # Maybe separate into different classes and use init to initalize these delays
 state_legislature_crawl_delay = scraper_utils.get_crawl_delay(WASHINGTON_STATE_LEGISLATURE_BASE_URL)
-republican_senator_crawl_delay = scraper_utils.get_crawl_delay(REPUBLICAN_SENATOR_BASE_URL)
-democratic_senator_crawl_delay = scraper_utils.get_crawl_delay(DEMOCRATIC_SENATOR_BASE_URL)
-republican_representative_crawl_delay = scraper_utils.get_crawl_delay(REPUBLICAN_REPRESENTATIVE_BASE_URL)
-democratic_representative_crawl_delay = scraper_utils.get_crawl_delay(DEMOCRATIC_REPRESENTATIVE_BASE_URL)
+wiki_crawl_delay = scraper_utils.get_crawl_delay(WIKI_BASE_URL)
 
 options = Options()
 options.headless = True
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
+columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 def program_driver():
-    representative_data = MainScraper("Representative").get_data()
-    senator_data = MainScraper("Senator").get_data()
-    # print(representative_data[:5])
-    # print(senator_data[:5])
+    mla_data = MainScraper("Representative").get_data()
+    mla_data.extend(MainScraper("Senator").get_data())
+
+    all_wiki_links = WikiScraper().scrape_main_wiki_link()
+    wiki_data = WikiScraper().get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
+
+    complete_data_set = configure_data(mla_data, wiki_data)
+    print('Writing data to database...')
+    scraper_utils.write_data(complete_data_set)
+    print("Complete")
+    
+def configure_data(mla_data, wiki_data):
+    mla_df = pd.DataFrame(mla_data)
+    mla_df = mla_df.drop(columns = columns_not_on_main_site)
+  
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+    ]
+
+    big_df = pd.merge(mla_df, wiki_df, 
+                           how='left',
+                           on=['name_first', 'name_last'])
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
+
+    return big_df.to_dict('records')
 
 class PreprogramFunctions:
     def __init__(self, url):
@@ -173,7 +187,7 @@ class MainScraper:
         self.__set_years_active(row, member_web_element)
         self.__set_most_recent_term_id(row)
         self.__set_source_url(row, member_web_element)
-        # self.__set_committee(row, member_web_element)
+        self.__set_committee(row, member_web_element)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -348,6 +362,59 @@ class MainScraper:
     def __set_source_url(self, row, web_element):
         link = web_element.find_element_by_link_text('Home Page').get_attribute("href")
         row.source_url = link
+
+    def __set_committee(self, row, web_element):
+        member_information_div = web_element.find_element_by_css_selector("div[class='row clearfix']")
+        member_main_columns = member_information_div.find_elements_by_css_selector("div[class='col-csm-6 col-md-3 memberColumnPad']")
+        committees_web_element = member_main_columns[-1]
+        row.committees = self.__extract_committee_data(committees_web_element)
+
+    def __extract_committee_data(self, web_element):
+        committees_container = web_element.find_elements_by_tag_name('span')
+        return_list = []
+        for committee in committees_container:
+            self.__add_committee(return_list, committee)
+        return return_list
+
+    def __add_committee(self, return_list, committee_web_element):
+        committee_info = committee_web_element.text
+        committee_name = committee_info.split("(")[0].strip()
+        roles = self.__get_role(committee_info)
+        if len(roles) == 1:
+            return_list.append({"role": roles[0],
+                                "committee":committee_name})
+        else:
+            for role in roles:
+                return_list.append({"role": role.strip(),
+                                    "committee": committee_name})
+
+    def __get_role(self, text):
+        if '(' not in text:
+            return ["Member"]
+        role = text.split('(')[1].split(')')[0]
+        roles = role.split(',')
+        return roles
+
+class WikiScraper:
+    def scrape_main_wiki_link(self):
+        wiki_urls = []
+        page_soup = SoupMaker().get_page_as_soup(WIKI_URL, wiki_crawl_delay)
+        table = page_soup.find("table", {"class": "nowraplinks mw-collapsible mw-collapsed navbox-inner"})
+        index_of_member_names = 2
+        table = table.findAll("tr")[index_of_member_names]
+        members = table.findAll('li')
+        for member in members:
+            link = member.a["href"]
+            url = WIKI_BASE_URL + link
+            wiki_urls.append(url)
+        return wiki_urls
+
+    def get_data_from_all_links(self, function, all_links):
+        data = []
+        with Pool(THREADS_FOR_POOL) as pool:
+            data = pool.map(func=function,
+                            iterable=all_links)
+        return data
 
 #global variable
 every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
