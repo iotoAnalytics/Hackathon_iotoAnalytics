@@ -1,11 +1,13 @@
-# Unavailable data - source_id, most_recent_term_id, years_active, seniority, military_experience
-# Wiki data - education, occupation
+# Unavailable data - source_id, seniority, military_experience
+# Wiki data - most_recent_term_id, years_active, education, occupation
 
 import os
 import re
 import sys
 
 import multiprocessing
+import numpy as np
+import pandas as pd
 from bs4 import BeautifulSoup
 from datetime import datetime
 from multiprocessing import Pool
@@ -22,17 +24,18 @@ from scraper_utils import USStateLegislatorScraperUtils
 DEBUG_MODE = False
 
 STATE_ABBREVIATION = 'TN'
-LEGISLATOR_TABLE_NAME = 'us_tn_legislators'
+LEGISLATOR_TABLE_NAME = 'us_tn_legislators_test'
 
 BASE_URL = 'https://www.capitol.tn.gov/'
 HOUSE_PATH = 'house/members/'
 SENATE_PATH = 'senate/members/'
-WIKI_URL = 'https://en.wikipedia.org/'
-WIKI_HOUSE_PATH = 'wiki/Tennessee_House_of_Representatives'
-WIKI_SENATE_PATH = 'wiki/Tennessee_Senate'
+WIKI_URL = 'https://en.wikipedia.org'
+WIKI_HOUSE_PATH = '/wiki/Tennessee_House_of_Representatives'
+WIKI_SENATE_PATH = '/wiki/Tennessee_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
+WIKI_DATA_TO_MERGE = ['most_recent_term_id', 'years_active', 'education', 'occupation']
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -84,55 +87,47 @@ def scrape(url):
 
     return row
 
-# FIXME: Refactor wiki methods
-def get_wiki_urls_with_district():
-    wiki_urls = []
-    
-    wiki_member_list_url = [WIKI_URL + WIKI_HOUSE_PATH, WIKI_URL + WIKI_SENATE_PATH]
+def get_legislators_wiki_urls(main_wiki_url):
+    wiki_urls_with_district = []
 
-    for url in wiki_member_list_url: 
-        page = scraper_utils.request(url)
-        soup = BeautifulSoup(page.content, SOUP_PARSER_TYPE)
-        scraper_utils.crawl_delay(crawl_delay)
+    soup = _create_soup(main_wiki_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
 
-        table_rows = soup.find('table', {'class': 'sortable wikitable'}).find('tbody').find_all('tr')
+    table_rows = soup.find('table', {'class': 'sortable wikitable'}).find('tbody').find_all('tr')
+    for row in table_rows[1:]:
+        fields = row.find_all('td')
+        district = fields[0].text.strip()
+        path = fields[1].find('a')
 
-        for row in table_rows[1:]:
-            try:
-                fields = row.find_all('td')
-                district_idx = 0
-                path_idx = 1
+        if path:
+            wiki_item = (f'{district}', WIKI_URL + path.get('href'))
+            wiki_urls_with_district.append(wiki_item)
 
-                district = fields[district_idx].text
-                path = fields[path_idx].find('a').get('href')
+    return wiki_urls_with_district
+        
+def scrape_wiki(wiki_item):
+    district, wiki_url = wiki_item
 
-                if '/wiki' in path:
-                    url = {
-                        'district': district,
-                        'url': WIKI_URL + path
-                    }
-                    wiki_urls.append(url)
-            except:
-                pass
-
-    return wiki_urls
-    
-def merge_all_wiki_data(legislator_data, wiki_urls):
-    with Pool(NUM_POOL_PROCESSES) as pool:
-        wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
-
-    for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, birthday=False)
-
-def _scrape_wiki(url):
-    wiki_data = scraper_utils.scrape_wiki_bio(url['url'])
-    wiki_crawl_delay = scraper_utils.get_crawl_delay(url['url'])
+    wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
+    wiki_crawl_delay = scraper_utils.get_crawl_delay(WIKI_URL)
     scraper_utils.crawl_delay(wiki_crawl_delay)
+   
+    wiki_data['district'] = district
 
-    return {
-        'data': wiki_data,
-        'district': url['district']
-    }
+    return wiki_data
+
+def merge_all_wiki_data(legislator_data, wiki_data):
+    leg_df = pd.DataFrame(legislator_data)
+    leg_df = leg_df.drop(columns = WIKI_DATA_TO_MERGE)
+
+    wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
+    leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district']) 
+    
+    for data in wiki_data:
+        for key in data.keys():
+            leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
+
+    return leg_wiki_df.to_dict('records')
 
 def _create_soup(url, soup_parser_type):
     page = scraper_utils.request(url)
@@ -340,33 +335,6 @@ def _set_district(row, soup):
     district = district_str.split()[-1]
     row.district = district
 
-def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True,
-                    years_active=True, most_recent_term_id=True):
-    full_name = wiki_data['data']['name_first'] + ' ' + wiki_data['data']['name_last']
-    district = wiki_data['district']
-
-    legislator_row = _get_legislator_row(legislator_data, full_name, district)
-
-    if not legislator_row:
-        return
-
-    for bio_info in wiki_data:
-        if birthday:
-            legislator_row.birthday = wiki_data['data']['birthday']
-        if education:
-            legislator_row.education = wiki_data['data']['education']
-        if occupation:
-            legislator_row.occupation = wiki_data['data']['occupation']
-        if years_active:
-            legislator_row.years_active = wiki_data['data']['years_active']
-        if most_recent_term_id:
-            legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
- 
-def _get_legislator_row(data, name_full, district):
-    for row in data:
-        if name_full == row.name_full and district == row.district:
-            return row
-
 def main():
     print('TENNESSEE!')
     print('O Tennessee: Fair Tennessee: ♫ ♫ ♫')
@@ -380,22 +348,28 @@ def main():
     urls = get_urls()
 
     # Scrape data from collected URLs
-    print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
+    print(DEBUG_MODE and 'Scraping data from legislator URLs...\n' or '', end='')
     with Pool(NUM_POOL_PROCESSES) as pool:
         data = list(tqdm(pool.imap(scrape, urls)))
 
     # Collect wiki urls
     print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
-    wiki_urls = get_wiki_urls_with_district()
+    wiki_urls = get_legislators_wiki_urls(WIKI_URL + WIKI_HOUSE_PATH) + \
+        get_legislators_wiki_urls(WIKI_URL + WIKI_SENATE_PATH)
+
+    # Scrape data from wiki URLs
+    print(DEBUG_MODE and 'Scraping data from wiki URLs...\n' or '', end='')
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        wiki_data = list(tqdm(pool.imap(scrape_wiki, wiki_urls)))
 
     # Merge data from wikipedia
-    print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
-    merge_all_wiki_data(data, wiki_urls)
-
+    print(DEBUG_MODE and 'Merging wiki data with legislators...\n' or '', end='')
+    merged_data = merge_all_wiki_data(data, wiki_data)
+    
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if not DEBUG_MODE:
-        scraper_utils.write_data(data)
+        scraper_utils.write_data(merged_data)
 
     print('\nCOMPLETE!\n')
 
