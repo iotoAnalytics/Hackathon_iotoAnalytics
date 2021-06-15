@@ -1,4 +1,3 @@
-
 import sys
 import os
 from pathlib import Path
@@ -6,15 +5,26 @@ from datetime import datetime
 from nameparser import HumanName
 from multiprocessing import Pool
 from bs4 import BeautifulSoup
+from selenium.webdriver.common.by import By
+
 from scraper_utils import USStateLegislationScraperUtils
 import pdfplumber
 import requests
 import io
+import re
+import dateutil.parser as dparser
+from selenium import webdriver
+import time
+from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
+import pandas as pd
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
+
+PATH = "../../../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
+browser = webdriver.Chrome(PATH)
 
 state_abbreviation = 'MA'
 database_table_name = 'us_ma_legislation'
@@ -28,44 +38,69 @@ base_url = 'https://malegislature.gov'
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
-def get_session(soup):
-    header_div = soup.find('div', {'id': 'logo2'})
-    session = header_div.find('h5').text
-    session = session.split(' ')[0].strip()
-    return session
+def get_individual_urls(url):
+    links = []
+    browser.get(url)
+    table = browser.find_element_by_id("searchTable")
+    links_table = table.find_element_by_tag_name("tbody")
+    rows = links_table.find_elements_by_tag_name('tr')
+    for row in rows:
+        row_elements = row.find_elements_by_tag_name("td")
+        link = row_elements[1].find_element_by_tag_name('a').get_attribute('href')
+        links.append(link)
+    return links
 
 
 def get_urls():
     urls = []
-    scrape_url = base_url
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    session = get_session(soup)
-    session = session.replace('-', '_')
-    session_link = '/li/b' + session[:5] + session[7:]
+    path = '/Bills/Search'
+    scrape_url = base_url + path
 
-    paths = '/measures/bills/', '/measures/concurs/', '/measures/resos/'
-    for path in paths:
-        scrape_url = base_url + session_link + path
-        page = scraper_utils.request(scrape_url)
-        soup = BeautifulSoup(page.content, 'html.parser')
+    browser.get(scrape_url)
+    url = scrape_url
+    # time.sleep(5)
+    # type_check_boxes = browser.find_elements_by_class_name("refinerGroup")[5]
+    # amendment = type_check_boxes.find_elements_by_tag_name("input")[0]
+    # bill = type_check_boxes.find_elements_by_tag_name("input")[1]
+    # resolution = type_check_boxes.find_elements_by_tag_name("input")[9]
+    # amendment.click()
+    # bill.click()
+    # resolution.click()
 
-        table = soup.find(
-            'div', {'class': 'infinite-tabs'})
 
-        for li in table.findAll('li'):
-            link = base_url + li.find('a').get('href')
-            urls.append(link)
-
-    # Delay so we do not overburden servers
-    scraper_utils.crawl_delay(crawl_delay)
+    #while True:
+    for i in range(0, 5):
+        try:
+            urls += (get_individual_urls(url))
+            pagination_table = browser.find_element_by_class_name("pagination")
+            pagination_buttons = pagination_table.find_elements_by_tag_name('li')
+            next_button_container = pagination_buttons[7]
+            next_button = next_button_container.find_element_by_tag_name('a')
+            next_button.click()
+            url = browser.current_url
+            browser.get(url)
+        except ElementClickInterceptedException:
+            break
 
     return urls
 
 
-def get_bill_name(main_div):
-    name = main_div.find('h1').text
+def get_session(soup, row):
+    session_text = soup.find('span', {'class': 'subTitle'}).text
+    session = session_text.split(' ')[0].strip()
+    session = re.findall(r'[0-9]', session)
+    session = "".join(session)
+    row.session = session
 
+    return session
+
+
+def get_bill_name(soup, row):
+    name = soup.find('h1').text.strip()
+    get_bill_type_chamber(name, row)
+    name = name.split(" ")[1]
+    name = name.replace(".", "")
+    row.bill_name = name
     return name
 
 
@@ -86,49 +121,29 @@ def get_full_name(url):
 
 
 def get_bill_type_chamber(bill_name, row):
-    bill_name = bill_name.split(' ')[0]
+    bill_type = bill_name.split(' ')[0]
+    bill_name = bill_name.split(' ')[1]
+    bill_name = bill_name.split('.')[0]
     chambers = {
-        'HR': 'House',
-        'SR': 'Senate',
-        'HB': 'House',
-        'SB': 'Senate',
-        'HCR': 'House',
-        'SCR': 'Senate'
+        'H': 'House',
+        'S': 'Senate',
+        'HD': 'House',
+        'SD': 'Senate',
     }
-    bill_types = {
-        'HR': 'Resolution',
-        'SR': 'Resolution',
-        'HB': 'Bill',
-        'SB': 'Bill',
-        'HCR': 'Concurrent Resolution',
-        'SCR': 'Concurrent Resolution'
-    }
-    bill_type = bill_types.get(bill_name)
     chamber_origin = chambers.get(bill_name)
-
     row.chamber_origin = chamber_origin
     row.bill_type = bill_type
 
 
 def get_committees(sponsor):
-    committee = sponsor.text
     chamber = ''
-    if "Joint" in committee:
+    if "Joint" in sponsor:
         chamber = "joint"
-    else:
-        link = "http://www.kslegislature.org" + sponsor.get('href')
-        page = scraper_utils.request(link)
-        soup = BeautifulSoup(page.content, 'lxml')
-        # getting sidebar on committee page
-        sidebar = soup.find('div', {'id': 'sidebar'})
-        list_items = sidebar.find_all('li')
-
-        for item in list_items:
-            if "House" in item:
-                chamber = "house"
-            elif "Senate" in item:
-                chamber = "senate"
-    committee_detail = {"chamber": chamber, "committee": committee}
+    elif "House" in sponsor:
+        chamber = "house"
+    elif "Senate" in sponsor:
+        chamber = "senate"
+    committee_detail = {"chamber": chamber, "committee": sponsor}
     return committee_detail
 
 
@@ -147,7 +162,7 @@ def get_sponsor_id(sponsor_name):
     return sponsor_id
 
 
-def get_sponsors(sidebar, row):
+def get_sponsors(soup, row):
     sponsors = []
     sponsor_ids = []
     committees = []
@@ -181,92 +196,100 @@ def get_sponsors(sidebar, row):
     row.sponsors_id = sponsor_ids
 
 
-def get_principal_sponsor(sidebar, row):
-    committees = []
-    sponsors_tabs = sidebar.find(
-        'ul', {'class': 'introduce-tab-content'})
-
+def get_principal_sponsor(soup, row):
+    is_sponsor = ""
+    principal_sponsor = ""
     try:
-        sponsors = sponsors_tabs.find_all('a')
-        if len(sponsors) == 1:
-            sponsor = sponsors[0]
-            name = sponsor.text
+        is_sponsor = soup.find("dt").text
+        principal_sponsor = soup.find("dd").text
+    except:
+        pass
 
-            if "Committee" in name:
-                committee = get_committees(sponsor)
-                committees.append(committee)
-                row.principal_sponsor = name
-            else:
-                link = "http://www.kslegislature.org" + sponsor.get('href')
-                name = get_full_name(link)
-                sponsor_id = get_sponsor_id(name)
-                hn = HumanName(name)
+    if "Sponsor" in is_sponsor:
+        if "Committee" in principal_sponsor:
+            committee_info = get_committees(principal_sponsor)
+            row.principal_sponsor = principal_sponsor
+            row.committees = committee_info
+            print(principal_sponsor)
+        else:
+            try:
+                sponsor_id = get_sponsor_id(principal_sponsor)
+                hn = HumanName(principal_sponsor)
                 name_last = hn.last
                 row.principal_sponsor = name_last
                 row.principal_sponsor_id = sponsor_id
+                print(name_last)
+            except:
+                row.principal_sponsor = principal_sponsor
+                print(principal_sponsor)
+    print()
+
+
+def get_bill_description(soup, row):
+    try:
+        description = soup.find("div", {"class": "col-xs-12 col-md-8"})
+        description = description.find("h2")
+        description = description.strip()
+        row.bill_description = description
+    except:
+        pass
+
+
+def get_bill_summary(soup, row):
+    try:
+        summary = soup.find("p", {"id": "pinslip"}).text
+        summary = summary.strip()
+        row.bill_summary = summary
+    except:
+        pass
+
+
+def get_introduced_date(actions_list, row):
+    if len(actions_list) > 0:
+        oldest_action = actions_list[-1]
+        date = oldest_action['date']
+        row.date_introduced = date
+
+
+def get_current_status(actions_list, row):
+    if len(actions_list) > 0:
+        most_recent_action = actions_list[0]
+        current_status = most_recent_action['description']
+        row.current_status = current_status
+
+
+def get_actions(soup, row):
+    actions_list = []
+    tables = soup.findAll('table')
+    for table in tables:
+        row_names = table.find("thead")
+        try:
+            row_names = row_names.findAll("tr")[0].text
+            if "Date" in row_names:
+                table = table
+        except Exception:
+            pass
+
+    try:
+        table_rows = table.findAll('tr')
+
+        for r in reversed(table_rows):
+            row_sections = r.findAll('td')
+            date = row_sections[0].text
+            datetime_date = datetime.strptime(date, '%m/%d/%Y')
+            datetime_date = datetime_date.strftime("%Y-%m-%d")
+            chamber = row_sections[1].text
+            description = row_sections[2].text.strip()
+            if "\n" in description:
+                description = description.replace("\n", "")
+                description = description.replace("  ", "")
+            row_data = {'date': datetime_date, 'action_by': chamber, 'description': description}
+            actions_list.append(row_data)
 
     except Exception:
         pass
-    row.committees = committees
-
-
-def get_bill_description(main_div, row):
-    description = main_div.find('div', {'class': 'container'}).text
-    description = description.split('Short Title')[1]
-
-    if "(more)" in description:
-        description = description[:description.index("(more)")]
-    elif "Summary of Legislation" in description:
-        description = description[:description.index("Summary of Legislation")]
-    elif "View Testimony" in description:
-        description = description[:description.index("View")]
-
-    description = description.strip()
-
-    row.bill_description = description
-
-
-def get_introduced_date(bottom_div, row):
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-    date_row = table_rows[-1]
-    date = date_row.findAll('td')[0].text
-    datetime_date = datetime.strptime(date, '%a, %b %d, %Y')
-    datetime_date = datetime_date.strftime("%Y-%m-%d")
-    row.date_introduced = datetime_date
-
-
-def get_current_status(bottom_div, row):
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-    current_status_row = table_rows[1]
-    status = current_status_row.findAll('td')[2].text.strip()
-    status = status.replace("  ", "")
-    status = status.replace("\n", "")
-    row.current_status = status
-
-
-def get_actions(bottom_div, row):
-    actions_list = []
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-
-    for r in table_rows[1:]:
-        row_sections = r.findAll('td')
-
-        date = row_sections[0].text
-        datetime_date = datetime.strptime(date, '%a, %b %d, %Y')
-        datetime_date = datetime_date.strftime("%Y-%m-%d")
-
-        chamber = row_sections[1].text
-
-        description = row_sections[2].text.strip()
-        if "\n" in description:
-            description = description.replace("\n", "")
-            description = description.replace("  ", "")
-
-        row_data = {'date': datetime_date, 'action_by': chamber, 'description': description}
-        actions_list.append(row_data)
+    get_current_status(actions_list, row)
+    get_introduced_date(actions_list, row)
     row.actions = actions_list
 
 
@@ -322,89 +345,67 @@ def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
     return voter_data_list
 
 
-def get_vote_detail(votes, row):
-    page = scraper_utils.request(votes)
-    soup = BeautifulSoup(page.content, 'lxml')
+def get_vote_detail(vote_links, row):
+    for link in vote_links:
+        url = link[0]
+        pdf_link = base_url + url
 
-    voter_data_list = []
-    passed = 0
-
-    bill_summary = soup.find('h4').text
-    row.bill_summary = bill_summary
-
-    main_content = soup.find('div', {'id': 'main_content'})
-    getting_votes = main_content.findAll('h3')
-
-    # getting if vote passed 1 or 0
-    if getting_votes[0].text.lower() in {'passed', 'adopted'}:
-        passed = 1
-
-    # getting vote date
-    date_string = getting_votes[0].text.split(' - ')[3]
-    date_string = date_string.strip()
-    date = datetime.strptime(date_string, '%m/%d/%Y')
-    date = date.strftime("%Y-%m-%d")
-
-    # getting Chamber
-    chamber = getting_votes[0].text.split(' - ')[0]
-
-    # getting description
-    description = getting_votes[0].text.split(chamber + ' - ')[1]
-    description = description[:description.index(";")]
-
-    # getting number of Yea
-    yeas = getting_votes[2].text.split("Yea - (")[1]
-    yeas = yeas.split(')')[0]
-    yeas = int(yeas)
-
-    # getting number of Nay
-    nays = getting_votes[3].text.split("Nay - (")[1]
-    nays = nays.split(')')[0]
-    nays = int(nays)
-
-    # getting number of Present and passing
-    pandp = getting_votes[4].text.split("Present and Passing - (")[1]
-    pandp = pandp.split(')')[0]
-    pandp = int(pandp)
-
-    # getting number of absent not voting
-    anv = getting_votes[5].text.split("Absent and Not Voting - (")[1]
-    anv = anv.split(')')[0]
-    anv = int(anv)
-
-    # getting number of Not voting
-    nv = getting_votes[6].text.split("Not Voting - (")[1]
-    nv = nv.split(')')[0]
-    nv = int(nv)
-
-    total = yeas + nays + pandp + anv + nv
-
-    voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
-
-    vote_data = {'date': date, 'description': description,
-                 'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
-                 'chamber': chamber,
-                 'votes': voter_data_list}
-
-    return vote_data
+        response = requests.get(pdf_link, stream=True)
+        pdf = pdfplumber.open(io.BytesIO(response.content))
+        pages = pdf.pages
+        text = ""
+        for page in pages:
+            page_text = page.extract_text()
+            text += page_text
+        print(text)
 
 
-def get_vote_data(bottom_div, row):
-    voting_data = []
-    table = bottom_div.find('table', {'class': 'bottom'})
-    table_rows = table.findAll('tr')
-    for r in table_rows:
-        r_text = r.text
-        if "Yea" in r_text:
-            try:
-                votes = r.find('a').get('href')
-                votes = "http://www.kslegislature.org" + votes
-                vote_data = get_vote_detail(votes, row)
-                voting_data.append(vote_data)
-            except Exception:
-                pass
+    # voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
+    #
+    # vote_data = {'date': date, 'description': description,
+    #              'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
+    #              'chamber': chamber,
+    #              'votes': voter_data_list}
+    #
+    # return vote_data
 
-    row.votes = voting_data
+
+def get_vote_data(soup, row):
+    vote_links = []
+    vote_data_link = None
+    tables = soup.findAll('table')
+    for table in tables:
+        row_names = table.find("thead")
+        try:
+            row_names = row_names.findAll("tr")[0].text
+            if "Date" in row_names:
+                table = table
+        except Exception:
+            pass
+
+    try:
+        table_body = table.find('tbody')
+        table_rows = table_body.findAll('tr')
+
+        for r in table_rows:
+            row_sections = r.findAll('td')
+            description = row_sections[2].text
+            description = description.lower()
+            date = row_sections[0].text
+            datetime_date = datetime.strptime(date, '%m/%d/%Y')
+            datetime_date = datetime_date.strftime("%Y-%m-%d")
+            chamber = row_sections[1].text
+            if "roll call" in description:
+                vote_data_link = row_sections[2].find('a').get('href')
+            if "yea" in description:
+                vote_data_link = row_sections[2].find('a').get('href')
+            if vote_data_link is not None:
+                votes = [vote_data_link, datetime_date, chamber]
+                vote_links.append(votes)
+    except:
+        pass
+    get_vote_detail(vote_links, row)
+    # row.votes = voting_data
 
 
 def get_bill_text(main_div, row):
@@ -424,42 +425,26 @@ def get_bill_text(main_div, row):
 
 
 def scrape(url):
-
     row = scraper_utils.initialize_row()
 
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
     row.source_url = url
+    session = get_session(soup, row)
+    bill_name = get_bill_name(soup, row)
 
-    # getting the main part of the page
-    main_div = soup.find('div', {'id': 'main'})
-    # getting sidebar
-    sidebar = soup.find('div', {'id': 'sidebar'})
-    # getting bottom div
-    bottom_div = soup.find('div', {'id': 'full'})
-
-    bill_name = get_bill_name(main_div)
-    session = get_session(soup)
-    row.bill_name = bill_name
-    get_bill_type_chamber(bill_name, row)
-
-    # removing space for goverlytics_id
-    bill_name = bill_name.replace(" ", "")
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
-
     row.goverlytics_id = goverlytics_id
 
-    row.session = session
+    #get_sponsors(soup, row)
+    get_principal_sponsor(soup, row)
+    get_bill_description(soup, row)
+    get_bill_summary(soup, row)
+    get_actions(soup, row)
 
-    get_sponsors(sidebar, row)
-    get_principal_sponsor(sidebar, row)
-    get_bill_description(main_div, row)
-    get_introduced_date(bottom_div, row)
-    get_current_status(bottom_div, row)
-    get_actions(bottom_div, row)
-    get_vote_data(bottom_div, row)
-    get_bill_text(main_div, row)
+    #get_vote_data(soup, row)
+    # get_bill_text(soup, row)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -471,13 +456,15 @@ if __name__ == '__main__':
     print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
 If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
-
     urls = get_urls()
 
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
 
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    # with Pool(processes=4) as pool:
+    #     data = pool.map(scrape, urls)
+    # data = clear_none_value_rows(data)
+    # big_list_of_dicts = clear_none_value_rows(data)
+
+    # scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')

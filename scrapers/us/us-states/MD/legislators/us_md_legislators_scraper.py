@@ -30,17 +30,16 @@ sys.path.insert(0, str(p))
 configParser = configparser.RawConfigParser()
 configParser.read('config.cfg')
 
-state_abbreviation = 'LA'
-database_table_name = 'us_la_legislators'
+state_abbreviation = 'MD'
+database_table_name = 'us_md_legislators'
 country = 'US'
 
 scraper_utils = USStateLegislatorScraperUtils(state_abbreviation, database_table_name)
 
-base_url_rep = 'https://house.louisiana.gov/'
-base_url_sen = 'https://senate.la.gov/'
-wiki_url = 'https://en.wikipedia.org/'
+base_url = 'https://mgaleg.maryland.gov'
+wiki_url = 'https://en.wikipedia.org'
 # Get scraper delay from website robots.txt file
-crawl_delay = scraper_utils.get_crawl_delay(base_url_rep)
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_rep_urls():
@@ -49,28 +48,27 @@ def get_rep_urls():
     return: a list of urls
     """
     urls = []
-    path = 'H_Reps/H_Reps_FullInfo'
-    scrape_url = base_url_rep + path
+    # Logic goes here! Some sample code:
+    path = '/mgawebsite/Members/Index/house'
+    scrape_url = base_url + path
 
     # request and soup
-    page = scraper_utils.request(scrape_url)
+    page = requests.get(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     # urls = {base_url + prod_path['href'] for prod_path in soup.findAll('a', {'href': re.compile("H_Reps/members")})}
 
-    legislator_list = soup.find_all('div', {'class': 'media-body'})
+    my_div = soup.find('div', {'id': 'myDIV'})
+    legislator_list = my_div.find_all('div', {'class': 'col-5 text-left'})
     for item in legislator_list:
-        name = item.find('span', {'id': re.compile("body_ListView1_LASTFIRSTLabel")}).text
-        if "Vacant" not in name:
-            # leave out the vacant seat
-            path = item.find('a', {'href': re.compile("H_Reps/members")})
-            scrape_url = base_url_rep + path['href']
-            urls.append(scrape_url)
+        # name = item.find('span', {'id': re.compile("body_ListView1_LASTFIRSTLabel")}).text
+        # if "Vacant" not in name:
+        #     # leave out the vacant seat
+        path = item.find('a', {'href': re.compile("/Members/Details")})
+        scrape_url = base_url + path['href']
+        urls.append(scrape_url)
 
-    # Delay so we don't overburden web servers
-    scraper_utils.crawl_delay(crawl_delay)
-
-    print(urls)
+    pprint(urls)
     return urls
 
 
@@ -81,27 +79,28 @@ def get_senate_urls():
     return: a list of urls
     """
     urls = []
-    path = 'Senators_FullInfo'
-    scrape_url = base_url_sen + path
+    # Logic goes here! Some sample code:
+    path = '/mgawebsite/Members/Index/senate'
+    scrape_url = base_url + path
 
     # request and soup
-    page = scraper_utils.request(scrape_url)
+    page = requests.get(scrape_url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
-    legislator_list = soup.find_all('div', {'class': 'media-body'})
+    my_div = soup.find('div', {'id': 'myDIV'})
+    legislator_list = my_div.find_all('div', {'class': 'col-5 text-left'})
     for item in legislator_list:
-        name = item.find('span', {'id': re.compile("body_ListView1_LASTFIRSTLabel")}).text
-        if "Vacant" not in name:
-            # leave out the vacant seat
-            path = item.find('a', {'href': re.compile("smembers")})
-            scrape_url = base_url_sen + path['href']
-            urls.append(scrape_url)
+        # name = item.find('span', {'id': re.compile("body_ListView1_LASTFIRSTLabel")}).text
+        # if "Vacant" not in name:
+        #     # leave out the vacant seat
+        path = item.find('a', {'href': re.compile("/Members/Details")})
+        scrape_url = base_url + path['href']
+        urls.append(scrape_url)
 
-    # Delay so we don't overburden web servers
-    scraper_utils.crawl_delay(crawl_delay)
-
-    print(urls)
+    pprint(urls)
     return urls
+
+
 
 
 def scrape_rep(url):
@@ -127,8 +126,7 @@ def scrape_rep(url):
 
     row.source_url = url
 
-    # request and soup
-    page = scraper_utils.request(url)
+    page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     row.role = 'Representative'
@@ -149,31 +147,14 @@ def get_info_from_scraped_gov_url(row, soup):
     """
     get_name(row, soup)
     get_party(row, soup)
+    get_area_served(row, soup)
     get_district(row, soup)
     get_address(row, soup)
     get_phone_number(row, soup)
     get_email(row, soup)
     get_committees(row, soup)
-    get_years_active(row, soup)
-    get_occupation(row, soup)
-    get_area_served(row, soup)
-
-
-def get_occupation(row, soup):
-    """
-        collect occupation info from personal page to fill the row. also check roles.
-
-        param: take the row dict and soup of the webpage
-    """
-    #occupation
-
-    try:
-        occupation = []
-        occ = soup.find('span', {'id': re.compile("body_FormView4_OCCUPATIONLabel")}).text
-        occupation.append(occ)
-        row.occupation = occupation
-    except Exception:
-        pass
+    # get_years_active(row, soup)
+    # get_occupation(row, soup)
 
 
 def get_committees(row, soup):
@@ -183,31 +164,29 @@ def get_committees(row, soup):
     param: take the row dict and soup of the webpage
     """
     # committees
-    committees = []
-    committees_html = soup.find('span', {'id': re.compile("body_FormView1_COMMITTEEASSIGNMENTS2Label")})
-    for committee in committees_html.stripped_strings:
-        chairman = ['Chairman', ', Chairman', 'chairman']
-        vice_chair = ['Vice Chair', ', Vice Chair', 'vice chair']
-        ex_officio = ['Ex Officio', ', Ex Officio', 'ex officio']
-        interim_member = ['Interim Member', ', Interim Member', 'interim member']
-        if chairman[0] in committee:
-            check_committees_position(committee, committees, chairman)
-        elif vice_chair[0] in committee:
-            check_committees_position(committee, committees, vice_chair)
-        elif ex_officio[0] in committee:
-            check_committees_position(committee, committees, ex_officio)
-        elif interim_member[0] in committee:
-            check_committees_position(committee, committees, interim_member)
-        else:
-            committee_dict = {'role': 'member', 'committee': committee.lower()}
-            committees.append(committee_dict)
-    row.committees = committees
-
-
-def check_committees_position(committee, committees, position):
-    committee_name = committee.replace(position[1], '')
-    committee_dict = {'role': position[2], 'committee': committee_name.lower()}
-    committees.append(committee_dict)
+    try:
+        committees = []
+        committees_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(6) > dl > dd")
+        # print(committees_html)
+        for i in committees_html:
+            committees_text = i.get_text().replace("\n", "").split("\r")
+        committees_text.pop(0)
+        # print(committees_text)
+        for committee in committees_text:
+            if '(Chair)' in committee:
+                committee_name = committee.replace(' (Chair)', '')
+                committee_dict = {'role': 'chair', 'committee': committee_name.replace(" Committee", "").lower()}
+                committees.append(committee_dict)
+            elif '(Vice Chair)' in committee:
+                committee_name = committee.replace(' (Vice Chair)', '')
+                committee_dict = {'role': 'vice chair', 'committee': committee_name.replace(" Committee", "").lower()}
+                committees.append(committee_dict)
+            else:
+                committee_dict = {'role': 'member', 'committee': committee.replace(" Committee", "").lower()}
+                committees.append(committee_dict)
+        row.committees = committees
+    except Exception:
+        pass
 
 
 def get_email(row, soup):
@@ -216,25 +195,29 @@ def get_email(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # email
-    email = soup.find('span', {'id': re.compile("body_FormView6_EMAILADDRESSPUBLICLabel")}).text
-    row.email = email
+    try:
+        email_tag = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(12) > a:nth-child(1)")
+        for i in email_tag:
+            email = i.text
+        row.email = email
+    except Exception:
+        pass
 
 
-def get_years_active(row, soup):
-    """
-    collect year elected info from personal page to fill the row. convert that into a years active list.
-
-    param: take the row dict and soup of the webpage
-    """
-    # convert years elected to years active
-    year_elected = soup.find('span', {'id': re.compile("body_FormView4_YEARELECTEDLabel")}).text
-    if year_elected != "":
-        try:
-            years_active = list(range(int(year_elected), 2022))
-            row.years_active = years_active
-        except Exception:
-            pass
+# def get_years_active(row, soup):
+#     """
+#     collect year elected info from personal page to fill the row. convert that into a years active list.
+#
+#     param: take the row dict and soup of the webpage
+#     """
+#     # convert years elected to years active
+#     year_elected = soup.find('span', {'id': re.compile("body_FormView4_YEARELECTEDLabel")}).text
+#     if year_elected != "":
+#         try:
+#             years_active = list(range(int(year_elected), 2022))
+#             row.years_active = list(range(int(year_elected), 2022))
+#         except Exception:
+#             pass
 
 
 def get_phone_number(row, soup):
@@ -243,19 +226,25 @@ def get_phone_number(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # phone number
-    raw_phone_number = soup.find('span', {'id': re.compile("body_FormView3_DISTRICTOFFICEPHONELabel")}).text
-    raw_phone_number = raw_phone_number.replace(" ", "")
-    if "POLLY" in raw_phone_number:
-        formatted_phone_number = '504-837-6559'
-        phone_number = [{'office': 'district office', 'number': formatted_phone_number}]
+    try:
+        phone_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(8) > dl > dd:nth-child(2)")
+        # print(phone_html)
+        phone_str = phone_html
+        for i in phone_html:
+            phone_text_list = i.get_text().replace("\n", "").split("\r")
+            phone_text = phone_text_list[1].strip()
+        # print(phone_text)
 
-    else:
-        extracted_phone_number = raw_phone_number.replace("(", "").replace(")", "-")
-        formatted_phone_number = extracted_phone_number[:12]
-        phone_number = [{'office': 'district office', 'number': formatted_phone_number}]
+        phone1 = re.findall('\d{3}-\d{3}-\d{4}', phone_text)[0]
+        phone2 = re.findall('\d{3}-\d{3}-\d{4}', phone_text)[1]
+        # print(phone1)
+        # print(phone2)
+        phone_numbers = [{'office': 'capitol office phone 1', 'number': phone1},
+                        {'office': 'capitol office phone 2', 'number': phone2}]
+        row.phone_numbers = phone_numbers
 
-    row.phone_numbers = phone_number
+    except Exception:
+        pass
 
 
 def get_address(row, soup):
@@ -264,10 +253,21 @@ def get_address(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # address
-    address = soup.find('span', {'id': re.compile("body_FormView3_OFFICEADDRESS2Label")}).get_text(separator=", ")
-    address = [{'location': 'district office', 'address': address}]
-    row.addresses = address
+    try:
+        address_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(8) > dl > dd:nth-child(1)")
+        # print(address_html)
+        for i in address_html:
+            address_text = i.get_text().replace("\n", "").split("\r")
+        address_text.pop(0)
+        # print(address_text)
+        address_str = ", ".join(address_text).replace("  ", "")
+        # print(address_str)
+        capitol_address = address_str.replace(", ,", ",")
+        # print(capitol_address[:-2])
+        address = [{'location': 'capitol office', 'address': capitol_address[:-2]}]
+        row.addresses = address
+    except Exception:
+        pass
 
 
 def get_district(row, soup):
@@ -276,9 +276,15 @@ def get_district(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # district
-    district = soup.find('span', {'id': re.compile("body_FormView5_DISTRICTNUMBERLabel")}).text
-    row.district = district
+    try:
+        district_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(2)")
+        # print(district_html)
+        for i in district_html:
+            district = i.get_text()
+        # print(district)
+        row.district = district
+    except Exception:
+        pass
 
 
 def get_area_served(row, soup):
@@ -286,7 +292,15 @@ def get_area_served(row, soup):
     collect representing parish as area served.
 
     """
-    area_served = soup.find('span', {'id': re.compile("body_FormView6_DISTRICTPARISHESLabel")}).text
+    try:
+        area_served_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(4)")
+        # print(area_served_html)
+        for i in area_served_html:
+            area_served = i.get_text()
+        # print(area_served)
+        row.areas_served = [area_served]
+    except Exception:
+        pass
 
 
 def get_party(row, soup):
@@ -295,10 +309,16 @@ def get_party(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # party
-    party = soup.find('span', {'id': re.compile("body_FormView5_PARTYAFFILIATIONLabel")}).text
-    row.party_id = scraper_utils.get_party_id(party)
-    row.party = party
+    try:
+        party_html = soup.select("#divMain > div > div.col.details-content-area > dl > dd:nth-child(14)")
+        # print(party_html)
+        for i in party_html:
+            party = i.get_text()
+        # print(party)
+        row.party = party
+        row.party_id = scraper_utils.get_party_id(party)
+    except Exception:
+        pass
 
 
 def get_name(row, soup):
@@ -308,21 +328,17 @@ def get_name(row, soup):
 
     param: take the row dict and soup of the webpage
     """
-    # name
-    name_full = soup.find('span', {'id': re.compile("body_FormView5_FULLNAMELabel")}).text
-    # !! 6.
-    if "Jonathan Goudeau, I" not in name_full:
-        hn = HumanName(name_full)
-        row.name_full = name_full
-        row.name_last = hn.last
-        row.name_first = hn.first
-        row.name_middle = hn.middle
-        row.name_suffix = hn.suffix
-    elif "Jonathan Goudeau, I" in name_full:
-        row.name_full = name_full
-        row.name_last = "Goudeau"
-        row.name_first = "Jonathan"
-        row.name_suffix = "I"
+    name_html = soup.select("body > div.container-fluid.zero-out-padding-horizontal > div > div:nth-child(1) > div.col-sm-8.col-md-9.col-lg-10 > div > div:nth-child(1) > div > h2")
+    # print(name_html)
+    for i in name_html:
+        name = i.get_text().replace("Senator ", "").replace("Delegate ", "")
+    # print(name)
+    hn = HumanName(name)
+    row.name_full = name
+    row.name_last = hn.last
+    row.name_first = hn.first
+    row.name_middle = hn.middle
+    row.name_suffix = hn.suffix
 
 
 def scrape_senate(url):
@@ -348,8 +364,7 @@ def scrape_senate(url):
 
     row.source_url = url
 
-    # request and soup
-    page = scraper_utils.request(url)
+    page = requests.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
 
     row.role = 'Senator'
@@ -415,7 +430,7 @@ def get_wiki_urls(path):
     scrape_url = wiki_url + path
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, 'lxml')
-    content_table = soup.find('table', {'class': 'wikitable sortable'})
+    content_table = soup.find('table', {'class': 'sortable wikitable'})
     rows = content_table.find('tbody').find_all('tr')
 
     pbar = tqdm(range(1, len(rows)))
@@ -455,6 +470,7 @@ def scrape_wiki_site(wiki_urls, rows):
                     row.occupation = url[2].get('occupation')
                     row.birthday = url[2].get('birthday')
                     row.most_recent_term_id = url[2].get('most_recent_term_id')
+                    row.years_active = url[2].get('years_active')
                 except Exception:
                     pass
 
@@ -467,7 +483,7 @@ if __name__ == '__main__':
     with Pool() as pool:
         sen_partially_filled_rows = pool.map(scrape_senate, sen_urls)
 
-    sen_wiki = get_wiki_urls('wiki/Louisiana_State_Senate')
+    sen_wiki = get_wiki_urls('/wiki/Maryland_Senate')
     # pprint(sen_wiki)
     sen_data = scrape_wiki_site(sen_wiki, sen_partially_filled_rows)
     pprint(sen_data)
@@ -475,11 +491,13 @@ if __name__ == '__main__':
     rep_urls = get_rep_urls()
     with Pool() as pool:
         rep_partially_filled_rows = pool.map(scrape_rep, rep_urls)
-    rep_wiki = get_wiki_urls('wiki/Louisiana_House_of_Representatives')
+    rep_wiki = get_wiki_urls('/wiki/Maryland_House_of_Delegates')
     rep_data = scrape_wiki_site(rep_wiki, rep_partially_filled_rows)
     pprint(rep_data)
 
     data = rep_data + sen_data
     scraper_utils.write_data(data)
+
+    # scrape_rep("https://mgaleg.maryland.gov/mgawebsite/Members/Details/amprey01")
 
     print('Complete!')

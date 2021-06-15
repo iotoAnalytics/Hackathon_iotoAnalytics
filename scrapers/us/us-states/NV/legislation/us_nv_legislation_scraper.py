@@ -20,7 +20,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-import requests
+import requests 
 from multiprocessing import Pool
 from database import Database
 import configparser

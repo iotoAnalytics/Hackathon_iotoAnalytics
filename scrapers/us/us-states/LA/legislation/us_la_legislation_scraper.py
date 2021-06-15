@@ -19,7 +19,6 @@ p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-import requests
 from multiprocessing import Pool
 from database import Database
 import configparser
@@ -39,8 +38,7 @@ import pdfplumber
 import requests
 import io
 import selenium
-
-
+from selenium.webdriver.chrome.options import Options
 
 # Other import statements
 
@@ -59,7 +57,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 # !! 1.
 legislator_name_special_cases = ["Amedee", "Beryl Amedee", "Beryl A. Amedee", "Johnson,T.", "Pat Moore", "Ken Brass",
                                  "Samuel Jenkins", "Larry Bagley", "Larry Frieman", "Gabe Firment", "Ray Garofalo",
-                                 "Daryl Adams", "Robert Carter","Scott McKnight", "Joe Stagni", "Beau Beaullieu",
+                                 "Daryl Adams", "Robert Carter", "Scott McKnight", "Joe Stagni", "Beau Beaullieu",
                                  "Mike Johnson", "Ed Price", "Jay Morris", "Cameron Henry", "Jay Luneau"]
 legislator_name_special_cases_reference = ["Amedée", "Beryl Amedée", "Beryl A. Amedée", "Johnson,C.", "Patricia Moore",
                                            'Kendricks "Ken" Brass', "Sam L. Jenkins, Jr.", 'Lawrence A. "Larry" Bagley',
@@ -77,12 +75,11 @@ def get_urls():
     return: a list of urls of bills.
     '''
     urls = []
-    # !! 2.
-    WEBDRIVER_PATH = "D:\work\IOTO\goverlytics-scrapers\web_drivers\chrome_win_90.0.4430.24\chromedriver.exe"
-    # !! 3.
-    url = "https://legis.la.gov/legis/BillSearch.aspx?sid=LAST&e=P1"
-    driver = webdriver.Chrome(WEBDRIVER_PATH)
-    select_index = 0
+    url = base_url + "legis/BillSearch.aspx?sid=LAST&e=P1"
+    options = Options()
+    driver = webdriver.Chrome(
+        executable_path=os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24',
+                                     'chromedriver.exe'), options=options)
     types_of_bills = 8
 
     driver.get(url)
@@ -90,14 +87,12 @@ def get_urls():
     search_by_range_btn.click()
     sleep(2)
 
-    # !! 4.
-    while select_index < types_of_bills:
+    for select_index in range(types_of_bills):
         bill_lists_prep_automation(driver, url, select_index)
         sleep(3)
         urls = scrape_urls(driver, urls)
         back_to_search = driver.find_element_by_xpath("//a[contains(text(), '< Back to Search')]")
         back_to_search.click()
-        select_index += 1
         sleep(3)
 
     print(f"All urls collected, total {str(len(urls))} bill urls in list")
@@ -124,26 +119,17 @@ def scrape_urls(driver, urls):
                 "href") == "javascript:__doPostBack('ctl00$ctl00$PageBody$PageContent$DataPager1$ctl02$ctl00','')":
             # !! 5.
             try:
-                current_page_urls = WebDriverWait(driver, 60).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
-                for item in current_page_urls:
-                    urls_per_page = item.get_attribute("href")
-                    urls.append(urls_per_page)
-                print("collected")
+                collect_current_page_urls(driver, urls)
                 sleep(2)
             except Exception:
+                sleep(6)
+                collect_current_page_urls(driver, urls)
                 sleep(2)
-                current_page_urls = WebDriverWait(driver, 60).until(
-                    EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
-                for item in current_page_urls:
-                    urls_per_page = item.get_attribute("href")
-                    urls.append(urls_per_page)
-                print("collected")
             try:
                 next_page.click()
                 print("next page clicked")
             except selenium.common.exceptions.StaleElementReferenceException as e:
-                sleep(2)
+                sleep(6)
                 next_page = WebDriverWait(driver, 60).until(
                     EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), ' > ')]")))
                 next_page.click()
@@ -157,6 +143,15 @@ def scrape_urls(driver, urls):
             print("all collected for current type of bills")
             sleep(2)
             return urls
+
+
+def collect_current_page_urls(driver, urls):
+    current_page_urls = WebDriverWait(driver, 60).until(
+        EC.presence_of_all_elements_located((By.XPATH, "//a[contains(text(), 'more...')]")))
+    for item in current_page_urls:
+        urls_per_page = item.get_attribute("href")
+        urls.append(urls_per_page)
+    print("collected")
 
 
 def bill_lists_prep_automation(driver, url, select_index):
@@ -207,6 +202,12 @@ def scrape(url):
     # like so:
     row.source_url = url
 
+    source_id = re.search('\d+', url).group(0)
+
+    print(source_id)
+
+    row.source_id = source_id
+
     bill_name = get_bill_name(driver, row)
 
     session = get_session(driver, row)
@@ -238,9 +239,11 @@ def scrape(url):
 
     driver.quit()
 
+    pprint(row)
+
     sleep(2)
     # Depending on the data you're able to collect, the legislation scraper may be more involved
-    # Than the legislator scraper. For one, you will need to create the goverlytics_id. The
+    # Than the legislators scraper. For one, you will need to create the goverlytics_id. The
     # goverlytics_id is composed of the state, session, and bill_name, The goverlytics_id can be
     # created like so:
     # goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
@@ -251,9 +254,9 @@ def scrape(url):
 
     # The sponsor and cosponsor ID's are where things can get complicated, depending on how
     # much and what kind of data the legislation page has on the (co)sponsors. The
-    # legislator_id's are pulled from the legislator database table, so you must be able to
+    # legislator_id's are pulled from the legislators database table, so you must be able to
     # uniquely identify each (co)sponsor... using just a last name, for instance, is not
-    # sufficient since often more than one legislator will have the same last name. If you
+    # sufficient since often more than one legislators will have the same last name. If you
     # have a unique identifier such as the (co)sponsor's state_url or state_member_id, use
     # that. Otherwise, you will have to use some combination of the data available to
     # identify. Using a first and last name may be sufficient.
@@ -262,18 +265,18 @@ def scrape(url):
     # get_legislator_id() function:
     # row.principal_sponsor_id = scraper_utils.get_legislator_id(state_url=legislator_state_url)
     # The get_legislator_id function takes in any number of arguments, where the key is
-    # the column in the legislator table you want to search, and the value is the value
+    # the column in the legislators table you want to search, and the value is the value
     # you want to search that column for. So having:
     # name_first = 'Joe'
     # name_last = 'Jimbo'
     # row.principal_sponsor_id = get_legislator_id(name_first=name_first, name_last=name_last)
-    # Will search the legislator table for the legislator with the first and last name Joe Jimbo.
+    # Will search the legislators table for the legislators with the first and last name Joe Jimbo.
     # Note that the value passed in must match exactly the value you are searching for, including
     # case and diacritics.
 
     # In the past, I've typically seen legislators with the same last name denoted with some sort
     # of identifier, typically either their first initial or party. Eg: A. Smith, or (R) Smith.
-    # If this is the case, scraper_utils has a function that lets you search for a legislator
+    # If this is the case, scraper_utils has a function that lets you search for a legislators
     # based on these identifiers. You can also pass in the name of the column you would like to
     # retrieve the results from, along with any additional search parameters:
     # fname_initial = 'A.'
@@ -348,31 +351,44 @@ def get_chamber_origin_and_bill_type(bill_name, row):
     """
     chamber_origin and bill_type is determined by the id tag in bill_name.
     """
-    # !! 6.
-    if "HB" in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Bill'
-    elif "HCR" in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Concurrent Resolution'
-    elif "HCSR" in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Concurrent Study Request'
-    elif "HR" in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Resolution'
-    elif "HSR" in bill_name:
-        chamber_origin = 'House'
-        bill_type = 'Study Request'
-    elif "SB" in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Bill'
-    elif "SCR" in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Concurrent Resolution'
-    elif "SR" in bill_name:
-        chamber_origin = 'Senate'
-        bill_type = 'Resolution'
+    # Bill names that start with 'H' belong to House, 'S' belong to Senate
+    chamber_origin = 'House' if bill_name[0] == 'H' else 'Senate'
+
+    # We can use the remaining characters in the bill name to determine the bill type:
+    bill_types = {'B': 'Bill',
+                  'CR': 'Concurrent Resolution',
+                  'CSR': 'Concurrent Study Request',
+                  'R': 'Resolution',
+                  'SR': 'Study Request'}
+
+    bill_tag = re.sub(r"\d+", "", bill_name)
+
+    bill_type = bill_types.get(bill_tag[1:])
+
+    # if "HB" in bill_name:
+    #     chamber_origin = 'House'
+    #     bill_type = 'Bill'
+    # elif "HCR" in bill_name:
+    #     chamber_origin = 'House'
+    #     bill_type = 'Concurrent Resolution'
+    # elif "HCSR" in bill_name:
+    #     chamber_origin = 'House'
+    #     bill_type = 'Concurrent Study Request'
+    # elif "HR" in bill_name:
+    #     chamber_origin = 'House'
+    #     bill_type = 'Resolution'
+    # elif "HSR" in bill_name:
+    #     chamber_origin = 'House'
+    #     bill_type = 'Study Request'
+    # elif "SB" in bill_name:
+    #     chamber_origin = 'Senate'
+    #     bill_type = 'Bill'
+    # elif "SCR" in bill_name:
+    #     chamber_origin = 'Senate'
+    #     bill_type = 'Concurrent Resolution'
+    # elif "SR" in bill_name:
+    #     chamber_origin = 'Senate'
+    #     bill_type = 'Resolution'
     row.chamber_origin = chamber_origin
     row.bill_type = bill_type
     return chamber_origin
@@ -404,20 +420,28 @@ def get_principal_sponsor_and_id(driver, row):
     principal_sponsor = driver.find_element_by_id("ctl00_PageBody_LinkAuthor").text
 
     # !! 8.
-    for name in legislator_name_special_cases:
-        if principal_sponsor == name:
-            principal_sponsor = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
+    principal_sponsor = match_name(principal_sponsor)
 
     principal_sponsor_name_parser = HumanName(principal_sponsor)
 
     # !! 7.
-    if principal_sponsor_name_parser != 'Troy Carter':
-        # special case: vacant senator
+    # if principal_sponsor_name_parser != 'Troy Carter':
+    # special case: vacant senator
+    try:
         principal_sponsor_id = scraper_utils.get_legislator_id(name_last=principal_sponsor_name_parser.last,
-                                                            name_first=principal_sponsor_name_parser.first,
-                                                            state_id=22)
+                                                               name_first=principal_sponsor_name_parser.first,
+                                                               state_id=22)
         row.principal_sponsor_id = principal_sponsor_id
+    except Exception:
+        pass
     row.principal_sponsor = principal_sponsor
+
+
+def match_name(sponsor):
+    for name in legislator_name_special_cases:
+        if sponsor == name:
+            sponsor = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
+    return sponsor
 
 
 def get_sponsors_and_sponsors_id(driver, row):
@@ -430,7 +454,8 @@ def get_sponsors_and_sponsors_id(driver, row):
         sponsors = []
         sponsors_id = []
 
-        authors_url_element = driver.find_element_by_xpath('//*[@id="ctl00_PageBody_MenuDocuments"]/tbody/tr/td[last()-1]/table/tbody/tr/td[1]/a')
+        authors_url_element = driver.find_element_by_xpath(
+            '//*[@id="ctl00_PageBody_MenuDocuments"]/tbody/tr/td[last()-1]/table/tbody/tr/td[1]/a')
         authors_url = authors_url_element.get_attribute("href")
 
         page = requests.get(authors_url)
@@ -439,18 +464,18 @@ def get_sponsors_and_sponsors_id(driver, row):
             sponsor_name = url.text
             sponsors.append(sponsor_name)
 
-            # !! 8.
-            for name in legislator_name_special_cases:
-                if sponsor_name == name:
-                    sponsor_name = legislator_name_special_cases_reference[legislator_name_special_cases.index(name)]
+            sponsor_name = match_name(sponsor_name)
 
             sponsor_name_parser = HumanName(sponsor_name)
-            if sponsor_name_parser != 'Troy Carter':
-                # special case: vacant senator
+            # if sponsor_name_parser != 'Troy Carter':
+            # special case: vacant senator
+            try:
                 sponsor_id = scraper_utils.get_legislator_id(name_last=sponsor_name_parser.last,
                                                              name_first=sponsor_name_parser.first,
                                                              state_id=22)
                 sponsors_id.append(sponsor_id)
+            except Exception:
+                pass
 
         sponsors.pop(0)  # remove principal sponsor
         sponsors_id.pop(0)  # remove principal sponsor id
@@ -468,8 +493,6 @@ def get_sponsors_and_sponsors_id(driver, row):
     # for sponsor in sponsors_elements:
     #     sponsor_name = sponsor.get_attribute("innerText")
     #
-
-
 
 
 def get_bill_text(driver, row):
@@ -491,9 +514,6 @@ def get_bill_text(driver, row):
                 bill_text += text
         bill_text = bill_text.replace("\n", " ")
         row.bill_text = bill_text
-    # !! 9.
-    else:
-        pass
 
 
 def get_item_bar_text(driver):
@@ -510,11 +530,11 @@ def get_action(driver, row, session):
     action data is collected from the action table of each bill.
     """
     actions = []
-    count = 1
+    # count = 1
     number_of_actions = len(driver.find_elements_by_xpath('//*[@id="ctl00_PageBody_PanelBillInfo"]/table[3]/tbody/tr'))
-    
-    # !! 10.
-    while count <= number_of_actions:
+
+    # while count <= number_of_actions:
+    for count in range(1, number_of_actions):
         try:
             date_short = driver.find_element_by_xpath(
                 f'//*[@id="ctl00_PageBody_PanelBillInfo"]/table[3]/tbody/tr[{count}]/td[1]').text
@@ -530,7 +550,7 @@ def get_action(driver, row, session):
             elif chamber_short == "H":
                 chamber = "House"
             actions.append({'date': date, 'action_by': chamber, 'description': action})
-            count += 1
+            # count += 1
         except Exception:
             pass
     row.actions = actions
@@ -557,9 +577,12 @@ def get_votes(chamber_origin, driver, row, bill_name):
             response = requests.get(pdf_link, stream=True)
             pdf = pdfplumber.open(io.BytesIO(response.content))
             for page in pdf.pages:
-                text = page.extract_text()
-                formatted_text = text.replace('\n', ' ')
-                votes_text += formatted_text
+                try:
+                    text = page.extract_text()
+                    formatted_text = text.replace('\n', ' ')
+                    votes_text += formatted_text
+                except Exception:
+                    pass
             date_string = re.search('Date: (.*?) ', votes_text)
             unformatted_date = datetime.strptime(date_string.group(1), "%m/%d/%Y")
             date = unformatted_date.strftime("%Y-%m-%d")
@@ -628,7 +651,7 @@ def votes_reformat(votes, name_string, votetext, chamber, bill_name, description
                 #                                                             startswith=voter_full_name[1],
                 #                                                             name_last=voter_full_name[0],
                 #                                                             state_id=22)
-                votes.append({"goverlytics_id": voter_id, "legislator": name, "votetext": votetext})
+                votes.append({"goverlytics_id": voter_id, "legislators": name, "votetext": votetext})
                 print(bill_name)
             elif "," not in name and "St." not in name:
                 if "House" in description:
@@ -636,14 +659,21 @@ def votes_reformat(votes, name_string, votetext, chamber, bill_name, description
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Representative")
                     except Exception:
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Senator")
+                    except Exception:
+                        voter_id = None
                 elif "Senate" in description:
-                    voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Senator")
+                    try:
+                        voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Senator")
+                    except Exception:
+                        voter_id = None
                 else:
                     try:
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Representative")
                     except Exception:
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Senator")
-                votes.append({"goverlytics_id": voter_id, "legislator": name, "votetext": votetext})
+                    except Exception:
+                        voter_id = None
+                votes.append({"goverlytics_id": voter_id, "legislators": name, "votetext": votetext})
 
             elif "," not in name and "St." in name:
                 name = name.replace("St.", "St. ")
@@ -659,8 +689,7 @@ def votes_reformat(votes, name_string, votetext, chamber, bill_name, description
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Representative")
                     except Exception:
                         voter_id = scraper_utils.get_legislator_id(name_last=name, state_id=22, role="Senator")
-                votes.append({"goverlytics_id": voter_id, "legislator": name, "votetext": votetext})
-
+                votes.append({"goverlytics_id": voter_id, "legislators": name, "votetext": votetext})
 
     return votes
 
@@ -700,6 +729,6 @@ if __name__ == '__main__':
     #
     # # Once we collect the data, we'll write it to the database.
     scraper_utils.write_data(data)
-    # scrape("http://www.legis.la.gov/legis/BillInfo.aspx?i=239780")
+    # scrape("https://legis.la.gov/legis/BillInfo.aspx?i=240585")
 
     print('Complete!')

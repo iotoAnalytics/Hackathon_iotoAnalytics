@@ -2,8 +2,6 @@ import sys
 import os
 from pathlib import Path
 
-from langdetect import detect
-
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -14,6 +12,7 @@ from scraper_utils import PDF_Reader
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen
 from multiprocessing import Pool
+from langdetect import detect
 import re
 import datetime
 
@@ -40,10 +39,10 @@ def program_driver():
     main_page_soup = main_functions.get_page_as_soup(BILLS_URL)
     bill_table_rows = main_functions.get_bill_rows(main_page_soup)
 
-    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows[3:5])
-    # print('Writing data to database...')
-    # scraper_utils.write_data(bill_data)
-    # print("Complete")
+    bill_data = main_functions.get_data_from_all_links(main_functions.get_bill_data, bill_table_rows)
+    print('Writing data to database...')
+    scraper_utils.write_data(bill_data)
+    print("Complete")
 
 class PreProgramFunctions:
     def set_current_session(self):
@@ -156,7 +155,6 @@ class BillScraper:
         self.row.bill_summary = self.__get_bill_summary()
         self.row.bill_text = self.__get_bill_text()
         self.row.bill_type = self.__get_bill_type()
-        print(self.row.bill_text)
     
     def __get_bill_name(self):
         first_column = self.bill_columns_from_site[self.column_description_to_index.get('Bill Number/Title')]
@@ -235,6 +233,7 @@ class BillScraper:
 
     def __get_summary_text(self, text):
         if self.row.bill_name == 'Bill75':
+            self.summary_page_index = 0
             text = text.split('Summary')[1:]
             text = ''.join(text)
         else:

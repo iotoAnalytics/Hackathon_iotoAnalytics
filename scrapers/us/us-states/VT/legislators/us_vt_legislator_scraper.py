@@ -82,29 +82,27 @@ def get_urls(path):
     return urls
 
 
-def get_role(url, row):
+def get_role(soup, row):
     """
     Find legislator role and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
-    soup = make_soup(url)
     header = soup.find('h1')
     role = header.text.split(' ')[0]
     row.role = role
 
 
-def get_name(url, row):
+def get_name(soup, row):
     """
     Find legislator name and set row values for first, middle, suffix, last name.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
-    soup = make_soup(url)
     header = soup.find('h1')
     info = header.text.split()
     name = " ".join(info[1:])
@@ -118,65 +116,75 @@ def get_name(url, row):
     row.name_full = hn.full_name
 
 
-def get_email(url, row):
+def get_email(soup, row):
     """
     Find legislator email and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
-    soup = make_soup(url)
     summary_table = soup.find('dl', {'class': 'summary-table profile-summary'})
-    email = summary_table.find_all('dd')[3].text
-    row.email = email
+    ## These two legislators are the ONLY ones who have the table ordered differently..
+    if row.name_last == 'Westman':
+        email = summary_table.find_all('dd')[5].text
+        row.email = email
+    elif row.name_last == 'Mazza':
+        pass
+    else:
+        email = summary_table.find_all('dd')[3].text
+        row.email = email
 
 
-def get_addresses(url, row):
+def get_addresses(soup, row):
     """
     Find legislator address and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
     addresses = []
-    soup = make_soup(url)
+    address_info = {'address': '', 'location': ''}
+
     summary_table = soup.find('dl', {'class': 'summary-table profile-summary'})
-    address = summary_table.find_all('dd')[5].text
+    address_text = summary_table.find_all('dd')
+    for address in address_text:
+        if len(address.text.split(',')) == 3:
+            address_info['address'] = address.text
+            break
+
     location = summary_table.find_all('dt')[5].text
-    address_info = {'address': address, 'location': location}
+    address_info['location'] = location
     addresses.append(address_info)
     row.addresses = addresses
 
 
-def get_phone_numbers(url, row):
+def get_phone_numbers(soup, row):
     """
     Find legislator phone number[s] and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
     phone_numbers = []
-    soup = make_soup(url)
     summary_table = soup.find('dl', {'class': 'summary-table profile-summary'})
     phone_number = summary_table.find_all('dd')[4].text
     phone_info = {'phone_number': phone_number, 'office': ''}
     phone_numbers.append(phone_info)
-    row.addresses = phone_numbers
+    row.phone_numbers = phone_numbers
 
 
-def get_committees(url, row):
+def get_committees(soup, row):
     """
     Find legislator committee info and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
     all_committee_info = []
-    soup = make_soup(url)
     item_list = soup.find('ul', {'class': 'item-list'})
     committees = item_list.find_all('li')
     for li in committees:
@@ -194,37 +202,37 @@ def get_committees(url, row):
     row.committees = all_committee_info
 
 
-def get_district(url, row):
+def get_district(soup, row):
     """
     Find legislator district info and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
-    soup = make_soup(url)
     summary_table = soup.find('dl', {'class': 'summary-table profile-summary'})
     district = summary_table.find_all('dd')[0].text.strip('\n')
     row.district = district
 
 
-def get_party(url, row):
+def get_party(soup, row):
     """
     Find legislator district info and set row value.
 
-    :param url: url of legislator
+    :param soup: soup obj
     :param row: row of legislator
     """
 
-    soup = make_soup(url)
     summary_table = soup.find('dl', {'class': 'summary-table profile-summary'})
-    party = summary_table.find_all('dd')[1].text
+    party = summary_table.find_all('dd')[1].text.split('/')[0]
+
+    row.party_id = scraper_utils.get_party_id('Republican' if party == 'Republican' else 'Democrat')
     row.party = party
 
 
 def get_source_id(url, row):
     """
-    Find source id  info and set row value.
+    Find source id info and set row value.
 
     :param url: url of legislator
     :param row: row of legislator
@@ -257,12 +265,17 @@ def get_wiki_info(row):
                 link = tr.find('td').find('a').get('href')
                 wiki_info = scraper_utils.scrape_wiki_bio(WIKI_URL + link)
                 row.education = wiki_info['education']
-                row.most_recent_term_id = wiki_info['most_recent_term_id']
+                row.occupation = wiki_info['occupation']
                 row.years_active = wiki_info['years_active']
                 if wiki_info['birthday'] is not None:
                     row.birthday = str(wiki_info['birthday'])
             except AttributeError:
                 pass
+
+
+def get_most_recent_term(soup, row):
+    session = soup.find('h3', {'class': 'session-current'}).text.split()
+    row.most_recent_term_id = session[0]
 
 
 def scrape(url):
@@ -272,17 +285,20 @@ def scrape(url):
     :param url: legislator url
     """
 
+    soup = make_soup(url)
     row = scraper_utils.initialize_row()
     row.source_url = url
-    get_role(url, row)
-    get_name(url, row)
-    get_email(url, row)
-    get_addresses(url, row)
-    get_committees(url, row)
-    get_district(url, row)
-    get_party(url, row)
+    get_role(soup, row)
+    get_name(soup, row)
+    get_email(soup, row)
+    get_addresses(soup, row)
+    get_committees(soup, row)
+    get_district(soup, row)
+    get_party(soup, row)
     get_source_id(url, row)
     get_wiki_info(row)
+    get_most_recent_term(soup, row)
+    get_phone_numbers(soup, row)
     return row
 
 
