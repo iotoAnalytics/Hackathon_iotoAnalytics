@@ -1,5 +1,5 @@
 # Unavailable data - source_id, seniority, military_experience
-# Wiki data - most_recent_term_id, years_active, education, occupation
+# Wiki data - years_active, education, occupation
 
 import os
 import re
@@ -24,7 +24,7 @@ from scraper_utils import USStateLegislatorScraperUtils
 DEBUG_MODE = False
 
 STATE_ABBREVIATION = 'TN'
-LEGISLATOR_TABLE_NAME = 'us_tn_legislators_test'
+LEGISLATOR_TABLE_NAME = 'us_tn_legislators'
 
 BASE_URL = 'https://www.capitol.tn.gov/'
 HOUSE_PATH = 'house/members/'
@@ -35,7 +35,14 @@ WIKI_SENATE_PATH = '/wiki/Tennessee_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WIKI_DATA_TO_MERGE = ['most_recent_term_id', 'years_active', 'education', 'occupation']
+WIKI_DATA_TO_MERGE = ['years_active', 'education', 'occupation']
+
+# Update for new assemblies
+CURRENT_ASSEMBLY = '111'
+ASSEMBLY_START_YEAR = {
+    '111': '2019',
+    '110': '2017',
+}
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -71,6 +78,7 @@ def scrape(url):
     row = scraper_utils.initialize_row()
 
     try:
+        _set_most_recent_term_id(row)
         _set_source_url(row, url)
         _set_name(row, soup)
         _set_party(row, soup)
@@ -127,12 +135,21 @@ def merge_all_wiki_data(legislator_data, wiki_data):
         for key in data.keys():
             leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
 
-    return leg_wiki_df.to_dict('records')
+    return leg_wiki_df.to_dict('records')    
+
+def fix_odditites(legislators_data):
+    # Fix occupation formats for oddities
+    for data in legislators_data:
+        _fix_occupation_format(data)
 
 def _create_soup(url, soup_parser_type):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
+
+def _set_most_recent_term_id(row):
+    most_recent_term_id = ASSEMBLY_START_YEAR.get(CURRENT_ASSEMBLY)
+    row.most_recent_term_id = most_recent_term_id
 
 def _set_source_url(row, url):
     row.source_url = url
@@ -196,7 +213,8 @@ def _set_phone_numbers(row, soup):
     phone_numbers = []
 
     phone_number_element = (
-        soup.select('body > div.row.content > div > div > div.padded-25 > div > div.large-6.medium-6.columns.side')[0]
+        soup.select('body > div.row.content > div > div > div.padded-25 > div > '
+            'div.large-6.medium-6.columns.side')[0]
             .find('div', {'data-mobilehide': 'contact'})
     )
 
@@ -219,7 +237,8 @@ def _set_addresses(row, soup):
     addresses = []
 
     address_element = (
-        soup.select('body > div.row.content > div > div > div.padded-25 > div > div.large-6.medium-6.columns.side')[0]
+        soup.select('body > div.row.content > div > div > div.padded-25 > div > '
+            'div.large-6.medium-6.columns.side')[0]
             .find('div', {'data-mobilehide': 'contact'})
             .find_all(lambda tag: tag.name == 'h2' and 'Address' in tag.text)
     )
@@ -285,21 +304,21 @@ def _format_birthdate(text):
 
     birthdate_str = birthdate_str.strip()
 
-    # Match format like March 1, 2021
+    # Match format March 1, 2021
     try:
         birthdate = datetime.strptime(birthdate_str, '%B %d, %Y')
         return birthdate
     except ValueError:
         pass
 
-    # Match format like March 1
+    # Match format March 1
     try:
         birthdate = datetime.strptime(birthdate_str, '%B %d')
         return birthdate
     except ValueError:
         pass
 
-    # Match format like March 2021
+    # Match format March 2021
     try:
         birthdate = datetime.strptime(birthdate_str, '%B %Y')
         return birthdate
@@ -335,6 +354,29 @@ def _set_district(row, soup):
     district = district_str.split()[-1]
     row.district = district
 
+def _fix_occupation_format(legislator_data):
+    if not legislator_data['occupation']:
+        return
+
+    formatted_occupation = []
+
+    # Janice Bowling - Senate - 16
+    if legislator_data['occupation'][0] == 'EducationCongressional Staffer':
+        legislator_data['occupation'] = ['Education', 'Congressional Staffer']
+
+    # Mark Pody - Senate - 17
+    elif legislator_data['occupation'][0] == 'PoliticianInsurance Producer':
+        legislator_data['occupation'] = ['Politician', 'Insurance Producer']
+
+    # Format occupations that are not formatted properly
+    for job in legislator_data['occupation']:
+        occupation_str = re.sub('\[[0-9]+\]|\([A-Za-z]+\)', '', job)
+        occupations = re.split('/| , | and ', occupation_str)
+        occupations = [occupation.strip() for occupation in occupations]
+        formatted_occupation += occupations
+
+    legislator_data['occupation'] = formatted_occupation
+
 def main():
     print('TENNESSEE!')
     print('O Tennessee: Fair Tennessee: ♫ ♫ ♫')
@@ -366,6 +408,10 @@ def main():
     print(DEBUG_MODE and 'Merging wiki data with legislators...\n' or '', end='')
     merged_data = merge_all_wiki_data(data, wiki_data)
     
+    # Fix oddities
+    print(DEBUG_MODE and 'Fixing formats in oddities...\n' or '', end='')
+    fix_odditites(merged_data)
+
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if not DEBUG_MODE:
