@@ -72,6 +72,11 @@ def configure_data(mla_data, wiki_data):
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
 
+    isna = big_df['occupation'].isna()
+    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    isna = big_df['education'].isna()
+    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+
     return big_df.to_dict('records')
 
 class PreprogramFunctions:
@@ -229,7 +234,7 @@ class MainScraper:
     def __set_district_and_county(self, row):
         name_to_look_for = row.name_last + ', ' + row.name_first
         row.district = self.__set_district(name_to_look_for)
-        row.areas_served = self.__set_county(name_to_look_for)
+        row.areas_served = list(self.__set_county(name_to_look_for))
 
     def __set_district(self, name):
         data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
