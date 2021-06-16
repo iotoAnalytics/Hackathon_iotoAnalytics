@@ -213,7 +213,7 @@ def get_bill_actions(url, row):
             actions.append({'action_by': str(r[0].text), 'date': str(r[1].text), 'description': str(r[-1].text)})
         row.actions = actions
         driver.quit()
-    except (IndexError, StaleElementReferenceExceptionUd):
+    except (IndexError, StaleElementReferenceException):
         pass
 
 
@@ -302,8 +302,6 @@ def get_bill_committees(url, soup, row):
         else:
             committees.append({'chamber': '', 'committee': location})
 
-        print(committees, url)
-
 
 def get_bill_type(url, row):
     info = url.split('/')
@@ -333,7 +331,6 @@ def get_date_introduced(url, row):
                 break
             date_lst.append(dates)
         row.date_introduced = date_lst[-1]
-        print(row.date_introduced)
     except (IndexError, StaleElementReferenceException):
         pass
 
