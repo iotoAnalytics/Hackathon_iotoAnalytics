@@ -37,12 +37,8 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
-    sponsor_info_getter = SponsorFromBillId()
-    # for bill in all_bills:
-    #     sponsor_info_getter.add_sponsor_info_to_bill(bill)
-    MainFunctions().append_data_to_bills(sponsor_info_getter.add_sponsor_info_to_bill,
-                                         all_bills)
-    print(all_bills[0])
+    all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
+                                                     all_bills)
 
 class PreProgramFunction:
     def get_biennium(self, year: int):
@@ -58,9 +54,11 @@ class MainFunctions:
         return requests.get(url, params=params)
 
     def append_data_to_bills(self, function, iterable):
+        data = []
         with Pool(THREADS_FOR_POOL) as pool:
-            pool.map(func=function,
-                     iterable=iterable)
+            data = (pool.map(func=function,
+                        iterable=iterable))
+        return data
 
 class AllDocumentsByClass:
     def get_data(self):
@@ -96,8 +94,8 @@ class AllDocumentsByClass:
 class SponsorFromBillId:
     def add_sponsor_info_to_bill(self, bill: dict):
         sponsor_info = self.get_relevant_bill_information(bill.get('billid'))
-        bill['name'] = 'fuckkk'
-        return
+        bill['sponsors'] = sponsor_info
+        return bill
 
     def get_relevant_bill_information(self, bill_id):
         sponsor_info_as_lxml = self.get_sponsor_information_for_bill_lxml(bill_id)

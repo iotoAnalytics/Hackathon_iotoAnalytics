@@ -143,10 +143,10 @@ class TestGetSponsor:
     def test_add_sponsor_information_to_bill_information(self):
         sample_bill = self.sample_bill_info[0]
         SponsorFromBillId().add_sponsor_info_to_bill(sample_bill)
-        assert sample_bill['sponsor'] != None
+        assert sample_bill['sponsors'] != None
 
     def test_pool_function(self, sample_bill_info):
-        MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
+        all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
                                              self.sample_bill_info)
-        for bill in self.sample_bill_info:
-            assert bill['sponsor'] != None
+        for bill in all_bills:
+            assert bill['sponsors'] != None
