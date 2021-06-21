@@ -37,7 +37,12 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
-    print(all_bills[4])
+    sponsor_info_getter = SponsorFromBillId()
+    # for bill in all_bills:
+    #     sponsor_info_getter.add_sponsor_info_to_bill(bill)
+    MainFunctions().append_data_to_bills(sponsor_info_getter.add_sponsor_info_to_bill,
+                                         all_bills)
+    print(all_bills[0])
 
 class PreProgramFunction:
     def get_biennium(self, year: int):
@@ -51,6 +56,11 @@ class PreProgramFunction:
 class MainFunctions:
     def request_page(self, url, params):
         return requests.get(url, params=params)
+
+    def append_data_to_bills(self, function, iterable):
+        with Pool(THREADS_FOR_POOL) as pool:
+            pool.map(func=function,
+                     iterable=iterable)
 
 class AllDocumentsByClass:
     def get_data(self):
@@ -84,9 +94,37 @@ class AllDocumentsByClass:
         return page_soup.findAll('legislativedocument')
 
 class SponsorFromBillId:
-    pass
+    def add_sponsor_info_to_bill(self, bill: dict):
+        sponsor_info = self.get_relevant_bill_information(bill.get('billid'))
+        bill['name'] = 'fuckkk'
+        return
+
+    def get_relevant_bill_information(self, bill_id):
+        sponsor_info_as_lxml = self.get_sponsor_information_for_bill_lxml(bill_id)
+        return [self.__extract_relevant_info(sponsor_lxml) for sponsor_lxml in sponsor_info_as_lxml]
+   
+    def __extract_relevant_info(self, bill_lxml):
+            fname = bill_lxml.find('firstname').text
+            lname = bill_lxml.find('lastname').text
+            type = bill_lxml.find('type').text
+
+            return {
+                'firstname': fname,
+                'lastname': lname,
+                'type': type
+            }
+
+    def get_sponsor_information_for_bill_lxml(self, bill_id):
+        params = {
+            "biennium": CURRENT_BIENNIUM,
+            "billId": bill_id
+        }
+        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+        page_soup = soup(request.text, 'lxml')
+        return page_soup.findAll('sponsor')
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
 if __name__ == '__main__':
     program_driver()
+    SponsorFromBillId()
