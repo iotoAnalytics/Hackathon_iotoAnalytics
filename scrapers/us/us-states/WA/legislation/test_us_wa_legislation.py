@@ -1,4 +1,5 @@
 import pytest
+import us_wa_legislation
 from us_wa_legislation import PreProgramFunction
 from us_wa_legislation import AllDocumentsByClass 
 from us_wa_legislation import MainFunctions
@@ -12,7 +13,7 @@ class TestGetBiennium:
         biennium = PreProgramFunction().get_biennium(2024)
         assert biennium == '2023-24'
 
-class TestOpenGetAllDocumentsByClass:
+class TestGetAllDocumentsByClass:
     def test_status_code(self):
         url = 'http://wslwebservices.leg.wa.gov/LegislativeDocumentService.asmx/GetAllDocumentsByClass'
         params = {
@@ -20,6 +21,7 @@ class TestOpenGetAllDocumentsByClass:
             "documentClass": "Bills"
         }
         r = MainFunctions().request_page(url, params)
+        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
         assert r.status_code == 200
 
     def test_correct_fields_in_return_data(self):
@@ -58,12 +60,21 @@ class TestOpenGetAllDocumentsByClass:
         relevant_bill_information = AllDocumentsByClass().get_relevant_bill_information()
         expected_contents = {
             'name',
-            'longfriendlyname',
-            'shortfriendlyname',
-            'description',
+            'longfriendlyname', 
             'htmurl',
             'pdfurl',
             'billid'
         }
         for bill in relevant_bill_information:
             assert set(bill.keys()) == set(expected_contents)
+
+class TestGetSponsor:
+    def test_status_code(self):
+        url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx?op=GetSponsors'
+        params = {
+            "biennium": PreProgramFunction().get_biennium(2021),
+            "billId": "HB 1002"
+        }
+        r = MainFunctions().request_page(url, params)
+        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        assert r.status_code == 200

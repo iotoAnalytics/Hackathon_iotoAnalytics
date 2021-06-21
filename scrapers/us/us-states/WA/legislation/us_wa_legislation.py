@@ -8,7 +8,7 @@ path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 import pandas as pd
-# from scraper_utils import USStateLegislationScraperUtils
+from scraper_utils import USStateLegislationScraperUtils
 from urllib.request import urlopen
 from multiprocessing import Pool
 from langdetect import detect
@@ -21,6 +21,7 @@ LEGISLATOR_TABLE_NAME = 'us_wa_legislators'
 
 BASE_URL = 'http://wslwebservices.leg.wa.gov/'
 REQUEST_URL_FOR_GETTING_BILLS = BASE_URL + 'LegislativeDocumentService.asmx/GetAllDocumentsByClass'
+REQUEST_URL_FOR_GETTING_SPONSORS = BASE_URL + 'LegislationService.asmx/GetSponsors'
 
 THREADS_FOR_POOL = 12
 CURRENT_DAY = datetime.date.today()
@@ -29,18 +30,14 @@ CURRENT_YEAR = CURRENT_DAY.year
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
-# scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION,
-#                                                DATABASE_TABLE_NAME,
-#                                                LEGISLATOR_TABLE_NAME)
-# crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
-
-# page_soup = soup(r.text, 'lxml')
-# all_documents = page_soup.findAll('legislativedocument')
-# for document in all_documents:
-#     print(document.find('name').text)
+scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION,
+                                               DATABASE_TABLE_NAME,
+                                               LEGISLATOR_TABLE_NAME)
+crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def program_driver():
-    pass
+    all_bills = AllDocumentsByClass().get_data()
+    print(all_bills[4])
 
 class PreProgramFunction:
     def get_biennium(self, year: int):
@@ -56,29 +53,22 @@ class MainFunctions:
         return requests.get(url, params=params)
 
 class AllDocumentsByClass:
-    def __init__(self):
-        self.params = {
-            "biennium": CURRENT_BIENNIUM,
-            "documentClass": "Bills"
-        }
+    def get_data(self):
+        return self.get_relevant_bill_information()
 
     def get_relevant_bill_information(self):
         bill_info_as_lxml = self.get_all_bill_information_lxml()
         return [self.__extract_relevant_info(bill_lxml) for bill_lxml in bill_info_as_lxml]
 
     def __extract_relevant_info(self, bill_lxml):
-        name = bill_lxml.find('name')
-        lfn = bill_lxml.find('longfriendlyname')
-        sfn = bill_lxml.find('shortfriendlyname')
-        desc = bill_lxml.find('description')
-        htmlurl = bill_lxml.find('htmurl')
-        pdfurl = bill_lxml.find('pdfurl')
-        billid = bill_lxml.find('billid')
+        name = bill_lxml.find('name').text
+        lfn = bill_lxml.find('longfriendlyname').text
+        htmlurl = bill_lxml.find('htmurl').text
+        pdfurl = bill_lxml.find('pdfurl').text
+        billid = bill_lxml.find('billid').text
         return {
             'name': name,
             'longfriendlyname': lfn,
-            'shortfriendlyname': sfn,
-            'description': desc,
             'htmurl': htmlurl,
             'pdfurl': pdfurl,
             'billid': billid 
@@ -92,6 +82,9 @@ class AllDocumentsByClass:
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativedocument')
+
+class SponsorFromBillId:
+    pass
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
