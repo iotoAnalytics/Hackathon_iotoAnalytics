@@ -19,6 +19,7 @@ pdf_plumber==0.1.2
 psycopg2==2.8.6
 pyparsing==2.4.7
 PyPDF2==1.26.0
+pytest
 python-dateutil==2.8.1
 pytz==2021.1
 regex==2020.11.13
