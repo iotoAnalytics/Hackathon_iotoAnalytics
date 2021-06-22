@@ -70,33 +70,41 @@ def get_urls():
     return urls
 
 
-def get_birthday(wiki_page_link):
-    data = []
-    uClient = uReq(wiki_page_link)
-    page_html = uClient.read()
-    uClient.close()
+# def get_birthday(wiki_page_link):
+#     data_dict = []
+#     uClient = uReq(wiki_page_link)
+#     page_html = uClient.read()
+#     uClient.close()
+#
+#     page_soup = BeautifulSoup(page_html, "lxml")
+#     tables = page_soup.findAll("tbody")
+#     people1 = tables[3].findAll("tr")
+#     people = tables[5].findAll("tr")
+#     persons = people1 + people
+#     print(people + people1)
+#     count = 0
+#     for person in persons[1:]:
+#         count += 1
+#         info = person.findAll("td")
+#
+#         try:
+#             name = info[1].text
+#             hn = HumanName(name)
+#             # print(hn.first)
+#             # print(hn.last)
+#             dob = info[2].text.strip()
+#             datetime_date = datetime.strptime(dob, '%B %d, %Y')
+#             birthday = datetime_date.strftime("%Y-%m-%d")
+#             # print(birthday)
+#             info = {'name_first': hn.first, 'name_last': hn.last, 'birthday': birthday}
+#             data.append(info)
+#         except Exception:
+#             pass
+#     print(count)
+#     scraper_utils.crawl_delay(crawl_delay)
+#
+#     return data_dict
 
-    page_soup = BeautifulSoup(page_html, "lxml")
-    tables = page_soup.findAll("tbody")
-    people = tables[3].findAll("tr") + tables[4].findAll("tr")
-    for person in people[1:]:
-        info = person.findAll("td")
-
-        try:
-            name = info[1].text
-            hn = HumanName(name)
-            dob = info[2].text
-            datetime_date = datetime.strptime(dob, '%B %d, %Y')
-            birthday = datetime_date.strftime("%Y-%m-%d")
-            print(hn.first + birthday)
-            info = {'name_first': hn.first, 'name_last': hn.last, 'birthday': birthday}
-            data.append(info)
-        except Exception:
-            pass
-
-    scraper_utils.crawl_delay(crawl_delay)
-
-    return data
 
 def find_individual_wiki(wiki_page_link):
     bio_lnks = []
@@ -106,14 +114,11 @@ def find_individual_wiki(wiki_page_link):
 
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
-    people = tables[3].findAll("tr") + tables[4].findAll("tr")
+    people = tables[3].findAll("tr") + tables[5].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
 
         try:
-            name = info[1].text
-            dob = info[2].text
-            print(name + dob)
             biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_lnks.append(biolink)
         except Exception:
@@ -311,18 +316,18 @@ if __name__ == '__main__':
 
     all_wiki_links = find_individual_wiki(wikipage_link)
 
-
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['education', 'years_active', 'name_first', 'name_last']]
-    birthday_data = get_birthday(wikipage_link)
-    birthday_df = pd.DataFrame(birthday_data)
-    new_df = pd.merge(wiki_df, birthday_df, how='left',
-                      on=["name_first", "name_last"])
+        ['birthday', 'education', 'name_first', 'name_last']]
 
-    big_df = pd.merge(leg_df, new_df, how='left',
+    big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
+    # birthday_data = get_birthday(wikipage_link)
+    # birthday_df = pd.DataFrame(birthday_data)
+    # new_df = pd.merge(wiki_df, birthday_df, how='left',
+    #                   on=["name_first", "name_last"])
+    # print(new_df)
 
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
@@ -331,11 +336,9 @@ if __name__ == '__main__':
     isna = big_df['years_active'].isna()
     big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
 
-    print(big_df['years_active'])
     # dropping rows with vacant seat
     vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
     for index in vacant_index:
-        print(index)
         big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')
