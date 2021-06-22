@@ -58,18 +58,24 @@ def get_urls():
 
     browser.get(scrape_url)
     url = scrape_url
-    # time.sleep(5)
-    # type_check_boxes = browser.find_elements_by_class_name("refinerGroup")[5]
-    # amendment = type_check_boxes.find_elements_by_tag_name("input")[0]
-    # bill = type_check_boxes.find_elements_by_tag_name("input")[1]
-    # resolution = type_check_boxes.find_elements_by_tag_name("input")[9]
-    # amendment.click()
-    # bill.click()
-    # resolution.click()
+    time.sleep(5)
 
+    amendment = browser.find_element_by_xpath('//*[@id="refiners"]/fieldset[6]/div[1]/div[1]/label/input')
+    amendment.click()
+    bill = browser.find_element_by_xpath('//*[@id="refiners"]/fieldset[6]/div[1]/div[2]/label/input')
+    bill.click()
+    more_options = browser.find_element_by_xpath('//*[@id="refiners"]/fieldset[6]/a')
+    more_options.click()
+    time.sleep(3)
+    resolution = browser.find_element_by_xpath('//*[@id="lawsfilingtypeModal"]/div/div/div[2]/div[2]/div[11]/label/input')
+    resolution.click()
+    apply_filter = browser.find_element_by_xpath('//*[@id="lawsfilingtypeModal"]/div/div/div[3]/button[2]')
+    apply_filter.click()
+    time.sleep(3)
+    url = browser.current_url
 
     #while True:
-    for i in range(0, 5):
+    for i in range(0, 3):
         try:
             urls += (get_individual_urls(url))
             pagination_table = browser.find_element_by_class_name("pagination")
@@ -81,7 +87,6 @@ def get_urls():
             browser.get(url)
         except ElementClickInterceptedException:
             break
-
     return urls
 
 
@@ -104,20 +109,20 @@ def get_bill_name(soup, row):
     return name
 
 
-def get_full_name(url):
-    page = scraper_utils.request(url)
-    soup = BeautifulSoup(page.content, 'lxml')
-
-    main_div = soup.find('div', {'id': 'main'})
-    name = main_div.find('h1').text
-
-    if "Senator" in name:
-        name = name.split("Senator ")[1]
-    elif "Representative" in name:
-        name = name.split("Representative ")[1]
-    if " - " in name:
-        name = name.split(" - ")[0]
-    return name
+# def get_full_name(url):
+#     page = scraper_utils.request(url)
+#     soup = BeautifulSoup(page.content, 'lxml')
+#
+#     main_div = soup.find('div', {'id': 'main'})
+#     name = main_div.find('h1').text
+#
+#     if "Senator" in name:
+#         name = name.split("Senator ")[1]
+#     elif "Representative" in name:
+#         name = name.split("Representative ")[1]
+#     if " - " in name:
+#         name = name.split(" - ")[0]
+#     return name
 
 
 def get_bill_type_chamber(bill_name, row):
@@ -147,93 +152,108 @@ def get_committees(sponsor):
     return committee_detail
 
 
-def get_sponsor_id(sponsor_name):
-    sponsor_id = None
-    if "Committee" not in sponsor_name:
-        hn = HumanName(sponsor_name)
+def get_legislator_id_by_full_name(name):
+    legislator_id = None
+    if "Committee" not in name:
+        hn = HumanName(name)
         name_first = hn.first
         name_middle = hn.middle
         name_last = hn.last
         name_suffix = hn.suffix
 
         search_for = dict(name_last=name_last, name_first=name_first)
-        sponsor_id = scraper_utils.get_legislator_id(**search_for)
 
-    return sponsor_id
+        legislator_id = scraper_utils.get_legislator_id(**search_for)
 
-
-def get_sponsors(soup, row):
-    sponsors = []
-    sponsor_ids = []
-    committees = []
-    sponsors_tabs = sidebar.find(
-        'ul', {'class': 'sponsor-tab-content'})
-    try:
-        sponsors_detail = sponsors_tabs.find_all('a')
-
-        for sponsor in sponsors_detail:
-            name = sponsor.text
-            if "Committee" in name:
-                committee = get_committees(sponsor)
-                committees.append(committee)
-                sponsors.append(name)
-            else:
-                link = "http://www.kslegislature.org" + sponsor.get('href')
-                name = get_full_name(link)
-                sponsor_id = get_sponsor_id(name)
-
-                hn = HumanName(name)
-                name_last = hn.last
-                sponsors.append(name_last)
-                if sponsor_id is not None:
-                    sponsor_ids.append(sponsor_id)
-
-    except Exception:
-        pass
-
-    row.committees = committees
-    row.sponsors = sponsors
-    row.sponsors_id = sponsor_ids
+    return legislator_id
 
 
-def get_principal_sponsor(soup, row):
-    is_sponsor = ""
-    principal_sponsor = ""
-    try:
-        is_sponsor = soup.find("dt").text
-        principal_sponsor = soup.find("dd").text
-    except:
-        pass
+def get_legislator_id_by_last_name(name):
+    legislator_id = None
+    name_last = name
+    if " " in name:
+        name_last = name.split(" ")[1]
+        first_initial = name.split(' ')[0]
+        legislator_id = scraper_utils.legislators_search_startswith('goverlytics_id', "name_first",
+                                                                 first_initial , name_last=name_last)
+    else:
+        search_for = dict(name_last=name_last)
+        legislator_id = scraper_utils.get_legislator_id(**search_for)
 
-    if "Sponsor" in is_sponsor:
-        if "Committee" in principal_sponsor:
-            committee_info = get_committees(principal_sponsor)
-            row.principal_sponsor = principal_sponsor
-            row.committees = committee_info
-            print(principal_sponsor)
-        else:
-            try:
-                sponsor_id = get_sponsor_id(principal_sponsor)
-                hn = HumanName(principal_sponsor)
-                name_last = hn.last
-                row.principal_sponsor = name_last
-                row.principal_sponsor_id = sponsor_id
-                print(name_last)
-            except:
-                row.principal_sponsor = principal_sponsor
-                print(principal_sponsor)
-    print()
+    return legislator_id
+
+
+# def get_sponsors(soup, row):
+#     sponsors = []
+#     sponsor_ids = []
+#     committees = []
+#     sponsors_tabs = sidebar.find(
+#         'ul', {'class': 'sponsor-tab-content'})
+#     try:
+#         sponsors_detail = sponsors_tabs.find_all('a')
+#
+#         for sponsor in sponsors_detail:
+#             name = sponsor.text
+#             if "Committee" in name:
+#                 committee = get_committees(sponsor)
+#                 committees.append(committee)
+#                 sponsors.append(name)
+#             else:
+#                 link = "http://www.kslegislature.org" + sponsor.get('href')
+#                 name = get_full_name(link)
+#                 sponsor_id = get_sponsor_id(name)
+#
+#                 hn = HumanName(name)
+#                 name_last = hn.last
+#                 sponsors.append(name_last)
+#                 if sponsor_id is not None:
+#                     sponsor_ids.append(sponsor_id)
+#
+#     except Exception:
+#         pass
+#
+#     row.committees = committees
+#     row.sponsors = sponsors
+#     row.sponsors_id = sponsor_ids
+
+
+# def get_principal_sponsor(soup, row):
+#     is_sponsor = ""
+#     principal_sponsor = ""
+#     try:
+#         is_sponsor = soup.find("dt").text
+#         principal_sponsor = soup.find("dd").text
+#     except:
+#         pass
+#
+#     if "Sponsor" in is_sponsor:
+#         if "Committee" in principal_sponsor:
+#             committee_info = get_committees(principal_sponsor)
+#             row.principal_sponsor = principal_sponsor
+#             row.committees = committee_info
+#             print(principal_sponsor)
+#         else:
+#             try:
+#                 sponsor_id = get_sponsor_id(principal_sponsor)
+#                 hn = HumanName(principal_sponsor)
+#                 name_last = hn.last
+#                 row.principal_sponsor = name_last
+#                 row.principal_sponsor_id = sponsor_id
+#                 print(name_last)
+#             except:
+#                 row.principal_sponsor = principal_sponsor
+#                 print(principal_sponsor)
+#     print()
 
 
 def get_bill_description(soup, row):
     try:
         description = soup.find("div", {"class": "col-xs-12 col-md-8"})
-        description = description.find("h2")
+        description = description.find("p", {'id': 'pinslip'}).text
         description = description.strip()
         row.bill_description = description
     except:
         pass
-
 
 def get_bill_summary(soup, row):
     try:
@@ -293,61 +313,12 @@ def get_actions(soup, row):
     row.actions = actions_list
 
 
-def get_voter_details_support_func(vote, name):
-    voter_id = get_sponsor_id(name)
-    hn = HumanName(name)
-    name_last = hn.last
-    voter_data = {'goverlytics_id': voter_id, 'legislator': name_last, 'votetext': vote}
-    return voter_data
-
-
-def get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv):
-    all_names = []
-    legislator_links = main_content.findAll('a')
-    for link in legislator_links:
-        link = 'http://www.kslegislature.org' + link.get('href')
-        if "rep_" in link:
-            name = get_full_name(link)
-            all_names.append(name)
-        elif "sen_" in link:
-            name = get_full_name(link)
-            all_names.append(name)
-    group_one = yeas + nays
-    group_two = yeas + nays + pandp
-    group_three = yeas + nays + pandp + anv
-    group_four = yeas + nays + pandp + anv + nv
-
-    for name in all_names[: yeas]:
-        vote = "yea"
-        voter_data = get_voter_details_support_func(vote, name)
-        voter_data_list.append(voter_data)
-
-    for name in all_names[yeas: group_one]:
-        vote = "nay"
-        voter_data = get_voter_details_support_func(vote, name)
-        voter_data_list.append(voter_data)
-
-    for name in all_names[group_one: group_two]:
-        vote = "passing"
-        voter_data = get_voter_details_support_func(vote, name)
-        voter_data_list.append(voter_data)
-
-    for name in all_names[group_two: group_three]:
-        vote = "absent"
-        voter_data = get_voter_details_support_func(vote, name)
-        voter_data_list.append(voter_data)
-
-    for name in all_names[group_three: group_four]:
-        vote = "not voting"
-        voter_data = get_voter_details_support_func(vote, name)
-        voter_data_list.append(voter_data)
-
-    return voter_data_list
-
-
 def get_vote_detail(vote_links, row):
     for link in vote_links:
         url = link[0]
+        date = link[1]
+        chamber = link[2]
+        description = link[3]
         pdf_link = base_url + url
 
         response = requests.get(pdf_link, stream=True)
@@ -357,17 +328,123 @@ def get_vote_detail(vote_links, row):
         for page in pages:
             page_text = page.extract_text()
             text += page_text
-        print(text)
+
+        vote_list = parse_vote_pdf_for_voter_info(text)
+        count = parse_vote_pdf_for_vote_count(text)
+        yea = count[0]
+        nay = count[1]
+        nv = count[2]
+        passed = count[3]
+        vote_detail = {"date": date, "description": description, "yea": yea, "nay": nay,
+                       "nv": nv, "absent": None, "passed": passed, "chamber": chamber, "votes": vote_list}
+        return vote_detail
 
 
-    # voter_data_list = get_voter_details(main_content, voter_data_list, yeas, nays, pandp, anv, nv)
-    #
-    # vote_data = {'date': date, 'description': description,
-    #              'yea': yeas, 'nay': nays, 'nv': nv, 'absent': anv, 'total': total, 'passed': passed,
-    #              'chamber': chamber,
-    #              'votes': voter_data_list}
-    #
-    # return vote_data
+def parse_vote_pdf_for_vote_count(text):
+    if "MASSACHUSETTS HOUSE OF REPRESENTATIVES" in text:
+        text = text.split('\n')
+        votes_count_detail = text[3]
+        votes_count_detail = votes_count_detail.split(' ')
+        yeas = int(votes_count_detail[2])
+        nays = int(votes_count_detail[4])
+        not_voting = int(votes_count_detail[6])
+        if yeas > 80:
+            passed = 1
+        else:
+            passed = 0
+    else:
+        text = text.split(' − ')
+        yeas = text[1]
+        yeas = int(yeas.split(".")[0])
+        nays = text[2]
+        nays = int(nays.split(".")[0])
+        not_voting = 0
+        if yeas > 20:
+            passed = 1
+        else:
+            passed = 0
+
+    vote_count = [yeas, nays, not_voting, passed]
+
+    return vote_count
+
+
+def parse_vote_pdf_for_voter_info(text):
+    list_of_yeas = []
+    list_of_nays = []
+    list_of_voters = []
+    if "MASSACHUSETTS HOUSE OF REPRESENTATIVES" in text:
+        list_of_votes = text.split('N/V\n')[1]
+        list_of_votes = list_of_votes.replace('Mr. ', '')
+        list_of_votes = list_of_votes.replace('\n', ' ')
+        list_of_votes = list_of_votes.split(' ')
+        count = 1
+        for item in list_of_votes:
+            vote_type = {
+                'Y': "yea",
+                'N': "nay",
+                'P': "present",
+                'X': "not voting"
+            }
+            vote = vote_type.get(item)
+            if item in vote_type:
+
+                try:
+                    legislator_name = list_of_votes[count]
+                    legislator_name = legislator_name.replace("--", '')
+                    name = legislator_name
+                    if ',' in legislator_name:
+                        legislator_name = list_of_votes[count+1] + list_of_votes[count]
+                        legislator_name = legislator_name.replace(',', '')
+                        legislator_name = legislator_name.replace('.', ' ')
+                except:
+                    pass
+                legislator_id = get_legislator_id_by_last_name(legislator_name)
+                voter = {'goverlytics_id': legislator_id, 'legislator': name, 'votetext': vote}
+                list_of_voters.append(voter)
+            count += 1
+    else:
+        list_of_yeas = text.split("YEAS.")[1].strip()
+        list_of_yeas = list_of_yeas.split("NAYS")[0]
+        list_of_yeas = re.findall(r'([A-Za-z, ]+[A-Za-z]+)', list_of_yeas)
+
+        try:
+            list_of_nays = text.split("NAYS ")[1].strip()
+            list_of_nays = list_of_nays.replace('− 0.', '')
+            list_of_nays = re.findall(r'([A-Za-z, ]+[A-Za-z]+)', list_of_nays)
+        except:
+            pass
+        for vote in list_of_yeas:
+            vote_text = "yea"
+            name = vote.split(",")
+
+            try:
+                firstname = name[1]
+                firstname = firstname.split(' ')[1]
+                lastname = name[0].strip()
+                fullname = firstname + ' ' + lastname
+            except:
+                pass
+            legislator_id = get_legislator_id_by_full_name(fullname)
+            voter = {'goverlytics_id': legislator_id, 'legislator': lastname, 'votetext': vote_text}
+            list_of_voters.append(voter)
+
+        for vote in list_of_nays:
+            vote_text = "nay"
+            name = vote.split(",")
+
+            try:
+                firstname = name[1]
+                firstname = firstname.split(' ')[1]
+                lastname = name[0].strip()
+                fullname = firstname + ' ' + lastname
+            except:
+                pass
+            legislator_id = get_legislator_id_by_full_name(fullname)
+            voter = {'goverlytics_id': legislator_id, 'legislator': lastname, 'votetext': vote_text}
+            list_of_voters.append(voter)
+
+        return list_of_voters
 
 
 def get_vote_data(soup, row):
@@ -400,19 +477,20 @@ def get_vote_data(soup, row):
             if "yea" in description:
                 vote_data_link = row_sections[2].find('a').get('href')
             if vote_data_link is not None:
-                votes = [vote_data_link, datetime_date, chamber]
+                votes = [vote_data_link, datetime_date, chamber, description]
                 vote_links.append(votes)
     except:
         pass
-    get_vote_detail(vote_links, row)
-    # row.votes = voting_data
+
+    voting_data = get_vote_detail(vote_links, row)
+    row.votes = voting_data
 
 
-def get_bill_text(main_div, row):
-    table_row = main_div.findAll('tr')
+def get_bill_text(url, row):
+    pdf_url = url + ".pdf"
+
     try:
-        pdf_link = "http://www.kslegislature.org" + table_row[1].find('a').get('href')
-        response = requests.get(pdf_link, stream=True)
+        response = requests.get(pdf_url, stream=True)
         pdf = pdfplumber.open(io.BytesIO(response.content))
         pages = pdf.pages
         text = ""
@@ -420,32 +498,37 @@ def get_bill_text(main_div, row):
             page_text = page.extract_text()
             text += page_text
         row.bill_text = text
-    except Exception:
-        row.bill_text = ""
+    except:
+        pass
 
+
+def get_bill_title(soup, row):
+    try:
+        title = soup.find('div', {'class': 'col-xs-12 col-md-8'})
+        title = title.find('h2').text
+        row.bill_title = title
+    except:
+        pass
 
 def scrape(url):
     row = scraper_utils.initialize_row()
-
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
 
     row.source_url = url
     session = get_session(soup, row)
     bill_name = get_bill_name(soup, row)
-
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
     row.goverlytics_id = goverlytics_id
-
     #get_sponsors(soup, row)
-    get_principal_sponsor(soup, row)
+    # get_principal_sponsor(soup, row)
     get_bill_description(soup, row)
     get_bill_summary(soup, row)
     get_actions(soup, row)
-
-    #get_vote_data(soup, row)
-    # get_bill_text(soup, row)
-
+    print(url)
+    get_vote_data(soup, row)
+    get_bill_text(url, row)
+    get_bill_title(soup, row)
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -458,13 +541,11 @@ If this occurs in your scraper, be sure to investigate. Check the database and m
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     urls = get_urls()
 
-    data = [scrape(url) for url in urls]
+    # data = [scrape(url) for url in urls]
 
-    # with Pool(processes=4) as pool:
-    #     data = pool.map(scrape, urls)
-    # data = clear_none_value_rows(data)
-    # big_list_of_dicts = clear_none_value_rows(data)
+    with Pool(processes=4) as pool:
+        data = pool.map(scrape, urls)
 
-    # scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(data)
 
     print('Complete!')
