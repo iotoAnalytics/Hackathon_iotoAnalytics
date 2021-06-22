@@ -1,5 +1,5 @@
-# Unavailable data - 
-# Wiki data - 
+# Unavailable data - military_experience
+# Wiki data - years_active, birthday, seniority, education
 
 import os
 import re
@@ -26,143 +26,99 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import USStateLegislatorScraperUtils
 
-# from selenium.common.exceptions import TimeoutException
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-# from selenium.webdriver.common.by import By
-
 DEBUG_MODE = True
 
 STATE_ABBREVIATION = 'SD'
-LEGISLATOR_TABLE_NAME = 'us_sd_legislators'
+LEGISLATOR_TABLE_NAME = 'us_sd_legislators_test'
 
 BASE_URL = 'https://sdlegislature.gov'
 LEGISLATORS_PATH = '/Legislators'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
-
-scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
-crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
-
-def get_session_members_json(session_number):
-    response = scraper_utils.request('https://sdlegislature.gov/api/SessionMembers/Session/' + session_number)
-    return response.json()
-
-def set_json_data(json_data):
-    row = scraper_utils.initialize_row()
-
-    # source_id
-    _set_source_id(row, json_data)
-
-    # most_recent_term_id
-    # _set_most_recent_term_id(row, json[])
-
-    # source_url
-    _set_source_url(row, json_data)
-
-    # name (full, last, first, middle, suffix)
-    _set_name(row, json_data)
-
-    # party_id & party
-    _set_party(row, json_data)
-
-    # role
-    _set_role(row, json_data)
-
-    # TODO - years_active
-
-    # committees
-    _set_committees(row, json_data)
-
-    # phone_number
-    _set_phone_numbers(row, json_data)
-
-    # addresses
-    _set_addresses(row, json_data)
-
-    # email
-    _set_email(row, json_data)
-
-    # TODO - birthday
-    # TODO - seniority
-
-    # occupation
-    _set_occupation(row, json_data)
-
-    # TODO - education
-    # TODO - military_experience
-
-    # areas_served
-    _set_areas_served(row, json_data)
-
-    # district
-    _set_district(row, json_data)
-
-    return row
-
-def _create_soup_from_selenium(url, soup_parser_type='lxml'):
-    options = Options()
-    options.headless = True
-
-    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
-    driver.switch_to.default_content()
-    driver.get(url)
-    driver.maximize_window()
-
-    sleep(5)
-
-    html = driver.page_source
-    soup = BeautifulSoup(html, soup_parser_type)
-    driver.quit()
-
-    return soup
-
-def _create_soup(url, soup_parser_type):
-    page = scraper_utils.request(url)
-    soup = BeautifulSoup(page.content, soup_parser_type)
-    return soup
-
-def _set_source_id(row, json_data):
-    source_id = json_data['SessionMemberId']
-    row.source_id = source_id
-
-def _set_most_recent_term_id(row, soup):
-    pass
-
-def _set_source_url(row, json_data):
-    session_member_id = str(json_data['SessionMemberId'])
-    source_url = BASE_URL + LEGISLATORS_PATH + '/Profile/' + session_member_id
-    row.source_url = source_url
-    print(source_url)
-
-def _set_name(row, json_data):
-    human_name = HumanName(json_data['Name'])
-    row.name_first = human_name.first
-    row.name_last = human_name.last
-    row.name_middle = human_name.middle
-    row.name_suffix = human_name.suffix
-    row.name_full = human_name.full_name
-
-def _set_party(row, json_data):
-    party = FULL_PARTY.get(json_data['Politics'])
-    row.party = party
-    row.party_id = scraper_utils.get_party_id(party)
 
 FULL_PARTY = {
     'R': 'Republican',
     'D': 'Democrat'
 }
 
-def _set_role(row, json_data):
-    role = json_data['MemberTypeLong']
+scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
+crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
+
+def get_current_session_data():
+    response = scraper_utils.request('https://sdlegislature.gov/api/Sessions/')
+    scraper_utils.crawl_delay(crawl_delay)
+    
+    for session in response.json():
+        if session['CurrentSession']:
+            return session
+
+def get_current_session_id(session_data):
+    return session_data['SessionId']
+
+def get_most_recent_term_id(session_data):
+    return session_data['Year']
+
+def get_members_areas_served(session_id):
+    response = scraper_utils.request('https://sdlegislature.gov/api/DistrictCounties')
+    scraper_utils.crawl_delay(crawl_delay)
+
+    members_areas_served = {}
+
+    for district_data in response.json():
+        if district_data['SessionId'] == session_id:
+            members_areas_served[district_data['District']['District']] = district_data['District']['Counties']
+
+    return members_areas_served
+
+def get_session_members_data(session_id):
+    response = scraper_utils.request('https://sdlegislature.gov/api/SessionMembers/Session/' 
+        + str(session_id))
+    scraper_utils.crawl_delay(crawl_delay)
+    return response.json()
+
+def init_most_recent_term_id(member_data, mrti):
+    if not member_data['InactiveDate']:
+        member_data['Year'] = mrti
+
+def init_areas_served(member_data, members_areas_served):
+    district = member_data['District']
+    member_data['AreasServed'] = members_areas_served[district]
+
+def _set_source_id(row, member_data):
+    source_id = str(member_data['SessionMemberId'])
+    row.source_id = source_id
+        
+def _set_most_recent_term_id(row, member_data):
+    most_recent_term_id = member_data['Year']
+    row.most_recent_term_id = most_recent_term_id
+
+def _set_source_url(row, member_data):
+    session_member_id = str(member_data['SessionMemberId'])
+    source_url = BASE_URL + LEGISLATORS_PATH + '/Profile/' + session_member_id
+    row.source_url = source_url
+
+def _set_name(row, member_data):
+    human_name = HumanName(member_data['Name'])
+    row.name_first = human_name.first
+    row.name_last = human_name.last
+    row.name_middle = human_name.middle
+    row.name_suffix = human_name.suffix
+    row.name_full = human_name.full_name
+
+def _set_party(row, member_data):
+    party = FULL_PARTY.get(member_data['Politics'])
+    row.party = party
+    row.party_id = scraper_utils.get_party_id(party)
+
+def _set_role(row, member_data):
+    role = member_data['MemberTypeLong']
     row.role = role
 
-def _set_committees(row, json_data):
+def _set_committees(row, member_data):
     committees = []
 
-    member_id = str(json_data['SessionMemberId'])
+    member_id = str(member_data['SessionMemberId'])
     response = scraper_utils.request('https://sdlegislature.gov/api/SessionMembers/Committees/' + member_id)
     
     committees_data = response.json()['Committees']
@@ -177,28 +133,28 @@ def _set_committees(row, json_data):
     
     row.committees = committees
 
-def _set_phone_numbers(row, json_data):
+def _set_phone_numbers(row, member_data):
     phone_numbers = []
 
-    _set_phone_number(phone_numbers, 'Home', json_data)
-    _set_phone_number(phone_numbers, 'Capitol', json_data)
-    _set_phone_number(phone_numbers, 'Business', json_data)
+    _set_phone_number(phone_numbers, 'Home', member_data)
+    _set_phone_number(phone_numbers, 'Capitol', member_data)
+    _set_phone_number(phone_numbers, 'Business', member_data)
     
     row.phone_numbers = phone_numbers
 
-def _set_phone_number(phone_numbers, office, json_data):
-    if number:= json_data[f'{office}Phone']:
+def _set_phone_number(phone_numbers, office, member_data):
+    if number:= member_data[f'{office}Phone']:
         phone_number = {
             'office': office,
             'number': number
         }
         phone_numbers.append(phone_number)
 
-def _set_addresses(row, json_data):
+def _set_addresses(row, member_data):
     addresses = []
 
-    home_address = ' '.join([json_data['HomeAddress1'], json_data['HomeCity'], json_data['HomeState'], json_data['HomeZip']])
-    if home_address:
+    if home_address:= ' '.join([member_data['HomeAddress1'], member_data['HomeCity'],
+        member_data['HomeState'], member_data['HomeZip']]):
         address = {
             'location': 'Home',
             'address': home_address
@@ -207,37 +163,44 @@ def _set_addresses(row, json_data):
     
     row.addresses = addresses
 
-def _set_email(row, json_data):
-    email = json_data['EmailState']
+def _set_email(row, member_data):
+    email = member_data['EmailState']
     row.email = email
 
-def _set_occupation(row, json_data):
-    occupation = str(json_data['Occupation']).split('/')
+def _set_occupation(row, member_data):
+    occupation = member_data['Occupation'].split('/')
     row.occupation = occupation
 
-def _set_areas_served(row, json_data):
-    areas_served = []
-
-    district = json_data['District']
-    response = scraper_utils.request('https://sdlegislature.gov/api/DistrictCounties')
-    
-    for data in response.json():
-        if data['SessionId'] == 44 and data['District']['District'] == district:
-            areas_served = data['District']['Counties'].split(', ')
-            break
-
+def _set_areas_served(row, member_data):
+    areas_served = member_data['AreasServed'].split(',')
     row.areas_served = areas_served
     
-def _set_district(row, json_data):
-    district = json_data['District']
+def _set_district(row, member_data):
+    district = member_data['District']
     row.district = district
 
 def main():
     print('\nSCRAPING SOUTH DAKOTA LEGISLATORS\n')
 
-    session_members_json = get_session_members_json('44')
-    data = [set_json_data(member_json) for member_json in session_members_json]
+    # Get session data and IDs
+    session_data = get_current_session_data()
+    session_id = get_current_session_id(session_data)
+    most_recent_term_id = get_most_recent_term_id(session_data)
+    
+    # Get members data
+    members_areas_served = get_members_areas_served(session_id)
+    members_committees = get_members_committees(session_id)
+    session_members_data = get_session_members_data(session_id)
 
+    # Initialize most_recent_term_id and areas_served into members data
+    for member_data in session_members_data:
+        init_most_recent_term_id(member_data, most_recent_term_id)
+        init_areas_served(member_data, members_areas_served)
+
+    # Set fields
+    data = [set_member_data(member_data) for member_data in session_members_data]
+
+    # Wikipedia
     pprint(data, width=200)
 
     print('\nCOMPLETE!\n')
