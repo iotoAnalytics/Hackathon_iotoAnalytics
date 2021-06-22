@@ -6,6 +6,7 @@ from us_wa_legislation import AllDocumentsByClass
 from us_wa_legislation import MainFunctions
 from us_wa_legislation import SponsorFromBillId
 from us_wa_legislation import BillDetailsFromBillId
+from us_wa_legislation import GetVotes
 
 class TestGetBiennium:
     def test_when_current_year_is_odd(self):
@@ -203,3 +204,64 @@ class TestGetBillDetails:
             assert bill['current_status'] != None
             assert bill['bill_description'] != None
             assert bill['bill_type'] != None
+
+
+@pytest.fixture(scope="class")
+def instance_variable_for_bill_votes_test(request):
+    request.cls.url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx/GetRollCalls'
+    request.cls.params = {
+            "biennium": PreProgramFunction().get_biennium(2021)
+    }
+    request.cls.all_bills = AllDocumentsByClass().get_data()
+
+class TestGetVotes:
+    def test_get_votes_request(self, sample_bill_info, instance_variable_for_bill_votes_test):
+        bill_number = sample_bill_info[0]['bill_number']
+        self.params["billNumber"] = int(bill_number)
+        r = MainFunctions().request_page(self.url, self.params)
+        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        assert r.status_code == 200
+
+    def test_process_no_vote_data(self):
+        votes = []
+        assert GetVotes().get_relevant_votes_information(votes) == []
+
+    def test_rollcall_has_all_necessary_data(self):
+        required_params = ['agency', 'votedate', 'yeavotes', 'membersvoting', 'nayvotes', 'absentvotes', 'excusedvotes', 'votes']
+
+        # this test is slow so test a subset.
+        for bill in self.all_bills[:50]:
+            vote_data = GetVotes().get_votes_information_lxml(bill['bill_number'])
+            if vote_data:
+                for vote in vote_data:
+                    assert vote.find('agency')
+                    assert vote.find('votedate')
+                    assert vote.find('yeavotes')
+                    assert vote.find('membersvoting')
+                    assert vote.find('nayvotes')
+                    assert vote.find('absentvotes')
+                    assert vote.find('excusedvotes')
+                    assert vote.find('votes')
+    
+    def test_get_relevant_votes_information(self):
+        expected_params = {
+            'date': '',
+            'description': '',
+            'yea': '',
+            'nay': '',
+            'nv': '',
+            'absent': '',
+            'passed': '',
+            'chamber': '',
+            'votes': [],
+        }
+
+        for bill in self.all_bills[:50]:
+            vote_data = GetVotes().get_votes_information_lxml(bill['bill_number'])
+            relevant_vote_information = GetVotes().get_relevant_votes_information(vote_data)
+
+            if not vote_data:
+                assert relevant_vote_information == []
+            else:
+                for element in relevant_vote_information:
+                    assert element.keys() == expected_params.keys()

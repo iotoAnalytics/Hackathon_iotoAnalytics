@@ -24,6 +24,7 @@ BASE_URL = 'http://wslwebservices.leg.wa.gov/'
 REQUEST_URL_FOR_GETTING_BILLS = BASE_URL + 'LegislativeDocumentService.asmx/GetAllDocumentsByClass'
 REQUEST_URL_FOR_GETTING_SPONSORS = BASE_URL + 'LegislationService.asmx/GetSponsors'
 REQUEST_URL_FOR_GETTING_BILL_DETAILS = BASE_URL + 'LegislationService.asmx/GetLegislation'
+REQUEST_URL_FOR_GETTING_VOTES = BASE_URL + 'LegislationService.asmx/GetRollCalls'
 
 THREADS_FOR_POOL = 12
 CURRENT_DAY = datetime.date.today()
@@ -174,8 +175,31 @@ class BillDetailsFromBillId:
         page_soup =  soup(request.text, 'lxml')
         return page_soup.find('legislation')
 
+class GetVotes:
+    def get_relevant_votes_information(self, vote_data):
+        if not vote_data:
+            return []
+        for data in vote_data:
+            # Can probably refactor this into a function
+            chamber = data.find('agency').text
+            description = data.find('motion').text
+            date = data.find('votedate').text
+            passed = data.find('yeavotes').find('count').text
+            
+
+    def get_votes_information_lxml(self, bill_number):
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                "billNumber": int(bill_number)
+            }
+        except:
+            print(bill_number)
+        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+        page_soup =  soup(request.text, 'lxml')
+        return page_soup.findAll('rollcall')
+
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
-if __name__ == '__main__':
-    program_driver()
-    SponsorFromBillId()
+# if __name__ == '__main__':
+#     program_driver()
