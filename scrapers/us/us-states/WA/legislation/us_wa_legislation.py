@@ -22,6 +22,7 @@ LEGISLATOR_TABLE_NAME = 'us_wa_legislators'
 BASE_URL = 'http://wslwebservices.leg.wa.gov/'
 REQUEST_URL_FOR_GETTING_BILLS = BASE_URL + 'LegislativeDocumentService.asmx/GetAllDocumentsByClass'
 REQUEST_URL_FOR_GETTING_SPONSORS = BASE_URL + 'LegislationService.asmx/GetSponsors'
+REQUEST_URL_FOR_GETTING_BILL_DETAILS = BASE_URL + 'LegislationService.asmx/GetLegislation'
 
 THREADS_FOR_POOL = 12
 CURRENT_DAY = datetime.date.today()
@@ -70,16 +71,14 @@ class AllDocumentsByClass:
 
     def __extract_relevant_info(self, bill_lxml):
         name = bill_lxml.find('name').text
-        lfn = bill_lxml.find('longfriendlyname').text
         htmlurl = bill_lxml.find('htmurl').text
         pdfurl = bill_lxml.find('pdfurl').text
         billid = bill_lxml.find('billid').text
         return {
-            'name': name,
-            'longfriendlyname': lfn,
+            'bill_number': name,
             'htmurl': htmlurl,
             'pdfurl': pdfurl,
-            'billid': billid 
+            'bill_id': billid 
         }
 
     def get_all_bill_information_lxml(self):
@@ -93,7 +92,7 @@ class AllDocumentsByClass:
 
 class SponsorFromBillId:
     def add_sponsor_info_to_bill(self, bill: dict):
-        sponsor_info = self.get_relevant_bill_information(bill.get('billid'))
+        sponsor_info = self.get_relevant_bill_information(bill.get('bill_id'))
         bill['sponsors'] = sponsor_info
         return bill
 
@@ -101,10 +100,10 @@ class SponsorFromBillId:
         sponsor_info_as_lxml = self.get_sponsor_information_for_bill_lxml(bill_id)
         return [self.__extract_relevant_info(sponsor_lxml) for sponsor_lxml in sponsor_info_as_lxml]
    
-    def __extract_relevant_info(self, bill_lxml):
-            fname = bill_lxml.find('firstname').text
-            lname = bill_lxml.find('lastname').text
-            type = bill_lxml.find('type').text
+    def __extract_relevant_info(self, sponsor_lxml):
+            fname = sponsor_lxml.find('firstname').text
+            lname = sponsor_lxml.find('lastname').text
+            type = sponsor_lxml.find('type').text
 
             return {
                 'firstname': fname,
@@ -120,6 +119,44 @@ class SponsorFromBillId:
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('sponsor')
+
+class BillDetailsFromBillId:
+    def add_bill_details_to_bill(self, bill: dict):
+        bill_details = self.get_relevant_bill_information(bill.get('bill_number'))
+        bill['bill_title'] = bill_details['legal_title']
+        bill['chamber_origin'] = bill_details['bill_origin']
+        bill['current_status'] = bill_details['bill_current_status']
+        bill['bill_description'] = bill_details['bill_description']
+        bill['bill_type'] = bill_details['bill_type']
+        return bill
+
+    def get_relevant_bill_information(self, bill_number):
+        bill_details_as_lxml = self.get_bill_details_lxml(bill_number)
+        return self.__extract_relevant_info(bill_details_as_lxml)
+
+    def __extract_relevant_info(self, bill_lxml):
+            billtype = bill_lxml.find('longlegislationtype').text
+            billorigin = bill_lxml.find('originalagency').text
+            currentstatus = bill_lxml.find('historyline').text
+            billdescription = bill_lxml.find('longdescription').text
+            legaltitle = bill_lxml.find('legaltitle').text
+
+            return {
+                'bill_type': billtype,
+                'bill_origin': billorigin,
+                'bill_current_status': currentstatus,
+                'bill_description': billdescription,
+                'legal_title': legaltitle,
+            }
+
+    def get_bill_details_lxml(self, bill_number):
+        params = {
+            "biennium": CURRENT_BIENNIUM,
+            "billNumber": bill_number
+        }
+        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+        page_soup =  soup(request.text, 'lxml')
+        return page_soup.find('legislation')
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
