@@ -1,5 +1,5 @@
-# Unavailable data - 
-# Wiki data - 
+# Unavailable data - seniority, military_experience
+# Wiki data - years_active, birthday, education
 
 import os
 import re
@@ -9,14 +9,10 @@ import multiprocessing
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
-from datetime import datetime
 from multiprocessing import Pool
 from nameparser import HumanName
 from pathlib import Path
 from pprint import pprint
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from time import sleep
 from tqdm import tqdm
 
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -24,290 +20,283 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import USStateLegislatorScraperUtils
 
-# from selenium.common.exceptions import TimeoutException
-# from selenium.webdriver.support.ui import WebDriverWait
-# from selenium.webdriver.support import expected_conditions as EC
-# from selenium.webdriver.common.by import By
-
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 STATE_ABBREVIATION = 'SD'
 LEGISLATOR_TABLE_NAME = 'us_sd_legislators'
 
 BASE_URL = 'https://sdlegislature.gov'
 LEGISLATORS_PATH = '/Legislators'
+WIKI_URL = 'https://en.wikipedia.org'
+LEGISLATURE_PATH = '/wiki/South_Dakota_Legislature'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
+WIKI_DATA_TO_MERGE = ['years_active', 'birthday', 'education']
+
+PARTY_FULL = {
+    'R': 'Republican',
+    'D': 'Democrat'
+}
 
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
-def get_urls():
-    legislators_listing_path = '/Listing/44'
+def get_current_session_data():
+    response = scraper_utils.request('https://sdlegislature.gov/api/Sessions/')
+    scraper_utils.crawl_delay(crawl_delay)
+    
+    for session in response.json():
+        if session['CurrentSession']:
+            return session
 
-    soup = _create_soup_from_selenium(BASE_URL + LEGISLATORS_PATH + legislators_listing_path)
+def get_current_session_id(session_data):
+    return session_data['SessionId']
+
+def get_most_recent_term_id(session_data):
+    return session_data['Year']
+
+def get_members_areas_served(session_id):
+    response = scraper_utils.request('https://sdlegislature.gov/api/DistrictCounties')
     scraper_utils.crawl_delay(crawl_delay)
 
-    legislators_links = (soup.select('#scrolling-techniques > main > div > div > '
-        'div.col-sm-12.col-md-10.col > div > div > div.v-data-table.elevation-1.theme--light > '
-        'div > table > tbody')[0]
-        .find_all('a'))
+    members_areas_served = {}
 
-    urls = [BASE_URL + legislators_link.get('href')
-        for legislators_link in legislators_links]
+    for district_data in response.json():
+        if district_data['SessionId'] == session_id:
+            members_areas_served[district_data['District']['District']] = district_data['District']['Counties']
 
-    return urls
+    return members_areas_served
 
-def scrape(url):
-    soup = _create_soup_from_selenium(url)
+def get_session_members_data(session_id):
+    response = scraper_utils.request('https://sdlegislature.gov/api/SessionMembers/Session/' 
+        + str(session_id))
     scraper_utils.crawl_delay(crawl_delay)
-    row = scraper_utils.initialize_row()
-    print(url)
-    # source_id
-    _set_source_id(row, url)
+    return response.json()
 
-    # most_recent_term_id
-    _set_most_recent_term_id(row, soup)
+def init_most_recent_term_id(member_data, mrti):
+    if not member_data['InactiveDate']:
+        member_data['Year'] = mrti
 
-    # source_url
-    _set_source_url(row, url)
+def init_areas_served(member_data, members_areas_served):
+    district = member_data['District']
+    member_data['AreasServed'] = members_areas_served[district]
 
-    # name (full, last, first, middle, suffix)
-    _set_name(row, soup)
+def get_legislators_wiki_urls(wiki_url):
+    wiki_urls_with_district = []
 
-    # party_id & party
-    _set_party(row, soup)
+    soup = _create_soup(wiki_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
 
-    # role
-    _set_role(row, soup)
+    for section in soup.select('div[aria-labelledby*="Members_of_"]'):
+        ordered_list = section.find('ol')
+        list_items = ordered_list.find_all('li')
 
-    # TODO - years_active
+        for idx, li in enumerate(list_items, start=1):
+            anchors = li.find_all('a')
+            
+            for a in anchors:
+                if '/wiki' in (url:= a.get('href')):
+                    wiki_item = (str(idx), WIKI_URL + url)
+                    wiki_urls_with_district.append(wiki_item)
 
-    # committees
-    _set_committees(row, url)
+    return wiki_urls_with_district
+        
+def scrape_wiki(wiki_item):
+    district, wiki_url = wiki_item
 
-    # phone_number
-    _set_phone_number(row, soup)
+    wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
+    wiki_crawl_delay = scraper_utils.get_crawl_delay(WIKI_URL)
+    scraper_utils.crawl_delay(wiki_crawl_delay)
+   
+    wiki_data['district'] = district
 
-    # addresses
-    _set_addresses(row, soup)
+    return wiki_data
 
-    # email
-    _set_email(row, soup)
+def merge_all_wiki_data(legislator_data, wiki_data):
+    leg_df = pd.DataFrame(legislator_data)
+    leg_df = leg_df.drop(columns = WIKI_DATA_TO_MERGE)
 
-    # TODO - birthday
-    # TODO - seniority
+    wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
+    leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district']) 
+    
+    for data in wiki_data:
+        for key in data.keys():
+            leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
 
-    # occupation
-    _set_occupation(row, soup)
-
-    # TODO - education
-    # TODO - military_experience
-
-    # areas_served
-    _set_areas_served(row, soup)
-
-    # district
-    _set_district(row, soup)
-
-    return row
-
-def _create_soup_from_selenium(url, soup_parser_type='lxml'):
-    options = Options()
-    options.headless = True
-
-    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
-    driver.switch_to.default_content()
-    driver.get(url)
-    driver.maximize_window()
-
-    sleep(5)
-
-    html = driver.page_source
-    soup = BeautifulSoup(html, soup_parser_type)
-    driver.quit()
-
-    return soup
+    return leg_wiki_df.to_dict('records') 
 
 def _create_soup(url, soup_parser_type):
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
 
-def _set_source_id(row, url):
-    source_id = re.search('Profile\/([0-9]+)', url).group(1)
+def set_member_data(member_data):
+    row = scraper_utils.initialize_row()
+
+    _set_source_id(row, member_data)
+    _set_most_recent_term_id(row, member_data)
+    _set_source_url(row, member_data)
+    _set_name(row, member_data)
+    _set_party(row, member_data)
+    _set_role(row, member_data)
+    _set_committees(row, member_data)
+    _set_phone_numbers(row, member_data)
+    _set_addresses(row, member_data)
+    _set_email(row, member_data)
+    _set_occupation(row, member_data)
+    _set_areas_served(row, member_data)
+    _set_district(row, member_data)
+
+    return row
+
+def _set_source_id(row, member_data):
+    source_id = str(member_data['SessionMemberId'])
     row.source_id = source_id
+        
+def _set_most_recent_term_id(row, member_data):
+    most_recent_term_id = member_data['Year']
+    row.most_recent_term_id = most_recent_term_id
 
-def _set_most_recent_term_id(row, soup):
-    try:
-        mrti_idx = 1
-        most_recent_term_id = (soup.select('#scrolling-techniques > main > div > div > '
-            'div.col-sm-12.col-md-10.col > div > div.v-card__title > span')[mrti_idx]
-            .text)
-        row.most_recent_term_id = most_recent_term_id
-    except IndexError:
-        print(soup)
+def _set_source_url(row, member_data):
+    session_member_id = str(member_data['SessionMemberId'])
+    source_url = BASE_URL + LEGISLATORS_PATH + '/Profile/' + session_member_id
+    row.source_url = source_url
 
-def _set_source_url(row, url):
-    row.source_url = url
-
-def _set_name(row, soup):
-    name_str = (soup.select('#scrolling-techniques > main > div > div > '
-        'div.col-sm-12.col-md-10.col > div > div.v-card__title')[0]
-        .text)
-    name_str = ' '.join(name_str.split(' ')[1:-1])
-    name_str = name_str.replace('-', '').strip()
-    
-    human_name = HumanName(name_str)
+def _set_name(row, member_data):
+    human_name = HumanName(member_data['Name'])
     row.name_first = human_name.first
     row.name_last = human_name.last
     row.name_middle = human_name.middle
     row.name_suffix = human_name.suffix
     row.name_full = human_name.full_name
 
-def _set_party(row, soup):
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-
-    party_element = biography_soup.find(lambda tag: tag.name == 'b' and 'Party' in tag.text) 
-    party = party_element.nextSibling.text
-    
+def _set_party(row, member_data):
+    party = PARTY_FULL.get(member_data['Politics'])
     row.party = party
     row.party_id = scraper_utils.get_party_id(party)
 
-def _set_role(row, soup):
-    role_idx = 0
-    role = (soup.select('#scrolling-techniques > main > div > div > '
-        'div.col-sm-12.col-md-10.col > div > div.v-card__title > span')[role_idx]
-        .text.strip())
+def _set_role(row, member_data):
+    role = member_data['MemberTypeLong']
     row.role = role
 
-# TODO - Refactor code
-def _set_committees(row, url):
+def _set_committees(row, member_data):
     committees = []
+
+    member_id = str(member_data['SessionMemberId'])
+    response = scraper_utils.request('https://sdlegislature.gov/api/SessionMembers/Committees/' + member_id)
     
-    soup = _create_soup_from_selenium(url + '/Committees')
+    committees_data = response.json()['Committees']
 
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
+    for committee_data in committees_data:
+        data = committee_data['SessionCommittees']
+        
+        if not data:
+            data = committee_data['InterimYearCommittee']
+        
+        if not data:
+            data = committee_data['ConferenceCommittee']
 
-    if not biography_soup:
-        print(url)
-        print("Didn't work")
-
-    committee_elements = biography_soup.find_all('table')
-    committee_elements_rows = [element.find('tbody').find_all('tr') for element in committee_elements]
-    committee_name_idx, role_idx = 0, 1
+        committee = {
+            'role': data['Description'],
+            'committee': data['Name']
+        }
+        committees.append(committee)
     
-    for committee_element in committee_elements_rows:
-        for element in committee_element:
-            committee_fields = element.find_all('td')
-            committee = {
-                'committee': _format_committee_name(committee_fields[committee_name_idx].text),
-                'role': committee_fields[role_idx].text
-            }
-            committees.append(committee)
-
     row.committees = committees
 
-def _format_committee_name(text):
-    formatted_committee_name = re.sub('\s{2,}', ' ', text)
-    formatted_committee_name = formatted_committee_name.strip()
-    return formatted_committee_name
-
-def _set_phone_number(row, soup):
+def _set_phone_numbers(row, member_data):
     phone_numbers = []
 
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-
-    offices = ['Home', 'Capitol']
-
-    for office in offices:
-        phone_element = biography_soup.find(lambda tag: tag.name == 'b' and office + ':' in tag.text) 
-        if phone_element:
-            phone_number = {
-                'office': office,
-                'number': phone_element.findNext().text 
-            }
-            phone_numbers.append(phone_number)
+    _set_phone_number(phone_numbers, 'Home', member_data)
+    _set_phone_number(phone_numbers, 'Capitol', member_data)
+    _set_phone_number(phone_numbers, 'Business', member_data)
     
     row.phone_numbers = phone_numbers
 
-def _set_addresses(row, soup):
+def _set_phone_number(phone_numbers, office, member_data):
+    if number:= member_data[f'{office}Phone']:
+        phone_number = {
+            'office': office,
+            'number': number
+        }
+        phone_numbers.append(phone_number)
+
+def _set_addresses(row, member_data):
     addresses = []
 
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-
-    locations = ['Home']
-
-    for location in locations:
-        address_element = biography_soup.find(lambda tag: tag.name == 'b' and location + ' Address:' in tag.text) 
-        if address_element:
-            address = {
-                'location': location,
-                'address': address_element.findNext().text + ' ' + address_element.findNext().findNext().text
-            }
-            addresses.append(address)
-
+    if home_address:= ' '.join([member_data['HomeAddress1'], member_data['HomeCity'],
+        member_data['HomeState'], member_data['HomeZip']]):
+        address = {
+            'location': 'Home',
+            'address': home_address
+        }
+        addresses.append(address)
+    
     row.addresses = addresses
 
-def _set_email(row, soup):
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-    
-    email_element = biography_soup.find(lambda tag: tag.name == 'a' and '@sdlegislature.gov' in tag.text) 
-    email = email_element.text
+def _set_email(row, member_data):
+    email = member_data['EmailState']
     row.email = email
 
-def _set_occupation(row, soup):
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-    
-    occupation_element = biography_soup.find(lambda tag: tag.name == 'b' and 'Occupation' in tag.text) 
-    occupation = str(occupation_element.nextSibling).split('/')
+def _set_occupation(row, member_data):
+    if not member_data['Occupation']:
+        return
+
+    occupation = member_data['Occupation'].split('/')
     row.occupation = occupation
 
-def _set_areas_served(row, soup):
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
-    
-    areas_served_element = biography_soup.find(lambda tag: tag.name == 'b' and 'Counties' in tag.text) 
-    areas_served = str(areas_served_element.nextSibling).split(',')
+def _set_areas_served(row, member_data):
+    areas_served = member_data['AreasServed'].split(',')
     row.areas_served = areas_served
-
-def _set_district(row, soup):
-    session_member_id = row.source_id
-    biography_soup = soup.find('div', {'sessionmemberid': session_member_id})
     
-    district_element = biography_soup.find(lambda tag: tag.name == 'b' and 'District' in tag.text) 
-    district = str(district_element.nextSibling).strip()
+def _set_district(row, member_data):
+    district = member_data['District']
     row.district = district
 
 def main():
+    print('SOUTH DAKOTA!')
+    print('Wanna go back to you though your nothing but a town ♫ ♫ ♫')
+    print('On the South Dakota grass I lay me down ♫ ♫ ♫')
+
     print('\nSCRAPING SOUTH DAKOTA LEGISLATORS\n')
 
-    # Collect legislators urls
-    print(DEBUG_MODE and 'Collecting legislator URLs...\n' or '', end='')
-    urls = get_urls()
+    # Get session data and IDs
+    print(DEBUG_MODE and 'Initializing...\n' or '', end='')
+    session_data = get_current_session_data()
+    session_id = get_current_session_id(session_data)
+    most_recent_term_id = get_most_recent_term_id(session_data)
+    
+    # Get members data
+    print(DEBUG_MODE and 'Scraping legislators data...\n' or '', end='')
+    members_areas_served = get_members_areas_served(session_id)
+    session_members_data = get_session_members_data(session_id)
 
-    # Scrape data from collected URLs
-    print(DEBUG_MODE and 'Scraping data from legislator URLs...\n' or '', end='')
-    # with Pool(NUM_POOL_PROCESSES) as pool:
-    #     data = list(tqdm(pool.imap(scrape, urls)))
-    data = [scrape(url) for url in urls]
-    # data = [scrape('https://sdlegislature.gov/Legislators/Profile/1766')]
-    # data = [scrape('https://sdlegislature.gov/Legislators/Profile/1768')]
+    # Initialize most_recent_term_id and areas_served into members data
+    for member_data in session_members_data:
+        init_most_recent_term_id(member_data, most_recent_term_id)
+        init_areas_served(member_data, members_areas_served)
 
-    pprint(data, width=200)
+    # Set fields
+    data = [set_member_data(member_data) for member_data in session_members_data]
+
+    # Collect wiki urls
+    print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
+    wiki_urls = get_legislators_wiki_urls(WIKI_URL + LEGISLATURE_PATH)
+
+    # Scrape data from wiki URLs
+    print(DEBUG_MODE and 'Scraping data from wiki URLs...\n' or '', end='')
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        wiki_data = list(tqdm(pool.imap(scrape_wiki, wiki_urls)))
+
+    # Merge data from wikipedia
+    print(DEBUG_MODE and 'Merging wiki data with legislators...\n' or '', end='')
+    merged_data = merge_all_wiki_data(data, wiki_data)
 
     # Write to database
-    # if not DEBUG_MODE:
-    # print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
-    # scraper_utils.write_data(data)
+    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
+    if not DEBUG_MODE:
+        scraper_utils.write_data(merged_data)
 
     print('\nCOMPLETE!\n')
 
