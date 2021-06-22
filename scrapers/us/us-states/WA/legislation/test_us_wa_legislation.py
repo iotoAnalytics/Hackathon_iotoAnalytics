@@ -1,4 +1,4 @@
-from random import sample
+import re
 import pytest
 import us_wa_legislation
 from us_wa_legislation import PreProgramFunction
@@ -69,6 +69,11 @@ class TestGetAllDocumentsByClass:
         }
         for bill in relevant_bill_information:
             assert set(bill.keys()) == set(expected_contents)
+
+    def test_get_relevant_bill_information_only_if_bill_number_has_no_suffix(self):
+        relevant_bill_information = AllDocumentsByClass().get_relevant_bill_information()
+        for bill in relevant_bill_information:
+            assert not re.search(r'\D', bill['bill_number'])
 
 @pytest.fixture(scope="module")
 def sample_bill_info():

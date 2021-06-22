@@ -8,6 +8,7 @@ path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 import pandas as pd
+import re
 from scraper_utils import USStateLegislationScraperUtils
 from urllib.request import urlopen
 from multiprocessing import Pool
@@ -40,6 +41,9 @@ def program_driver():
     all_bills = AllDocumentsByClass().get_data()
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
                                                      all_bills)
+    all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
+                                                     all_bills)
+    print(all_bills[600:610])
 
 class PreProgramFunction:
     def get_biennium(self, year: int):
@@ -67,10 +71,16 @@ class AllDocumentsByClass:
 
     def get_relevant_bill_information(self):
         bill_info_as_lxml = self.get_all_bill_information_lxml()
-        return [self.__extract_relevant_info(bill_lxml) for bill_lxml in bill_info_as_lxml]
+        bill_info = [self.__extract_relevant_info(bill_lxml) for bill_lxml in bill_info_as_lxml]
+        while None in bill_info:
+            bill_info.remove(None)
+        return bill_info
 
     def __extract_relevant_info(self, bill_lxml):
         name = bill_lxml.find('name').text
+        if re.search(r'\D', name):
+            return None
+
         htmlurl = bill_lxml.find('htmurl').text
         pdfurl = bill_lxml.find('pdfurl').text
         billid = bill_lxml.find('billid').text
@@ -137,7 +147,10 @@ class BillDetailsFromBillId:
     def __extract_relevant_info(self, bill_lxml):
             billtype = bill_lxml.find('longlegislationtype').text
             billorigin = bill_lxml.find('originalagency').text
-            currentstatus = bill_lxml.find('historyline').text
+            try:
+                currentstatus = bill_lxml.find('historyline').text
+            except:
+                currentstatus = ''
             billdescription = bill_lxml.find('longdescription').text
             legaltitle = bill_lxml.find('legaltitle').text
 
@@ -150,10 +163,13 @@ class BillDetailsFromBillId:
             }
 
     def get_bill_details_lxml(self, bill_number):
-        params = {
-            "biennium": CURRENT_BIENNIUM,
-            "billNumber": bill_number
-        }
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                "billNumber": int(bill_number)
+            }
+        except:
+            print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
         page_soup =  soup(request.text, 'lxml')
         return page_soup.find('legislation')
