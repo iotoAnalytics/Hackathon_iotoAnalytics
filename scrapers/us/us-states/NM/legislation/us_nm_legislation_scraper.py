@@ -81,7 +81,7 @@ def get_urls():
         'tr')
     sleep(2)
 
-    pbar = tqdm(table)
+    pbar = tqdm(table[:5])
     for row in pbar:
         link = row.find_element_by_tag_name('a').get_attribute('href')
         pbar.set_description(f'Scraping {link}')
@@ -511,11 +511,11 @@ def main():
     urls = get_urls()
 
     # tabula doesn't work with pool
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
 
-    # data = [scrape(url) for url in urls]
-    scraper_utils.write_data(data, 'us_nm_legislation')
+    data = [scrape(url) for url in urls]
+    scraper_utils.write_data(data, 'us_nm_legislation_test')
 
 
 if __name__ == '__main__':
