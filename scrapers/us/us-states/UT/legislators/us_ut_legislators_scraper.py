@@ -27,6 +27,7 @@ scraper_utils = USStateLegislatorScraperUtils('UT', 'us_ut_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 
+@scraper_utils.Timer()
 def open_driver(url):
     options = Options()
     options.headless = True
@@ -34,6 +35,7 @@ def open_driver(url):
                                                            'chrome_win_90.0.4430.24', 'chromedriver.exe'), options=options)
     driver.get(url)
     driver.maximize_window()
+    scraper_utils.crawl_delay(crawl_delay)
     return driver
 
 
@@ -45,84 +47,138 @@ def make_soup(url):
     :return: soup object
     """
 
-    scrape_url = url
-    page = scraper_utils.request(scrape_url)
+    page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, 'lxml')
     scraper_utils.crawl_delay(crawl_delay)
     return soup
 
 
-scraper_utils.Timer()
+@scraper_utils.Timer()
 def get_urls(path):
     urls = []
     soup = make_soup(path)
-    table = soup.find('table', {'class': 'UItable'}).find('tbody').find_all('tr')[1:]
-    for tr in table:
-        link = tr.find('a').get_attribute('href')
+    table = soup.find('table', {'class': 'UItable'}).find_all('tr')[1:]
+    pbar = tqdm(table[:20])
+    for tr in pbar:
+        link = 'https://le.utah.gov/asp/roster/' + tr.find('td').find('a').get('href')
         urls.append(link)
-
     return urls
 
 
-scraper_utils.Timer()
-def get_name(url, row):
+@scraper_utils.Timer()
+def get_representative_name(url, row):
     driver = open_driver(url)
-    full_name = driver.find_element_by_class_name('et_pb_text_inner').find_element_by_tag_name('h1')
+    full_name = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[1]/div/h1').text.title()
     hn = HumanName(full_name)
     row.name_first = hn.first
     row.name_last = hn.last
     row.name_middle = hn.middle
     row.name_suffix = hn.suffix
     row.name_full = hn.full_name
+    # print(hn.full_name)
+    driver.quit()
 
 
-scraper_utils.Timer()
-def get_email(url, row):
+@scraper_utils.Timer()
+def get_representative_email(url, row):
     driver = open_driver(url)
-    table = driver.find_element_by_class_name('et_pb_text_inner')
-    email_container = table.find_elements_by_tag_name('div')[2].find_element_by_tag_name('div').find_element_by_class_name('et_pb_blurb_container')
-    email = email_container.find_element_by_class_name('et_pb_blurb_description').text
+    email = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[2]/div/div[3]/div/div[2]/div').text
     row.email = email
+    # print(email)
+    driver.quit()
 
 
-scraper_utils.Timer()
-def get_addresses(url, row):
-    addresses = []
+@scraper_utils.Timer()
+def get_representative_addresses(url, row):
     driver = open_driver(url)
-    table = driver.find_element_by_class_name('et_pb_text_inner')
-    address_container = table.find_elements_by_tag_name('div')[0].find_element_by_tag_name('div').find_element_by_class_name('et_pb_blurb_container')
-    location = address_container.find_element_by_tag_name('h4')
-    address = address_container.find_element_by_tag_name('div')
+    addresses = []
+    location = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[2]/div/div[1]/div/div[2]/h4').text
+    address = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[2]/div/div[1]/div/div[2]/div').text
     address_dict = {'address': address, 'location': location}
     addresses.append(address_dict)
     row.addresses = addresses
+    # print(addresses)
+    driver.quit()
 
 
-scraper_utils.Timer()
-def get_phone_number(url, row):
-    phone_nums = []
+@scraper_utils.Timer()
+def get_representative_phone_number(url, row):
     driver = open_driver(url)
-    table = driver.find_element_by_class_name('et_pb_text_inner')
-    phone_container = table.find_elements_by_tag_name('div')[1].find_element_by_tag_name('div').find_element_by_class_name('et_pb_blurb_container')
-    phone = phone_container.find_element_by_tag_name('div')
+    phone_nums = []
+    phone = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[2]/div/div[2]/div/div[2]/div').text
     phone_dict = {'phone': phone, 'office': ''}
     phone_nums.append(phone_dict)
     row.addresses = phone_nums
+    # print(phone_nums)
+    driver.quit()
+
+
+@scraper_utils.Timer()
+def get_representative_party(url, row):
+    driver = open_driver(url)
+    text = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[1]/div/p[2]').text
+    row.party = text.split()[0]
+    row.party_id = scraper_utils.get_party_id('Republican' if row.party == 'Republican' else 'Democrat')
+    # print(row.party)
+    driver.quit()
+
+
+
+@scraper_utils.Timer()
+def get_representative_role(url, row):
+    driver = open_driver(url)
+    text = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[1]/div/p[1]').text
+    row.role = text.split()[0]
+    # print(row.role)
+    driver.quit()
+
+
+
+@scraper_utils.Timer()
+def get_representative_district(url, row):
+    driver = open_driver(url)
+    text = driver.find_element_by_xpath('//*[@id="et-boc"]/div/div/div[1]/div/div[1]/div[1]/div/p[2]').text
+    role = text.split('–')[1].split()
+    row.district = " ".join(role[:2])
+    # print(row.district)
+    driver.quit()
+
+
+@scraper_utils.Timer()
+def get_wiki_info(url, row):
+    soup = make_soup(url)
+    table = soup.find('table', {'class': 'wikitable sortable'}).find('tbody').find_all('tr')
+    for tr in table[1:]:
+        name = tr.find_all('td')[1].text.split()
+        wiki_first, wiki_last = name[0], name[1]
+        if row.name_last == wiki_last and row.name_first[0:2].startswith(wiki_first[0]):
+            try:
+                path = tr.find_all('td')[1].find('a').get('href')
+                wiki_info = scraper_utils.scrape_wiki_bio(WIKI_URL + path)
+                row.education = wiki_info['education']
+                row.occupation = wiki_info['occupation']
+                row.years_active = wiki_info['years_active']
+                if wiki_info['birthday'] is not None:
+                    row.birthday = str(wiki_info['birthday'])
+            except AttributeError:
+                pass
 
 
 def scrape(url):
     row = scraper_utils.initialize_row()
-    soup = make_soup(url)
-    get_name(url, row)
-    get_email(url, row)
-    get_addresses(url, row)
-    # todo get_phone_numbers
-    # todo get_role
-    # todo get_district
-    # todo get_party
-    # todo get_wiki_info
-    # todo get_source_url
-
+    # soup = make_soup(url)
+    if url[-1] == 'H':
+        row.source_url = url
+        get_representative_name(url, row)
+        get_representative_email(url, row)
+        get_representative_addresses(url, row)
+        get_representative_phone_number(url, row)
+        get_representative_role(url, row)
+        get_representative_district(url, row)
+        get_representative_party(url, row)
+        get_wiki_info(WIKI_URL + WIKI_REP_PATH, row)
+        # todo get_representative_committees
+    print(row)
     return row
 
 
@@ -132,11 +188,11 @@ def main():
     """
 
     urls = get_urls(BASE_URL)
-    print(urls)
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
 
-    scraper_utils.write_data(data, 'us_ut_legislators')
+    with Pool() as pool:
+        data = pool.map(scrape, urls)
+
+    # scraper_utils.write_data(data, 'us_ut_legislators')
 
 
 if __name__ == '__main__':
