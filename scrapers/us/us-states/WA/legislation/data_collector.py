@@ -37,7 +37,7 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
-                                                     all_bills)
+                                                     all_bills[:2])
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
@@ -321,3 +321,4 @@ CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
 if __name__ == "__main__":
     print("data_collector called directly...")
+    print(program_driver())

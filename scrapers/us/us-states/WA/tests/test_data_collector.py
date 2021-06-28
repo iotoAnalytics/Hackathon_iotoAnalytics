@@ -2,15 +2,23 @@ import re
 from typing import Iterable
 import pytest
 import datetime
-import data_collector
-from data_collector import PreProgramFunction
-from data_collector import AllDocumentsByClass 
-from data_collector import MainFunctions
-from data_collector import SponsorFromBillId
-from data_collector import BillDetailsFromBillId
-from data_collector import GetVotes
-from data_collector import GetCommittees
-from data_collector import GetActions
+import os
+import sys
+from pathlib import Path
+
+NODES_TO_LEGISLATION_FOLDER = 1
+path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_LEGISLATION_FOLDER]
+sys.path.insert(0, str(path_to_root))
+
+from legislation import data_collector 
+from legislation.data_collector import PreProgramFunction
+from legislation.data_collector import AllDocumentsByClass 
+from legislation.data_collector import MainFunctions
+from legislation.data_collector import SponsorFromBillId
+from legislation.data_collector import BillDetailsFromBillId
+from legislation.data_collector import GetVotes
+from legislation.data_collector import GetCommittees
+from legislation.data_collector import GetActions
 
 class TestGetBiennium:
     def test_when_current_year_is_odd(self):
