@@ -2,6 +2,7 @@ import re
 from typing import Iterable
 from bs4 import BeautifulSoup
 import pytest
+import datetime
 import us_wa_legislation
 from us_wa_legislation import PreProgramFunction
 from us_wa_legislation import AllDocumentsByClass 
@@ -10,6 +11,7 @@ from us_wa_legislation import SponsorFromBillId
 from us_wa_legislation import BillDetailsFromBillId
 from us_wa_legislation import GetVotes
 from us_wa_legislation import GetCommittees
+from us_wa_legislation import GetActions
 
 class TestGetBiennium:
     def test_when_current_year_is_odd(self):
@@ -262,7 +264,7 @@ class TestGetVotes:
 
 @pytest.fixture(scope="class")
 def instance_variable_for_committees_test(request):
-    request.cls.url = 'http://wslwebservices.leg.wa.gov/CommitteeActionService.asmx/GetCommitteeReferralsByBill'
+    request.cls.url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx/GetLegislativeStatusChangesByBillId'
     request.cls.params = {
             "biennium": PreProgramFunction().get_biennium(2021)
     }
@@ -277,7 +279,7 @@ class TestGetCommittee:
 
     def test_get_committtees_data(self, sample_bill_info, instance_variable_for_committees_test):
         bill_number = sample_bill_info[1]['bill_number']
-        assert isinstance(GetCommittees().get_committees_data_lxml(1000), Iterable)
+        assert isinstance(GetCommittees().get_committees_data_lxml(bill_number), Iterable)
 
     def test_committee_data_has_all_info(self, sample_bill_info):
             for bill in sample_bill_info:
@@ -314,3 +316,59 @@ class TestGetCommittee:
                                              sample_bill_info)
         for bill in all_bills:
             assert bill['committees'] != None
+
+@pytest.fixture(scope="class")
+def instance_variable_for_actions_test(request):
+    request.cls.url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx/GetLegislativeStatusChangesByBillId'
+    request.cls.params = {
+            "biennium": PreProgramFunction().get_biennium(2021),
+            "beginDate": datetime.datetime(2021, 1, 1),
+            "endDate": datetime.datetime.now()
+    }
+
+class TestGetActions:
+    def test_get_actions_request(self, sample_bill_info, instance_variable_for_actions_test):
+        bill_id = sample_bill_info[1]['bill_id']
+        self.params["billId"] = bill_id
+        r = MainFunctions().request_page(self.url, self.params)
+        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        assert r.status_code == 200
+
+    def test_get_actions_data(self, sample_bill_info, instance_variable_for_actions_test):
+        bill_id = sample_bill_info[1]['bill_id']
+        assert isinstance(GetActions().get_actions_data_lxml(bill_id), Iterable)
+
+    def test_action_data_has_all_info(self, sample_bill_info):
+            for bill in sample_bill_info:
+                action_data = GetActions().get_actions_data_lxml(bill['bill_number'])
+                if action_data:
+                    for action in action_data:
+                        assert action.find('actiondate')
+                        assert action.find('historyline')
+
+    def test_get_relevant_actions_information(self, sample_bill_info):
+        expected_params = {
+            'actiondate',
+            'historyline'
+        }
+
+        for bill in sample_bill_info:
+            actions_data = GetActions().get_actions_data_lxml(bill['bill_number'])
+            relevant_actions_information = GetActions().get_relevant_actions_information(actions_data)
+
+            if not actions_data:
+                assert relevant_actions_information == []
+            else:
+                for element in relevant_actions_information:
+                    assert set(element.keys()) == expected_params
+
+    def test_add_actions_data_to_bill_information(self, sample_bill_info):
+        sample_bill = sample_bill_info[0]
+        GetActions().add_actions_data_to_bill(sample_bill)
+        assert sample_bill['actions'] != None
+
+    def test_pool_function(self, sample_bill_info):
+        all_bills = MainFunctions().append_data_to_bills(GetActions().add_actions_data_to_bill,
+                                             sample_bill_info)
+        for bill in all_bills:
+            assert bill['actions'] != None

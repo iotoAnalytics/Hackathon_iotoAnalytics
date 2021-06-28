@@ -26,6 +26,7 @@ REQUEST_URL_FOR_GETTING_SPONSORS = BASE_URL + 'LegislationService.asmx/GetSponso
 REQUEST_URL_FOR_GETTING_BILL_DETAILS = BASE_URL + 'LegislationService.asmx/GetLegislation'
 REQUEST_URL_FOR_GETTING_VOTES = BASE_URL + 'LegislationService.asmx/GetRollCalls'
 REQUEST_URL_FOR_GETTING_COMMITTEES = BASE_URL + 'CommitteeActionService.asmx/GetCommitteeReferralsByBill'
+REQUEST_URL_FOR_GETTING_ACTIONS = BASE_URL + 'LegislationService.asmx/GetLegislativeStatusChangesByBillId'
 
 THREADS_FOR_POOL = 12
 CURRENT_DAY = datetime.date.today()
@@ -48,6 +49,8 @@ def program_driver():
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
                                                      all_bills)
     all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
+                                                     all_bills)
+    all_bills = MainFunctions().append_data_to_bills(GetActions().add_actions_data_to_bill,
                                                      all_bills)
     print(all_bills)
 
@@ -281,6 +284,44 @@ class GetCommittees:
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('committee')
+
+class GetActions:
+    def add_actions_data_to_bill(self, bill: dict):
+        actions_data = self.get_actions_data_lxml(bill.get('bill_id'))
+        actions_data = self.get_relevant_actions_information(actions_data)
+        bill['actions'] = actions_data
+        return bill
+
+    def get_relevant_actions_information(self, actions_data):
+        return_list = []
+        if not actions_data:
+            return []
+        for action in actions_data:
+            date = action.find('actiondate').text
+            description = action.find('historyline').text
+            return_list.append(
+                {
+                    'date': date,
+                    'description':description
+                }
+            )
+        return return_list
+
+    def get_actions_data_lxml(self, bill_id):
+        year = CURRENT_BIENNIUM.split('-')[0]
+        #biennium begins second week of January of odd numbered year
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                "billId": bill_id,
+                "beginDate": datetime.datetime(int(year), 1, 1),
+                "endDate": datetime.datetime.now()
+            }
+        except:
+            print(bill_id)
+        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+        page_soup = soup(request.text, 'lxml')
+        return page_soup.findAll('legislativestatus')
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
