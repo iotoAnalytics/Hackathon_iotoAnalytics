@@ -185,6 +185,7 @@ class MainScraper:
     def __set_data(self, member_web_element):
         row = scraper_utils.initialize_row()
         self.__set_name_data(row, member_web_element)
+        self.__set_source_id(row, member_web_element)
         self.__set_role(row)
         self.__set_party_data(row, member_web_element)
         self.__set_district_and_county(row)
@@ -214,6 +215,12 @@ class MainScraper:
         text = text.split(self.identity)[1]
         text = text.split('(')[0]
         return text.strip()
+
+    def __set_source_id(self, row, web_element):
+        id_container = web_element.find_element_by_css_selector("div[class='col-csm-6 col-md-3 memberColumnPad']")
+        a_link = id_container.find_element_by_tag_name('a')
+        source_id = a_link.get_attribute('id')
+        row.source_id = re.findall(r'\d+', source_id)[0]
 
     def __set_role(self, row):
         row.role = self.identity

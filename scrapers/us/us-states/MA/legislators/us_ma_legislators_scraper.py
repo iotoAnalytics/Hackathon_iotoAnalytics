@@ -1,7 +1,6 @@
 
 import sys
 import os
-from datetime import datetime
 from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
 import re
@@ -9,7 +8,6 @@ import numpy as np
 from nameparser import HumanName
 from multiprocessing import Pool
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 import time
@@ -70,42 +68,6 @@ def get_urls():
     return urls
 
 
-# def get_birthday(wiki_page_link):
-#     data_dict = []
-#     uClient = uReq(wiki_page_link)
-#     page_html = uClient.read()
-#     uClient.close()
-#
-#     page_soup = BeautifulSoup(page_html, "lxml")
-#     tables = page_soup.findAll("tbody")
-#     people1 = tables[3].findAll("tr")
-#     people = tables[5].findAll("tr")
-#     persons = people1 + people
-#     print(people + people1)
-#     count = 0
-#     for person in persons[1:]:
-#         count += 1
-#         info = person.findAll("td")
-#
-#         try:
-#             name = info[1].text
-#             hn = HumanName(name)
-#             # print(hn.first)
-#             # print(hn.last)
-#             dob = info[2].text.strip()
-#             datetime_date = datetime.strptime(dob, '%B %d, %Y')
-#             birthday = datetime_date.strftime("%Y-%m-%d")
-#             # print(birthday)
-#             info = {'name_first': hn.first, 'name_last': hn.last, 'birthday': birthday}
-#             data.append(info)
-#         except Exception:
-#             pass
-#     print(count)
-#     scraper_utils.crawl_delay(crawl_delay)
-#
-#     return data_dict
-
-
 def find_individual_wiki(wiki_page_link):
     bio_lnks = []
     uClient = uReq(wiki_page_link)
@@ -114,13 +76,13 @@ def find_individual_wiki(wiki_page_link):
 
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
-    people = tables[3].findAll("tr") + tables[5].findAll("tr")
+    people = tables[2].findAll("tr") + tables[4].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
-
         try:
             biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_lnks.append(biolink)
+
         except Exception:
             pass
 
@@ -141,12 +103,9 @@ def get_most_recent_term_id(soup, row):
 
 def find_party_and_district(soup, row):
     party_block = soup.find('span', {'class': 'subTitle'}).text
-    try:
-        party = party_block.split(' -')[0].strip()
-    except Exception:
-        pass
-
+    party = party_block.split(' -')[0].strip()
     row.party = party
+
     try:
         row.party_id = scraper_utils.get_party_id(party)
     except Exception:
@@ -170,21 +129,24 @@ def find_party_and_district(soup, row):
 
 def get_name_and_role(soup, row):
     name_block = soup.find('h1')
-    role = name_block.find('span').text.strip()
-    name_full = name_block.text.split(role)[1].strip()
-    if "Democrat" in name_full:
-        name_full = name_full.split('Democrat')[0].strip()
-    else:
-        name_full = name_full.split('Republican')[0].strip()
+    try:
+        role = name_block.find('span').text.strip()
+        name_full = name_block.text.split(role)[1].strip()
+        if "Democrat" in name_full:
+            name_full = name_full.split('Democrat')[0].strip()
+        else:
+            name_full = name_full.split('Republican')[0].strip()
 
-    row.role = role
+        row.role = role
 
-    hn = HumanName(name_full)
-    row.name_full = name_full
-    row.name_last = hn.last
-    row.name_first = hn.first
-    row.name_middle = hn.middle
-    row.name_suffix = hn.suffix
+        hn = HumanName(name_full)
+        row.name_full = name_full
+        row.name_last = hn.last
+        row.name_first = hn.first
+        row.name_middle = hn.middle
+        row.name_suffix = hn.suffix
+    except:
+        pass
 
 
 def get_phone_numbers(soup, row):
@@ -253,20 +215,22 @@ def get_committees_page(url, row):
 def get_committees(soup, row):
     committees_list = []
     role = "member"
-    c_section = soup.find('div', {'class': 'membershipList'})
-    comm_list = c_section.find_all('li')
-    for comm in comm_list:
-        committee = comm.text
-        committee = committee.replace('\n', '')
-        if "Chairperson" in committee:
-            role = "chairperson"
-            committee = committee.split(", ")[1]
-        elif "Vice Chair" in committee:
-            role = "vice chair"
-            committee = committee.split(", ")[1]
-        committee_detail = {"role": role, "committee": committee}
-        committees_list.append(committee_detail)
-
+    try:
+        c_section = soup.find('div', {'class': 'membershipList'})
+        comm_list = c_section.find_all('li')
+        for comm in comm_list:
+            committee = comm.text
+            committee = committee.replace('\n', '')
+            if "Chairperson" in committee:
+                role = "chairperson"
+                committee = committee.split(", ")[1]
+            elif "Vice Chair" in committee:
+                role = "vice chair"
+                committee = committee.split(", ")[1]
+            committee_detail = {"role": role, "committee": committee}
+            committees_list.append(committee_detail)
+    except:
+        pass
     row.committees = committees_list
 
 
@@ -319,20 +283,15 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last']]
+        ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
-    # birthday_data = get_birthday(wikipage_link)
-    # birthday_df = pd.DataFrame(birthday_data)
-    # new_df = pd.merge(wiki_df, birthday_df, how='left',
-    #                   on=["name_first", "name_last"])
-    # print(new_df)
 
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    #big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    # big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
     isna = big_df['years_active'].isna()
     big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
 
