@@ -25,6 +25,7 @@ REQUEST_URL_FOR_GETTING_BILLS = BASE_URL + 'LegislativeDocumentService.asmx/GetA
 REQUEST_URL_FOR_GETTING_SPONSORS = BASE_URL + 'LegislationService.asmx/GetSponsors'
 REQUEST_URL_FOR_GETTING_BILL_DETAILS = BASE_URL + 'LegislationService.asmx/GetLegislation'
 REQUEST_URL_FOR_GETTING_VOTES = BASE_URL + 'LegislationService.asmx/GetRollCalls'
+REQUEST_URL_FOR_GETTING_COMMITTEES = BASE_URL + 'CommitteeActionService.asmx/GetCommitteeReferralsByBill'
 
 THREADS_FOR_POOL = 12
 CURRENT_DAY = datetime.date.today()
@@ -41,10 +42,12 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
-                                                     all_bills[600:610])
+                                                     all_bills[:10])
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
+                                                     all_bills)
+    all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
                                                      all_bills)
     print(all_bills)
 
@@ -174,7 +177,7 @@ class BillDetailsFromBillId:
         except:
             print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
-        page_soup =  soup(request.text, 'lxml')
+        page_soup = soup(request.text, 'lxml')
         return page_soup.find('legislation')
 
 class GetVotes:
@@ -242,8 +245,42 @@ class GetVotes:
         except:
             print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
-        page_soup =  soup(request.text, 'lxml')
+        page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('rollcall')
+
+class GetCommittees:
+    def add_committee_data_to_bill(self, bill: dict):
+        committee_data = self.get_committees_data_lxml(bill.get('bill_number'))
+        committee_data = self.get_relevant_committee_information(committee_data)
+        bill['committees'] = committee_data
+        return bill
+
+    def get_relevant_committee_information(self, committee_data):
+        return_list = []
+        if not committee_data:
+            return []
+        for committee in committee_data:
+            chamber = committee.find('agency').text
+            committee_name = committee.find('longname').text
+            return_list.append(
+                {
+                    'chamber': chamber,
+                    'committee':committee_name
+                }
+            )
+        return return_list
+
+    def get_committees_data_lxml(self, bill_number):
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                "billNumber": int(bill_number)
+            }
+        except:
+            print(bill_number)
+        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+        page_soup = soup(request.text, 'lxml')
+        return page_soup.findAll('committee')
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 

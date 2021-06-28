@@ -1,4 +1,6 @@
 import re
+from typing import Iterable
+from bs4 import BeautifulSoup
 import pytest
 import us_wa_legislation
 from us_wa_legislation import PreProgramFunction
@@ -7,6 +9,7 @@ from us_wa_legislation import MainFunctions
 from us_wa_legislation import SponsorFromBillId
 from us_wa_legislation import BillDetailsFromBillId
 from us_wa_legislation import GetVotes
+from us_wa_legislation import GetCommittees
 
 class TestGetBiennium:
     def test_when_current_year_is_odd(self):
@@ -75,23 +78,6 @@ class TestGetAllDocumentsByClass:
         relevant_bill_information = AllDocumentsByClass().get_relevant_bill_information()
         for bill in relevant_bill_information:
             assert not re.search(r'\D', bill['bill_number'])
-
-@pytest.fixture(scope="module")
-def sample_bill_info():
-    return [
-        {
-            'bill_number': '1002', 
-            'htmurl': 'http://lawfilesext.leg.wa.gov/biennium/2021-22/Htm/Bills/House Bills/1002.htm', 
-            'pdfurl': 'http://lawfilesext.leg.wa.gov/biennium/2021-22/Pdf/Bills/House Bills/1002.pdf', 
-            'bill_id': 'HB 1002'
-        },
-        {
-            'bill_number': '1000', 
-            'htmurl': 'http://lawfilesext.leg.wa.gov/biennium/2021-22/Htm/Bills/House Bills/1002.htm', 
-            'pdfurl': 'http://lawfilesext.leg.wa.gov/biennium/2021-22/Pdf/Bills/House Bills/1002.pdf', 
-            'bill_id': 'HB 1000'
-        }
-    ]
 
 @pytest.fixture(scope="class")
 def instance_variable_for_sponsor_test(request):
@@ -205,7 +191,6 @@ class TestGetBillDetails:
             assert bill['bill_description'] != None
             assert bill['bill_type'] != None
 
-
 @pytest.fixture(scope="class")
 def instance_variable_for_bill_votes_test(request):
     request.cls.url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx/GetRollCalls'
@@ -227,9 +212,7 @@ class TestGetVotes:
         assert GetVotes().get_relevant_votes_information(votes) == []
 
     def test_rollcall_has_all_necessary_data(self):
-        required_params = ['agency', 'votedate', 'yeavotes', 'membersvoting', 'nayvotes', 'absentvotes', 'excusedvotes', 'votes']
-
-        # this test is slow so test a subset.
+        # this test is slow so testS a subset.
         for bill in self.all_bills[:50]:
             vote_data = GetVotes().get_votes_information_lxml(bill['bill_number'])
             if vote_data:
@@ -271,4 +254,63 @@ class TestGetVotes:
         GetVotes().add_vote_data_to_bill(sample_bill)
         assert sample_bill['votes'] != None
 
-# ToDo. Need to add the result from get_relelvant_votes_information to the actual data
+    def test_pool_function(self, sample_bill_info):
+        all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
+                                             sample_bill_info)
+        for bill in all_bills:
+            assert bill['votes'] != None
+
+@pytest.fixture(scope="class")
+def instance_variable_for_committees_test(request):
+    request.cls.url = 'http://wslwebservices.leg.wa.gov/CommitteeActionService.asmx/GetCommitteeReferralsByBill'
+    request.cls.params = {
+            "biennium": PreProgramFunction().get_biennium(2021)
+    }
+
+class TestGetCommittee:
+    def test_get_committee_request(self, sample_bill_info, instance_variable_for_committees_test):
+        bill_number = sample_bill_info[1]['bill_number']
+        self.params["billNumber"] = int(bill_number)
+        r = MainFunctions().request_page(self.url, self.params)
+        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        assert r.status_code == 200
+
+    def test_get_committtees_data(self, sample_bill_info, instance_variable_for_committees_test):
+        bill_number = sample_bill_info[1]['bill_number']
+        assert isinstance(GetCommittees().get_committees_data_lxml(1000), Iterable)
+
+    def test_committee_data_has_all_info(self, sample_bill_info):
+            for bill in sample_bill_info:
+                committee_data = GetCommittees().get_committees_data_lxml(bill['bill_number'])
+                if committee_data:
+                    for committee in committee_data:
+                        assert committee.find('id')
+                        assert committee.find('longname')
+                        assert committee.find('agency')
+ 
+    def test_get_relevant_committees_information(self, sample_bill_info):
+        expected_params = {
+            'chamber',
+            'committee'
+        }
+
+        for bill in sample_bill_info:
+            committee_data = GetCommittees().get_committees_data_lxml(bill['bill_number'])
+            relevant_committee_information = GetCommittees().get_relevant_committee_information(committee_data)
+
+            if not committee_data:
+                assert relevant_committee_information == []
+            else:
+                for element in relevant_committee_information:
+                    assert set(element.keys()) == expected_params
+
+    def test_add_committee_data_to_bill_information(self, sample_bill_info):
+        sample_bill = sample_bill_info[0]
+        GetCommittees().add_committee_data_to_bill(sample_bill)
+        assert sample_bill['committees'] != None
+
+    def test_pool_function(self, sample_bill_info):
+        all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
+                                             sample_bill_info)
+        for bill in all_bills:
+            assert bill['committees'] != None
