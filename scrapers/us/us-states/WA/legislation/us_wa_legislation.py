@@ -41,10 +41,12 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
-                                                     all_bills)
+                                                     all_bills[600:610])
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
-    print(all_bills[600:610])
+    all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
+                                                     all_bills)
+    print(all_bills)
 
 class PreProgramFunction:
     def get_biennium(self, year: int):
@@ -176,7 +178,14 @@ class BillDetailsFromBillId:
         return page_soup.find('legislation')
 
 class GetVotes:
+    def add_vote_data_to_bill(self, bill: dict):
+        vote_data = self.get_votes_information_lxml(bill.get('bill_number'))
+        vote_data = self.get_relevant_votes_information(vote_data)
+        bill['votes'] = vote_data
+        return bill
+
     def get_relevant_votes_information(self, vote_data):
+        return_list = []
         if not vote_data:
             return []
         for data in vote_data:
@@ -184,8 +193,45 @@ class GetVotes:
             chamber = data.find('agency').text
             description = data.find('motion').text
             date = data.find('votedate').text
-            passed = data.find('yeavotes').find('count').text
-            
+            yea = data.find('yeavotes').find('count').text
+            nay = data.find('nayvotes').find('count').text
+            nv = data.find('excusedvotes').find('count').text
+            absent = data.find('absentvotes').find('count').text
+            passed = 1 if int(yea) > int(nay) else 0
+            votes = self.__process_votes(data.find('votes').findAll('vote'))
+            return_list.append(
+                {
+                    'date': date,
+                    'description': description,
+                    'yea': yea,
+                    'nay': nay,
+                    'nv': nv,
+                    'absent': absent,
+                    'passed': passed,
+                    'chamber': chamber,
+                    'votes': votes,
+                }
+            )
+        return return_list
+
+    def __process_votes(self, list_of_vote_web_element):
+        return_list = []
+        for vote in list_of_vote_web_element:
+            if len(vote.contents) == 1:
+                pass
+            else:
+                member_id = vote.find('memberid').text
+                legislator = vote.find('name').text
+                votetext = vote.find('vote').text
+                goverlytics_id = scraper_utils.get_legislator_id(source_id=member_id)
+                return_list.append(
+                    {
+                        'goverlytics_id': goverlytics_id,
+                        'legislator': legislator,
+                        'votetext': votetext
+                    }
+                )
+        return return_list
 
     def get_votes_information_lxml(self, bill_number):
         try:
@@ -201,5 +247,5 @@ class GetVotes:
 
 CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
-# if __name__ == '__main__':
-#     program_driver()
+if __name__ == '__main__':
+    program_driver()

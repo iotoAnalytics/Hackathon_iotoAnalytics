@@ -265,3 +265,10 @@ class TestGetVotes:
             else:
                 for element in relevant_vote_information:
                     assert element.keys() == expected_params.keys()
+
+    def test_add_vote_data_to_bill_information(self, sample_bill_info):
+        sample_bill = sample_bill_info[0]
+        GetVotes().add_vote_data_to_bill(sample_bill)
+        assert sample_bill['votes'] != None
+
+# ToDo. Need to add the result from get_relelvant_votes_information to the actual data
