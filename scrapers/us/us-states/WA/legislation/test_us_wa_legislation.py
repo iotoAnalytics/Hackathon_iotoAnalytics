@@ -1,17 +1,16 @@
 import re
 from typing import Iterable
-from bs4 import BeautifulSoup
 import pytest
 import datetime
-import us_wa_legislation
-from us_wa_legislation import PreProgramFunction
-from us_wa_legislation import AllDocumentsByClass 
-from us_wa_legislation import MainFunctions
-from us_wa_legislation import SponsorFromBillId
-from us_wa_legislation import BillDetailsFromBillId
-from us_wa_legislation import GetVotes
-from us_wa_legislation import GetCommittees
-from us_wa_legislation import GetActions
+import data_collector
+from data_collector import PreProgramFunction
+from data_collector import AllDocumentsByClass 
+from data_collector import MainFunctions
+from data_collector import SponsorFromBillId
+from data_collector import BillDetailsFromBillId
+from data_collector import GetVotes
+from data_collector import GetCommittees
+from data_collector import GetActions
 
 class TestGetBiennium:
     def test_when_current_year_is_odd(self):
@@ -30,7 +29,7 @@ class TestGetAllDocumentsByClass:
             "documentClass": "Bills"
         }
         r = MainFunctions().request_page(url, params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_correct_fields_in_return_data(self):
@@ -93,7 +92,7 @@ class TestGetSponsor:
         billId = sample_bill_info[0]['bill_id']
         self.params["billId"] = billId
         r = MainFunctions().request_page(self.url, self.params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_correct_fields_in_return_data(self, sample_bill_info):
@@ -159,7 +158,7 @@ class TestGetBillDetails:
         bill_number = sample_bill_info[0]['bill_number']
         self.params["billNumber"] = int(bill_number)
         r = MainFunctions().request_page(self.url, self.params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_get_relevant_bill_information(self, sample_bill_info):
@@ -206,7 +205,7 @@ class TestGetVotes:
         bill_number = sample_bill_info[0]['bill_number']
         self.params["billNumber"] = int(bill_number)
         r = MainFunctions().request_page(self.url, self.params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_process_no_vote_data(self):
@@ -264,7 +263,7 @@ class TestGetVotes:
 
 @pytest.fixture(scope="class")
 def instance_variable_for_committees_test(request):
-    request.cls.url = 'http://wslwebservices.leg.wa.gov/LegislationService.asmx/GetLegislativeStatusChangesByBillId'
+    request.cls.url = 'http://wslwebservices.leg.wa.gov/CommitteeActionService.asmx/GetCommitteeReferralsByBill'
     request.cls.params = {
             "biennium": PreProgramFunction().get_biennium(2021)
     }
@@ -274,7 +273,7 @@ class TestGetCommittee:
         bill_number = sample_bill_info[1]['bill_number']
         self.params["billNumber"] = int(bill_number)
         r = MainFunctions().request_page(self.url, self.params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_get_committtees_data(self, sample_bill_info, instance_variable_for_committees_test):
@@ -331,7 +330,7 @@ class TestGetActions:
         bill_id = sample_bill_info[1]['bill_id']
         self.params["billId"] = bill_id
         r = MainFunctions().request_page(self.url, self.params)
-        us_wa_legislation.scraper_utils.crawl_delay(us_wa_legislation.crawl_delay)
+        data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
     def test_get_actions_data(self, sample_bill_info, instance_variable_for_actions_test):
