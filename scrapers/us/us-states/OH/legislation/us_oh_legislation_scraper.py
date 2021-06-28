@@ -17,12 +17,13 @@ from pprint import pprint
 from nameparser import HumanName
 import re
 import boto3
+import urllib3
 
 # Other import statements
-
+urllib3.disable_warnings()
 
 state_abbreviation = 'OH'
-database_table_name = 'us_oh_legislation_test'
+database_table_name = 'us_oh_legislation'
 legislator_table_name = 'us_oh_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
@@ -227,7 +228,6 @@ def scrape(info_dict):
             cosponsor_names_lst, cosponsor_ids_lst = [], []
             for cosponsor in cosponsor_section.find_all('a'):
                 cosponsor_id = get_id(fix_sponsor_link(cosponsor.get('href')))
-                # cosponsor_id = scraper_utils.get_legislator_id(source_url=cosponsor_link)
                 cosponsor_ids_lst.append(cosponsor_id)
                 cosponsor_name = cosponsor.text
                 cosponsor_names_lst.append(cosponsor_name)
@@ -241,12 +241,12 @@ def scrape(info_dict):
         if status_html:
             status_lst = status_html.find_all('tr')
             actions, committees = [], []
-            current_action, date_introduced = '', ''
+            current_action, date_introduced = '', None
             for status_el in status_lst:
                 date = edit_date(status_el.find('th', {'class': 'date-cell'}).text)
                 action_by = status_el.find('td', {'class': 'chamber-cell'}).text
                 description = status_el.find('td', {'class': 'action-cell'}).text
-                date_introduced = date if description == 'Introduced' else ''
+                date_introduced = date if description == 'Introduced' else None
                 committee = status_el.find('td', {'class': 'committee-cell'}).text
                 action = {
                     'date': date,
