@@ -105,7 +105,14 @@ def _set_source_id(row, bill_data):
     row.source_id = source_id
 
 def _set_bill_name(row, bill_data):
-    bill_name = bill_data['BillType'] + bill_data['BillNumber']
+    bill_type = bill_data['BillType']
+    bill_number = bill_data['BillNumber']
+
+    if bill_type in bill_number:
+        bill_name = bill_number
+    else:
+        bill_name = bill_data['BillType'] + bill_data['BillNumber']
+
     row.bill_name = bill_name
 
 def _set_session(row, bill_data):
