@@ -20,6 +20,7 @@ LEGISLATOR_TABLE_NAME = 'us_wa_legislators'
 def program_driver():
     print("collecting data...")
     all_bills = data_collector.program_driver()
+    print("processing data...")
     data = process_data(all_bills)
     print("Writing data to database...")
     data_collector.scraper_utils.write_data(data)
@@ -55,7 +56,10 @@ class DataOrganize:
         self.__set_sponsor_info(bill['sponsors'])
         self.row.actions = bill['actions']
         self.__format_actions()
-        self.row.date_introduced = self.row.actions[0]['date']
+        try:
+            self.row.date_introduced = self.row.actions[0]['date']
+        except:
+            self.row.date_introduced = None
         self.row.votes = bill['votes']
         self.__format_votes()
         self.row.bill_text = 'lorem ipsum'
@@ -80,9 +84,9 @@ class DataOrganize:
 
     def __set_sponsor_info(self, sponsors):
         self.row.sponsors = [sponsor['lastname'] for sponsor in sponsors]
-        self.row.sponsors_id = self.__get_sponsors_id(self, sponsors)
+        self.row.sponsors_id = self.__get_sponsors_id(sponsors)
 
-    def __get_sponsors_id(sponsors):
+    def __get_sponsors_id(self, sponsors):
         sponsors_ids = []
         for sponsor in sponsors:
             full_name = sponsor['firstname'] + ' ' + sponsor['lastname']

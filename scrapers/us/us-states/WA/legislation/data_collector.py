@@ -33,7 +33,7 @@ CURRENT_YEAR = CURRENT_DAY.year
 scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION,
                                                DATABASE_TABLE_NAME,
                                                LEGISLATOR_TABLE_NAME)
-crawl_delay = 5
+crawl_delay = 3
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
@@ -108,6 +108,7 @@ class AllDocumentsByClass:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
 
@@ -143,6 +144,7 @@ class SponsorFromBillId:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
         page_soup = soup(request.text, 'lxml')
@@ -191,6 +193,7 @@ class BillDetailsFromBillId:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)  
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
 
@@ -266,6 +269,7 @@ class GetVotes:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
 
@@ -305,6 +309,7 @@ class GetCommittees:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
 
@@ -348,6 +353,7 @@ class GetActions:
         try:
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
         except:
+            print("Ran into a problem requesting. Trying again.")
             scraper_utils.crawl_delay(crawl_delay)
             request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
 
