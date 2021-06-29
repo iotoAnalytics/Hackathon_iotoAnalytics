@@ -36,14 +36,19 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
+    scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
-                                                     all_bills[:2])
+                                                     all_bills)
+    scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
+    scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
                                                      all_bills)
+    scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
                                                      all_bills)
+    scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetActions().add_actions_data_to_bill,
                                                      all_bills)
     return all_bills
@@ -91,7 +96,7 @@ class AllDocumentsByClass:
             'bill_number': name,
             'htmurl': htmlurl,
             'pdfurl': pdfurl,
-            'bill_id': billid 
+            'bill_id': billid
         }
 
     def get_all_bill_information_lxml(self):
@@ -100,6 +105,7 @@ class AllDocumentsByClass:
             "documentClass": "Bills"
         }
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+        scraper_utils.crawl_delay(0.1)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativedocument')
 
@@ -130,6 +136,8 @@ class SponsorFromBillId:
             "billId": bill_id
         }
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+            # request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+        scraper_utils.crawl_delay(0.1)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('sponsor')
 
@@ -174,6 +182,7 @@ class BillDetailsFromBillId:
         except:
             print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+        scraper_utils.crawl_delay(0.1)  
         page_soup = soup(request.text, 'lxml')
         return page_soup.find('legislation')
 
@@ -197,6 +206,7 @@ class GetVotes:
             nay = data.find('nayvotes').find('count').text
             nv = data.find('excusedvotes').find('count').text
             absent = data.find('absentvotes').find('count').text
+            total = int(yea) + int(nay) + int(nv) + int(absent)
             passed = 1 if int(yea) > int(nay) else 0
             votes = self.__process_votes(data.find('votes').findAll('vote'))
             return_list.append(
@@ -207,6 +217,7 @@ class GetVotes:
                     'nay': nay,
                     'nv': nv,
                     'absent': absent,
+                    'total': total,
                     'passed': passed,
                     'chamber': chamber,
                     'votes': votes,
@@ -242,6 +253,7 @@ class GetVotes:
         except:
             print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+        scraper_utils.crawl_delay(0.1)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('rollcall')
 
@@ -276,6 +288,7 @@ class GetCommittees:
         except:
             print(bill_number)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+        scraper_utils.crawl_delay(0.1)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('committee')
 
@@ -314,6 +327,7 @@ class GetActions:
         except:
             print(bill_id)
         request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+        scraper_utils.crawl_delay(0.1)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativestatus')
 
