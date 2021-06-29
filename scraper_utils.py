@@ -20,6 +20,7 @@ from database import Database, CursorFromConnectionFromPool, Persistence
 from dataclasses import dataclass, field
 from typing import List
 from rows import *
+import row_validator
 import copy
 # import atexit
 import utils
@@ -217,6 +218,9 @@ class ScraperUtils:
         row.country_id = self.country_id
         row.country = self.country
         return row
+
+    def validate_row_format(self, row):
+        row_validator.Validator(row)
 
     class Timer:
         """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to
