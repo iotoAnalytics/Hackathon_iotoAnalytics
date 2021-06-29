@@ -6,12 +6,12 @@ import os
 import re
 import sys
 from datetime import datetime
+from functools import partial
 
 import pdfplumber
 import requests
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
-from nameparser import HumanName
 from pathlib import Path
 from pprint import pprint
 from tqdm import tqdm
@@ -25,11 +25,9 @@ from scraper_utils import USStateLegislationScraperUtils
 DEBUG_MODE = False
 
 STATE_ABBREVIATION = 'SD'
-DATABASE_TABLE_NAME = 'us_sd_legislation_test'
+DATABASE_TABLE_NAME = 'us_sd_legislation'
 LEGISLATOR_TABLE_NAME = 'us_sd_legislators'
-
 BASE_URL = 'https://sdlegislature.gov/'
-SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 
@@ -80,7 +78,7 @@ def set_bill_data(bill_data, search_table=None):
         _set_bill_name(row, bill_data)
         _set_session(row, bill_data)
         _set_date_introduced(row, bill_data)
-        _set_source_url(row, bill_data)
+        _set_source_url(row, bill_id)
         _set_chamber_origin(row, bill_data)
         _set_committees(row, bill_data)
         _set_bill_type(row, bill_data)
@@ -94,8 +92,8 @@ def set_bill_data(bill_data, search_table=None):
         _set_votes(row, bill_id)
         _set_source_topic(row, bill_data, search_table['topic_index'])
         _set_goverlytics_id(row)
-    except:
-        print('Error with: ', row.source_url)
+    except Exception:
+        print(f'Error with: {bill_id}')
 
     return row
 
@@ -124,8 +122,7 @@ def _format_date(date):
     if date:= re.search(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', date):
         return datetime.strptime(date.group(0), r'%Y-%m-%d')
 
-def _set_source_url(row, bill_data):
-    bill_id = str(bill_data['BillId'])
+def _set_source_url(row, bill_id):
     source_url = f'https://sdlegislature.gov/Session/Bill/{bill_id}'
     row.source_url = source_url
 
@@ -191,8 +188,9 @@ def _set_current_status(row, bill_id):
     response = scraper_utils.request(f'https://sdlegislature.gov/api/Bills/ActionLog/{bill_id}').json()
     scraper_utils.crawl_delay(crawl_delay)
     
-    current_status = response[-1]['StatusText']
-    row.current_status = current_status
+    if response:
+        current_status = response[-1]['StatusText']
+        row.current_status = current_status
 
 def _set_principal_sponsor(row, bill_data, legislator_members_data):
     sponsors_sid = bill_data['PrimeSponsors']
@@ -210,7 +208,7 @@ def _get_sponsor_id(source_id):
 def _get_sponsor_name(source_id, legislator_members_data):
     for member in legislator_members_data:
         if member['SessionMemberId'] == source_id:
-            full_name = f"{member['FirstName']}{member['LastName']}"
+            full_name = f"{member['FirstName']} {member['LastName']}"
             return full_name
 
 def _set_sponsors(row, bill_data, legislator_members_data):
@@ -220,7 +218,7 @@ def _set_sponsors(row, bill_data, legislator_members_data):
     sponsors_id = []
     sponsors = []
 
-    # Set as sponsors if there are more than one prime sponsors 
+    # Set prime sponsors as sponsors if there are more than one prime sponsors 
     if has_more_than_one_prime_sponsors:
         for sponsor_sid in sponsors_sid:
             sponsors_id.append(scraper_utils.get_legislator_id(source_id=sponsor_sid))
@@ -232,7 +230,7 @@ def _set_sponsors(row, bill_data, legislator_members_data):
     if bill_data['Sponsors']:
         return
 
-    # Set committee as sponsor
+    # Set committee as a sponsor
     if session_committee_id:= bill_data['SessionCommitteeId']:
         committee_name = _get_committee_name(session_committee_id, 'session')
     if interim_committee_id:= bill_data['InterimCommitteeId']:
@@ -246,9 +244,14 @@ def _set_cosponsors(row, bill_data, legislator_members_data):
     cosponsors_id = []
     cosponsors = []
 
-    sponsors_data = bill_data['Sponsors']
-    if sponsors_data:
+    prime_sponsors_sid = bill_data['PrimeSponsors']
+
+    if sponsors_data:= bill_data['Sponsors']:
         for sponsor_sid in sponsors_data:
+            # Don't add prime sponsors as cosponsors
+            if sponsor_sid in prime_sponsors_sid:
+                continue
+
             cosponsors_id.append(scraper_utils.get_legislator_id(source_id=sponsor_sid))
             cosponsors.append(_get_sponsor_name(sponsor_sid, legislator_members_data))
 
@@ -279,13 +282,14 @@ def _set_actions(row, bill_id):
     scraper_utils.crawl_delay(crawl_delay)
     
     for action_data in response:
-        action = {
-            'date': _format_date(action_data['ActionDate']),
-            'action_by': CHAMBER_FULL.get(action_data['ActionCommittee']['Body']),
-            'description': action_data['Description']
-        }
-        actions.append(action)
-
+        if action_data['ActionCommittee']:
+            action = {
+                'date': _format_date(action_data['ActionDate']),
+                'action_by': CHAMBER_FULL.get(action_data['ActionCommittee']['Body']),
+                'description': action_data['Description']
+            }
+            actions.append(action)
+        
     row.actions = actions
 
 def _set_votes(row, bill_id):
@@ -309,7 +313,7 @@ def _get_votes_id_and_status(bill_id):
             vote_id = action_data['Vote']['VoteId']
             vote_status = action_data['Result']
             votes_id_and_status.append((vote_id, vote_status))
-        except:
+        except Exception:
             pass
 
     return votes_id_and_status
@@ -349,12 +353,14 @@ def _get_votes_data(vote_ias):
 
 def _set_source_topic(row, bill_data, topic_index):
     topics_id = bill_data['Keywords']
-    source_topic = ""
+    source_topic = []
 
     for topic_id in topics_id:
-        source_topic += _get_topic(topic_id, topic_index) + ', '
+        topic = _get_topic(topic_id, topic_index)
+        source_topic.append(topic)
     else:
-        source_topic += _get_topic(topic_id, topic_index)
+        # Change to string format
+        source_topic = ', '.join(source_topic)    
 
     row.source_topic = source_topic
 
@@ -371,27 +377,33 @@ def main():
     print('\nSCRAPING SOUTH DAKOTA LEGISLATION\n')
 
     # Get session data and IDs
+    print(DEBUG_MODE and 'Retrieving session data and IDs...\n' or '', end='')
     session_data = get_current_session_data()
     session_id = get_current_session_id(session_data)
     session_bills_data = get_current_session_bills_data(session_id)
 
     # Populate search_table
+    print(DEBUG_MODE and 'Populating search tables for easier lookup...\n' or '', end='')
     search_table = {
         'legislator_members_data': get_session_members_data(session_id),
         'topic_index': get_topic_index(session_id) 
     }
 
-    # Get legislation data
+    # Initialize sessions into members data
+    print(DEBUG_MODE and 'Initializing sessions into members data...\n' or '', end='')
     session_number = get_session_number(session_id)
-
-    # Initialize most_recent_term_id and areas_served into members data
     for bill_data in session_bills_data:
         init_session(bill_data, session_number)
 
     # Set fields
-    data = [set_bill_data(bill_data, search_table) for bill_data in tqdm(session_bills_data)]
+    print(DEBUG_MODE and 'Setting fields of legislation rows...\n' or '', end='')
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        data = list(tqdm(pool.imap(partial(set_bill_data, search_table=search_table), session_bills_data)))
 
-    # pprint(data, width=200)
+    # Write to database
+    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
+    if not DEBUG_MODE:
+        scraper_utils.write_data(data)
 
 if __name__ == '__main__':
     main()
