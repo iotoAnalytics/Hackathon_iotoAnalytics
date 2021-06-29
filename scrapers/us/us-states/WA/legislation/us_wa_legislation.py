@@ -43,7 +43,7 @@ class DataOrganize:
         self.row.session = data_collector.CURRENT_BIENNIUM
         self.row.bill_name = bill['bill_number']
         self.row.goverlytics_id = self.__set_goverlytics_id()
-        self.row.source_url = self.__format_source_url(bill['pdfurl'])
+        self.row.source_url = bill['htmurl']
         self.row.chamber_origin = bill['chamber_origin']
         self.row.committees = bill['committees']
         self.row.bill_type = bill['bill_type']
@@ -60,14 +60,11 @@ class DataOrganize:
             self.row.date_introduced = None
         self.row.votes = bill['votes']
         self.__format_votes()
-        self.row.bill_text = 'lorem ipsum'
+        self.row.bill_text = ''
     
     def __set_goverlytics_id(self):
         session = self.row.session.split('-')[0] + '20' + self.row.session.split('-')[1]
         return STATE_ABBREVIATION + '_' + session + '_' +self.row.bill_name
-
-    def __format_source_url(self, url):
-        return url.replace(' ', '_')
 
     def __set_principal_sponsor_data(self, sponsors):
         primary_sponsor = self.__find_primary_sponsor(sponsors)
