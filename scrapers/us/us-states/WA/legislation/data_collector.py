@@ -32,7 +32,7 @@ CURRENT_YEAR = CURRENT_DAY.year
 scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION,
                                                DATABASE_TABLE_NAME,
                                                LEGISLATOR_TABLE_NAME)
-crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
+crawl_delay = 3
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
@@ -54,19 +54,36 @@ class PreProgramFunction:
             past_year = year - 1
             return str(past_year) + '-' + str(year)[2:]
         else:
-            next_year = year + 1
+            next_year = year + 1    
             return str(year) + '-' + str(next_year)[2:]
 
 class MainFunctions:
-    def request_page(self, url, params):
-        return requests.get(url, params=params)
-
     def append_data_to_bills(self, function, iterable):
         data = []
         with Pool(THREADS_FOR_POOL) as pool:
             data = (pool.map(func=function,
                         iterable=iterable))
         return data
+
+    def get_params(self, key, value):
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                key: value
+            }
+            return params
+        except:
+            print(f'There was a problem getting {value}')
+
+    def get_request(self, url, params):
+        try:
+            request = requests.get(url, params=params)
+        except:
+            print("Ran into a problem requesting. Trying again.")
+            scraper_utils.crawl_delay(crawl_delay)
+            request = requests.get(url, params=params)
+        finally:
+            return request
 
 class AllDocumentsByClass:
     def get_data(self):
@@ -91,15 +108,13 @@ class AllDocumentsByClass:
             'bill_number': name,
             'htmurl': htmlurl,
             'pdfurl': pdfurl,
-            'bill_id': billid 
+            'bill_id': billid
         }
 
     def get_all_bill_information_lxml(self):
-        params = {
-            "biennium": CURRENT_BIENNIUM,
-            "documentClass": "Bills"
-        }
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+        params = MainFunctions().get_params("documentClass", "Bills")
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativedocument')
 
@@ -125,11 +140,8 @@ class SponsorFromBillId:
             }
 
     def get_sponsor_information_for_bill_lxml(self, bill_id):
-        params = {
-            "biennium": CURRENT_BIENNIUM,
-            "billId": bill_id
-        }
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+        params = MainFunctions().get_params('billId', bill_id)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_SPONSORS, params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('sponsor')
 
@@ -166,14 +178,9 @@ class BillDetailsFromBillId:
             }
 
     def get_bill_details_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.find('legislation')
 
@@ -197,6 +204,7 @@ class GetVotes:
             nay = data.find('nayvotes').find('count').text
             nv = data.find('excusedvotes').find('count').text
             absent = data.find('absentvotes').find('count').text
+            total = int(yea) + int(nay) + int(nv) + int(absent)
             passed = 1 if int(yea) > int(nay) else 0
             votes = self.__process_votes(data.find('votes').findAll('vote'))
             return_list.append(
@@ -207,6 +215,7 @@ class GetVotes:
                     'nay': nay,
                     'nv': nv,
                     'absent': absent,
+                    'total': total,
                     'passed': passed,
                     'chamber': chamber,
                     'votes': votes,
@@ -234,14 +243,9 @@ class GetVotes:
         return return_list
 
     def get_votes_information_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('rollcall')
 
@@ -268,14 +272,9 @@ class GetCommittees:
         return return_list
 
     def get_committees_data_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('committee')
 
@@ -304,6 +303,7 @@ class GetActions:
     def get_actions_data_lxml(self, bill_id):
         year = CURRENT_BIENNIUM.split('-')[0]
         #biennium begins second week of January of odd numbered year
+        params = MainFunctions().get_params('actions', bill_id)
         try:
             params = {
                 "biennium": CURRENT_BIENNIUM,
@@ -312,8 +312,9 @@ class GetActions:
                 "endDate": datetime.datetime.now()
             }
         except:
-            print(bill_id)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+            print(f"There was a problem requesting {bill_id}")
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativestatus')
 
@@ -321,3 +322,4 @@ CURRENT_BIENNIUM = PreProgramFunction().get_biennium(CURRENT_YEAR)
 
 if __name__ == "__main__":
     print("data_collector called directly...")
+    print(program_driver())

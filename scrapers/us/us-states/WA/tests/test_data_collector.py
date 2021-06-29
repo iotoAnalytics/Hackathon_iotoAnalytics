@@ -2,7 +2,15 @@ import re
 from typing import Iterable
 import pytest
 import datetime
-import data_collector
+import os
+import sys
+from pathlib import Path
+
+NODES_TO_LEGISLATION_FOLDER = 1
+path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_LEGISLATION_FOLDER].joinpath("legislation")
+sys.path.insert(0, str(path_to_root))
+
+import data_collector 
 from data_collector import PreProgramFunction
 from data_collector import AllDocumentsByClass 
 from data_collector import MainFunctions
@@ -28,7 +36,7 @@ class TestGetAllDocumentsByClass:
             "biennium": PreProgramFunction().get_biennium(2021),
             "documentClass": "Bills"
         }
-        r = MainFunctions().request_page(url, params)
+        r = MainFunctions().get_request(url, params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
@@ -91,7 +99,7 @@ class TestGetSponsor:
     def test_get_sponsor_request(self, sample_bill_info, instance_variable_for_sponsor_test):
         billId = sample_bill_info[0]['bill_id']
         self.params["billId"] = billId
-        r = MainFunctions().request_page(self.url, self.params)
+        r = MainFunctions().get_request(self.url, self.params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
@@ -157,7 +165,7 @@ class TestGetBillDetails:
     def test_get_detail_request(self, sample_bill_info, instance_variable_for_bill_detail_test):
         bill_number = sample_bill_info[0]['bill_number']
         self.params["billNumber"] = int(bill_number)
-        r = MainFunctions().request_page(self.url, self.params)
+        r = MainFunctions().get_request(self.url, self.params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
@@ -204,7 +212,7 @@ class TestGetVotes:
     def test_get_votes_request(self, sample_bill_info, instance_variable_for_bill_votes_test):
         bill_number = sample_bill_info[0]['bill_number']
         self.params["billNumber"] = int(bill_number)
-        r = MainFunctions().request_page(self.url, self.params)
+        r = MainFunctions().get_request(self.url, self.params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
@@ -235,6 +243,7 @@ class TestGetVotes:
             'nay': '',
             'nv': '',
             'absent': '',
+            'total':'',
             'passed': '',
             'chamber': '',
             'votes': [],
@@ -272,7 +281,7 @@ class TestGetCommittee:
     def test_get_committee_request(self, sample_bill_info, instance_variable_for_committees_test):
         bill_number = sample_bill_info[1]['bill_number']
         self.params["billNumber"] = int(bill_number)
-        r = MainFunctions().request_page(self.url, self.params)
+        r = MainFunctions().get_request(self.url, self.params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
@@ -329,7 +338,7 @@ class TestGetActions:
     def test_get_actions_request(self, sample_bill_info, instance_variable_for_actions_test):
         bill_id = sample_bill_info[1]['bill_id']
         self.params["billId"] = bill_id
-        r = MainFunctions().request_page(self.url, self.params)
+        r = MainFunctions().get_request(self.url, self.params)
         data_collector.scraper_utils.crawl_delay(data_collector.crawl_delay)
         assert r.status_code == 200
 
