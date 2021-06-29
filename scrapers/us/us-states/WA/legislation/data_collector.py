@@ -12,6 +12,7 @@ from scraper_utils import USStateLegislationScraperUtils
 from multiprocessing import Pool
 from bs4 import BeautifulSoup as soup
 import requests
+import urllib3
 
 STATE_ABBREVIATION = 'WA'
 DATABASE_TABLE_NAME = 'us_wa_legislation'
@@ -32,23 +33,23 @@ CURRENT_YEAR = CURRENT_DAY.year
 scraper_utils = USStateLegislationScraperUtils(STATE_ABBREVIATION,
                                                DATABASE_TABLE_NAME,
                                                LEGISLATOR_TABLE_NAME)
-crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
+crawl_delay = 5
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
-    scraper_utils.crawl_delay(crawl_delay)
+    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
                                                      all_bills)
-    scraper_utils.crawl_delay(crawl_delay)
+    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
-    scraper_utils.crawl_delay(crawl_delay)
+    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
                                                      all_bills)
-    scraper_utils.crawl_delay(crawl_delay)
+    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
                                                      all_bills)
-    scraper_utils.crawl_delay(crawl_delay)
+    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetActions().add_actions_data_to_bill,
                                                      all_bills)
     return all_bills
@@ -59,7 +60,7 @@ class PreProgramFunction:
             past_year = year - 1
             return str(past_year) + '-' + str(year)[2:]
         else:
-            next_year = year + 1
+            next_year = year + 1    
             return str(year) + '-' + str(next_year)[2:]
 
 class MainFunctions:
@@ -104,8 +105,12 @@ class AllDocumentsByClass:
             "biennium": CURRENT_BIENNIUM,
             "documentClass": "Bills"
         }
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
-        scraper_utils.crawl_delay(0.1)
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativedocument')
 
@@ -135,9 +140,11 @@ class SponsorFromBillId:
             "biennium": CURRENT_BIENNIUM,
             "billId": bill_id
         }
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
-            # request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
-        scraper_utils.crawl_delay(0.1)
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('sponsor')
 
@@ -181,8 +188,12 @@ class BillDetailsFromBillId:
             }
         except:
             print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
-        scraper_utils.crawl_delay(0.1)  
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)  
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.find('legislation')
 
@@ -252,8 +263,12 @@ class GetVotes:
             }
         except:
             print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
-        scraper_utils.crawl_delay(0.1)
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('rollcall')
 
@@ -287,8 +302,12 @@ class GetCommittees:
             }
         except:
             print(bill_number)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
-        scraper_utils.crawl_delay(0.1)
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('committee')
 
@@ -326,8 +345,12 @@ class GetActions:
             }
         except:
             print(bill_id)
-        request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
-        scraper_utils.crawl_delay(0.1)
+        try:
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+        except:
+            scraper_utils.crawl_delay(crawl_delay)
+            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativestatus')
 
