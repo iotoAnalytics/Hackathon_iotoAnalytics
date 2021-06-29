@@ -12,7 +12,6 @@ from scraper_utils import USStateLegislationScraperUtils
 from multiprocessing import Pool
 from bs4 import BeautifulSoup as soup
 import requests
-import urllib3
 
 STATE_ABBREVIATION = 'WA'
 DATABASE_TABLE_NAME = 'us_wa_legislation'
@@ -37,19 +36,14 @@ crawl_delay = 3
 
 def program_driver():
     all_bills = AllDocumentsByClass().get_data()
-    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(SponsorFromBillId().add_sponsor_info_to_bill,
                                                      all_bills)
-    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(BillDetailsFromBillId().add_bill_details_to_bill,
                                                      all_bills)
-    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetVotes().add_vote_data_to_bill,
                                                      all_bills)
-    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetCommittees().add_committee_data_to_bill,
                                                      all_bills)
-    # scraper_utils.crawl_delay(crawl_delay)
     all_bills = MainFunctions().append_data_to_bills(GetActions().add_actions_data_to_bill,
                                                      all_bills)
     return all_bills
@@ -64,15 +58,32 @@ class PreProgramFunction:
             return str(year) + '-' + str(next_year)[2:]
 
 class MainFunctions:
-    def request_page(self, url, params):
-        return requests.get(url, params=params)
-
     def append_data_to_bills(self, function, iterable):
         data = []
         with Pool(THREADS_FOR_POOL) as pool:
             data = (pool.map(func=function,
                         iterable=iterable))
         return data
+
+    def get_params(self, key, value):
+        try:
+            params = {
+                "biennium": CURRENT_BIENNIUM,
+                key: value
+            }
+            return params
+        except:
+            print(f'There was a problem getting {value}')
+
+    def get_request(self, url, params):
+        try:
+            request = requests.get(url, params=params)
+        except:
+            print("Ran into a problem requesting. Trying again.")
+            scraper_utils.crawl_delay(crawl_delay)
+            request = requests.get(url, params=params)
+        finally:
+            return request
 
 class AllDocumentsByClass:
     def get_data(self):
@@ -101,16 +112,8 @@ class AllDocumentsByClass:
         }
 
     def get_all_bill_information_lxml(self):
-        params = {
-            "biennium": CURRENT_BIENNIUM,
-            "documentClass": "Bills"
-        }
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILLS, params=params)
+        params = MainFunctions().get_params("documentClass", "Bills")
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_BILLS, params=params)
 
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativedocument')
@@ -137,16 +140,8 @@ class SponsorFromBillId:
             }
 
     def get_sponsor_information_for_bill_lxml(self, bill_id):
-        params = {
-            "biennium": CURRENT_BIENNIUM,
-            "billId": bill_id
-        }
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_SPONSORS, params=params)
+        params = MainFunctions().get_params('billId', bill_id)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_SPONSORS, params)
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('sponsor')
 
@@ -183,19 +178,8 @@ class BillDetailsFromBillId:
             }
 
     def get_bill_details_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)  
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_BILL_DETAILS, params=params)
 
         page_soup = soup(request.text, 'lxml')
         return page_soup.find('legislation')
@@ -259,19 +243,8 @@ class GetVotes:
         return return_list
 
     def get_votes_information_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_VOTES, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_VOTES, params=params)
 
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('rollcall')
@@ -299,19 +272,8 @@ class GetCommittees:
         return return_list
 
     def get_committees_data_lxml(self, bill_number):
-        try:
-            params = {
-                "biennium": CURRENT_BIENNIUM,
-                "billNumber": int(bill_number)
-            }
-        except:
-            print(bill_number)
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
+        params = MainFunctions().get_params('billNumber', bill_number)
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_COMMITTEES, params=params)
 
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('committee')
@@ -341,6 +303,7 @@ class GetActions:
     def get_actions_data_lxml(self, bill_id):
         year = CURRENT_BIENNIUM.split('-')[0]
         #biennium begins second week of January of odd numbered year
+        params = MainFunctions().get_params('actions', bill_id)
         try:
             params = {
                 "biennium": CURRENT_BIENNIUM,
@@ -349,13 +312,8 @@ class GetActions:
                 "endDate": datetime.datetime.now()
             }
         except:
-            print(bill_id)
-        try:
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
-        except:
-            print("Ran into a problem requesting. Trying again.")
-            scraper_utils.crawl_delay(crawl_delay)
-            request = MainFunctions().request_page(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
+            print(f"There was a problem requesting {bill_id}")
+        request = MainFunctions().get_request(REQUEST_URL_FOR_GETTING_ACTIONS, params=params)
 
         page_soup = soup(request.text, 'lxml')
         return page_soup.findAll('legislativestatus')

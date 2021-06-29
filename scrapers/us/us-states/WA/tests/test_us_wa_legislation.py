@@ -5,10 +5,11 @@ import os
 import json
 
 NODES_TO_LEGISLATION_FOLDER = 1
-path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_LEGISLATION_FOLDER]
+path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_LEGISLATION_FOLDER].joinpath("legislation")
 sys.path.insert(0, str(path_to_root))
 
-from legislation.us_wa_legislation import DataOrganize
+#ignore this warning, it should work..! Something with the path above.
+from us_wa_legislation import DataOrganize
 
 @pytest.fixture
 def sample_data(request):
@@ -18,8 +19,7 @@ def sample_data(request):
 
 class TestRow:
     def test_current_biennium(self, sample_data):
-        data = DataOrganize()
-        data.set_rows(sample_data)
+        data = DataOrganize(sample_data)
 
         assert data.row.goverlytics_id == "WA_20212022_1001"
         assert data.row.session == "2021-22" 

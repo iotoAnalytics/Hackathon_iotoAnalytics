@@ -1,4 +1,3 @@
-import datetime
 import sys
 import os
 from pathlib import Path
@@ -18,14 +17,13 @@ DATABASE_TABLE_NAME = 'us_wa_legislation'
 LEGISLATOR_TABLE_NAME = 'us_wa_legislators'
 
 def program_driver():
-    print("collecting data...")
+    print("collecting bills...")
     all_bills = data_collector.program_driver()
     print("processing data...")
     data = process_data(all_bills)
     print("Writing data to database...")
     data_collector.scraper_utils.write_data(data)
     print("Complete")
-
     
 def process_data(bills):
     data = []
