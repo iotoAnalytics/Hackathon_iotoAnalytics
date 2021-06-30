@@ -276,7 +276,6 @@ def scrape(url):
 
     # why are senators and reps laid out complete differently...
     if url[-1] == 'H':
-        pass
         get_representative_name(url, row)
         get_representative_email(url, row)
         get_representative_addresses(url, row)
