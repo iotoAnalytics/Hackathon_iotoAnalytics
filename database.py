@@ -133,6 +133,26 @@ class CursorFromConnectionFromPool:
 class Persistence:
     """Class for writing collected data to database"""
     @staticmethod
+    def write_sam_data_test(table):
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        name text PRIMARY KEY,
+                        number int
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
+                """).format(table=sql.Identifier(table))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            except:
+                print('Didn\'t work...')
+
+
+    @staticmethod
     def write_us_fed_legislation(data, table):
         if not isinstance(data, list):
             raise TypeError(
