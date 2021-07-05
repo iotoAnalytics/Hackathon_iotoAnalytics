@@ -4,13 +4,34 @@ from rows import *
 
 class RowValidator:
     @abc.abstractmethod
-    def validate_rows(self, rows):
+    def validate_row(self, row):
         pass
+
+    def validate_rows(self, rows):
+        try:
+            for row in rows:
+                self.validate_row(row)
+            print("All rows are valid!")
+        except Exception as e:
+            print(f"Error in bill: {row.bill_name}")
+            print(e.with_traceback())
 
     def raise_exception(self, message):
         raise Exception(message)
 
 class LegislationRowValidator(RowValidator):
+    def validate_universal_rows(self, row):
+        self._test_goverlytics_id(row)
+        self._test_text_components(row)
+        self._test_date_introduced(row)
+        self._test_source_url(row)
+        self._test_committees(row)
+        self._test_principal_sponsor(row)
+        self._test_sponsors(row)
+        self._test_cosponsors(row)
+        self._test_actions(row)
+        self._test_votes(row)
+
     def _test_goverlytics_id(self, row):
         if type(row.goverlytics_id) != str:
             self.raise_exception("goverlytics_id must be a string")
@@ -154,21 +175,40 @@ class LegislationRowValidator(RowValidator):
                 self.raise_exception("vote data must have a valid legislator vote")
 
 class USLegislationRowValidator(LegislationRowValidator):
-    def validate_rows(self, row):
-        self._test_goverlytics_id(row)
-        self._test_text_components(row)
-        self._test_date_introduced(row)
-        self._test_source_url(row)
-        self._test_committees(row)
-        self._test_principal_sponsor(row)
-        self._test_sponsors(row)
-        self._test_cosponsors(row)
-        self._test_actions(row)
-        self._test_votes(row)
+    def validate_row(self, row):
+        self.validate_universal_rows(row)
+        self._test_state_id(row)
+        self._test_state(row)
 
+    def _test_state_id(self, row):
+        if type(row.country_id) != int or not row.country_id:
+            self.raise_exception("state_id must be an int")
+    
+    def _test_state(self, row):
+        if type(row.state) != str or not row.state:
+            self.raise_exception("state must be a string")
+        if len(row.state) != 2:
+            self.raise_exception("state must be in abbreviated form (ex. AL, TX)")
 
 class CALegislationRowValidator(LegislationRowValidator):
-    pass
+    def validate_row(self, row):
+        self.validate_universal_rows(row)
+        self._test_province_territory_id(row)
+        self._test_province_territory(row)
+
+    def _test_province_territory_id(self, row):
+        if type(row.province_territory_id) != int or not row.province_territory_id:
+            self.raise_exception("province_territory_id must be an int")
+
+    def _test_province_territory(self, row):
+        if type(row.province_territory) != str or not row.province_territory:
+            self.raise_exception("province_territory must be a string")
+        if len(row.province_territory) != 2:
+            self.raise_exception("province_territory must be abbreviated (ex. BC, SK)")
+        
+    def _test_region(self, row):
+        if type(row.region) != str or not row.region:
+            self.raise_exception("region must be a string (ex. Prairies)")
 
 class CAFedLegislationRowValidator(CALegislationRowValidator):
     pass
@@ -196,12 +236,14 @@ class Validator:
         type(CAFedLegislatorRow()): CAFedLegislatorRowValidator()
     }
 
-    def __init__(self, row):
-        self.row = row
-        validator = self.assign_validator()
-        validator.validate_rows(self.row)
+    def __init__(self, row_type):
+        self.validator = self.assign_validator(row_type)
 
-    def assign_validator(self) -> RowValidator:
-        row_type = type(self.row)
+    def assign_validator(self, row_type) -> RowValidator:
         return self.validators.get(row_type)
 
+    def validate_row(self, row):
+        self.validator.validate_rows(row)
+
+    def validate_rows(self, rows):
+        self.validator.validate_rows(rows)
