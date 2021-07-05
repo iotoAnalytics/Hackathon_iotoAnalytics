@@ -42,7 +42,7 @@ class LegislationRowValidator(RowValidator):
 
     def _test_date_introduced(self, row):
         date = row.date_introduced
-        if not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', date):
+        if date and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', date):
             self.raise_exception("Improper date formating in date_introduced")
 
     def _test_source_url(self, row):
@@ -118,6 +118,40 @@ class LegislationRowValidator(RowValidator):
             if not action['description'] or type(action['description']) != str:
                 self.raise_exception("action data requires a valid description in string format")
 
+    def _test_votes(self, row):
+        votes = row.votes
+        if type(votes) != list:
+            self.raise_exception("votes data must be formatted as a list of dictionaries")
+        for vote in votes:
+            if type(vote) != dict:
+                self.raise_exception("votes data must be formatted as a list of dictionaries")
+            date = vote['date']
+            if not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', date):
+                self.raise_exception("Improper date formating in date")
+            if type(vote['description']) != str or not vote['description']:
+                self.raise_exception("votes data must have description attribute in string format")
+            if type(vote['yea']) != int or type(vote['nay']) != int or \
+                    type(vote['nv']) != int or type(vote['absent']) != int or type(vote['total']) != int:
+                self.raise_exception('vote numbers for votes data must be in numeral format')
+            if vote['yea'] + vote['nay'] + vote['nv'] + vote['absent'] != vote['total']:
+                self.raise_exception('all the votes do not add up to the total')
+            if vote['passed'] != 0 and vote['passed'] != 1:
+                self.raise_exception('vote passed data must be 0 (not passed) or 1 (passed)')
+            vote_data = vote['votes']
+            self.__test_vote_data(vote_data)
+
+    def __test_vote_data(self, vote_data):
+        if type(vote_data) != list:
+            self.raise_exception("voting data in votes must be formatted as a list of dictionaries")
+        for vote in vote_data:
+            if type(vote) != dict:
+                self.raise_exception("voting data in votes must be formatted as a list of dictionaries")
+            if not vote['goverlytics_id']:
+                self.raise_exception("votes data must have a valid goverlytics_id")
+            if not vote['legislator']:
+                self.raise_exception("votes data must have a valid legislator")
+            if not vote['votetext']:
+                self.raise_exception("vote data must have a valid legislator vote")
 
 class USLegislationRowValidator(LegislationRowValidator):
     def validate_rows(self, row):
@@ -130,6 +164,7 @@ class USLegislationRowValidator(LegislationRowValidator):
         self._test_sponsors(row)
         self._test_cosponsors(row)
         self._test_actions(row)
+        self._test_votes(row)
 
 
 class CALegislationRowValidator(LegislationRowValidator):
@@ -165,7 +200,6 @@ class Validator:
         self.row = row
         validator = self.assign_validator()
         validator.validate_rows(self.row)
-        print("All validation passed!")
 
     def assign_validator(self) -> RowValidator:
         row_type = type(self.row)
