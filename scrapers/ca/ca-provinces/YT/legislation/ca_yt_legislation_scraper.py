@@ -96,6 +96,7 @@ class SessionScraper:
         session.click()
         self.current_session = self.__get_current_session_as_num(session)
         self.data = self.__scrape()
+        self.__validate_data(self.data)
     
     def __get_current_session_as_num(self, session):
         session_as_text = session.text.split(' - ')[1]
@@ -189,7 +190,7 @@ class SessionScraper:
     def __get_date(self, bill_row):
         first_reading = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.First_Reading.value].text
         date = datetime.datetime.strptime(first_reading, '%B %d, %Y')
-        date = date.strftime('%Y-%b-%d')
+        date = date.strftime('%Y-%m-%d')
         return date
 
     def __get_bill_title(self, bill_row):
@@ -200,10 +201,12 @@ class SessionScraper:
 
     def __get_principal_sponsor(self, bill_row):
         name = bill_row.find_elements_by_tag_name('td')[SessionScraper.TableRow.Sponsor.value].text
-        return re.findall('[A-Za-z]+', name)[0]
+        name = re.findall('[A-Za-z]+', name)[0]
+        name_full = scraper_utils.legislators_search_startswith("name_full", "name_last", name, name_last=name)
+        return name_full
 
     def __get_principal_sponsor_id(self, row):
-        search_for = {'name_last' : row.principal_sponsor}
+        search_for = {'name_full' : row.principal_sponsor}
         try:
             sponsor_id = scraper_utils.get_legislator_id(** search_for)
             sponsor_id = int(sponsor_id)
@@ -351,6 +354,10 @@ class SessionScraper:
         text = text.replace('\n', ' ')
         text = text.replace('  ', ' ')
         return text.strip()
+
+    def __validate_data(self, rows):
+        validator = scraper_utils.get_row_validator()
+        validator.validate_rows(rows)
 
 if __name__ == '__main__':
     main_program = Main_Program()
