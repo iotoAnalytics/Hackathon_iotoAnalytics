@@ -1,12 +1,21 @@
 import abc
+from datetime import date
 import re
+
+from torch import are_deterministic_algorithms_enabled
 from rows import *
+
+#TODO format to test for text and int, then remaining just as it is.
 
 class RowValidator:
     @abc.abstractmethod
     def validate_row(self, row):
         pass
 
+    def raise_exception(self, message):
+        raise Exception(message)
+
+class LegislationRowValidator(RowValidator):
     def validate_rows(self, rows):
         try:
             for row in rows:
@@ -16,11 +25,7 @@ class RowValidator:
             print(f"Error in bill: {row.bill_name}")
             print(e.with_traceback())
 
-    def raise_exception(self, message):
-        raise Exception(message)
-
-class LegislationRowValidator(RowValidator):
-    def validate_universal_rows(self, row):
+    def validate_universal_row_data(self, row):
         self._test_goverlytics_id(row)
         self._test_text_components(row)
         self._test_date_introduced(row)
@@ -176,7 +181,7 @@ class LegislationRowValidator(RowValidator):
 
 class USLegislationRowValidator(LegislationRowValidator):
     def validate_row(self, row):
-        self.validate_universal_rows(row)
+        self.validate_universal_row_data(row)
         self._test_state_id(row)
         self._test_state(row)
 
@@ -192,7 +197,7 @@ class USLegislationRowValidator(LegislationRowValidator):
 
 class CALegislationRowValidator(LegislationRowValidator):
     def validate_row(self, row):
-        self.validate_universal_rows(row)
+        self.validate_universal_row_data(row)
         self._test_province_territory_id(row)
         self._test_province_territory(row)
 
@@ -212,9 +217,17 @@ class CALegislationRowValidator(LegislationRowValidator):
 
 class CAFedLegislationRowValidator(CALegislationRowValidator):
     def validate_row(self, row):
-        self.validate_universal_rows(row)
+        self.validate_universal_row_data(row)
         self._test_province_territory_id(row)
         self._test_province_territory(row)
+        self._test_sponsor_affiliation(row)
+        self._test_sponsor_gender(row)
+        self._test_pm_name_full(row)
+        self._test_pm_party_id(row)
+        self._test_statute_year(row)
+        self._test_statute_chapter(row)
+        self._test_publications(row)
+        self._test_last_major_event(row)
 
     def _test_sponsor_affiliation(self, row):
         if type(row.sponsor_affiliation) != str or not row.sponsor_affiliation:
@@ -274,18 +287,225 @@ class CAFedLegislationRowValidator(CALegislationRowValidator):
         if type(meeting_number) != int or not meeting_number:
             self.raise_exception("meeting_number in last_major_event must be of type int")
 
-
 class LegislatorRowValidator(RowValidator):
-    pass
+    def validate_rows(self, rows):
+        try:
+            for row in rows:
+                self.validate_row(row)
+            print("All rows are valid!")
+        except Exception as e:
+            print(f"Error in legislator: {row.name_full}")
+            print(e.with_traceback())
+
+    def validate_universal_row_data(self, row):
+        self._test_text_components(row)
+        self._test_country_id(row)
+        self._test_party_id(row)
+        self._test_party(row)
+        self._test_role(row)
+        self._test_years_active(row)
+        self._test_committees(row)
+        self._test_phone_numbers(row)
+        self._test_addresses(row)
+        self._test_email(row)
+        self._test_birthday(row)
+        self._test_seniority(row)
+        self._test_occupation(row)
+        self._test_education(row)
+
+    def _test_text_components(self, row):
+        if type(row.source_id) != str:
+            self.raise_exception("source_id must be of type str")
+        if type(row.most_recent_term_id) != str:
+            self.raise_exception("most_recent_term_id must be of type str")
+        if type(row.source_url) != str:
+            self.raise_exception("source_url must be of type str")
+        if type(row.name_full) != str:
+            self.raise_exception("name_full must be of type str")
+        if type(row.name_last) != str:
+            self.raise_exception("name_last must be of type str")
+        if type(row.name_first) != str:
+            self.raise_exception("source_url must be of type str")
+        if type(row.name_middle) != str:
+            self.raise_exception("name_middle must be of type str")
+        if type(row.name_suffix) != str:
+            self.raise_exception("name_suffix must be of type str")
+        if type(row.country) != str:
+            self.raise_exception("country data must be of type str")
+        if type(row.military_experience) != str:
+            self.raise_exception("military_experience data must be of type str")
+
+    def _test_country_id(self, row):
+        if type(row.country_id) != int:
+            self.raise_exception("country_id must be of type int")
+
+    def _test_party_id(self, row):
+        if type(row.party_id) != int:
+            self.raise_exception("party_id must of be of type int")
+
+    def _test_party(self, row):
+        if type(row.country) != str:
+            self.raise_exception("party data must be of type str -- use full name of party")
+
+    def _test_role(self, row):
+        if type(row.role) != str:
+            self.raise_exception("role data must be of type str")
+
+    def _test_years_active(self, row):
+        ya = row.years_active
+        if type(ya) != list:
+            self.raise_exception("years_active data must be of type list")
+        for year in ya:
+            if type(year) != int:
+                self.raise_exception("years in years_active must be of format YYYY of type int")
+        
+    def _test_committees(self, row):
+        if type(row.committees) != list:
+            self.raise_exception("committees data must be a list of dicts")
+        for committee in row.committees:
+            if type(committee) != dict:
+                self.raise_exception("committees data must be a list of dicts")
+            if type(committee['role']) != str or not committee['role']:
+                self.raise_exception("committees data must have valid role information as str")
+            if type(committee['committee']) != str or not committee['committee']:
+                self.raise_exception("committees data must have valid committee name as str")
+
+    def _test_phone_numbers(self, row):
+        if type(row.phone_numbers) != list:
+            self.raise_exception("phone_numbers data must be a list of dicts")
+        for numbers in row.phone_numbers:
+            if type(numbers) != dict:
+                self.raise_exception("phone_numbers data must be a list of dicts")
+            if type(numbers['office']) != str or not numbers['office']:
+                self.raise_exception("phone_numbers data must have a valid office information as str")
+            if type(numbers['number']) != str or not numbers['number'] or not re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', numbers['number']):
+                self.raise_exception("phone_numbers data must have a valid number information as str in format ###-###-####")
+
+    def _test_addresses(self, row):
+        if type(row.addresses) != list:
+            self.raise_exception("addresses data must be a list of dicts")
+        for address in row.addresses:
+            if type(address) != dict:
+                self.raise_exception("addresses data must be a list of dicts")
+            if type(address['location']) != str or not address['location']:
+                self.raise_exception("addresses data must have a valid location information as str")
+            if type(address['address']) != str or not address['address']:
+                self.raise_exception("addresses data must have a valid address information as str")
+
+    def _test_email(self, row):
+        if type(row.email) != str:
+            self.raise_exception("email data must be of type str")
+        if '@' not in row.email:
+            self.raise_exception("email data must be be in proper format (ex. joeburns@cagov.com)")
+    
+    def _test_birthday(self, row):
+        if row.birthday and type(row.birthday) != type(datetime):
+            self.raise_exception(f"birthday data must be of type date - current: {type(row.birthday)}")
+
+    def _test_seniority(self, row):
+        if type(row.seniority) != int:
+            self.raise_exception("seniority data must be of type int")
+    
+    def _test_occupation(self, row):
+        if type(row.occupation) != list:
+            self.raise_exception("occupation data must be a list of str")
+        for element in row.occupation:
+            if type(element) != str:
+                self.raise_exception("occupation data must be a list of str")
+        
+    def _test_education(self, row):
+        if type(row.education) != list:
+            self.raise_exception(f"education data must be list of dicts")
+        for element in row.education:
+            if type(element['level']) != str:
+                self.raise_exception("education data must have valid level information")
+            if type(element['field']) != str:
+                self.raise_exception("education data must have valid field information")
+            if type(element['school']) != str:
+                self .raise_exception("education data must have valid school information")
 
 class USLegislatorRowValidator(LegislatorRowValidator):
-    pass
+    def validate_row(self, row):
+        self.validate_universal_row_data(row)
+        self._test_state_id(row)
+        self._test_state(row)
+        self._test_areas_served(row)
+        self._test_district(row)
+
+    def _test_state_id(self, row):
+        if type(row.state_id) != int:
+            self.raise_exception("state_id must be of type int")
+
+    def _test_state(self, row):
+        if type(row.state) != str:
+            self.raise_exception("state must be of type str")
+    
+    def _test_areas_served(self, row):
+        if type(row.areas_served) != list:
+            self.raise_exception("areas_served must be a list of str")
+        for area in row.areas_served:
+            if type(area) != str:
+                self.raise_exception("areas_served must be a list of str")
+    
+    def _test_district(self, row):
+        if type(row.district) != str:
+            self.raise_exception("district must be of type str")
 
 class CALegislatorRowValidator(LegislatorRowValidator):
-    pass
+    def validate_row(self, row):
+        self.validate_universal_row_data(row)
+        self._test_province_territory_id(row)
+        self._test_province_territory(row)
+        self._test_region(row)
+        self._test_riding(row)
+
+    def _test_province_territory_id(self, row):
+        if type(row.province_territory_id) != int:
+            self.raise_exception("province_territory_id must be of type int")
+
+    def _test_province_territory(self, row):
+        if type(row.province_territory) != str:
+            self.raise_exception("province_territory must be of type str")
+
+    def _test_region(self, row):
+        if type(row.region) != str:
+            self.raise_exception("region data must be of type str")
+
+    def _test_riding(self, row):
+        if type(row.riding) != str:
+            self.raise_exception("riding data must be of type str")
 
 class CAFedLegislatorRowValidator(CALegislatorRowValidator):
-    pass
+    def validate_row(self, row):
+        self.validate_universal_row_data(row)
+        self._test_province_territory_id(row)
+        self._test_province_territory(row)
+        self._test_region(row)
+        self._test_riding(row)
+
+    def _test_offices_roles_as_mp(self, row):
+        data = row.offices_roles_as_mp
+        if data and type(data) != list:
+            self.raise_exception("offices_roles_as_mp data must a list of str")
+        
+        for element in data:
+            if data and type(element) != str:
+                self.raise_exception("offices_roles_as_mp data must a list of str")
+
+    def _test_parl_assoc_interparl_groups(self, row):
+        data = row.parl_assoc_interparl_groups
+        if data and type(data) != list:
+            self.raise_exception("parl_assoc_interparl_groups data must a list of dicts")
+        
+        for element in data:
+            if data and type(element) != dict:
+                self.raise_exception("parl_assoc_interparl_groups data must a list of str")
+            if data and (not element['role'] or type(element['role']) != str):
+                self.raise_exception("parl_assoc_interparl_groups data must have valid role information")
+            if data and (not element['title'] or type(element['title']) != str):
+                self.raise_exception("parl_assoc_interparl_groups data must have valid title information")
+            if data and (not element['organization'] or type(element['organization']) != str):
+                self.raise_exception("parl_assoc_interparl_groups data must have valid organization information")
 
 
 class Validator:
