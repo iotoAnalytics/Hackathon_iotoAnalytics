@@ -211,7 +211,69 @@ class CALegislationRowValidator(LegislationRowValidator):
             self.raise_exception("region must be a string (ex. Prairies)")
 
 class CAFedLegislationRowValidator(CALegislationRowValidator):
-    pass
+    def validate_row(self, row):
+        self.validate_universal_rows(row)
+        self._test_province_territory_id(row)
+        self._test_province_territory(row)
+
+    def _test_sponsor_affiliation(self, row):
+        if type(row.sponsor_affiliation) != str or not row.sponsor_affiliation:
+            self.raise_exception("sponsor_affiliation must be of type string (ex. Minister of Finance, York -- Simcoe")
+        
+    def _test_sponsor_gender(self, row):
+        if type(row.sponsor_gender) != str or not row.sponsor_gender:
+            self.raise_exception("sponsor_gender data must be of type string")
+        
+        if row.sponsor_gender != 'M' and row.sponsor_gender != 'F':
+            self.raise_exception("sponsor_gender data must be either M or F (note: this may need to chane in the future)")
+
+    def _test_pm_name_full(self, row):
+        if type(row.pm_name_full) != str or not row.pm_name_full:
+            self.raise_exception("pm_name_full data must be of type string")
+        name_split = row.pm_name_full.split(' ')
+        if len(name_split) <= 1:
+            self.raise_exception("pm_name_full must be the full name of pm (ex. Justin Trudeau)")
+
+    def _test_pm_party_id(self, row):
+        if type(row.pm_party_id) != int or not row.pm_party_id:
+            self.raise_exception("pm_party_id data must be of type int")
+
+    def _test_statute_year(self, row):
+        if type(row.statute_year) != int or not row.statute_year:
+            self.raise_exception("statute_year data must of be type int")
+
+    def _test_statute_chapter(self, row):
+        if type(row.statute_chapter) != int or not row.statute_chapter:
+            self.raise_exception("statute_chapter must be of type int")
+
+    def _test_publications(self, row):
+        if type(row.publications) != list or not row.publications:
+            self.raise_exception("publications data must be a list of string (ex. ['First Reading', 'Royal Assent']")
+        
+        for publication in row.publications:
+            if type(publication) != str:
+                self.raise_exception("publications data must be a list of string (ex. ['First Reading', 'Royal Assent']")
+
+    def _test_last_major_event(self, row):
+        if type(row.last_major_event) != dict or not row.last_major_event:
+            self.raise_exception("last_major_event data must be of type dict")
+        date = row.last_major_event['date']
+        if type(date) != type(datetime):
+            self.raise_exception("date in last_major_event must be of type datetime")
+        status = row.last_major_event['status']
+        chamber = row.last_major_event['chamber']
+        committee = row.last_major_event['committee']
+        meeting_number = row.last_major_event['meeting_number']
+
+        if type(status) != str or not status:
+            self.raise_exception("status in last_major_event must be of type string")
+        if type(chamber) != str or not chamber:
+            self.raise_exception("chamber in last_major_event must be of type string")
+        if type(committee) != str or not committee:
+            self.raise_exception("committee in last_major_event must be of type string")
+        if type(meeting_number) != int or not meeting_number:
+            self.raise_exception("meeting_number in last_major_event must be of type int")
+
 
 class LegislatorRowValidator(RowValidator):
     pass
