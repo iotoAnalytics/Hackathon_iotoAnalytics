@@ -1,10 +1,11 @@
 '''
 Author: Avery Quan
-Date: May 11, 2021
+Date: May 26, 2021
 
 Notes:
-
-- Scrape historical legislators by setting the historical field in get_urls() to true
+- Source url is not unique, have to modify scraper_utils to insert into database
+    for this table I used full_name as the unique field
+- Does not scrape historical
 '''
 import sys
 import os
@@ -38,20 +39,37 @@ def get_wiki_links(link, chamber):
     wikipedia_link = 'https://en.wikipedia.org'
 
     member_request = scraper_utils.request(link)
+    scraper_utils.crawl_delay(crawl_delay)
     member_soup = BeautifulSoup(member_request.content, 'html.parser')
     members = member_soup.find_all('table', class_='wikitable sortable')[0]
     members = members.find_all('tr')[1:]
-
     links = {}
 
-    for member in members:
+    if chamber == 'House':
+        length = len(members)
+        for i in range(0, length - 1, 2):
+        
+            district = members[i].find('th').text.strip()
 
-        elements = member.find_all('td')
-        district = elements[0].text.strip()
-        member_url = elements[1].find('a')['href']
+            elements = members[i].find_all('td')
+            member_url = elements[1].find('a')['href']
+            seat = elements[0].text.strip()
+            links[(chamber, district, seat)] = wikipedia_link + member_url
 
-        links[(chamber, district)] = wikipedia_link + member_url
-    scraper_utils.crawl_delay(crawl_delay)
+            elements = members[i + 1].find_all('td')
+            member_url = elements[1].find('a')['href']
+            seat = elements[0].text.strip()
+            links[(chamber, district, seat)] = wikipedia_link + member_url
+    
+    else:
+        for member in members:
+            elements = member.find_all('td')
+            district = elements[0].text.strip()
+            member_url = elements[1].find('a')['href']
+
+            links[(chamber, district, None)] = wikipedia_link + member_url
+
+
     return links
 
 def get_urls():
@@ -63,15 +81,17 @@ def get_urls():
 
 
 def scrape(info):
-    try:
-        url = info['url']
-        chamber = info['chamber']
+    
+    url = info['url']
+    chamber = info['chamber']
 
-        page = scraper_utils.request(url)
-        soup = BeautifulSoup(page.content, 'html.parser')
-        pages = soup.find_all('div', class_= 'wpb_column vc_column_container col-xs-mobile-fullwidth col-sm-4 text-left sm-text-left xs-text-left')
-        rows = []
-        for a in pages:
+    page = scraper_utils.request(url)
+    scraper_utils.crawl_delay(crawl_delay)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    pages = soup.find_all('div', class_= 'wpb_column vc_column_container col-xs-mobile-fullwidth col-sm-4 text-left sm-text-left xs-text-left')
+    rows = []
+    for a in pages:
+        try:
             row = scraper_utils.initialize_row()
 
             a_tag = a.find_all('a')
@@ -81,9 +101,10 @@ def scrape(info):
             fields = a.text.split(';;')
             if 'District' not in fields[2]:
                 del fields[2]
-            print(fields)
 
-            name, role = fields[0].strip().rsplit(' ', 1)
+            roles = {'Senate': 'Senator', 'House': 'Representative'}
+            row.role = roles[chamber]
+            name, party = fields[0].strip().rsplit(' ', 1)
             name = HumanName(name.replace('\xa0', '')) 
             row.name_full = name.full_name
             row.name_first = name.first
@@ -91,45 +112,84 @@ def scrape(info):
             row.name_middle = name.middle
             row.name_name_suffix = name.suffix
 
-            roles = {'(R)': 'Representative', '(S)': 'Senator'}
-            row.role = roles[role]
+            parties = {'(R)': 'Republican', '(D)': 'Democrat'}
+            row.party = parties[party]
+            row.party_id = scraper_utils.get_party_id(row.party)
 
-            row.email = a_tag[0]
+            row.source_url = url
+
+            row.email = a_tag[0].text
             row.district = a_tag[1].text.split(' ')[1]
+
+            offset = 0
+            if row.role == 'Senator':
+                offset = -1  
 
             committees = a_tag[3:]
             for c in committees:
-                row.committees.append({'role': 'member', 'committee': c.text})
+                next = str(c.next_sibling)
+                if next != ' ':
+                    role = next.split('–')[1].strip()
+                else:
+                    role = 'member'
+                row.committees.append({'role': role, 'committee': c.text})
 
-            addresses = fields[5].strip()
+            addresses = fields[5 + offset].strip()
+            if 'term' in addresses:
+                addresses = fields[6 + offset].strip()
             row.addresses = {'location': 'home', 'address': addresses}
 
-            label, phone_number_1 = fields[6].strip().split(' ', 1)
+            try:
+                label, phone_number_1 = fields[6 + offset].strip().split(' ', 1)
+            except:
+                label, phone_number_1 = [" ", " "]
+                
 
-            phone_number_2 = fields[7].strip().split(' ')
+            try:
+                label2, phone_number_2 = fields[7 + offset].strip().split(' ', 1)
+            except:
+                traceback.print_exc()   
+                print(url)
+                print(row)
+                label2, phone_number_2 = [" ", " "]
+
+            if 'Home' not in label or 'Statehouse' not in label:
+                try:
+                    label, phone_number_1 = fields[7 + offset].strip().split(' ', 1)
+                except:
+                    pass
+                try:
+                    label2, phone_number_2 = fields[8 + offset].strip().split(' ', 1)
+                except:
+                    pass
 
             if 'Bus' in phone_number_2:
-                phone_number_2 = fields[8].strip().split(' ')
-            label2 = phone_number_2[0]
-            phone_number_2 = ' '.join(phone_number_2[1:-2])
-            row.phone_number = [{"office": label.lower(), "number": phone_number_1}, 
-                            {"office": label2.lower(), "number": phone_number_2}]
+                phone_number_2 = fields[8 + offset].strip().split(' ')
+            row.phone_numbers = [{"office": label.lower(), "number": phone_number_1.replace('(Session Only)', '')}, 
+                            {"office": label2.lower(), "number": phone_number_2.replace('(Session Only)', '')}]
 
-            if 'Committees' not in fields[8]:
-                if 'Fax' in fields[8]:
-                    row.occupation = fields[9].strip()
+            
+
+            if 'FAX' in fields[8 + offset] or 'Statehouse'  in fields[8 + offset] or 'Bus' in fields[8 + offset]:
+                if 'FAX' in fields[9 + offset] or 'Statehouse'  in fields[9 + offset] or 'Bus' in fields[9 + offset]:
+                    row.occupation = [fields[10 + offset].strip()]
                 else:
-                    row.occupation = fields[8].strip()
+                    row.occupation = [fields[9 + offset].strip()]
+            else:
+                row.occupation = [fields[8 + offset].strip()]
 
             # Wiki fields below
 
             try:   
-                wiki_url = wiki_urls[(chamber, row.district)]
+                seat = 'B' if 'B' in fields[3] else 'A'
+                seat = None if row.role == 'Senator' else seat
+                wiki_url = wiki_urls[(chamber, row.district, seat)]
 
                 wiki = scraper_utils.scrape_wiki_bio(wiki_url)
                 row.years_active = wiki['years_active']
                 row.education = wiki['education']
-                row.occupation = wiki['occupation']
+                if len(wiki['occupation']) != 0 and len(row.occupation) == 0:
+                    row.occupation = wiki['occupation']
                 row.most_recent_term_id = wiki['most_recent_term_id']
                 row.birthday = wiki['birthday']
             except:
@@ -137,11 +197,12 @@ def scrape(info):
 
 
             # Delay so we don't overburden web servers
-            # scraper_utils.crawl_delay(crawl_delay)
+            scraper_utils.crawl_delay(crawl_delay)
             rows.append(row)
-    except:
-        traceback.print_exc()   
-        print(url)
+        except:
+            traceback.print_exc()   
+            print(url)
+            print(row)
     return rows
 
 
@@ -157,8 +218,7 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
 
-    data = data[0][0] + data[1][0]
-    print(data)
+    data = data[0] + data[1]
 
     # Once we collect the data, we'll write it to the database:
     scraper_utils.write_data(data)
