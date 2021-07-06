@@ -25,15 +25,16 @@ import datetime
 
 
 state_abbreviation = 'NV'
-database_table_name = 'us_nv_legislator'
+database_table_name = 'us_nv_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
 
+# !! 1.
 original_url  = 'https://www.leg.state.nv.us/'
 
-base_url = 'https://www.leg.state.nv.us/App/Legislator/A/Assembly/Current'
-base_senate_url = 'https://www.leg.state.nv.us/App/Legislator/A/Senate/Current'
+base_url = original_url +'/App/Legislator/A/Assembly/Current'
+base_senate_url = original_url + '/App/Legislator/A/Senate/Current'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
@@ -48,7 +49,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 #gets the district
 def get_district(content) :
     district = content.find_all('td')[3].find('a').text
-    district = re.findall("\d+", district)
+    district = re.findall("\d+", district)[0]
     print(district)
     return district
 
@@ -113,7 +114,7 @@ def get_urls(url) :
     county = None
     link = None
 
-
+    # !! 3.
     for item in url_links:
         if(count % 2 == 0 ) :
             
@@ -123,10 +124,16 @@ def get_urls(url) :
             link = get_link(item)
             
         else:
+            # !! 4.
             phoneNumbers = []
             print(county)
             content = item.find_all('td')
-            address = " ".join(content[0].text.split())
+            address_list = []
+            address = {
+                'location': 'office',
+                'address' : " ".join(content[0].text.split())
+            }
+            address_list.append(address)
             content = content[1].find_all('span',{'class':'field'})
             if (sentate == 0):
                 term_id = int(content[0].text) - 2
@@ -145,7 +152,9 @@ def get_urls(url) :
                 'number' : content[4].text.replace('(','').replace(')','')
                 }
                 phoneNumbers.append(work_no)
-            except:
+
+            # !! 2.
+            except Exception:
                 print("no phone number")
 
             print(address)
@@ -159,7 +168,7 @@ def get_urls(url) :
                 'party':party,
                 'county':county,
                 'phoneNo':phoneNumbers,
-                'address':address,
+                'address':address_list,
                 'email':email
             }
             legislators.append(legislator)
@@ -178,7 +187,6 @@ def get_years(content):
     active_years = []
     year_ranges = re.findall("\d{4}-Present", content.text)
 
-    
     for range in year_ranges:
         active_years = active_years + get_range(range)
     
@@ -225,9 +233,9 @@ def get_committees(content):
 #gets the education from the legislator
 def get_education(content):
     print (content)
-    level = None
-    field = None
-    school = None
+    level = ''
+    field = ''
+    school = ''
 
     education_parts = content.split(',')
     if("High School" in education_parts[0]) :
@@ -249,7 +257,7 @@ def get_education(content):
         'field': field,
         'school':school
     }
-    if(education['school'] == None):
+    if(education['school'] == ''):
         return None
 
     return education
@@ -308,7 +316,7 @@ def get_area_served(content) :
     area_list = area_list[1].text
     area_list = area_list.split(':')[1].split(',')
     for area in area_list :
-        areas_served.append(area.replace('(Part)',''))
+        areas_served.append(area.replace('(Part)','').strip())
     return areas_served
 
 #scrapes the urls and inserts data into the DB

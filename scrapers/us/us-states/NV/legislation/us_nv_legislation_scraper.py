@@ -20,7 +20,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 from scraper_utils import USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
-import requests
+import requests 
 from multiprocessing import Pool
 from database import Database
 import configparser
@@ -41,20 +41,25 @@ from tqdm import tqdm
 
 state_abbreviation = 'NV'
 database_table_name = 'us_nv_legislation'
-legislator_table_name = 'us_nv_legislator'
+legislator_table_name = 'us_nv_legislators'
 options = Options()
 options.headless = False 
-driver = webdriver.Chrome(executable_path=r'C:\Users\DCYUM\Downloads\chromedriver_win32\chromedriver.exe', options=options)
+# !! 1.
+
+p = Path('./web_drivers/chrome_win_91.0.4472.19/chromedriver.exe')
+driver = webdriver.Chrome(executable_path=p)
+
 driver.switch_to.default_content()
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, database_table_name, legislator_table_name)
 
-base_url = 'https://www.leg.state.nv.us'
-bills_url = 'https://www.leg.state.nv.us/App/NELIS/REL/81st2021/Bills/List'
+# !! 2.
+original_url = 'https://www.leg.state.nv.us'
+bills_url = original_url +'/App/NELIS/REL/81st2021/Bills/List'
 
 # Get the crawl delay specified in the website's robots.txt file
-crawl_delay = scraper_utils.get_crawl_delay(base_url)
+crawl_delay = scraper_utils.get_crawl_delay(original_url)
 
 session_id = '2021'
 
@@ -194,9 +199,6 @@ def get_votes():
             nv = get_votes_number(specific_votes[4])
             absent = get_votes_number(specific_votes[5])
             people_votes = get_voters(specific_votes[0])
-            
-
-
 
             vote_details = {
                 'date' :date,
@@ -213,6 +215,7 @@ def get_votes():
         
             print("No vote data")
             votes.append(vote_details)
+        # !! 4.
         except:
             print('No specific voting data')
     
@@ -261,7 +264,9 @@ def get_cosponsors():
 def get_bill_info() :
     bill_id = driver.find_element_by_css_selector('#bills-container > div > div.col-lg-9.pt-lg-4.main-content > div:nth-child(3) > div > h1').get_attribute('textContent')
     origin = None
-    type = None
+
+    # !! 3.
+    bill_type = None
     if 'S' in bill_id :
         
         origin = "Senate"
@@ -271,14 +276,14 @@ def get_bill_info() :
     
     if 'B' in bill_id :
         
-        type = "Bill"
+        bill_type = "Bill"
     elif "R":
-        type  = "Resoultion"
+        bill_type  = "Resoultion"
     
 
     bill_info = {
         'origin':origin,
-        'type': type,
+        'type': bill_type,
         'ID': bill_id
     }
     
@@ -290,7 +295,9 @@ def get_text():
     sleep(1)
     pdf_link = driver.find_element_by_css_selector('#divText > div.d-md-none > div > div > ul > li:last-child > div > p > a').get_attribute('href')
 
+    # !! 5.
     r = requests.get(pdf_link)
+    scraper_utils.crawl_delay(crawl_delay)
     f = io.BytesIO(r.content)
 
     reader = PdfFileReader(f)
@@ -359,27 +366,32 @@ def scrape(url):
         history = get_history()
         row.actions = history['actions']
         row.date_introduced = history['introduced']
-    except:
+    # !! 4.
+    except Exception:
         print('No History')
 
     try :
         
         row.bill_title = driver.find_element_by_id('title').get_attribute('textContent')
         row.bill_summary = driver.find_element_by_css_selector('#divOverview > div > div:nth-child(1) > div.col').text
-    except:
+    # !! 4.
+    except Exception:
         print('No info')
 
     try:
         row.committees = get_committes()
-    except:
+    # !! 4.
+    except Exception:
        print('No committees')
     try:
         row.bill_text = get_text()
-    except:
+    # !! 4.
+    except Exception:
         print('No current text')
     try:
         row.votes = get_votes()
-    except:
+    # !! 4.
+    except Exception:
         print('No vote data')
     
     try:
@@ -387,14 +399,16 @@ def scrape(url):
     
         row.sponsors = sponsors['names']
         row.sponsors_id = sponsors['ids']
-    except:
+    # !! 4.
+    except Exception:
         print('no sponsors')
 
     try:
         cosponsor = get_cosponsors()
         row.cosponsors = cosponsor['names']
         row.cosponsors_id = cosponsor['ids']
-    except:
+    # !! 4.
+    except Exception:
         print('no cosponsors')
     
     
