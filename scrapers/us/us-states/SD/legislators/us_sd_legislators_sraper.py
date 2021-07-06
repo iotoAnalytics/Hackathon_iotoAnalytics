@@ -120,7 +120,6 @@ def merge_all_wiki_data(legislator_data, wiki_data):
     wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
     leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district']) 
     
-    # for data in wiki_data:
     for key in WIKI_DATA_TO_MERGE:
         leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
 
