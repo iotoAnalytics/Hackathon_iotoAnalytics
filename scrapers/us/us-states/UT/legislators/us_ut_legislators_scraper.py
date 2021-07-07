@@ -131,7 +131,6 @@ def get_representative_party(url, row):
     driver.quit()
 
 
-
 @scraper_utils.Timer()
 def get_representative_role(url, row):
     driver = open_driver(url)
@@ -139,7 +138,6 @@ def get_representative_role(url, row):
     row.role = text.split()[0]
     # print(row.role)
     driver.quit()
-
 
 
 @scraper_utils.Timer()
