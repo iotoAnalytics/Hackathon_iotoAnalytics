@@ -2,8 +2,7 @@ import sys
 import requests
 import os
 from pathlib import Path
-import boto3
-from random import randint
+from random import randint, random
 from database import Persistence
 
 base_api = 'https://api.goverlytics.com/v1'
@@ -29,25 +28,54 @@ def grab_bills_sponsored(legislation_lod, legislator):
         'bills_sponsored_num': num_sponsored,
         'bills_sponsored_percentage': percentage
     }
-# Get path to the root directory so we can import necessary modules
 
-# makes dummy table in database
-# Persistence.write_sam_data_test('test_table_sam')
-# print('Done!')
+
+def get_ave_bills_sponsored(state):
+    try:
+        legislation_requests = grab_data(state, 'division-legislation', 'us', 2000)
+        legislator_requests = grab_data(state, 'division-legislators', 'us', 1000)
+
+        # gets average bills sponsored for legislator in state
+        data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
+        ave_percentage_data = sum([x['bills_sponsored_percentage'] for x in data])/ len(data)
+        ave_percentage_data = round(ave_percentage_data + 0.1, 2)
+        ave_num_data = sum([x['bills_sponsored_num'] for x in data])/ len(data)
+        ave_num_data = round(ave_num_data + 0.1, 2)
+
+        print(f'Average bills sponsored per legislator in {state.upper()}: {ave_num_data}')
+        print(f'As a percentage: {ave_percentage_data}')
+        return {
+            'state_name':state,
+            'ave_bills_sponsored':ave_num_data,
+            'ave_bills_sponsored_percent':ave_percentage_data
+        }
+
+    except KeyError:
+        print(f'KeyError for state {state.upper()}')
+        return ''
+
+state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
+info_dict = []
+for state in state_lst[:5]:
+    info_dict.append(get_ave_bills_sponsored(state))
+random_data = [x for x in info_dict if x]
+
+Persistence.write_stats_data_test(random_data, 'test_table_sam_2')
+print('Done!')
 
 # grab all file names from us_legislators folder
-state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
+# state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
 
 # print(state_lst)
 
-rand_state = state_lst[randint(0, len(state_lst)-1)]
-print(f'grabbing data for {rand_state}')
-legislation_requests = grab_data(rand_state, 'division-legislation', 'us', 2000)
-legislator_requests = grab_data(rand_state, 'division-legislators', 'us', 1000)
+# rand_state = state_lst[randint(0, len(state_lst)-1)]
+# print(f'grabbing data for {rand_state}')
+# legislation_requests = grab_data(rand_state, 'division-legislation', 'us', 2000)
+# legislator_requests = grab_data(rand_state, 'division-legislators', 'us', 1000)
 
 # gets average bills sponsored for legislator in state
-data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
-ave_percentage_data = sum([x['bills_sponsored_percentage'] for x in data])/len(data)
-ave_num_data = sum([x['bills_sponsored_num'] for x in data])/len(data)
-print(f'Average bills sponsored per legislator in {rand_state}: {ave_num_data}')
-print(f'As a percentage: {ave_percentage_data}')
+# data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
+# ave_percentage_data = sum([x['bills_sponsored_percentage'] for x in data])/len(data)
+# ave_num_data = sum([x['bills_sponsored_num'] for x in data])/len(data)
+# print(f'Average bills sponsored per legislator in {rand_state}: {ave_num_data}')
+# print(f'As a percentage: {ave_percentage_data}')

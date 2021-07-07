@@ -133,14 +133,15 @@ class CursorFromConnectionFromPool:
 class Persistence:
     """Class for writing collected data to database"""
     @staticmethod
-    def write_sam_data_test(table):
+    def write_stats_data_test(data, table):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
 
                     CREATE TABLE IF NOT EXISTS {table} (
-                        name text PRIMARY KEY,
-                        number int
+                        state_name text UNIQUE, 
+                        ave_bills_sponsored decimal(5,2),
+                        ave_bills_sponsored_percent decimal(5,2)
                     );
 
                     ALTER TABLE {table} OWNER TO rds_ad;
@@ -148,8 +149,34 @@ class Persistence:
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
-            except:
-                print('Didn\'t work...')
+            except Exception as e:
+                print(f'An exception occured executting a query:\n{e}')
+                cur.connection.rollback()
+
+            insert_legislator_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (state_name) DO UPDATE SET
+                        ave_bills_sponsored = excluded.ave_bills_sponsored,
+                        ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent;
+                    """).format(table=sql.Identifier(table))
+
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
+                try:
+                    tup = (
+                        item.state_name,
+                        item.ave_bills_sponsored, 
+                        item.ave_bills_sponsored_percent
+                    )
+
+                    cur.execute(insert_legislator_query, tup)
+                except Exception as e:
+                    print(f'Exception occured inserting the following data:\n{tup}')
+                    print(e)
+                    cur.connection.rollback()
 
 
     @staticmethod
