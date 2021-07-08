@@ -158,7 +158,7 @@ class Persistence:
 
             insert_legislator_query = sql.SQL("""
                     INSERT INTO {table}
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     ON CONFLICT (state_name) DO UPDATE SET
                         legislator_count = excluded.legislator_count,
                         ave_bills_sponsored = excluded.ave_bills_sponsored,
