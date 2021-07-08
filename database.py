@@ -163,7 +163,7 @@ class Persistence:
                         legislator_count = excluded.legislator_count,
                         ave_bills_sponsored = excluded.ave_bills_sponsored,
                         ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent,
-                        ave_age = excluded.ave_ave,
+                        ave_age = excluded.ave_age,
                         ave_years_active = excluded.ave_years_active;
                     """).format(table=sql.Identifier(table))
 
