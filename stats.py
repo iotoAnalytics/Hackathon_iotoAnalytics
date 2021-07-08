@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from random import randint, random
 from database import Persistence
+from datetime import datetime
 
 base_api = 'https://api.goverlytics.com/v1'
 headers = {'x-api-key':'d41d8cd98f00b204e9800998ecf8427e'}
@@ -30,10 +31,48 @@ def grab_bills_sponsored(legislation_lod, legislator):
     }
 
 
-def get_ave_bills_sponsored(state):
+def get_legislator_count(data):
+    current_year = datetime.today().year
+    legislator_lst = []
+    for legislator in data:
+        most_recent_term_id = legislator['most_recent_term_id']
+        years_active = legislator['years_active']
+        try:
+            if most_recent_term_id == current_year or current_year in years_active:
+                legislator_lst.append(legislator)
+        except TypeError:
+            pass
+    return len(legislator_lst)
+
+
+def get_bday_and_activity(legislator_data):
+    bday_lst, years_active_lst = [], []
+    for legislator in legislator_data:
+        birthday = legislator['birthday']
+        years_active = legislator['years_active']
+        if years_active:
+            years_active = len(legislator['years_active'])
+            years_active_lst.append(years_active)
+        if birthday:
+            bday_lst.append(datetime.today().year - int(birthday.split('-')[0]))
+        # print(f'\nBirthday: {birthday}\nYears Active: {years_active}')
+    return [bday_lst, years_active_lst]
+
+
+def get_all_data(state):
+    ave_num_data = None
+    ave_percentage_data = None
+    ave_age = 0
+    ave_years_active = 0
+    legislator_count = None
     try:
-        legislation_requests = grab_data(state, 'division-legislation', 'us', 2000)
         legislator_requests = grab_data(state, 'division-legislators', 'us', 1000)
+        legislator_count = get_legislator_count(legislator_requests)
+        birthday, years_active = get_bday_and_activity(legislator_requests)
+        ave_age = round(sum(birthday)/ len(birthday) + 0.1, 2) if len(birthday) != 0 else 0
+        ave_years_active = round(sum(years_active)/ len(years_active) + 0.1, 2) if len(years_active) != 0 else 0
+
+        legislation_requests = grab_data(state, 'division-legislation', 'us', 2000)
 
         # gets average bills sponsored for legislator in state
         data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
@@ -44,38 +83,29 @@ def get_ave_bills_sponsored(state):
 
         print(f'Average bills sponsored per legislator in {state.upper()}: {ave_num_data}')
         print(f'As a percentage: {ave_percentage_data}')
-        return {
-            'state_name':state,
-            'ave_bills_sponsored':ave_num_data,
-            'ave_bills_sponsored_percent':ave_percentage_data
-        }
 
     except KeyError:
         print(f'KeyError for state {state.upper()}')
-        return ''
+    return {
+        'state_name':state,
+        'ave_bills_sponsored':ave_num_data,
+        'ave_bills_sponsored_percent':ave_percentage_data,
+        'legislator_count': legislator_count,
+        'ave_age': ave_age,
+        'ave_years_active': ave_years_active
+    }
+
+
+# def get_all_data(state):
+#     info_dict = get_ave_bills_sponsored(state)
+#     return info_dict
 
 state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
 info_dict = []
-for state in state_lst[:5]:
-    info_dict.append(get_ave_bills_sponsored(state))
-random_data = [x for x in info_dict if x]
+for state in state_lst[:10]:
+    info_dict.append(get_all_data(state))
+data = [x for x in info_dict if x]
 
-Persistence.write_stats_data_test(random_data, 'test_table_sam_2')
+# print(data)
+Persistence.write_stats_data_test(data, 'test_table_sam_2')
 print('Done!')
-
-# grab all file names from us_legislators folder
-# state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
-
-# print(state_lst)
-
-# rand_state = state_lst[randint(0, len(state_lst)-1)]
-# print(f'grabbing data for {rand_state}')
-# legislation_requests = grab_data(rand_state, 'division-legislation', 'us', 2000)
-# legislator_requests = grab_data(rand_state, 'division-legislators', 'us', 1000)
-
-# gets average bills sponsored for legislator in state
-# data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
-# ave_percentage_data = sum([x['bills_sponsored_percentage'] for x in data])/len(data)
-# ave_num_data = sum([x['bills_sponsored_num'] for x in data])/len(data)
-# print(f'Average bills sponsored per legislator in {rand_state}: {ave_num_data}')
-# print(f'As a percentage: {ave_percentage_data}')

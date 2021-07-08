@@ -139,9 +139,12 @@ class Persistence:
                 create_table_query = sql.SQL("""
 
                     CREATE TABLE IF NOT EXISTS {table} (
-                        state_name text UNIQUE, 
+                        state_name text UNIQUE,
+                        legislator_count int, 
                         ave_bills_sponsored decimal(5,2),
-                        ave_bills_sponsored_percent decimal(5,2)
+                        ave_bills_sponsored_percent decimal(5,2),
+                        ave_age decimal(5,2),
+                        ave_years_active decimal(5,2)
                     );
 
                     ALTER TABLE {table} OWNER TO rds_ad;
@@ -155,10 +158,13 @@ class Persistence:
 
             insert_legislator_query = sql.SQL("""
                     INSERT INTO {table}
-                    VALUES (%s, %s, %s)
+                    VALUES (%s, %s, %s, %s)
                     ON CONFLICT (state_name) DO UPDATE SET
+                        legislator_count = excluded.legislator_count,
                         ave_bills_sponsored = excluded.ave_bills_sponsored,
-                        ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent;
+                        ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent,
+                        ave_age = excluded.ave_ave,
+                        ave_years_active = excluded.ave_years_active;
                     """).format(table=sql.Identifier(table))
 
             # This is used to convert dictionaries to rows. Need to test it out!
@@ -168,8 +174,11 @@ class Persistence:
                 try:
                     tup = (
                         item.state_name,
+                        item.legislator_count,
                         item.ave_bills_sponsored, 
-                        item.ave_bills_sponsored_percent
+                        item.ave_bills_sponsored_percent,
+                        item.ave_age,
+                        item.ave_years_active
                     )
 
                     cur.execute(insert_legislator_query, tup)
