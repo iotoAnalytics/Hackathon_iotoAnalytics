@@ -17,7 +17,7 @@ import re
 import pdfplumber
 
 state_abbreviation = 'NE'
-database_table_name = 'us_ne_legislation_test'
+database_table_name = 'us_ne_legislation'
 legislator_table_name = 'us_ne_legislators'
 
 scraper_utils = USStateLegislationScraperUtils(
@@ -252,7 +252,7 @@ def scrape(bill_dict):
         row.principal_sponsor = bill_dict['primary_sponsor'].replace(', Chairperson', '').strip()
         row.principal_sponsor_id = gov_id_checker
 
-    row.bill_text = get_pdf_text(grab_pdf_link(soup))
+    row.bill_text = get_pdf_text(grab_pdf_link(soup)).replace(bill_name, '').replace(str(date), '')
     if 'LB' in bill_name:
         row.bill_type = 'Bill'
     elif 'LR' in bill_name:
@@ -267,9 +267,10 @@ def scrape(bill_dict):
 
 if __name__ == '__main__':
     bill_dicts = make_bill_dicts(bill_url)
+    print('Done making bill dicts')
 
     with Pool() as pool:
-        data = pool.map(scrape, bill_dicts[:5])
+        data = pool.map(scrape, bill_dicts)
 
     scraper_utils.write_data(data)
 
