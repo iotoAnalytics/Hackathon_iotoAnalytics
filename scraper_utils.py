@@ -219,8 +219,8 @@ class ScraperUtils:
         row.country = self.country
         return row
 
-    def validate_row_format(self, row):
-        row_validator.Validator(row)
+    def get_row_validator(self):
+        return row_validator.Validator(type(self.row_type))
 
     class Timer:
         """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to

@@ -131,7 +131,6 @@ def get_representative_party(url, row):
     driver.quit()
 
 
-
 @scraper_utils.Timer()
 def get_representative_role(url, row):
     driver = open_driver(url)
@@ -139,7 +138,6 @@ def get_representative_role(url, row):
     row.role = text.split()[0]
     # print(row.role)
     driver.quit()
-
 
 
 @scraper_utils.Timer()
@@ -276,7 +274,6 @@ def scrape(url):
 
     # why are senators and reps laid out complete differently...
     if url[-1] == 'H':
-        pass
         get_representative_name(url, row)
         get_representative_email(url, row)
         get_representative_addresses(url, row)

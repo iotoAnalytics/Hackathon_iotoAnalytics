@@ -200,10 +200,10 @@ class GetVotes:
             chamber = data.find('agency').text
             description = data.find('motion').text
             date = data.find('votedate').text
-            yea = data.find('yeavotes').find('count').text
-            nay = data.find('nayvotes').find('count').text
-            nv = data.find('excusedvotes').find('count').text
-            absent = data.find('absentvotes').find('count').text
+            yea = int(data.find('yeavotes').find('count').text)
+            nay = int(data.find('nayvotes').find('count').text)
+            nv = int(data.find('excusedvotes').find('count').text)
+            absent = int(data.find('absentvotes').find('count').text)
             total = int(yea) + int(nay) + int(nv) + int(absent)
             passed = 1 if int(yea) > int(nay) else 0
             votes = self.__process_votes(data.find('votes').findAll('vote'))

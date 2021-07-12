@@ -46,13 +46,20 @@ pd.set_option('display.max_columns', None)
 columns_not_on_main_site = ['birthday', 'education', 'occupation']
 
 def program_driver():
+    print("Gathering data...")
     mla_data = MainScraper("Representative").get_data()
     mla_data.extend(MainScraper("Senator").get_data())
 
     all_wiki_links = WikiScraper().scrape_main_wiki_link()
     wiki_data = WikiScraper().get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
+    print("Validating data...")
+    validator = scraper_utils.get_row_validator()
+    validator.validate_rows(mla_data)
+
+    print("Configuring data...")
     complete_data_set = configure_data(mla_data, wiki_data)
+    
     print('Writing data to database...')
     scraper_utils.write_data(complete_data_set)
     print("Complete")

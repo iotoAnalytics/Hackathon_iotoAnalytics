@@ -56,6 +56,10 @@ def program_driver():
     all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
     mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
 
+    print("Validating data...")
+    validator = scraper_utils.get_row_validator()
+    validator.validate_rows(mla_data)
+
     print("Getting data from wiki pages...")
     all_wiki_links = scrape_main_wiki_link(WIKI_URL)
     wiki_data = get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
@@ -345,7 +349,7 @@ class ScraperForMLAs:
                 return_list.append(i)
 
     def __set_most_recent_term_id(self):
-        self.row.most_recent_term_id = self.row.years_active[-1]
+        self.row.most_recent_term_id = str(self.row.years_active[-1])
 
 class ScraperForCommitteesMainSite:
     def get_all_commitee_links(self, soup):
@@ -407,7 +411,8 @@ class ScraperForCommittee:
         return self.driver.find_element_by_class_name('page-header').text
 
     def __get_members_names(self, committee_name):
-        if 'Special Committee on Civil Emergency Legislation' in committee_name:
+        if 'Special Committee on Civil Emergency Legislation' in committee_name or \
+                'Special Committee on Electoral Reform' in committee_name:
             return self.__get_members_from_weird_special_committee()
         elif 'Select Committee on Bill 108, Legislative Renewal Act' in committee_name:
             return self.__get_members_from_special(1)

@@ -1,12 +1,15 @@
 import sys
 import os
 from pathlib import Path
+
 import data_collector
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
+from rows import USLegislationRow
+from row_validator import Validator
 import pandas as pd
 
 pd.set_option('display.max_rows', None)
@@ -21,6 +24,8 @@ def program_driver():
     all_bills = data_collector.program_driver()
     print("processing data...")
     data = process_data(all_bills)
+    print("validating data...")
+    validate_data(data)
     print("Writing data to database...")
     data_collector.scraper_utils.write_data(data)
     print("Complete")
@@ -30,6 +35,10 @@ def process_data(bills):
     for bill in bills:
         data.append(DataOrganize(bill).get_rows())
     return data
+
+def validate_data(rows):
+    validator = Validator(USLegislationRow)
+    validator.validate_rows(rows)
 
 class DataOrganize:
     def __init__(self, bill):
