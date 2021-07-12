@@ -144,7 +144,8 @@ class Persistence:
                         ave_bills_sponsored decimal(5,2),
                         ave_bills_sponsored_percent decimal(5,2),
                         ave_age decimal(5,2),
-                        ave_years_active decimal(5,2)
+                        ave_years_active decimal(5,2),
+                        topics_count json
                     );
 
                     ALTER TABLE {table} OWNER TO rds_ad;
@@ -158,13 +159,14 @@ class Persistence:
 
             insert_legislator_query = sql.SQL("""
                     INSERT INTO {table}
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (state_name) DO UPDATE SET
                         legislator_count = excluded.legislator_count,
                         ave_bills_sponsored = excluded.ave_bills_sponsored,
                         ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent,
                         ave_age = excluded.ave_age,
-                        ave_years_active = excluded.ave_years_active;
+                        ave_years_active = excluded.ave_years_active,
+                        topics_count = excluded.topics_count;
                     """).format(table=sql.Identifier(table))
 
             # This is used to convert dictionaries to rows. Need to test it out!
@@ -178,7 +180,9 @@ class Persistence:
                         item.ave_bills_sponsored, 
                         item.ave_bills_sponsored_percent,
                         item.ave_age,
-                        item.ave_years_active
+                        item.ave_years_active,
+                        # item.topics_count
+                        json.dumps(item.topics_count, default=utils.json_serial)
                     )
 
                     cur.execute(insert_legislator_query, tup)

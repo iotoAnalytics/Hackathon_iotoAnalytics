@@ -59,15 +59,30 @@ def get_bday_and_activity(legislator_data):
     return [bday_lst, years_active_lst]
 
 
+def get_topics(state):
+    # print(f'getting state: {state}')
+    topic_dict = {}
+    data =requests.get(f'{base_api}/division-legislation/us/{state}?limit=2000', headers=headers).json()['data']
+    for legislation in data:
+        topic = legislation['topic']
+        if topic:
+            if topic in topic_dict: 
+                topic_dict[topic] += 1
+            else:
+                topic_dict[topic] = 1
+    return topic_dict
+
+
 def get_all_data(state):
     ave_num_data = None
     ave_percentage_data = None
     ave_age = 0
     ave_years_active = 0
     legislator_count = None
+    topic_dict = get_topics(state)
     try:
         legislator_requests = grab_data(state, 'division-legislators', 'us', 1000)
-        legislator_count = get_legislator_count(legislator_requests)
+        legislator_count = get_legislator_count(legislator_requests) if len(legislator_requests) > 200 else len(legislator_requests)
         birthday, years_active = get_bday_and_activity(legislator_requests)
         ave_age = round(sum(birthday)/ len(birthday) + 0.1, 2) if len(birthday) != 0 else 0
         ave_years_active = round(sum(years_active)/ len(years_active) + 0.1, 2) if len(years_active) != 0 else 0
@@ -92,7 +107,8 @@ def get_all_data(state):
         'ave_bills_sponsored_percent':ave_percentage_data,
         'legislator_count': legislator_count,
         'ave_age': ave_age,
-        'ave_years_active': ave_years_active
+        'ave_years_active': ave_years_active,
+        'topics_count':topic_dict
     }
 
 
@@ -102,7 +118,7 @@ def get_all_data(state):
 
 state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
 info_dict = []
-for state in state_lst[:10]:
+for state in state_lst[10:12]:
     info_dict.append(get_all_data(state))
 data = [x for x in info_dict if x]
 
