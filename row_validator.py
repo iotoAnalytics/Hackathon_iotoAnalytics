@@ -71,7 +71,7 @@ class LegislationRowValidator(RowValidator):
 
     def _test_source_url(self, row):
         if row.source_url == None or len(row.source_url) == 0:
-            self._raise_exception("Source_url must not be null or an empty string.")
+            self._raise_exception("source_url must not be null or an empty string.")
 
     def _test_committees(self, row):
         committees = row.committees
@@ -94,7 +94,7 @@ class LegislationRowValidator(RowValidator):
         if type(principal_sponsor) != str:
             self._raise_exception("principal sponsor must be a string")
         principal_sponsor_name_split = principal_sponsor.split(' ')
-        if len(principal_sponsor_name_split) <= 1:
+        if len(principal_sponsor_name_split) == 0:
             self._raise_exception("principal_sponsor name must be provided a full name.")
 
     def _test_sponsors(self, row):
