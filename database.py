@@ -132,6 +132,53 @@ class CursorFromConnectionFromPool:
 
 class Persistence:
     """Class for writing collected data to database"""
+    # table that indexes columns in canadian datasets that have null values
+
+    # writes pm_video data to database
+    @staticmethod
+    def write_pm_vid_data(data, table):
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        title text UNIQUE,
+                        video_text text
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
+                """).format(table=sql.Identifier(table))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            except Exception as e:
+                print(f'An exception occured executting a query:\n{e}')
+                cur.connection.rollback()
+
+            insert_legislator_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (%s, %s)
+                    ON CONFLICT (title) DO UPDATE SET
+                        title = excluded.title,
+                        video_text = excluded.video_text;
+                    """).format(table=sql.Identifier(table))
+
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
+                try:
+                    tup = (
+                        item.title,
+                        item.video_text
+                    )
+
+                    cur.execute(insert_legislator_query, tup)
+                except Exception as e:
+                    print(f'Exception occured inserting the following data:\n{tup}')
+                    print(e)
+                    cur.connection.rollback()
+
     @staticmethod
     def write_stats_data_test(data, table):
         with CursorFromConnectionFromPool() as cur:
