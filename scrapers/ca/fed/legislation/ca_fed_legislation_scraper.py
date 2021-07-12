@@ -164,6 +164,72 @@ def get_bill_summary_and_text(bill_file_url):
 
     return bill_data
 
+def get_senate_vote_details(senate_vote_url):
+    sen_vote_details = {}
+
+    """
+    TODO: Return dictionary containing senate vote information.
+    senate_vote_url example:
+    https://sencanada.ca/en/in-the-chamber/votes/43-2
+    Displays web page containing vote details. Need to collect vote information and
+    store them in the sen_vote_details dictionary.
+    This dictionary should have the following format:
+    
+    sen_vote_details = {
+        'C-30': # Bill name
+            [
+                {
+                    'date': '...', # Vote details, as outline in data dictionary
+                    'description': '...',
+                    'yea': 10,
+                    # Etc...
+                },
+                {
+                    'date': '...', # Details for next vote with same bill name
+                    'description': '...',
+                    'yea': 9,
+                    # Etc...
+                }
+            ],
+        'C-12': [ {...}, {...} ], # Vote details for next bill, etc...
+    }
+    
+    Once this data is collected, simply return the sen_vote_details dictionary - The contents
+    of this dictionary will be merged with MP vote data and stored in row.votes inside of the
+    scrape() function (this logic has already been implemented).
+    """
+    return sen_vote_details
+
+
+def get_mp_vote_details(bill_url):
+    bill_vote_page_url = bill_url + '&View=5'
+    soup = get_soup(bill_vote_page_url)
+
+    bill_vote_details = []
+    
+    """
+    TODO: Get vote details
+    An example bill_vote_page_url:
+    https://www.parl.ca/LegisInfo/BillDetails.aspx?Language=E&billId=10870098&View=5
+    The above page has a "Recorded Votes" section. The details of these votes will need
+    to be collected. In this function, only the House of Commons votes need to be collected.
+    The Senate votes will need to be collected in the get_senate_vote_details() function, which
+    will need to be implemented as well.
+
+    The above URL has one HoC vote in the Recorded Votes section - Vote 18. Link:
+    https://www.ourcommons.ca/Members/en/votes/43/2/18
+    This is the information we want to collect. Note that you can also append /xml
+    to the above link:
+    https://www.ourcommons.ca/Members/en/votes/43/2/18/xml
+    This will present the vote data in XML format which is usually easier to collect. You may
+    collect from either source, though I do recommend collecting from the XML link.
+
+    Once you collect the bill_vote_details which should be stored in a list, simply return it;
+    it will be combined with the senate vote details and stored within row.votes in the scrape()
+    function. This logic has already been implemented.
+    """
+    return bill_vote_details
+
 
 def scrape(xml_url):
     """
@@ -182,6 +248,7 @@ def scrape(xml_url):
     current_session_number = get_current_session_number()
 
     bill_lst = []
+    senate_vote_details = {}
     for bill in tqdm(root.findall('Bill')[:5], "Bill scrapin'"):
 
         parl_session = bill.find('ParliamentSession')
@@ -193,6 +260,9 @@ def scrape(xml_url):
         row = scraper_utils.initialize_row()
 
         bill_id = bill.attrib['id']
+
+        source_url = f'{base_url}/LegisInfo/BillDetails.aspx?Language=E&billId={bill_id}'
+
         introduced_date = datetime.strptime(
             bill.find('BillIntroducedDate').text, '%Y-%m-%dT%H:%M:%S')
 
@@ -200,6 +270,14 @@ def scrape(xml_url):
 
         bill_number = bill.find('BillNumber')
         bill_number = f'{bill_number.attrib["prefix"]}-{bill_number.attrib["number"]}'
+
+        # Collect vote details
+        if not senate_vote_details:
+            senate_vote_url = f'https://sencanada.ca/en/in-the-chamber/votes/{parl_number}-{parl_session}'
+            senate_vote_details = get_senate_vote_details(senate_vote_url)
+        
+        votes = get_mp_vote_details(source_url)
+        votes += senate_vote_details.get(bill_number, [])
 
         bill_title = get_english_title(bill.find('BillTitle'))
         bill_title_short = get_english_title(bill.find('ShortTitle'))
@@ -266,9 +344,10 @@ def scrape(xml_url):
                 committees.append(
                     {'chamber': le['chamber'], 'committee': le['committee']})
 
+        row.votes = votes
         row.committees = committees
         row.goverlytics_id = f'CAFED_{session}_{bill_number}'
-        row.source_url = f'{base_url}/LegisInfo/BillDetails.aspx?Language=E&billId={bill_id}'
+        row.source_url = source_url
         row.source_id = bill_id
         row.bill_name = bill_number
         row.session = session
