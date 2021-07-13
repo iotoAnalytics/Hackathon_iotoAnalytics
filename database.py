@@ -773,13 +773,13 @@ class Persistence:
                        row.publications,
                        json.dumps(row.last_major_event, default=utils.json_serial))
 
-            try:
-                cur.execute(insert_legislator_query, tup)
+                try:
+                    cur.execute(insert_legislator_query, tup)
 
-            except Exception as e:
-                print(
-                    f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-                cur.connection.rollback()
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                    cur.connection.rollback()
 
     @staticmethod
     def write_ca_prov_terr_legislation(data, table):
