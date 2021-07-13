@@ -69,7 +69,7 @@ class Status_Of_Bills:
         self.table_reader.set_page_width_ratio(width_in_inch=11)
         self.table_reader.set_page_height_ratio(height_in_inch=8.5)
         self.table_reader.set_page_top_spacing_in_inch(top_spacing_in_inch=1.15)
-        self.table_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=1.45)
+        self.table_reader.set_page_bottom_spacing_in_inch(bottom_spacing_in_inch=1.00)
 
 class Main_Functions:
     def set_main_page_soup_global(self, url):
@@ -210,7 +210,10 @@ class Bill_PDF_Scraper:
 
     def __get_bill_actions(self):
         bill_name_that_matches_status_of_bills = self.__adjust_bill_name_to_match_status_of_bills()
-        bill_row_from_df = self.__get_bill_row_from_df(bill_name_that_matches_status_of_bills)
+        try:
+            bill_row_from_df = self.__get_bill_row_from_df(bill_name_that_matches_status_of_bills)
+        except:
+            print(bill_name_that_matches_status_of_bills)
         relevant_cells = bill_row_from_df[:1:-1]
         actions = []
         for index, cell in enumerate(relevant_cells):

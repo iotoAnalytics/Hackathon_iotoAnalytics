@@ -53,10 +53,6 @@ def program_driver():
     all_wiki_links = WikiScraper().scrape_main_wiki_link()
     wiki_data = WikiScraper().get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
 
-    print("Validating data...")
-    validator = scraper_utils.get_row_validator()
-    validator.validate_rows(mla_data)
-
     print("Configuring data...")
     complete_data_set = configure_data(mla_data, wiki_data)
     
@@ -170,8 +166,9 @@ class MainScraper:
         self.driver_instance.start_driver(url, state_legislature_crawl_delay)
         try:
             self.data = self.__get_member_data()
-        except:
-            error("Error getting member data.")
+        except Exception as e:
+            print(e.with_traceback())
+            error(f"Error getting {identity} member data.")
         finally:
             self.driver_instance.close_driver()
 
@@ -254,7 +251,7 @@ class MainScraper:
         data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
         district = data_row['District'].values[0]
         district = district.split()[1].strip()
-        return int(district)
+        return district
 
     def __set_county(self, name):
         data_row = every_county_as_df.loc[every_county_as_df['Member'].str.contains(name)]
