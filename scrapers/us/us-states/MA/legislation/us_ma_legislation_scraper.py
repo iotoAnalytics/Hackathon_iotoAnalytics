@@ -75,7 +75,7 @@ def get_urls():
     url = browser.current_url
 
     #while True:
-    for i in range(0, 3):
+    for i in range(0, 262):
         try:
             urls += (get_individual_urls(url))
             pagination_table = browser.find_element_by_class_name("pagination")
@@ -254,6 +254,7 @@ def get_bill_description(soup, row):
         row.bill_description = description
     except:
         pass
+
 
 def get_bill_summary(soup, row):
     try:
@@ -509,6 +510,7 @@ def get_bill_title(soup, row):
         row.bill_title = title
     except:
         pass
+
 
 def scrape(url):
     row = scraper_utils.initialize_row()

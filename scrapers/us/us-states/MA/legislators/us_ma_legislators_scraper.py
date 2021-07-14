@@ -1,8 +1,9 @@
-
+from database import CursorFromConnectionFromPool
 import sys
 import os
 from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
+from scraper_utils import USStateLegislationScraperUtils
 import re
 import numpy as np
 from nameparser import HumanName
@@ -22,6 +23,10 @@ database_table_name = 'us_ma_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
+
+legislator_table_name = 'us_ma_legislators'
+legislation_scraper_utils = USStateLegislationScraperUtils(
+    state_abbreviation, database_table_name, legislator_table_name)
 
 base_url = 'https://malegislature.gov'
 # Get scraper delay from website robots.txt file
@@ -252,10 +257,105 @@ def scrape(url):
     get_biography(url, row)
     get_committees_page(url, row)
 
+
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
     return row
+
+
+def get_legislator_id_by_full_name(soup):
+    legislator_id = None
+    name_block = soup.find('h1')
+    try:
+        role = name_block.find('span').text.strip()
+        name_full = name_block.text.split(role)[1]
+        if "Democrat" in name_full:
+            name_full = name_full.split("Democrat")[0].strip()
+        else:
+            name_full = name_full.split("Republican")[0].strip()
+
+        hn = HumanName(name_full)
+        name_last = hn.last
+        name_first = hn.first
+        print(hn)
+    except:
+        pass
+
+    try:
+        search_for = dict(name_last=name_last, name_first=name_first)
+
+        legislator_id = legislation_scraper_utils.get_legislator_id(**search_for)
+    except:
+        pass
+    return legislator_id, name_last
+
+
+def get_legislators_sponsored_bills(soup):
+    sponsored_bills = []
+    table_section = soup.find('div', {'class': 'tab-content'})
+    rows = table_section.find_all('tr')
+    for row in rows[1:]:
+        columns = row.find_all('td')
+        if '*' not in columns[3].text:
+            bill = columns[1].text.strip()
+            bill = bill.replace('.', '')
+            sponsored_bills.append(bill)
+
+    return sponsored_bills
+
+
+def get_legislators_cosponsored_bills(url):
+    cosponsored_bills = []
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    table_section = soup.find('div', {'class': 'tab-content'})
+    rows = table_section.find_all('tr')
+    for row in rows[1:]:
+        columns = row.find_all('td')
+        if '*' not in columns[3].text:
+            bill = columns[1].text.strip()
+            bill = bill.replace('.', '')
+            cosponsored_bills.append(bill)
+
+    return cosponsored_bills
+
+
+def update_legislation_table(legislator_data,
+                             legislator_id,
+                             last_name,
+                             cur):
+
+    sponsored_bills = legislator_data[0]
+    cosponsored_bills = legislator_data[1]
+    for bill in sponsored_bills:
+
+        query = (f'UPDATE us_ma_legislation SET sponsors = (select array_agg(distinct e) from unnest(sponsors || {last_name} ::text[]) e) where bill_name = {bill};')
+        query2 = (f'UPDATE us_ma_legislation SET sponsors_id = (select array_agg(distinct e) from unnest(sponsors_id || {legislator_id} ::integer[]) e) where bill_name = {bill};')
+        cur.execute(query)
+        cur.execute(query2)
+
+
+def scrape_for_legislation(url, cur):
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    sponsored_bills = get_legislators_sponsored_bills(soup)
+
+    term_title = soup.find('span', {'class': 'headNumber'}).text
+    term_id = term_title.split(' ')[1].strip()
+    term_id = re.findall(r'[0-9]', term_id)
+    term_id = "".join(term_id)
+    cosponsored_bills_url = url + "/" + term_id + "/Bills/Cosponsored"
+    cosponsored_bills = get_legislators_cosponsored_bills(cosponsored_bills_url)
+
+    legislator_id, last_name = get_legislator_id_by_full_name(soup)
+    legislator_data = [sponsored_bills, cosponsored_bills]
+    update_legislation_table(legislator_data,
+                             legislator_id,
+                             last_name,
+                             cur)
 
 
 if __name__ == '__main__':
@@ -268,12 +368,18 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
+    with CursorFromConnectionFromPool() as cur:
+        for url in get_urls():
+            scrape_for_legislation(url, cur)
+
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="years_active")
+
+
 
     # getting urls from wikipedia
     wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
