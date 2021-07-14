@@ -162,12 +162,54 @@ def get_bill_session(soup, row):
 
 
 def get_white_vote(url, row):
-    pass
+    votes = []
+    vote_dict = {}
+    driver = open_driver(url)
+    totals_row = driver.find_element_by_xpath('//*[@id="main-content"]/div/article/font[2]/center/table/tbody/tr[2]').find_elements_by_tag_name('td')
+    yea, nay, absent = totals_row[0].text, totals_row[2].text, totals_row[-1].text
+    yea, nay, absent = yea.split('-')[-1].strip(), nay.split('-')[-1].strip(), absent.split('-')[-1].strip()
+
+    chamber = driver.find_element_by_xpath('//*[@id="main-content"]/div/article/center/font[1]/b').text.split()[0]
+    description = driver.find_element_by_xpath('//*[@id="main-content"]/div/article/center/font[2]/b').text
+    date = driver.find_element_by_xpath('/html/body/main/div/article/center/font[2]/text()[1]').split()[0].split('/')
+    date = date[-1] + '-' + date[0] + '-' + date[1]
+
+    table = driver.find_element_by_xpath('//*[@id="main-content"]/div/article/font[2]/center/table').find_elements_by_tag_name('tr')[-1]
+    columns = table.find_elements_by_tag_name('td')
+
+    vote_info = []
+    yea_voters, nay_voters, absent_voters = columns[0].text.split('\n'), columns[2].text.split('\n'), columns[-1].text.split('\n')
+    for voter in yea_voters:
+        if voter == '':
+            pass
+        else:
+            gov_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id', column_to_search='name_first',
+                                                             startswith=voter.split(',')[-1].strip()[0], name_last=voter.split(',')[0])
+            vote_info.append({'vote': 'Yea', 'legislator': voter, 'goverlyics_id': gov_id})
+    for voter in nay_voters:
+        if voter == '':
+            pass
+        else:
+            gov_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id', column_to_search='name_first',
+                                                             startswith=voter.split(',')[-1].strip()[0], name_last=voter.split(',')[0])
+            vote_info.append({'vote': 'Nay', 'legislator': voter, 'goverlyics_id': gov_id})
+    for voter in absent_voters:
+        if voter == '':
+            pass
+        else:
+            gov_id = scraper_utils.legislators_search_startswith(column_val_to_return='goverlytics_id', column_to_search='name_first',
+                                                             startswith=voter.split(',')[-1].strip()[0], name_last=voter.split(',')[0])
+            vote_info.append({'vote': 'Absent', 'legislator': voter, 'goverlyics_id': gov_id})
+
+    vote_dict['yea'], vote_dict['nay'], vote_dict['absent'] = yea, nay, absent
+    vote_dict['votes'], vote_dict['chamber'], vote_dict['description'], vote_dict = vote_info, chamber, description, date
+    votes.append(vote_dict)
+    row.votes = votes
+    pprint(row.votes, url)
 
 
 def get_blue_red_vote(url, row):
     pass
-
 
 
 def get_bill_actions_and_votes(url, row):
@@ -188,12 +230,24 @@ def get_bill_actions_and_votes(url, row):
         font_color = table_row[0].find_element_by_tag_name('font').value_of_css_property('color')
         if font_color == 'rgba(204, 0, 0, 1)':
             action_by = 'House'
-            vote_link = table_row[-1].get_attribute('href')
-            print(vote_link)
+            try:
+                vote_link = table_row[-1].find_element_by_tag_name('a').get_attribute('href')
+                get_blue_red_vote(vote_link, row)
+            except NoSuchElementException:
+                pass
         elif font_color == 'rgba(51, 51, 255, 1)':
             action_by = 'Senate'
+            try:
+                vote_link = table_row[-1].find_element_by_tag_name('a').get_attribute('href')
+                get_blue_red_vote(vote_link, row)
+            except NoSuchElementException:
+                pass
         else:
-            pass
+            try:
+                vote_link = table_row[-1].find_element_by_tag_name('a').get_attribute('href')
+                get_white_vote(vote_link, row)
+            except NoSuchElementException:
+                pass
         actions.append({'date': date, 'action_by': action_by, 'description': action})
     row.actions = actions
     row.date_introduced = date_introduced
@@ -242,29 +296,29 @@ def get_current_status(url, row):
     driver.quit()
 
 
-# def get_bill_committees(url, row):
-#     committees = []
-#     driver = open_driver(url)
-#     button = driver.find_element_by_xpath('//*[@id="activator-billVideo"]')
-#     button.click()
-#     print(url)
-#     try:
-#         table = driver.find_element_by_xpath('//*[@id="billVideo"]/ul[1]/li/ul').find_elements_by_tag_name('li')
-#         print(len(table))
-#         for li in table:
-#             x = li.find_element_by_tag_name('a')
-#
-#         #     committee_name = li.find_elements_by_tag_name('a')[0].text
-#             print(x.text)
-#             print()
-#
-#             # chamber = committee_name.split()[0]
-#             # committees.append({'chamber': chamber, 'committee_name': committee_name})
-#     except NoSuchElementException:
-#         pass
-#     print('__________________________________________________')
-#     row.committees = committees
-#     # print(url, row.committees)
+def get_bill_committees(url, row):
+    committees = []
+    driver = open_driver(url)
+    button = driver.find_element_by_xpath('//*[@id="activator-billVideo"]')
+    button.click()
+    print(url)
+    try:
+        table = driver.find_element_by_xpath('//*[@id="billVideo"]/ul[1]/li/ul').find_elements_by_tag_name('li')
+        print(len(table))
+        for li in table:
+            x = li.find_element_by_tag_name('a')
+
+        #     committee_name = li.find_elements_by_tag_name('a')[0].text
+            print(x.text)
+            print()
+
+            # chamber = committee_name.split()[0]
+            # committees.append({'chamber': chamber, 'committee_name': committee_name})
+    except NoSuchElementException:
+        pass
+    print('__________________________________________________')
+    row.committees = committees
+    # print(url, row.committees)
 
 
 @scraper_utils.Timer()
@@ -275,7 +329,7 @@ def scrape(url):
     # get_bill_text(url, row)
     # get_bill_sponsor(url, row)
     # get_bill_session(soup, row)
-    get_bill_actions_and_votes(url, row)
+    # get_bill_actions_and_votes(url, row)
     # get_bill_name(url, row)
     # get_bill_type(url, row)
     # get_bill_title(url, row)
