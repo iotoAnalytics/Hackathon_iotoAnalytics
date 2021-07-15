@@ -8,8 +8,6 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-from rows import USLegislationRow
-from row_validator import Validator
 import pandas as pd
 
 pd.set_option('display.max_rows', None)
@@ -24,8 +22,6 @@ def program_driver():
     all_bills = data_collector.program_driver()
     print("processing data...")
     data = process_data(all_bills)
-    print("validating data...")
-    validate_data(data)
     print("Writing data to database...")
     data_collector.scraper_utils.write_data(data)
     print("Complete")
@@ -35,10 +31,6 @@ def process_data(bills):
     for bill in bills:
         data.append(DataOrganize(bill).get_rows())
     return data
-
-def validate_data(rows):
-    validator = Validator(USLegislationRow)
-    validator.validate_rows(rows)
 
 class DataOrganize:
     def __init__(self, bill):
@@ -59,10 +51,9 @@ class DataOrganize:
         self.row.bill_description = bill['bill_description']
         self.row.bill_title = bill['bill_title']
         self.row.current_status = bill['current_status']
-        self.__set_principal_sponsor_data(bill['sponsors'])
+        self.__set_principal_sponsor_data(bill['sponsors']) 
         self.__set_sponsor_info(bill['sponsors'])
-        self.row.actions = bill['actions']
-        self.__format_actions()
+        self.row.actions = self.__format_actions(bill['actions'])
         try:
             self.row.date_introduced = self.row.actions[0]['date']
         except:
@@ -97,10 +88,11 @@ class DataOrganize:
             sponsors_ids.append(data_collector.scraper_utils.get_legislator_id(name_full=full_name))
         return sponsors_ids
 
-    def __format_actions(self):
-        for action in self.row.actions:
+    def __format_actions(self, actions):
+        for action in actions:
             self.__format_date(action)
             self.__set_action_by(action)
+        return actions
 
     def __format_date(self, action):
         date = action['date'].split('T')[0]
