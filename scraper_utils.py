@@ -1176,10 +1176,17 @@ class PDF_Table_Reader(PDF_Reader):
         return tables
 
 # region Previous Election Data
+
 ##########################################
 # PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
 
-class ProvinceTerrPreviousElectionScraperUtils(ScraperUtils):
-    def __init__(self, country, row_type):
-        database_table_name = country + "_prov"
+class FedPreviousElectionScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str, row_type: PreviousElectionRow):
+        super().__init__(country, table_name, row_type)
+
+class CAFedPreviousElectionScraperUtils(FedPreviousElectionScraperUtils):
+    def __init__(self, table_name='ca_prev_fed_election_by_division'):
+        super().__init__('ca', table_name, CAFedPrevElectionByDivisionRow())
+
+# end region

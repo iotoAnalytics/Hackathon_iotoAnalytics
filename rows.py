@@ -1092,13 +1092,13 @@ class PreviousElectionRow:
     def country_id(self) -> int:
         return self._country_id
     @country_id.setter
-    def goverlyitcs_id(self, id: int) -> None:
+    def country_id(self, id: int) -> None:
         if type(id) != int:
             raise TypeError("country_id must be an int")
         self._country_id = id
 
 @dataclass
-class CAPrevElectionByDivisionRow(PreviousElectionRow):
+class CAFedPrevElectionByDivisionRow(PreviousElectionRow):
     province_territory: str
     province_territory_id: int
     valid_votes: int
