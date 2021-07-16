@@ -260,7 +260,6 @@ class LegislatorScraperUtils(ScraperUtils):
         except Exception:
             return val
 
-
     def scrape_wiki_bio(self, wiki_link):
         """
         Used for getting missing legislator fields from their wikipedia bios.
@@ -1189,4 +1188,22 @@ class CAFedPreviousElectionScraperUtils(FedPreviousElectionScraperUtils):
     def __init__(self, table_name='ca_prev_fed_election_by_division'):
         super().__init__('ca', table_name, CAFedPrevElectionByDivisionRow())
 
+    def get_prov_terr_id(self, prov_terr_abbrev: str) -> int:
+        """Returns the province/territory ID for a given province/territory"""
+        df = self.divisions
+        val = df.loc[df['abbreviation'] == prov_terr_abbrev]['id'].values[0]
+        try:
+            return int(val)
+        except Exception:
+            return val
+
+    def get_party_id(self, party_name: str, location=None) -> int:
+        """Returns the party ID for a given party. Party name must match database entry"""
+        if not location:
+            raise exceptions.MissingLocationException(self.get_party_id)
+        df = self.parties
+        try:
+            return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
+        except IndexError:
+            raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
 # end region

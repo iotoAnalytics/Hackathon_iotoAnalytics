@@ -1174,6 +1174,8 @@ class CAFedPrevElectionByDivisionRow(PreviousElectionRow):
                 raise TypeError("valid_votes_by_party must be a list of dicts")
             if element.get('party') is None or type(element.get('party')) != str:
                 raise ValueError("valid_votes_by_party must have a valid party entry as a str")
+            if element.get('party_id') is None or type(element.get('party_id')) != int:
+                raise ValueError("valid_votes_by_party must have a valid party_id entry as an int")
             if element.get('votes') is None or type(element.get('votes')) != int:
                 raise ValueError("valid_votes_by_party must have a valid votes entry as an int")
         self._valid_votes_by_party = value
