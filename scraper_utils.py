@@ -1175,5 +1175,11 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
+# region Previous Election Data
+##########################################
+# PREVIOUS ELECTION SCRAPER UTILS
+##########################################
 
-
+class ProvinceTerrPreviousElectionScraperUtils(ScraperUtils):
+    def __init__(self, country, row_type):
+        database_table_name = country + "_prov"

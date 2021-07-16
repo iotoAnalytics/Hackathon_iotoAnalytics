@@ -1039,3 +1039,168 @@ class CAFedLegislatorRow(CALegislatorRow):
             if not element.get('organization') or type(element.get('organization')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value
+
+@dataclass
+class PreviousElectionRow:
+    """
+    Data structure for housing data for previous elections
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    goverlytics_id: str
+    year: int
+    country: str
+    country_id: int
+
+    def __init__(self):
+        self._goverlytics_id = ''
+        self._year = None
+        self._country = ''
+        self._country_id = None
+
+    @property
+    def goverlytics_id(self) -> str:
+        return self._goverlytics_id
+    @goverlytics_id.setter
+    def goverlyitcs_id(self, id: str) -> None:
+        if type(id) != str:
+            raise TypeError("goverlytics_id must be a str")
+        self._goverlytics_id = id
+
+    @property
+    def year(self) -> int:
+        return self._year
+    @year.setter
+    def year(self, value: int) -> None:
+        if type(value) != int:
+            raise TypeError("year must be an int")
+        self._year = value
+
+    @property
+    def country(self) -> str:
+        return self._country
+    @country.setter
+    def country(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("country must be a str")
+        self._country = value
+
+    @property
+    def country_id(self) -> int:
+        return self._country_id
+    @country_id.setter
+    def goverlyitcs_id(self, id: int) -> None:
+        if type(id) != int:
+            raise TypeError("country_id must be an int")
+        self._country_id = id
+
+@dataclass
+class CAPrevElectionByDivisionRow(PreviousElectionRow):
+    province_territory: str
+    province_territory_id: int
+    valid_votes: int
+    valid_votes_by_method: List[dict]
+    valid_votes_by_party: List[dict]
+    invalid_votes: int
+    total_votes: int
+    voter_turnout: float
+    
+    def __init__(self):
+        super().__init__()
+        self._province_territory = ''
+        self._province_territory_id = None
+        self._valid_votes = None
+        self._valid_votes_by_method = []
+        self._valid_votes_by_party = []
+        self._invalid_votes = None
+        self._total_votes = None
+        self._voter_turnout = None
+
+    @property
+    def province_territory(self) -> str:
+        return self._province_territory
+    @province_territory.setter
+    def province_territory(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("province_territory must be a str")
+        self._province_territory = value
+    
+    @property
+    def province_territory_id(self) -> int:
+        return self._province_territory_id
+    @province_territory_id.setter
+    def province_territory_id(self, id: int) -> None:
+        if type(id) != int:
+            raise TypeError("province_territory_id must be an int")
+        self._province_territory_id = id
+
+    @property
+    def valid_votes(self) -> int:
+        return self._valid_votes
+    @valid_votes.setter
+    def valid_votes(self, value: int) -> None:
+        if type(value) != int:
+            raise TypeError("valid_votes must be an int")
+        self._valid_votes = value
+
+    @property
+    def valid_votes_by_method(self) -> list:
+        return self._valid_votes_by_method
+    @valid_votes_by_method.setter
+    def valid_votes_by_method(self, value: list) -> None:
+        if type(value) != list:
+            raise TypeError("valid_votes_by_method must be a list of dicts")
+        for element in value:
+            if type(element) != dict:
+                raise TypeError("valid_votes_by_method must be a list of dicts")
+            if element.get('method') is None or type(element.get('method')) != str:
+                raise ValueError("valid_votes_by_method must have a valid method entry as a str")
+            if element.get('votes') is None or type(element.get('votes')) != int:
+                raise ValueError("valid_votes_by_method must have a valid votes entry as an int")
+        self._valid_votes_by_method = value
+
+    @property
+    def valid_votes_by_party(self) -> list:
+        return self._valid_votes_by_party
+    @valid_votes_by_party.setter
+    def valid_votes_by_party(self, value: list) -> None:
+        if type(value) != list:
+            raise TypeError("valid_votes_by_party must be a list of dicts")
+        for element in value:
+            if type(element) != dict:
+                raise TypeError("valid_votes_by_party must be a list of dicts")
+            if element.get('party') is None or type(element.get('party')) != str:
+                raise ValueError("valid_votes_by_party must have a valid party entry as a str")
+            if element.get('votes') is None or type(element.get('votes')) != int:
+                raise ValueError("valid_votes_by_party must have a valid votes entry as an int")
+        self._valid_votes_by_party = value
+
+    @property
+    def invalid_votes(self) -> int:
+        return self._invalid_votes
+    @invalid_votes.setter
+    def invalid_votes(self, value: int) -> None:
+        if type(value) != int:
+            raise TypeError("invalid_votes must be an int")
+        self._invalid_votes = value
+
+    @property
+    def total_votes(self) -> int:
+        return self._total_votes
+    @total_votes.setter
+    def total_votes(self, value: int) -> None:
+        if type(value) != int:
+            raise TypeError("total_votes must be an int")
+        self._total_votes = value
+
+    @property
+    def voter_turnout(self) -> float:
+        return self._voter_turnout
+    @voter_turnout.setter
+    def voter_turnout(self, value: float) -> None:
+        if type(value) != float:
+            raise TypeError("voter_turnout must be a float")
+        self._voter_turnout = value
