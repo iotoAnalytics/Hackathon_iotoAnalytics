@@ -297,14 +297,17 @@ def get_legislator_id_by_full_name(soup):
 def get_legislators_sponsored_bills(soup):
     sponsored_bills = []
     table_section = soup.find('div', {'class': 'tab-content'})
-    rows = table_section.find_all('tr')
-    for row in rows[1:]:
-        columns = row.find_all('td')
-        if '*' not in columns[3].text:
-            bill = columns[1].find('a').get('href')
-            bill = base_url + bill
-            sponsored_bills.append(bill)
-            print(bill)
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                sponsored_bills.append(bill)
+                print(bill)
+    except:
+        pass
     return sponsored_bills
 
 
@@ -314,15 +317,17 @@ def get_legislators_cosponsored_bills(url):
     soup = BeautifulSoup(page.content, 'lxml')
 
     table_section = soup.find('div', {'class': 'tab-content'})
-    rows = table_section.find_all('tr')
-    for row in rows[1:]:
-        columns = row.find_all('td')
-        if '*' not in columns[3].text:
-            bill = columns[1].find('a').get('href')
-            bill = base_url + bill
-            cosponsored_bills.append(bill)
-            print(bill)
-
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                cosponsored_bills.append(bill)
+                print(bill)
+    except:
+        pass
     return cosponsored_bills
 
 
@@ -350,17 +355,19 @@ def scrape_for_legislation(url, cur):
     soup = BeautifulSoup(page.content, 'lxml')
 
     sponsored_bills = get_legislators_sponsored_bills(soup)
+    try:
+        term_title = soup.find('span', {'class': 'headNumber'}).text
+        term_id = term_title.split(' ')[1].strip()
+        term_id = re.findall(r'[0-9]', term_id)
+        term_id = "".join(term_id)
+        cosponsored_bills_url = url + "/" + term_id + "/Bills/Cosponsored"
+        cosponsored_bills = get_legislators_cosponsored_bills(cosponsored_bills_url)
+        legislator_id, last_name = get_legislator_id_by_full_name(soup)
+        legislator_data = [sponsored_bills, cosponsored_bills]
+        update_legislation_table(legislator_data, legislator_id, last_name, cur)
 
-    term_title = soup.find('span', {'class': 'headNumber'}).text
-    term_id = term_title.split(' ')[1].strip()
-    term_id = re.findall(r'[0-9]', term_id)
-    term_id = "".join(term_id)
-    cosponsored_bills_url = url + "/" + term_id + "/Bills/Cosponsored"
-    cosponsored_bills = get_legislators_cosponsored_bills(cosponsored_bills_url)
-
-    legislator_id, last_name = get_legislator_id_by_full_name(soup)
-    legislator_data = [sponsored_bills, cosponsored_bills]
-    update_legislation_table(legislator_data, legislator_id, last_name, cur)
+    except:
+        pass
 
 
 if __name__ == '__main__':
