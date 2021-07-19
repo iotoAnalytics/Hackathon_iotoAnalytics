@@ -58,29 +58,29 @@ def scrape(url):
     scraper_utils.crawl_delay(crawl_delay)
     row = scraper_utils.initialize_row()
     
-    try:
-        _set_bill_name(row, soup)
-        _set_session(row, url)
-        _set_date_introduced(row, soup)
-        _set_source_url(row, url)
-        _set_chamber_origin(row, soup)
-        # TODO - committees
-        _set_bill_type(row, soup)
-        _set_current_status(row, soup)
-        _set_principal_sponsor(row, soup)
-        _set_sponsors(row, soup)
-        # TODO - cosponsors
-        # TODO - cosponsors_id
-        _set_bill_text(row, soup)
-        _set_description(row, soup)
-        _set_bill_summary(row, soup)
-        _set_actions(row, soup)
-        # TODO - votes
-        _set_goverlytics_id(row)
+    # try:
+    _set_bill_name(row, soup)
+    #     _set_session(row, url)
+    #     _set_date_introduced(row, soup)
+    #     _set_source_url(row, url)
+    #     _set_chamber_origin(row, soup)
+    #     # TODO - committees
+    #     _set_bill_type(row, soup)
+    #     _set_current_status(row, soup)
+    #     _set_principal_sponsor(row, soup)
+    #     _set_sponsors(row, soup)
+    #     # TODO - cosponsors
+    #     # TODO - cosponsors_id
+    #     _set_bill_text(row, soup)
+    #     _set_description(row, soup)
+    #     _set_bill_summary(row, soup)
+    #     _set_actions(row, soup)
+    #     # TODO - votes
+    #     _set_goverlytics_id(row)
 
-        _set_votes(row, soup)
-    except Exception:
-        print(f'Problem occurred with: {url}')
+    _set_votes(row, soup)
+    # except Exception:
+    #     print(f'Problem occurred with: {url}')
 
     return row
     
@@ -305,7 +305,7 @@ def _set_votes(row, soup):
             vote_data = _get_vote_data(vd, chamber)
             votes.append(vote_data)
     
-    # pprint(votes, width=200)
+    pprint(votes, width=200)
 
     row.votes = votes
 
@@ -328,7 +328,7 @@ def _get_vote_data(text, chamber):
     # Find description and date
     if search := re.search(r'- (.+) ([0-9]{1,2}/[0-9]{1,2}/[0-9]{4})', text):
         vote_data['description'] = search.group(1)
-        vote_data['date'] = datetime.strptime(search.group(2), r'%m/%d/%Y')
+        vote_data['date'] = datetime.strftime(datetime.strptime(search.group(2), r'%m/%d/%Y'), r'%Y-%m-%d')
 
     # Find status
     if search := re.search(r'(Passed|Failed)', text):
@@ -405,7 +405,7 @@ def _get_voter_data(name, vote, role):
             name_first, name_last=name_last, role=role)
 
     voter_data['legislator'] = name
-    voter_data['votetext'] = vote
+    voter_data['vote_text'] = vote
     voter_data['goverlytics_id'] = gov_id
 
     return voter_data
@@ -419,16 +419,17 @@ def main():
 
     # Collect legislation urls
     print(DEBUG_MODE and 'Collecting legislation URLs...\n' or '', end='')
-    urls = get_urls()[403:703]
+    # urls = get_urls()[403:703]
 
     # Scrape data from collected URLs
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
-    with Pool(NUM_POOL_PROCESSES) as pool:
-        data = list(tqdm(pool.imap(scrape, urls)))
+    # with Pool(NUM_POOL_PROCESSES) as pool:
+    #     data = list(tqdm(pool.imap(scrape, urls)))
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=SB0530&GA=112')]
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/Default.aspx?BillNumber=HB0767&GA=112')]
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/Default.aspx?BillNumber=HB0635&GA=112')]
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=HB0159&GA=112')]
+    data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=HB0404&GA=112')]
 
     # pprint(data, width=200)
     # print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
