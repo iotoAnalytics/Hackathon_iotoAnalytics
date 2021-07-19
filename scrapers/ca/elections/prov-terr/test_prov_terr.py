@@ -18,13 +18,6 @@ class TestMainScraper:
              'content.aspx?section=ele&document=index&dir=pas/39ge&lang=e', 
              'content.aspx?section=ele&document=index&dir=pas/38e&lang=e', 
              'content.aspx?section=ele&document=index&dir=pas/37g&lang=e', 
-             'content.aspx?section=ele&document=index&dir=pas/tge&lang=e']
-    def test_get_data_from_all_links(self):
-        sample_list = ['a b c', 'd e f', 'g h i']
-        return_list = main_file.MainFunction().get_data_from_all_links(self.__sample_function, sample_list)
-        assert len(return_list) == 9
-
-    def __sample_function(self, words: str):
-        return words.split()
+             'content.aspx?section=ele&document=index&dir=pas/tge&lang=e']            
 
     
