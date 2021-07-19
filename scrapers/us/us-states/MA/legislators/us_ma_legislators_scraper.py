@@ -1,8 +1,9 @@
-
+from database import CursorFromConnectionFromPool
 import sys
 import os
 from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
+from scraper_utils import USStateLegislationScraperUtils
 import re
 import numpy as np
 from nameparser import HumanName
@@ -22,6 +23,10 @@ database_table_name = 'us_ma_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
+
+legislator_table_name = 'us_ma_legislators'
+legislation_scraper_utils = USStateLegislationScraperUtils(
+    state_abbreviation, database_table_name, legislator_table_name)
 
 base_url = 'https://malegislature.gov'
 # Get scraper delay from website robots.txt file
@@ -252,10 +257,117 @@ def scrape(url):
     get_biography(url, row)
     get_committees_page(url, row)
 
+
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
     return row
+
+
+def get_legislator_id_by_full_name(soup):
+    legislator_id = None
+    name_block = soup.find('h1')
+    try:
+        role = name_block.find('span').text.strip()
+        name_full = name_block.text.split(role)[1]
+        if "Democrat" in name_full:
+            name_full = name_full.split("Democrat")[0].strip()
+        else:
+            name_full = name_full.split("Republican")[0].strip()
+
+        hn = HumanName(name_full)
+        name_last = hn.last
+        name_first = hn.first
+
+    except:
+        pass
+
+    try:
+        search_for = dict(name_last=name_last, name_first=name_first)
+
+        legislator_id = legislation_scraper_utils.get_legislator_id(**search_for)
+    except:
+        pass
+
+    if "'" in name_last:
+        name_last = name_last.replace("'", "''")
+    return legislator_id, name_last
+
+
+def get_legislators_sponsored_bills(soup):
+    sponsored_bills = []
+    table_section = soup.find('div', {'class': 'tab-content'})
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                sponsored_bills.append(bill)
+                print(bill)
+    except:
+        pass
+    return sponsored_bills
+
+
+def get_legislators_cosponsored_bills(url):
+    cosponsored_bills = []
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    table_section = soup.find('div', {'class': 'tab-content'})
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                cosponsored_bills.append(bill)
+                print(bill)
+    except:
+        pass
+    return cosponsored_bills
+
+
+def update_legislation_table(legislator_data,
+                             legislator_id,
+                             last_name,
+                             cur):
+
+    sponsored_bills = legislator_data[0]
+    cosponsored_bills = legislator_data[1]
+    for bill in sponsored_bills:
+
+
+        try:
+
+            query = (f"UPDATE us_ma_legislation SET sponsors_id = array_append(sponsors_id, '{legislator_id}'), sponsors = array_append(sponsors, '{last_name}') WHERE source_url = '{bill}' AND '{legislator_id}' != ALL(sponsors_id) AND '{last_name}' != ALL(sponsors);")
+
+            cur.execute(query)
+        except:
+            pass
+
+
+def scrape_for_legislation(url, cur):
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    sponsored_bills = get_legislators_sponsored_bills(soup)
+    try:
+        term_title = soup.find('span', {'class': 'headNumber'}).text
+        term_id = term_title.split(' ')[1].strip()
+        term_id = re.findall(r'[0-9]', term_id)
+        term_id = "".join(term_id)
+        cosponsored_bills_url = url + "/" + term_id + "/Bills/Cosponsored"
+        cosponsored_bills = get_legislators_cosponsored_bills(cosponsored_bills_url)
+        legislator_id, last_name = get_legislator_id_by_full_name(soup)
+        legislator_data = [sponsored_bills, cosponsored_bills]
+        update_legislation_table(legislator_data, legislator_id, last_name, cur)
+
+    except:
+        pass
 
 
 if __name__ == '__main__':
@@ -268,44 +380,50 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
-    leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="years_active")
+    with CursorFromConnectionFromPool() as cur:
+        for url in get_urls():
+            scrape_for_legislation(url, cur)
 
-    # getting urls from wikipedia
-    wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
-
-    all_wiki_links = find_individual_wiki(wikipage_link)
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    # big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
-    isna = big_df['years_active'].isna()
-    big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
-
-    # dropping rows with vacant seat
-    vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
-    for index in vacant_index:
-        big_df = big_df.drop(big_df.index[index])
-
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    # leg_df = pd.DataFrame(data)
+    # leg_df = leg_df.drop(columns="birthday")
+    # leg_df = leg_df.drop(columns="education")
+    # leg_df = leg_df.drop(columns="years_active")
+    #
+    #
+    #
+    # # getting urls from wikipedia
+    # wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
+    #
+    # all_wiki_links = find_individual_wiki(wikipage_link)
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_first", "name_last"])
+    #
+    # isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    # # big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    # isna = big_df['years_active'].isna()
+    # big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
+    #
+    # # dropping rows with vacant seat
+    # vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
+    # for index in vacant_index:
+    #     big_df = big_df.drop(big_df.index[index])
+    #
     print('Scraping complete')
-
-    big_list_of_dicts = big_df.to_dict('records')
-
-    print('Writing data to database...')
-
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print(f'Scraper ran successfully!')
+    #
+    # big_list_of_dicts = big_df.to_dict('records')
+    #
+    # print('Writing data to database...')
+    #
+    # scraper_utils.write_data(big_list_of_dicts)
+    #
+    # print(f'Scraper ran successfully!')
