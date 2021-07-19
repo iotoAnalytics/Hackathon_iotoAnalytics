@@ -564,7 +564,6 @@ def scrape(xml_url):
                 committees.append(
                     {'chamber': le['chamber'], 'committee': le['committee']})
 
-        row.votes = votes
         row.committees = committees
         row.goverlytics_id = f'CAFED_{session}_{bill_number}'
         row.source_url = source_url
