@@ -758,6 +758,11 @@ class Persistence:
                 else:
                     row.principal_sponsor_id = None
 
+                if pd.notna(row.province_territory_id):
+                    row.province_territory_id = int(row.province_territory_id)
+                else:
+                    row.province_territory_id = None 
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
