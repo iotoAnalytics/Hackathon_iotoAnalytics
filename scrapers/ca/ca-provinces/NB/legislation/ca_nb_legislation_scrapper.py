@@ -16,6 +16,7 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
+from PyPDF2 import PdfFileReader
 from scraper_utils import CAProvinceTerrLegislationScraperUtils, USStateLegislationScraperUtils
 from bs4 import BeautifulSoup
 import requests
@@ -111,23 +112,36 @@ def scrape(url):
     title = first_row[0].getText()
     print(title)
     second_row = rows[2].find_all('td')
+    
     legislature = second_row[1].getText()
     third_row = rows[3].find_all('td')
     fourth_row = rows[4].find_all('td')
+    first_reading = fourth_row[1].getText()
     
     fifth_row = rows[5].find_all('td')
     sixth_row = rows[6].find_all('td')
+    
     seventh_row = rows[7].find_all('td')
+    
+    pdf_link = seventh_row[1].find('a').get('href')
+    pattern = ('=\d*')
+    source_id = re.search(pattern,url)[0][1:]
+    print (source_id)
+    row.session = legislature
+    row.source_id = source_id 
+    row.date_introduced = first_reading
+    row.goverlytics_id = f'{prov_terr_abbreviation.strip()}_{legislature.strip()}_{source_id.strip()}'
+    print(pdf_link)
 
-    pdf_link = seventh_row[1].find('a').get_attribute('href')
-
+    
     r = requests.get(pdf_link)
     scraper_utils.crawl_delay(crawl_delay)
     f = io.BytesIO(r.content)
-
+    
     reader = PdfFileReader(f)
     contents = reader.getPage(0).extractText().strip()
-    print(legislature)
+    row.bill_text = contents
+
 
     # Depending on the data you're able to collect, the legislation scraper may be more involved
     # Than the legislator scraper. For one, you will need to create the goverlytics_id. The
@@ -191,15 +205,19 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls(bills_url1)
+    urls2 = get_urls(bills_url2)
+    urls3 = get_urls(bills_url3)
+    urls.append(urls2)
+    urls.append(urls3)
 
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     # data = [scrape(url) for url in urls]
     with Pool() as pool:
-        data = pool.map(scrape, urls[:5])
+        data = pool.map(scrape, urls)
 
     # Once we collect the data, we'll write it to the database.
-    #scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('Complete!')

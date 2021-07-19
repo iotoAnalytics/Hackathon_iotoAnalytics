@@ -96,7 +96,6 @@ class SessionScraper:
         session.click()
         self.current_session = self.__get_current_session_as_num(session)
         self.data = self.__scrape()
-        self.__validate_data(self.data)
     
     def __get_current_session_as_num(self, session):
         session_as_text = session.text.split(' - ')[1]
@@ -354,10 +353,6 @@ class SessionScraper:
         text = text.replace('\n', ' ')
         text = text.replace('  ', ' ')
         return text.strip()
-
-    def __validate_data(self, rows):
-        validator = scraper_utils.get_row_validator()
-        validator.validate_rows(rows)
 
 if __name__ == '__main__':
     main_program = Main_Program()

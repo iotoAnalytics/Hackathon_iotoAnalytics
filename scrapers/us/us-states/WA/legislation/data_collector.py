@@ -237,7 +237,7 @@ class GetVotes:
                     {
                         'goverlytics_id': goverlytics_id,
                         'legislator': legislator,
-                        'votetext': votetext
+                        'vote_text': votetext
                     }
                 )
         return return_list
