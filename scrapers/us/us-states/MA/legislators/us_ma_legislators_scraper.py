@@ -278,7 +278,7 @@ def get_legislator_id_by_full_name(soup):
         hn = HumanName(name_full)
         name_last = hn.last
         name_first = hn.first
-        print(hn)
+
     except:
         pass
 
@@ -288,6 +288,9 @@ def get_legislator_id_by_full_name(soup):
         legislator_id = legislation_scraper_utils.get_legislator_id(**search_for)
     except:
         pass
+
+    if "'" in name_last:
+        name_last = name_last.replace("'", "''")
     return legislator_id, name_last
 
 
@@ -298,10 +301,10 @@ def get_legislators_sponsored_bills(soup):
     for row in rows[1:]:
         columns = row.find_all('td')
         if '*' not in columns[3].text:
-            bill = columns[1].text.strip()
-            bill = bill.replace('.', '')
+            bill = columns[1].find('a').get('href')
+            bill = base_url + bill
             sponsored_bills.append(bill)
-
+            print(bill)
     return sponsored_bills
 
 
@@ -315,9 +318,10 @@ def get_legislators_cosponsored_bills(url):
     for row in rows[1:]:
         columns = row.find_all('td')
         if '*' not in columns[3].text:
-            bill = columns[1].text.strip()
-            bill = bill.replace('.', '')
+            bill = columns[1].find('a').get('href')
+            bill = base_url + bill
             cosponsored_bills.append(bill)
+            print(bill)
 
     return cosponsored_bills
 
@@ -331,10 +335,14 @@ def update_legislation_table(legislator_data,
     cosponsored_bills = legislator_data[1]
     for bill in sponsored_bills:
 
-        query = (f'UPDATE us_ma_legislation SET sponsors = (select array_agg(distinct e) from unnest(sponsors || {last_name} ::text[]) e) where bill_name = {bill};')
-        query2 = (f'UPDATE us_ma_legislation SET sponsors_id = (select array_agg(distinct e) from unnest(sponsors_id || {legislator_id} ::integer[]) e) where bill_name = {bill};')
-        cur.execute(query)
-        cur.execute(query2)
+
+        try:
+
+            query = (f"UPDATE us_ma_legislation SET sponsors_id = array_append(sponsors_id, '{legislator_id}'), sponsors = array_append(sponsors, '{last_name}') WHERE source_url = '{bill}' AND '{legislator_id}' != ALL(sponsors_id) AND '{last_name}' != ALL(sponsors);")
+
+            cur.execute(query)
+        except:
+            pass
 
 
 def scrape_for_legislation(url, cur):
@@ -352,10 +360,7 @@ def scrape_for_legislation(url, cur):
 
     legislator_id, last_name = get_legislator_id_by_full_name(soup)
     legislator_data = [sponsored_bills, cosponsored_bills]
-    update_legislation_table(legislator_data,
-                             legislator_id,
-                             last_name,
-                             cur)
+    update_legislation_table(legislator_data, legislator_id, last_name, cur)
 
 
 if __name__ == '__main__':
@@ -372,46 +377,46 @@ if __name__ == '__main__':
         for url in get_urls():
             scrape_for_legislation(url, cur)
 
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
-    leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="years_active")
-
-
-
-    # getting urls from wikipedia
-    wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
-
-    all_wiki_links = find_individual_wiki(wikipage_link)
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    # big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
-    isna = big_df['years_active'].isna()
-    big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
-
-    # dropping rows with vacant seat
-    vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
-    for index in vacant_index:
-        big_df = big_df.drop(big_df.index[index])
-
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    # leg_df = pd.DataFrame(data)
+    # leg_df = leg_df.drop(columns="birthday")
+    # leg_df = leg_df.drop(columns="education")
+    # leg_df = leg_df.drop(columns="years_active")
+    #
+    #
+    #
+    # # getting urls from wikipedia
+    # wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
+    #
+    # all_wiki_links = find_individual_wiki(wikipage_link)
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_first", "name_last"])
+    #
+    # isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    # big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    # # big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    # isna = big_df['years_active'].isna()
+    # big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
+    #
+    # # dropping rows with vacant seat
+    # vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
+    # for index in vacant_index:
+    #     big_df = big_df.drop(big_df.index[index])
+    #
     print('Scraping complete')
-
-    big_list_of_dicts = big_df.to_dict('records')
-
-    print('Writing data to database...')
-
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print(f'Scraper ran successfully!')
+    #
+    # big_list_of_dicts = big_df.to_dict('records')
+    #
+    # print('Writing data to database...')
+    #
+    # scraper_utils.write_data(big_list_of_dicts)
+    #
+    # print(f'Scraper ran successfully!')
