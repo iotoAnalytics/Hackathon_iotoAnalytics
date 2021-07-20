@@ -1,17 +1,19 @@
 import sys
 import os
+from database import CursorFromConnectionFromPool
 from pathlib import Path
 from datetime import datetime
 from nameparser import HumanName
 from multiprocessing import Pool
 from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
-
+from scraper_utils import USStateLegislatorScraperUtils
 from scraper_utils import USStateLegislationScraperUtils
 import pdfplumber
 import requests
 import io
 import re
+
 import dateutil.parser as dparser
 from selenium import webdriver
 import time
@@ -90,6 +92,45 @@ def get_urls():
     return urls
 
 
+def get_legislator_urls():
+    urls = []
+
+    path_senate = '/Legislators/Members/Senate'
+    path_house = '/Legislators/Members/House'
+
+    # getting urls for senate
+    scrape_url = base_url + path_senate
+    page = scraper_utils.request(scrape_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    table = soup.find('table', {'id': 'legislatorTable'})
+    items = table.find_all('tr')
+
+    for tr in items[1:]:
+        td = tr.find_all('td')[2]
+        link = base_url + td.find('a').get('href')
+        urls.append(link)
+
+    # Delay so we do not overburden servers
+    scraper_utils.crawl_delay(crawl_delay)
+
+    # Collecting representatives urls
+    scrape_url = base_url + path_house
+    page = scraper_utils.request(scrape_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    table = soup.find('table', {'id': 'legislatorTable'})
+    items = table.find_all('tr')
+
+    for tr in items[1:]:
+        td = tr.find_all('td')[2]
+        link = base_url + td.find('a').get('href')
+        urls.append(link)
+
+    # Delay so we do not overburden servers
+    scraper_utils.crawl_delay(crawl_delay)
+
+    return urls
+
+
 def get_session(soup, row):
     session_text = soup.find('span', {'class': 'subTitle'}).text
     session = session_text.split(' ')[0].strip()
@@ -107,22 +148,6 @@ def get_bill_name(soup, row):
     name = name.replace(".", "")
     row.bill_name = name
     return name
-
-
-# def get_full_name(url):
-#     page = scraper_utils.request(url)
-#     soup = BeautifulSoup(page.content, 'lxml')
-#
-#     main_div = soup.find('div', {'id': 'main'})
-#     name = main_div.find('h1').text
-#
-#     if "Senator" in name:
-#         name = name.split("Senator ")[1]
-#     elif "Representative" in name:
-#         name = name.split("Representative ")[1]
-#     if " - " in name:
-#         name = name.split(" - ")[0]
-#     return name
 
 
 def get_bill_type_chamber(bill_name, row):
@@ -537,17 +562,136 @@ def scrape(url):
     return row
 
 
+def get_legislator_id_by_full_name(soup):
+    legislator_id = None
+    name_block = soup.find('h1')
+    try:
+        role = name_block.find('span').text.strip()
+        name_full = name_block.text.split(role)[1]
+        if "Democrat" in name_full:
+            name_full = name_full.split("Democrat")[0].strip()
+        else:
+            name_full = name_full.split("Republican")[0].strip()
+
+        hn = HumanName(name_full)
+        name_last = hn.last
+        name_first = hn.first
+
+    except Exception as e:
+        print(e)
+
+    try:
+        search_for = dict(name_last=name_last, name_first=name_first)
+
+        legislator_id = scraper_utils.get_legislator_id(**search_for)
+    except Exception as e:
+        print(e)
+
+    if "'" in name_last:
+        name_last = name_last.replace("'", "''")
+    return legislator_id, name_last
+
+
+def get_legislators_sponsored_bills(soup):
+    sponsored_bills = []
+    table_section = soup.find('div', {'class': 'tab-content'})
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                sponsored_bills.append(bill)
+                print(bill)
+    except Exception as e:
+        print(e)
+    return sponsored_bills
+
+
+def get_legislators_cosponsored_bills(url):
+    cosponsored_bills = []
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    table_section = soup.find('div', {'class': 'tab-content'})
+    try:
+        rows = table_section.find_all('tr')
+        for row in rows[1:]:
+            columns = row.find_all('td')
+            if '*' not in columns[3].text:
+                bill = columns[1].find('a').get('href')
+                bill = base_url + bill
+                cosponsored_bills.append(bill)
+                print(bill)
+    except Exception as e:
+        print(e)
+    print(cosponsored_bills)
+    return cosponsored_bills
+
+
+def update_legislation_table(legislator_data,
+                             legislator_id,
+                             last_name,
+                             cur):
+    print("updating")
+    sponsored_bills = legislator_data[0]
+    cosponsored_bills = legislator_data[1]
+    for bill in sponsored_bills:
+        if legislator_id is not None:
+            try:
+                query = (f"UPDATE us_ma_legislation SET sponsors_id = array_append(sponsors_id, '{legislator_id}'), sponsors = array_append(sponsors, '{last_name}') WHERE source_url = '{bill}' AND '{legislator_id}' != ALL(sponsors_id) AND '{last_name}' != ALL(sponsors);")
+                print(query)
+                cur.execute(query)
+            except Exception as e:
+                print(e)
+
+    for bill in cosponsored_bills:
+        if legislator_id is not None:
+            try:
+                query = (f"UPDATE us_ma_legislation SET cosponsors_id = array_append(cosponsors_id, '{legislator_id}'), cosponsors = array_append(cosponsors, '{last_name}') WHERE source_url = '{bill}' AND '{legislator_id}' != ALL(cosponsors_id) AND '{last_name}' != ALL(cosponsors);")
+                print(query)
+                cur.execute(query)
+            except Exception as e:
+                print(e)
+
+
+def scrape_for_sponsors(url, cur):
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'lxml')
+
+    sponsored_bills = get_legislators_sponsored_bills(soup)
+    try:
+        term_title = soup.find('span', {'class': 'headNumber'}).text
+        term_id = term_title.split(' ')[1].strip()
+        term_id = re.findall(r'[0-9]', term_id)
+        term_id = "".join(term_id)
+        cosponsored_bills_url = url + "/" + term_id + "/Bills/Cosponsored"
+        cosponsored_bills = get_legislators_cosponsored_bills(cosponsored_bills_url)
+        legislator_id, last_name = get_legislator_id_by_full_name(soup)
+        legislator_data = [sponsored_bills, cosponsored_bills]
+        update_legislation_table(legislator_data, legislator_id, last_name, cur)
+
+    except Exception as e:
+        print(e)
+
+
 if __name__ == '__main__':
     print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
 If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
-    urls = get_urls()
+   # urls = get_urls()
 
     # data = [scrape(url) for url in urls]
 
-    with Pool(processes=4) as pool:
-        data = pool.map(scrape, urls)
+    # with Pool(processes=4) as pool:
+    #     data = pool.map(scrape, urls)
+    #
+    # scraper_utils.write_data(data)
 
-    scraper_utils.write_data(data)
+    #sponsor data needs to be scraped from the legislator pages and added to the table.
+    with CursorFromConnectionFromPool() as cur:
+        for url in get_legislator_urls():
+            scrape_for_sponsors(url, cur)
 
     print('Complete!')
