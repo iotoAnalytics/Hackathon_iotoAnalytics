@@ -333,7 +333,7 @@ class LegislationRow:
             for votes_data in element.get('votes'):
                 if type(votes_data) != dict:
                     raise ValueError("votes data must have valid 'votes' information as a list of dicts")
-                if votes_data.get('goverlytics_id') is None or type(votes_data.get('goverlytics_id')) != int:
+                if votes_data.get('goverlytics_id') is not None and type(votes_data.get('goverlytics_id')) != int:
                     raise ValueError("votes in votes data must have valid 'goverlytics_id' information as an int")
                 if votes_data.get('legislator') is None or type(votes_data.get('legislator')) != str:
                     raise ValueError("votes in votes data must have valid 'legislator' information as a str")
