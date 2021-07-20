@@ -27,6 +27,8 @@ from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.chrome.options import Options
 from tqdm import tqdm
 
+import difflib
+
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
@@ -60,27 +62,28 @@ def scrape(url):
     
     # try:
     _set_bill_name(row, soup)
-    #     _set_session(row, url)
-    #     _set_date_introduced(row, soup)
-    #     _set_source_url(row, url)
-    #     _set_chamber_origin(row, soup)
-    #     # TODO - committees
-    #     _set_bill_type(row, soup)
-    #     _set_current_status(row, soup)
-    #     _set_principal_sponsor(row, soup)
-    #     _set_sponsors(row, soup)
-    #     # TODO - cosponsors
-    #     # TODO - cosponsors_id
-    #     _set_bill_text(row, soup)
-    #     _set_description(row, soup)
-    #     _set_bill_summary(row, soup)
-    #     _set_actions(row, soup)
-    #     # TODO - votes
-    #     _set_goverlytics_id(row)
+    # _set_session(row, url)
+    # _set_date_introduced(row, soup)
+    # _set_source_url(row, url)
+    # _set_chamber_origin(row, soup)
+    # # TODO - committees
+    # _set_bill_type(row, soup)
+    # _set_current_status(row, soup)
+    # _set_principal_sponsor(row, soup)
+    # _set_sponsors(row, soup)
+    # # TODO - cosponsors
+    # # TODO - cosponsors_id
+    # _set_bill_text(row, soup)
+    # _set_description(row, soup)
+    # _set_bill_summary(row, soup)
+    # _set_actions(row, soup)
+    # # TODO - votes
+    # _set_goverlytics_id(row)
 
     _set_votes(row, soup)
-    # except Exception:
+    # except Exception as e:
     #     print(f'Problem occurred with: {url}')
+    #     print(e)
 
     return row
     
@@ -117,6 +120,7 @@ def _create_soup(url, soup_parser_type):
 def _create_soup_from_selenium(url):
     options = Options()
     options.add_argument("--headless")
+    options.add_argument('--no-sandbox')         
 
     if not DEBUG_MODE:
         options.add_argument("--log-level=3")
@@ -294,7 +298,14 @@ def _set_actions(row, soup):
 def _set_votes(row, soup):
     votes = []
 
-    votes_text = soup.select('#lblHouseVoteData')[0].text
+    if 'H' in row.bill_name:
+        votes_text = soup.select('#lblHouseVoteData')[0].text
+    elif 'S' in row.bill_name:
+        votes_text = soup.select('#lblSenateVoteData')[0].text
+    else:
+        row.votes = votes
+        return
+
     votes_text = unicodedata.normalize("NFKD", votes_text)
 
     if 'are not available' not in votes_text:
@@ -302,13 +313,12 @@ def _set_votes(row, soup):
         chamber = tn_utils.CHAMBER_FULL.get(row.bill_name[0])
 
         for vd in votes_data:
-            vote_data = _get_vote_data(vd, chamber)
-            votes.append(vote_data)
+            if vote_data:= _get_vote_data(vd, chamber):
+                votes.append(vote_data)
     
-    pprint(votes, width=200)
-
     row.votes = votes
 
+# FIXME: Consider fixing the hacky solution for vote_data date
 def _get_vote_data(text, chamber):
     '''
     [{
@@ -335,6 +345,10 @@ def _get_vote_data(text, chamber):
         vote_data['passed'] = 1 if search.group(1) == 'Passed' else 0 
     if search := re.search(r'(Ayes|Nays) Prevail', text):
         vote_data['passed'] = 1 if search.group(1) == 'Ayes' else 0
+    
+    # Invalid entry if no description, date, or passed status exist
+    if 'description' not in vote_data or 'date' not in vote_data or 'passed' not in vote_data:
+        return None
 
     # Find voters
     vote_data['chamber'] = chamber
@@ -370,21 +384,26 @@ def _get_vote_data(text, chamber):
         for voter in voters:
             votes.append(_get_voter_data(voter, group[0], role))
 
+    # TODO: Refactor
     # Find requested voters
     if search:= re.findall(r'(Rep\(s\).) ([A-Za-z ,.]+) requested to be recorded as voting ([A-Za-z]+)', text):
         for group in search:
             voters = group[1].split(', ')
 
             for voter in voters:
-                votes.append(_get_voter_data(voter, group[2], role))
+                if voter:
+                    voter = voter.replace(',', '').replace('.', '')
+                    vote_text = 'nay' if group[2] == 'No' else group[2]
+                    votes.append(_get_voter_data(voter, vote_text, role))
 
     vote_data['total'] = vote_data['yea'] + vote_data['nay'] + vote_data['nv'] + vote_data['absent']
     vote_data['votes'] = votes
 
     return vote_data
-    # pprint(vote_data, width=200)
 
 def _get_voter_data(name, vote, role):
+    name = name.strip()
+
     voter_data = {}
 
     if vote == 'no':
@@ -392,17 +411,38 @@ def _get_voter_data(name, vote, role):
 
     # Special case for Speaker
     if 'Speaker' in name:
-        name = name.replace('Mr. Speaker ', '')
-        role = 'Speaker'
+        name = re.sub(r'(Mr|Mrs|Ms|Mlle). Speaker ', '', name)
+        if role == 'Representative':
+            role = 'Speaker'
+        if role == 'Senator':
+            role = 'Governor'
 
     # Search assuming name is "name_last"
     gov_id = scraper_utils.get_legislator_id(name_last=name, role=role)
     
     # Otherwise, search assuming name is "name_last, name_first"
     if not gov_id:
-        name_last, name_first = name.split()
-        gov_id = scraper_utils.legislators_search_startswith('goverlytics_id','name_first',
-            name_first, name_last=name_last, role=role)
+        try:
+            name_last, name_first = name.split()
+            gov_id = scraper_utils.legislators_search_startswith('goverlytics_id','name_first',
+                name_first, name_last=name_last, role=role)
+
+            # TODO: Refactor
+            if gov_id is None:
+                if l_name:= _get_closest_legislator(name_last):
+                    gov_id = scraper_utils.legislators_search_startswith('goverlytics_id','name_first',
+                        name_first, name_last=l_name, role=role)
+                    name = f'{l_name} {name_first}'
+
+            # Try again for closest if name is "name_last"
+            if gov_id is None:
+                if l_name:= _get_closest_legislator(name):
+                    gov_id = scraper_utils.get_legislator_id(name_last=l_name, role=role)
+                    name = l_name
+
+        except Exception as e:
+            print(e)
+            print(f'Problem trying to find gov id of {name}:{role}')
 
     voter_data['legislator'] = name
     voter_data['vote_text'] = vote
@@ -414,12 +454,30 @@ def _set_goverlytics_id(row):
     goverlytics_id = f'{STATE_ABBREVIATION}_{row.session}_{row.bill_name}'
     row.goverlytics_id = goverlytics_id
 
+def _get_all_legislators():
+    # scraper_utils.get_attribute('legislator', 'state', STATE_ABBREVIATION, attribute_to_return=name_family)
+    return ['Johnson', 'Camper']
+
+def _get_closest_legislator(name_last):
+    legislators = _get_all_legislators()
+    close_matches = difflib.get_close_matches(name_last, legislators, cutoff=0.9)
+    print(f'{name_last} matches: {close_matches}')
+
+    if close_matches:
+        return close_matches[0]
+
+    return None
+
 def main():
     print('\nSCRAPING TENNESSEE LEGISLATION\n')
 
     # Collect legislation urls
     print(DEBUG_MODE and 'Collecting legislation URLs...\n' or '', end='')
-    # urls = get_urls()[403:703]
+    # urls = get_urls()
+    
+    # pprint(f'Length: {len(urls)}')
+    # urls = urls[1300:]
+    # urls = urls[803:1003]
 
     # Scrape data from collected URLs
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
@@ -429,7 +487,7 @@ def main():
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/Default.aspx?BillNumber=HB0767&GA=112')]
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/Default.aspx?BillNumber=HB0635&GA=112')]
     # data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=HB0159&GA=112')]
-    data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=HB0404&GA=112')]
+    data = [scrape('https://wapp.capitol.tn.gov/apps/BillInfo/default.aspx?BillNumber=SB0030&GA=112')]
 
     # pprint(data, width=200)
     # print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
