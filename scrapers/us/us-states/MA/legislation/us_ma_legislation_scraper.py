@@ -680,14 +680,14 @@ if __name__ == '__main__':
     print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
 If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
-   # urls = get_urls()
+    urls = get_urls()
 
     # data = [scrape(url) for url in urls]
 
-    # with Pool(processes=4) as pool:
-    #     data = pool.map(scrape, urls)
-    #
-    # scraper_utils.write_data(data)
+    with Pool(procesgit ses=4) as pool:
+        data = pool.map(scrape, urls)
+
+    scraper_utils.write_data(data)
 
     #sponsor data needs to be scraped from the legislator pages and added to the table.
     with CursorFromConnectionFromPool() as cur:
