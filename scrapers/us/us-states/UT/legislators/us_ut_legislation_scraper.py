@@ -12,6 +12,7 @@ from selenium.common.exceptions import NoSuchElementException, StaleElementRefer
 from multiprocessing import Pool
 from time import sleep
 from scraper_utils import USStateLegislationScraperUtils
+from datetime import datetime
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -256,12 +257,12 @@ def get_bill_actions_and_votes(url, row):
     button.click()
     table = driver.find_element_by_xpath('//*[@id="billStatus"]/div/table').find_elements_by_tag_name('tr')
     date_introduced = table[2].find_elements_by_tag_name('td')
-    date_introduced = date_introduced[0].text.split()[0].split('/')
-    date_introduced = date_introduced[2] + '-' + date_introduced[0] + '-' + date_introduced[1]
+    date_introduced = date_introduced[0].text.split()[0]
+    date_introduced = str(datetime.strptime(date_introduced, '%m/%d/%Y').strftime('%Y-%m-%d'))
     for tr in table[1:]:
         table_row = tr.find_elements_by_tag_name('td')
-        date_info = table_row[0].text.split()[0].split('/')
-        date = date_info[2] + '-' + date_info[0] + '-' + date_info[1]
+        date_info = table_row[0].text.split()[0]
+        date = str(datetime.strptime(date_info, '%m/%d/%Y').strftime('%Y-%m-%d'))
         action = table_row[1].text
         action_by = ''
         font_color = table_row[0].find_element_by_tag_name('font').value_of_css_property('color')
@@ -282,7 +283,7 @@ def get_bill_actions_and_votes(url, row):
         else:
             try:
                 vote_link = table_row[-1].find_element_by_tag_name('a').get_attribute('href')
-                # get_white_vote(vote_link, row)
+                get_white_vote(vote_link, row)
             except NoSuchElementException:
                 pass
         actions.append({'date': date, 'action_by': action_by, 'description': action})
@@ -381,6 +382,8 @@ def main():
 
     with Pool() as pool:
         data = list(tqdm(pool.imap(scrape, urls)))
+
+    scraper_utils.write_data(data, 'us_ut_legislation')
 
 
 if __name__ == '__main__':
