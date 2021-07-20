@@ -148,9 +148,9 @@ class LegislationRow:
         for committee in value:
             if type(committee) != dict:
                 raise TypeError("committees must be a list of dicts")
-            if not committee.get('chamber') or type(committee.get('chamber')) != str:
+            if committee.get('chamber') is None or type(committee.get('chamber')) != str:
                 raise ValueError("committees data must have valid 'chamber' information as a str")
-            if not committee.get('committee') or type(committee.get('committee')) != str:
+            if committee.get('committee') is None or type(committee.get('committee')) != str:
                 raise ValueError("committees data must have valid 'committee' information as a str")
         self._committees = value
 
@@ -283,13 +283,13 @@ class LegislationRow:
         for element in value:
             if type(element) != dict:
                 raise TypeError("actions must a list of dicts")
-            if not element.get('date') or type(element.get('date')) != str:
+            if element.get('date') is None or type(element.get('date')) != str:
                 raise ValueError("actions data must have valid 'date' information as a str")
             if not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', element.get('date')):
                 raise ValueError("Improper date formating in actions['date']. Required format: YYYY-MM-DD")
-            if not element.get('action_by') or type(element.get('action_by')) != str:
+            if element.get('action_by') is None or type(element.get('action_by')) != str:
                 raise ValueError("actions data must have valid 'action_by' information as a str")
-            if not element.get('description') or type(element.get('description')) != str:
+            if element.get('description') is None or type(element.get('description')) != str:
                 raise ValueError("actions data must have valid 'description' information as a str")
         self._actions = value
 
@@ -303,41 +303,41 @@ class LegislationRow:
         for element in value:
             if type(element) != dict:
                 raise TypeError("votes must a list of dicts")
-            if not element.get('date') or type(element.get('date')) != str:
+            if element.get('date') is None or type(element.get('date')) != str:
                 raise ValueError("votes data must have valid 'date' information as a str")
             if not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', element.get('date')):
                 raise ValueError("Improper date formating in votes['date']. Required format: YYYY-MM-DD")
-            if not element.get('description') or type(element.get('description')) != str:
+            if element.get('description') is None or type(element.get('description')) != str:
                 raise ValueError("votes data must have valid 'description' information as a str")
-            if element.get('yea') == None or type(element.get('yea')) != int:
+            if element.get('yea') is None or type(element.get('yea')) != int:
                 raise ValueError("votes data must have valid 'yea' information as an int")
-            if element.get('nay') == None or type(element.get('nay')) != int:
+            if element.get('nay') is None or type(element.get('nay')) != int:
                 raise ValueError("votes data must have valid 'nay' information as an int")
-            if element.get('nv') == None or type(element.get('nv')) != int:
+            if element.get('nv') is None or type(element.get('nv')) != int:
                 raise ValueError("votes data must have valid 'nv' information as an int")
-            if element.get('absent') == None or type(element.get('absent')) != int:
+            if element.get('absent') is None or type(element.get('absent')) != int:
                 raise ValueError("votes data must have valid 'absent' information as an int")
-            if element.get('total') == None or type(element.get('total')) != int:
+            if element.get('total') is None or type(element.get('total')) != int:
                 raise ValueError("votes data must have valid 'total' information as an int")
             if element.get('total') != (element.get('yea') + element.get('nay') + element.get('nv') + \
                 element.get('absent')):
                 raise ValueError("votes data does not add up to total") 
-            if element.get('passed') == None or type(element.get('passed')) != int:
+            if element.get('passed') is None or type(element.get('passed')) != int:
                 raise ValueError("votes data must have valid 'passed' information as an int")
             if element.get('passed') != 0 and element.get('passed') != 1:
                 raise ValueError("votes passed data must be a 0 (not passed) or 1 (passed)")
-            if not element.get('chamber') or type(element.get('chamber')) != str:
+            if element.get('chamber') is None or type(element.get('chamber')) != str:
                 raise ValueError("votes data must have valid 'chamber' information as an str")
-            if not element.get('votes') or type(element.get('votes')) != list:
+            if element.get('votes') is None or type(element.get('votes')) != list:
                 raise ValueError("votes data must have valid 'votes' information as a list of dicts")
             for votes_data in element.get('votes'):
                 if type(votes_data) != dict:
                     raise ValueError("votes data must have valid 'votes' information as a list of dicts")
-                if not votes_data.get('goverlytics_id') or type(votes_data.get('goverlytics_id')) != int:
+                if votes_data.get('goverlytics_id') is None or type(votes_data.get('goverlytics_id')) != int:
                     raise ValueError("votes in votes data must have valid 'goverlytics_id' information as an int")
-                if not votes_data.get('legislator') or type(votes_data.get('legislator')) != str:
+                if votes_data.get('legislator') is None or type(votes_data.get('legislator')) != str:
                     raise ValueError("votes in votes data must have valid 'legislator' information as a str")
-                if not votes_data.get('vote_text') or type(votes_data.get('vote_text')) != str:
+                if votes_data.get('vote_text') is None or type(votes_data.get('vote_text')) != str:
                     raise ValueError("votes in votes data must have valid 'vote_text' information as a str")
         self._votes = value
         
@@ -569,13 +569,13 @@ class CAFedLegislationRow(CALegislationRow):
     def last_major_event(self, value: dict) -> None:
         if type(value) != list:
             raise TypeError("last_major_event must be a dict")
-        if not value.get('date') or type(value.get('date')) != str:
+        if value.get('date') is None or type(value.get('date')) != str:
             raise ValueError("last_major_event data must have valid 'date' information as a str")
-        if not value.get('status') or type(value.get('status')) != str:
+        if value.get('status') is None or type(value.get('status')) != str:
             raise ValueError("last_major_event data must have valid 'status' information as a str")
-        if not value.get('chamber') or type(value.get('chamber')) != str:
+        if value.get('chamber') is None or type(value.get('chamber')) != str:
             raise ValueError("last_major_event data must have valid 'chamber' information as a str")
-        if not value.get('committee') or type(value.get('committee')) != str:
+        if value.get('committee') is None or type(value.get('committee')) != str:
             raise ValueError("last_major_event data must have valid 'committee' information as a str")
         if value.get('meeting_number') == None or type(value.get('meeting_number')) != int:
             raise ValueError("last_major_event data must have valid 'meeting_number' information as a int")
@@ -781,9 +781,9 @@ class LegislatorRow:
         for committee in value:
             if type(committee) != dict:
                 raise TypeError("committees must be a list of dicts")
-            if not committee.get('role') or type(committee.get('role')) != str:
+            if committee.get('role') is None or type(committee.get('role')) != str:
                 raise ValueError("committees data must have valid 'role' information as a str")
-            if not committee.get('committee') or type(committee.get('committee')) != str:
+            if committee.get('committee') is None or type(committee.get('committee')) != str:
                 raise ValueError("committees data must have valid 'committee' information as a str")
         self._committees = value
 
@@ -797,9 +797,9 @@ class LegislatorRow:
         for number in value:
             if type(number) != dict:
                 raise TypeError("phone_numbers must be a list of dicts")
-            if not number.get('office') or type(number.get('office')) != str:
+            if number.get('office') is None or type(number.get('office')) != str:
                 raise ValueError("phone_numbers data must have valid 'office' information as a str")
-            if not number.get('number') or type(number.get('number')) != str:
+            if number.get('number') is None or type(number.get('number')) != str:
                 raise ValueError("phone_numbers data must have valid 'number' information as a str")
             if not re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number')):
                 raise ValueError("Improper number formatting in phone_numbers. Required format: ###-###-####")
@@ -815,9 +815,9 @@ class LegislatorRow:
         for address in value:
             if type(address) != dict:
                 raise TypeError("addresses must be a list of dicts")
-            if not address.get('location') or type(address.get('location')) != str:
+            if address.get('location') is None or type(address.get('location')) != str:
                 raise ValueError("addresses data must have valid 'location' information as a str")
-            if not address.get('address') or type(address.get('address')) != str:
+            if address.get('address') is None or type(address.get('address')) != str:
                 raise ValueError("addresses data must have valid 'address' information as a str")
         self._addresses = value
 
@@ -872,11 +872,11 @@ class LegislatorRow:
         for element in value:
             if type(element) != dict:
                 raise TypeError("education must be a list of dicts")
-            if not element.get('level') or type(element.get('level')) != str:
+            if element.get('level') is None or type(element.get('level')) != str:
                 raise ValueError("education data must have valid 'level' information as a str")
-            if not element.get('field') or type(element.get('field')) != str:
+            if element.get('field') is None or type(element.get('field')) != str:
                 raise ValueError("education data must have valid 'field' information as a str")
-            if not element.get('school') or type(element.get('school')) != str:
+            if element.get('school') is None or type(element.get('school')) != str:
                 raise ValueError("education data must have valid 'school' information as a str")
         self._education = value
 
@@ -1032,10 +1032,10 @@ class CAFedLegislatorRow(CALegislatorRow):
         for element in value:
             if type(element) != dict:
                 raise TypeError("parl_assoc_interparl_groups must be a list of dicts")
-            if not element.get('role') or type(element.get('role')) != str:
+            if element.get('role') is None or type(element.get('role')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'role' information as a str")
-            if not element.get('title') or type(element.get('title')) != str:
+            if element.get('title') is None or type(element.get('title')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'title' information as a str")
-            if not element.get('organization') or type(element.get('organization')) != str:
+            if element.get('organization') is None or type(element.get('organization')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value

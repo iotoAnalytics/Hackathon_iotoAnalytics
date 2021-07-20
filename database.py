@@ -758,6 +758,11 @@ class Persistence:
                 else:
                     row.principal_sponsor_id = None
 
+                if pd.notna(row.province_territory_id):
+                    row.province_territory_id = int(row.province_territory_id)
+                else:
+                    row.province_territory_id = None 
+
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -773,13 +778,13 @@ class Persistence:
                        row.publications,
                        json.dumps(row.last_major_event, default=utils.json_serial))
 
-            try:
-                cur.execute(insert_legislator_query, tup)
+                try:
+                    cur.execute(insert_legislator_query, tup)
 
-            except Exception as e:
-                print(
-                    f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-                cur.connection.rollback()
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                    cur.connection.rollback()
 
     @staticmethod
     def write_ca_prov_terr_legislation(data, table):

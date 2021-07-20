@@ -131,10 +131,13 @@ def merge_all_wiki_data(legislator_data, wiki_data):
     wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
     leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district']) 
     
-    for data in wiki_data:
-        for key in data.keys():
-            leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
+    for key in WIKI_DATA_TO_MERGE:
+        leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
 
+        if key not in set(['birthday', 'most_recent_term_id']):
+            isna = leg_wiki_df[key].isna()
+            leg_wiki_df.loc[isna, key] = pd.Series([[]] * isna.sum()).values
+            
     return leg_wiki_df.to_dict('records')    
 
 def fix_odditites(legislators_data):
