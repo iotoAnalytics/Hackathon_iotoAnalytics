@@ -64,7 +64,7 @@ def get_members_areas_served(session_id):
 
     for district_data in response.json():
         if district_data['SessionId'] == session_id:
-            members_areas_served[district_data['District']['District']] = district_data['District']['Counties']
+            members_areas_served[district_data['District']['District'].lstrip('0')] = district_data['District']['Counties']
 
     return members_areas_served
 
@@ -79,7 +79,7 @@ def init_most_recent_term_id(member_data, mrti):
         member_data['Year'] = mrti
 
 def init_areas_served(member_data, members_areas_served):
-    district = member_data['District']
+    district = member_data['District'].lstrip('0')
     member_data['AreasServed'] = members_areas_served[district]
 
 def get_legislators_wiki_urls(wiki_url):
@@ -120,9 +120,12 @@ def merge_all_wiki_data(legislator_data, wiki_data):
     wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
     leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district']) 
     
-    for data in wiki_data:
-        for key in data.keys():
-            leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
+    for key in WIKI_DATA_TO_MERGE:
+        leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
+
+        if key not in set(['birthday', 'most_recent_term_id']):
+            isna = leg_wiki_df[key].isna()
+            leg_wiki_df.loc[isna, key] = pd.Series([[]] * isna.sum()).values
 
     return leg_wiki_df.to_dict('records') 
 
@@ -247,11 +250,11 @@ def _set_occupation(row, member_data):
     row.occupation = occupation
 
 def _set_areas_served(row, member_data):
-    areas_served = member_data['AreasServed'].split(',')
+    areas_served = [area.strip() for area in member_data['AreasServed'].split(',')]
     row.areas_served = areas_served
     
 def _set_district(row, member_data):
-    district = member_data['District']
+    district = member_data['District'].lstrip('0')
     row.district = district
 
 def main():
