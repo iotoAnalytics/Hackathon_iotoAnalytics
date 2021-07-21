@@ -20,7 +20,7 @@ class LegislationRow:
     source_id: str
     bill_name: str
     session: str
-    date_introduced: datetime
+    date_introduced: str
     source_url: str
     chamber_origin: str
     committees: List[dict]
@@ -48,7 +48,7 @@ class LegislationRow:
         self._source_id = ''
         self._bill_name = ''
         self._session = ''
-        self._date_introduced = None
+        self._date_introduced = ''
         self._source_url = ''
         self._chamber_origin = ''
         self._committees = []
@@ -1050,33 +1050,35 @@ class PreviousElectionRow:
         for attr, value in self.__dict__.items():
             yield attr, value
 
-    election_id: int
-    election_date: datetime
+    election_name: str
+    election_date: str
     description: str
     is_by_election: bool
 
     def __init__(self):
-        self._election_id = ''
+        self._election_name = ''
         self._election_date = None
         self._description = ''
         self._is_by_election = None
 
     @property
-    def election_id(self) -> int:
-        return self._election_id
-    @election_id.setter
-    def election_id(self, id: int) -> None:
-        if type(id) != int:
-            raise TypeError("election_id must be an int")
-        self._election_id = id
+    def election_name(self) -> str:
+        return self._election_name
+    @election_name.setter
+    def election_name(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("election_name must be a str")
+        self._election_name = value
 
     @property
-    def election_date(self) -> datetime:
+    def election_date(self) -> str:
         return self._election_date
     @election_date.setter
-    def election_date(self, value: datetime) -> None:
-        if type(value) != datetime:
-            raise TypeError("election_date must be a datetime")
+    def election_date(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("election_date must be a str")
+        if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+            raise ValueError("Improper date formating in election_date. Required format: YYYY-MM-DD")
         self._election_date = value
 
     @property
