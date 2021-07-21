@@ -899,3 +899,56 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
                     cur.connection.rollback()
+
+    @staticmethod
+    def write_previous_election_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        election_id SERIAL PRIMARY KEY,
+                        election_name text,
+                        election_date date UNIQUE,
+                        description text,
+                        is_by_election boolean
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
+                    """).format(table=sql.Identifier(table))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+
+            except Exception as e:
+                print(
+                    f'An exception occurred creating {table}:\n{e}')
+                cur.connection.rollback()
+
+            insert_previous_election_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s)
+                ON CONFLICT (election_date) DO UPDATE SET
+                    election_name = excluded.election_name,
+                    description = excluded.description,
+                    is_by_election = excluded.is_by_election;
+                """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.election_name, row.election_date, row.description, row.is_by_election)
+
+                try:
+                    cur.execute(insert_previous_election_query, tup)
+
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.election_name}:\n{e}')
+                    cur.connection.rollback()
