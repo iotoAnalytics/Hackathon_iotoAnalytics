@@ -22,8 +22,12 @@ crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
 
 def program_driver():
     general_election_data = GeneralElection().get_election_data()
+    by_election_data = ByElection().get_election_data()
+    print("writing data")
+    scraper_utils.write_data(general_election_data)
+    print("complete")
 
-class MainFunction:
+class Election:
     def get_page_as_soup(self, url):
         page_html = self.__get_site_as_html(url)
         return soup(page_html, 'html.parser')
@@ -35,9 +39,9 @@ class MainFunction:
         scraper_utils.crawl_delay(crawl_delay)
         return page_html
 
-class GeneralElection:
+class GeneralElection(Election):
     def get_election_data(self) -> list:
-        page_soup = MainFunction().get_page_as_soup(PAST_ELECTIONS_URL)
+        page_soup = self.get_page_as_soup(PAST_ELECTIONS_URL)
         elections = self._get_elections_from_soup(page_soup)
         return self._extract_election_info(elections)
 
@@ -53,8 +57,25 @@ class GeneralElection:
 
     def _get_row_data(self, election: soup):
         row = scraper_utils.initialize_row()
-        row.election_id 
+        text = election.text
+        row.election_name = self._get_election_name(text)
+        row.election_date = self._get_election_date(text)
+        row.description = f"The {row.election_name} which was held on {row.election_date}."
+        row.is_by_election = False
+        return row
+    
+    def _get_election_name(self, text: str) -> str:
+        name = text.split(', ')[0]
+        return name.strip()
 
+    def _get_election_date(self, text: str) -> str:
+        text = text.split('Election, ')[1]
+        date = datetime.datetime.strptime(text, '%B %d, %Y')
+        date = date.strftime('%Y-%m-%d')
+        return date
+
+class ByElection(Election):
+    pass
 
 if __name__ == '__main__':
     program_driver()
