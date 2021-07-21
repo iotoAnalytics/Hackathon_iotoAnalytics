@@ -1,8 +1,14 @@
+#TODO
+# Get the dates for the special cases
+# write to database
+
 import sys
 import os
 from pathlib import Path
 import re
 import datetime
+
+from pdfplumber import page
 
 NODES_TO_ROOT = 4
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -24,12 +30,12 @@ def program_driver():
     general_election_data = GeneralElection().get_election_data()
     by_election_data = ByElection().get_election_data()
     print("writing data")
-    scraper_utils.write_data(general_election_data)
+    # scraper_utils.write_data(general_election_data)
     print("complete")
 
 class Election:
-    def get_page_as_soup(self, url):
-        page_html = self.__get_site_as_html(url)
+    def get_page_as_soup(self):
+        page_html = self.__get_site_as_html(PAST_ELECTIONS_URL)
         return soup(page_html, 'html.parser')
 
     def __get_site_as_html(self, url):
@@ -41,7 +47,7 @@ class Election:
 
 class GeneralElection(Election):
     def get_election_data(self) -> list:
-        page_soup = self.get_page_as_soup(PAST_ELECTIONS_URL)
+        page_soup = self.get_page_as_soup()
         elections = self._get_elections_from_soup(page_soup)
         return self._extract_election_info(elections)
 
@@ -75,7 +81,59 @@ class GeneralElection(Election):
         return date
 
 class ByElection(Election):
-    pass
+    def get_election_data(self) -> list:
+        page_soup = self.get_page_as_soup()
+        by_elections_links = self._get_by_elections_links_from_soup(page_soup)
+        return self._extract_by_election_info(by_elections_links)
+        # return self._extract_by_election_info(by_elections)
+
+    def _get_by_elections_links_from_soup(self, page_soup: soup):
+        main_content = page_soup.find('div', {'id': 'content-main'})
+        relelvant_ul = main_content.find_all('ul')[1:]
+        all_a = []
+        for ul in relelvant_ul:
+            all_a.extend(ul.find_all('a'))
+        return all_a
+
+    def _extract_by_election_info(self, elections: list[soup]) -> list:
+        data = []
+        for election in elections:
+            data.append(self._get_row_data(election))
+        return data
+
+    def _get_row_data(self, election: soup):
+        row = scraper_utils.initialize_row()
+        text = election.text
+        year_match = re.search(r'[A-Z][a-z]+ \d{1,2}, \d{4}', text)
+        if (year_match):
+            location = text.split(',')[0]
+            row.election_date = self._get_election_date(year_match.group())
+            row.election_name = self._get_election_name(location, row.election_date)
+        else:
+            location = text
+            row.election_date = "1111-11-11"
+            row.election_name = self._get_election_name(location, row.election_date)
+        row.description = self._get_description(text, row.election_date, location)
+        row.is_by_election = True
+        return row
+
+    def _get_election_date(self, text: str) -> str:
+        date = datetime.datetime.strptime(text, '%B %d, %Y')
+        date = date.strftime('%Y-%m-%d')
+        return date
+
+    def _get_election_name(self, location: str, date: str) -> str:
+        name = date.replace('-', '_')
+        location = location.replace('\x96', '-')
+        location = location.replace(' ', '_').replace('(', '').replace(')', '').replace('–', '-')
+        name = name + '_by_election_' + location
+        return name
+
+    def _get_description(self, text: str, date: str, location: str) -> str:
+        location = location.replace('\x96', '-').replace('–', '-')
+        if 'cancelled' in text.lower():
+            return f"By-election which was held on {date} at {location} (cancelled)."
+        return f"By-election which was held on {date} at {location}."
 
 if __name__ == '__main__':
     program_driver()
