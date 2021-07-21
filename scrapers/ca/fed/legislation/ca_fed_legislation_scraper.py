@@ -261,6 +261,7 @@ def _get_date_in_senate_vote_details(soup):
         date_text = soup.select('div.vote-title-box')[0].find('div').text
         date_text = re.search(r'[A-Za-z]+, ([A-Za-z]+ [0-9]+, [0-9]+)', date_text).group(1)
         date = datetime.strptime(date_text, r'%B %d, %Y')
+        date = datetime.strftime(date, r'%Y-%m-%d')
     except Exception as e:
         print(e)
         raise
@@ -298,11 +299,11 @@ def _get_votes_data_in_senate_vote_details(soup):
         vote_data = {
             'goverlytics_id': gov_id,
             'legislator': senator,
-            'votetext': vote
+            'vote_text': vote
         }
         votes.append(vote_data)
     
-    counts['total'] = counts['yea'] + counts['nay'] + counts['absent']
+    counts['total'] = counts['yea'] + counts['nay'] + counts['nv'] + counts['absent']
 
     return (votes, counts)
 
@@ -413,8 +414,11 @@ def _get_mp_other_vote_details(xml_url):
             votetext = 'nay'
             nay_count += 1
         elif vp.find('IsVotePaired').text == 'true':
-            votetext = 'abs'
+            votetext = 'absent'
             abs_count += 1
+        else:
+            votetext = 'nv'
+            nv_count += 1
 
         search = {
             'source_id': source_id,
@@ -424,20 +428,21 @@ def _get_mp_other_vote_details(xml_url):
 
         vote_data = {
             'goverlytics_id': gov_id,
-            'legislator:': f'{first_name} {last_name}',
-            'votetext': votetext
+            'legislator': f'{first_name} {last_name}',
+            'vote_text': votetext
         }
         votes.append(vote_data)
     
     vote_details['yea'] = yea_count
     vote_details['nay'] = nay_count
     vote_details['nv'] = nv_count
-    vote_details['abs'] = abs_count
-    vote_details['total'] = yea_count + nay_count + abs_count
+    vote_details['absent'] = abs_count
+    vote_details['total'] = yea_count + nay_count + nv_count + abs_count
     vote_details['votes'] = votes
 
     date_text = root.find('VoteParticipant').find('DecisionEventDateTime').text
     date = datetime.strptime(date_text, r'%Y-%m-%dT%H:%M:%S')
+    date = datetime.strftime(date, r'%Y-%m-%d')
     vote_details['date'] = date
 
     passed_text = root.find('VoteParticipant').find('DecisionResultName').text
