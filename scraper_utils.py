@@ -1180,30 +1180,34 @@ class PDF_Table_Reader(PDF_Reader):
 # PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
 
-class FedPreviousElectionScraperUtils(ScraperUtils):
-    def __init__(self, country: str, table_name: str, row_type: PreviousElectionRow):
-        super().__init__(country, table_name, row_type)
+class PreviousElectionScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=PreviousElectionRow())
 
-class CAFedPreviousElectionScraperUtils(FedPreviousElectionScraperUtils):
-    def __init__(self, table_name='ca_prev_fed_election_by_division'):
-        super().__init__('ca', table_name, CAFedPrevElectionByDivisionRow())
+# class FedPreviousElectionScraperUtils(ScraperUtils):
+#     def __init__(self, country: str, table_name: str, row_type: PreviousElectionRow):
+#         super().__init__(country, table_name, row_type)
 
-    def get_prov_terr_id(self, prov_terr_abbrev: str) -> int:
-        """Returns the province/territory ID for a given province/territory"""
-        df = self.divisions
-        val = df.loc[df['abbreviation'] == prov_terr_abbrev]['id'].values[0]
-        try:
-            return int(val)
-        except Exception:
-            return val
+# class CAFedPreviousElectionScraperUtils(FedPreviousElectionScraperUtils):
+#     def __init__(self, table_name='ca_prev_fed_election_by_division'):
+#         super().__init__('ca', table_name, CAFedPrevElectionByDivisionRow())
 
-    def get_party_id(self, party_name: str, location=None) -> int:
-        """Returns the party ID for a given party. Party name must match database entry"""
-        if not location:
-            raise exceptions.MissingLocationException(self.get_party_id)
-        df = self.parties
-        try:
-            return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
-        except IndexError:
-            raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
+#     def get_prov_terr_id(self, prov_terr_abbrev: str) -> int:
+#         """Returns the province/territory ID for a given province/territory"""
+#         df = self.divisions
+#         val = df.loc[df['abbreviation'] == prov_terr_abbrev]['id'].values[0]
+#         try:
+#             return int(val)
+#         except Exception:
+#             return val
+
+#     def get_party_id(self, party_name: str, location=None) -> int:
+#         """Returns the party ID for a given party. Party name must match database entry"""
+#         if not location:
+#             raise exceptions.MissingLocationException(self.get_party_id)
+#         df = self.parties
+#         try:
+#             return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
+#         except IndexError:
+#             raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
 # end region
