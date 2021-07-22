@@ -46,6 +46,20 @@ class Election:
         scraper_utils.crawl_delay(crawl_delay)
         return page_html
 
+    def _has_official_voting_result(self, tag: soup):
+        text = ' '.join(tag.text.split())
+        return "Official Voting Results" in text and tag.name == 'a'
+
+    def _get_ovr_url(self, url: str) -> str:
+        link = MAIN_URL + url
+        page_soup = self.get_page_as_soup(link)
+        main_content = page_soup.find('div', {'id':'content-main'})
+        try:
+            link = main_content.find_all(self._has_official_voting_result)[0]['href']
+        except Exception as e:
+            return ''
+        return MAIN_URL + link[1:]
+
 class GeneralElection(Election):
     def get_election_data(self) -> list:
         page_soup = self.get_page_as_soup(PAST_ELECTIONS_URL)
@@ -67,6 +81,7 @@ class GeneralElection(Election):
         text = election.text
         row.election_name = self._get_election_name(text)
         row.election_date = self._get_election_date(text)
+        row.official_votes_record_url = self._get_ovr_url(election.a['href'])
         row.description = f"The {row.election_name} which was held on {row.election_date}."
         row.is_by_election = False
         return row
@@ -113,11 +128,9 @@ class ByElection(Election):
             row.election_name = self._get_election_name(location, row.election_date)
         else:
             location = text
-            try:
-                row.election_date = self._get_election_date_special(election)
-            except:
-                print(location)
+            row.election_date = self._get_election_date_special(election)
             row.election_name = self._get_election_name(location, row.election_date)
+        row.official_votes_record_url = self._get_ovr_url(election['href'])
         row.description = self._get_description(text, row.election_date, location)
         row.is_by_election = True
         return row
@@ -152,9 +165,6 @@ class ByElection(Election):
         if 'cancelled' in text.lower():
             return f"By-election which was held on {date} at {location} (cancelled)."
         return f"By-election which was held on {date} at {location}."
-
-    def _has_official_voting_result(self, tag: soup):
-        return "Official Voting Results" in tag.text and tag.has_attr('href')
 
 if __name__ == '__main__':
     program_driver()

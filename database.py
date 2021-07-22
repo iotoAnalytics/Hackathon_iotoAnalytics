@@ -912,6 +912,7 @@ class Persistence:
                     CREATE TABLE IF NOT EXISTS {table} (
                         election_id SERIAL PRIMARY KEY,
                         election_name text UNIQUE,
+                        official_votes_record_url text,
                         election_date date,
                         description text,
                         is_by_election boolean
@@ -931,8 +932,9 @@ class Persistence:
             insert_previous_election_query = sql.SQL("""
                 INSERT INTO {table}
                 VALUES (
-                    DEFAULT, %s, %s, %s, %s)
+                    DEFAULT, %s, %s, %s, %s, %s)
                 ON CONFLICT (election_name) DO UPDATE SET
+                    official_votes_record_url = excluded.official_votes_record_url,
                     election_date = excluded.election_date,
                     description = excluded.description,
                     is_by_election = excluded.is_by_election;
@@ -943,7 +945,7 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                tup = (row.election_name, row.election_date, row.description, row.is_by_election)
+                tup = (row.election_name, row.official_votes_record_url, row.election_date, row.description, row.is_by_election)
 
                 try:
                     cur.execute(insert_previous_election_query, tup)

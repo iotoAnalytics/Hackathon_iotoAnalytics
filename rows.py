@@ -1052,12 +1052,14 @@ class PreviousElectionRow:
 
     election_name: str
     election_date: str
+    official_votes_record_url: str
     description: str
     is_by_election: bool
 
     def __init__(self):
         self._election_name = ''
         self._election_date = None
+        self._official_votes_record_url = ''
         self._description = ''
         self._is_by_election = None
 
@@ -1080,6 +1082,15 @@ class PreviousElectionRow:
         if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
             raise ValueError("Improper date formating in election_date. Required format: YYYY-MM-DD")
         self._election_date = value
+
+    @property
+    def official_votes_record_url(self) -> str:
+        return self._official_votes_record_url
+    @official_votes_record_url.setter
+    def official_votes_record_url(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("official_votes_record_url must be a str")
+        self._official_votes_record_url = value
 
     @property
     def description(self) -> str:
