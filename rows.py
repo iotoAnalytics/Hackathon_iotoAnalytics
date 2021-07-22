@@ -186,7 +186,7 @@ class LegislationRow:
         return self._principal_sponsor_id
     @principal_sponsor_id.setter
     def principal_sponsor_id(self, id: int) -> None:
-        if type(id) != int:
+        if id is not None and type(id) != int:
             raise TypeError("principal_sponsor_id must be a int")
         self._principal_sponsor_id = id
 
@@ -430,7 +430,7 @@ class CALegislationRow(LegislationRow):
         return self._province_territory_id
     @province_territory_id.setter
     def province_territory_id(self, id: int) -> None:
-        if type(id) != int:
+        if id is not None and type(id) != int:
             raise TypeError("province_territory_id must be an int")
         self._province_territory_id = id
 
@@ -439,9 +439,9 @@ class CALegislationRow(LegislationRow):
         return self._province_territory
     @province_territory.setter
     def province_territory(self, value: str) -> None:
-        if type(value) != str:
+        if value is not None and type(value) != str:
             raise TypeError("province_territory must be a str")
-        if len(value) != 2:
+        if value is not None and len(value) != 2:
             raise ValueError("Improper province_territory formatting. Required format: XX (ex. BC, NU")
         self._province_territory = value
 
@@ -450,7 +450,7 @@ class CALegislationRow(LegislationRow):
         return self._region
     @region.setter
     def region(self, value: str) -> None:
-        if type(value) != str:
+        if value is not None and type(value) != str:
             raise TypeError("region must be a str")
         self._region = value
 
@@ -538,7 +538,7 @@ class CAFedLegislationRow(CALegislationRow):
     def statute_year(self, value: int) -> None:
         if type(value) != int:
             raise TypeError("statute_year must be an int")
-        if value < 999:
+        if value < 999 and value != 0:
             raise ValueError("Improper year formatting in statute_year. Required format: YYYY")
         self._statute_year = value
 
@@ -567,7 +567,7 @@ class CAFedLegislationRow(CALegislationRow):
         return self._last_major_event
     @last_major_event.setter
     def last_major_event(self, value: dict) -> None:
-        if type(value) != list:
+        if type(value) != dict:
             raise TypeError("last_major_event must be a dict")
         if value.get('date') is None or type(value.get('date')) != str:
             raise ValueError("last_major_event data must have valid 'date' information as a str")
