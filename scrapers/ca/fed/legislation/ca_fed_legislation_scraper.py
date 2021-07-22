@@ -40,7 +40,7 @@ party_switcher = {
 
 def get_soup(url, parser='lxml'):
     """
-    Used for getting BeautifulSup representation of webpage.
+    Used for getting BeautifulSoup representation of webpage.
     Args:
         url: URL for webpage you wish to collect data from
         parser: Type of BS parser to use.
@@ -95,8 +95,8 @@ def get_event_details(event):
         dictionary containg chamber, meeting, committee and status
     """
     chamber = event.attrib['chamber']
-    date = datetime.strptime(event.attrib['date'], '%Y-%m-%d')
-    meeting_num = event.attrib['meetingNumber']
+    date = event.attrib['date']
+    meeting_num = int(event.attrib['meetingNumber'])
 
     committee_xml = event.find('Committee')
     committee_full = ''
@@ -485,6 +485,7 @@ def scrape(xml_url):
 
         introduced_date = datetime.strptime(
             bill.find('BillIntroducedDate').text, '%Y-%m-%dT%H:%M:%S')
+        introduced_date = datetime.strftime(introduced_date, r'%Y-%m-%d')
 
         session = f'{parl_number}-{parl_session.attrib["sessionNumber"]}'
 
@@ -531,8 +532,8 @@ def scrape(xml_url):
             pm_details.find('PoliticalParty').find('abbreviation'))
 
         statute = bill.find('Statute')
-        statute_year = statute.find('Year').text
-        statute_chapter = statute.find('Chapter').text
+        statute_year = int(statute.find('Year').text)
+        statute_chapter = int(statute.find('Chapter').text)
 
         publications = bill.find('Publications')
         all_publications = publications.findall('Publication')
@@ -560,14 +561,21 @@ def scrape(xml_url):
         progress = last_major_event_xml.find('Progress').text
 
         legislative_events_xml = events.find('LegislativeEvents')
-        legislative_events = [get_event_details(
-            event) for event in legislative_events_xml.findall('Event')]
+        legislative_events = []
+        for event in legislative_events_xml.findall('Event'):
+            event_details = get_event_details(event)
+            legislative_events.append({
+                'date': event_details['date'],
+                'description': event_details['status'],
+                'action_by': event_details['chamber'],
+                'committee': event_details['committee']
+            })
 
         committees = []
         for le in legislative_events:
             if 'committee' in le and le['committee'] != '':
                 committees.append(
-                    {'chamber': le['chamber'], 'committee': le['committee']})
+                    {'chamber': le['action_by'], 'committee': le['committee']})
 
         row.committees = committees
         row.goverlytics_id = f'CAFED_{session}_{bill_number}'
