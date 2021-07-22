@@ -29,13 +29,14 @@ crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
 def program_driver():
     general_election_data = GeneralElection().get_election_data()
     by_election_data = ByElection().get_election_data()
+    data = general_election_data + by_election_data
     print("writing data")
-    # scraper_utils.write_data(general_election_data)
+    scraper_utils.write_data(data)
     print("complete")
 
 class Election:
-    def get_page_as_soup(self):
-        page_html = self.__get_site_as_html(PAST_ELECTIONS_URL)
+    def get_page_as_soup(self, url):
+        page_html = self.__get_site_as_html(url)
         return soup(page_html, 'html.parser')
 
     def __get_site_as_html(self, url):
@@ -47,7 +48,7 @@ class Election:
 
 class GeneralElection(Election):
     def get_election_data(self) -> list:
-        page_soup = self.get_page_as_soup()
+        page_soup = self.get_page_as_soup(PAST_ELECTIONS_URL)
         elections = self._get_elections_from_soup(page_soup)
         return self._extract_election_info(elections)
 
@@ -72,6 +73,8 @@ class GeneralElection(Election):
     
     def _get_election_name(self, text: str) -> str:
         name = text.split(', ')[0]
+        name = name.lower()
+        name = name.replace(' ', '_')
         return name.strip()
 
     def _get_election_date(self, text: str) -> str:
@@ -82,10 +85,9 @@ class GeneralElection(Election):
 
 class ByElection(Election):
     def get_election_data(self) -> list:
-        page_soup = self.get_page_as_soup()
+        page_soup = self.get_page_as_soup(PAST_ELECTIONS_URL)
         by_elections_links = self._get_by_elections_links_from_soup(page_soup)
         return self._extract_by_election_info(by_elections_links)
-        # return self._extract_by_election_info(by_elections)
 
     def _get_by_elections_links_from_soup(self, page_soup: soup):
         main_content = page_soup.find('div', {'id': 'content-main'})
@@ -111,11 +113,27 @@ class ByElection(Election):
             row.election_name = self._get_election_name(location, row.election_date)
         else:
             location = text
-            row.election_date = "1111-11-11"
+            try:
+                row.election_date = self._get_election_date_special(election)
+            except:
+                print(location)
             row.election_name = self._get_election_name(location, row.election_date)
         row.description = self._get_description(text, row.election_date, location)
         row.is_by_election = True
         return row
+
+    def _get_election_date_special(self, election_link):
+        url = MAIN_URL + election_link['href']
+        page_soup = self.get_page_as_soup(url)
+        main_content = page_soup.find('div', {'id':'content-main'})
+        date = re.search(r'[A-Z][a-z]+ \d{1,2}, \d{4}', main_content.text)
+        if date:
+            return self._get_election_date(date.group())
+        else:
+            link = main_content.find_all(self._has_official_voting_result)[0]['href']
+            page_soup = self.get_page_as_soup(MAIN_URL + link)
+            date = re.search(r'[A-Z][a-z]+ \d{1,2}, \d{4}', page_soup.text)
+            return self._get_election_date(date.group())
 
     def _get_election_date(self, text: str) -> str:
         date = datetime.datetime.strptime(text, '%B %d, %Y')
@@ -134,6 +152,9 @@ class ByElection(Election):
         if 'cancelled' in text.lower():
             return f"By-election which was held on {date} at {location} (cancelled)."
         return f"By-election which was held on {date} at {location}."
+
+    def _has_official_voting_result(self, tag: soup):
+        return "Official Voting Results" in tag.text and tag.has_attr('href')
 
 if __name__ == '__main__':
     program_driver()

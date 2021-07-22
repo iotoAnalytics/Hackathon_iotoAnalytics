@@ -911,8 +911,8 @@ class Persistence:
                 create_table_query = sql.SQL("""
                     CREATE TABLE IF NOT EXISTS {table} (
                         election_id SERIAL PRIMARY KEY,
-                        election_name text,
-                        election_date date UNIQUE,
+                        election_name text UNIQUE,
+                        election_date date,
                         description text,
                         is_by_election boolean
                     );
@@ -932,8 +932,8 @@ class Persistence:
                 INSERT INTO {table}
                 VALUES (
                     DEFAULT, %s, %s, %s, %s)
-                ON CONFLICT (election_date) DO UPDATE SET
-                    election_name = excluded.election_name,
+                ON CONFLICT (election_name) DO UPDATE SET
+                    election_date = excluded.election_date,
                     description = excluded.description,
                     is_by_election = excluded.is_by_election;
                 """).format(table=sql.Identifier(table))
