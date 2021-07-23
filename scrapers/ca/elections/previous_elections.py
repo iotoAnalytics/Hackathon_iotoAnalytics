@@ -9,6 +9,7 @@ path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
 from scraper_utils import ElectionScraperUtils
 from urllib.request import urlopen
 
@@ -16,6 +17,7 @@ COUNTRY = 'ca'
 TABLE = 'ca_previous_elections'
 MAIN_URL = 'https://www.elections.ca/'
 PAST_ELECTIONS_URL = MAIN_URL + 'content.aspx?section=ele&dir=pas&document=index&lang=e'
+THREADS_FOR_POOL = 12
 
 scraper_utils = ElectionScraperUtils(COUNTRY, TABLE)
 crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
@@ -66,16 +68,22 @@ class GeneralElection(Election):
 
     def _extract_election_info(self, elections: list[soup]) -> list:
         data = []
-        for election in elections:
-            data.append(self._get_row_data(election))
+        divTexts = [str(election) for election in elections]
+        with Pool(THREADS_FOR_POOL) as pool:
+            data = pool.map(func=GeneralElectionDataCollector().get_row_data,
+                            iterable=divTexts)
+        # for election in elections:
+        #     data.append(self._get_row_data(election))
         return data
 
-    def _get_row_data(self, election: soup):
+class GeneralElectionDataCollector(Election):
+    def get_row_data(self, election: str):
+        election_html = soup(election, 'html.parser')
         row = scraper_utils.initialize_row()
-        text = election.text
+        text = election_html.text
         row.election_name = self._get_election_name(text)
         row.election_date = self._get_election_date(text)
-        row.official_votes_record_url = self._get_ovr_url(election.a['href'])
+        row.official_votes_record_url = self._get_ovr_url(election_html.a['href'])
         row.description = f"The {row.election_name} which was held on {row.election_date}."
         row.is_by_election = False
         return row
@@ -101,20 +109,24 @@ class ByElection(Election):
     def _get_by_elections_links_from_soup(self, page_soup: soup):
         main_content = page_soup.find('div', {'id': 'content-main'})
         relelvant_ul = main_content.find_all('ul')[1:]
-        all_a = []
+        all_li = []
         for ul in relelvant_ul:
-            all_a.extend(ul.find_all('a'))
-        return all_a
+            all_li.extend(ul.find_all('li'))
+        return all_li
 
     def _extract_by_election_info(self, elections: list[soup]) -> list:
         data = []
-        for election in elections:
-            data.append(self._get_row_data(election))
+        divTexts = [str(election) for election in elections]
+        with Pool(THREADS_FOR_POOL) as pool:
+            data = pool.map(func=ByElectionDataCollector().get_row_data,
+                            iterable=divTexts)
         return data
 
-    def _get_row_data(self, election: soup):
+class ByElectionDataCollector(Election):
+    def get_row_data(self, election: str):
+        election_html = soup(election, 'html.parser')
         row = scraper_utils.initialize_row()
-        text = election.text
+        text = election_html.text
         year_match = re.search(r'[A-Z][a-z]+ \d{1,2}, \d{4}', text)
         if (year_match):
             location = text.split(',')[0]
@@ -122,15 +134,18 @@ class ByElection(Election):
             row.election_name = self._get_election_name(location, row.election_date)
         else:
             location = text
-            row.election_date = self._get_election_date_special(election)
+            row.election_date = self._get_election_date_special(election_html.a)
             row.election_name = self._get_election_name(location, row.election_date)
-        row.official_votes_record_url = self._get_ovr_url(election['href'])
+        row.official_votes_record_url = self._get_ovr_url(election_html.a['href'])
         row.description = self._get_description(text, row.election_date, location)
         row.is_by_election = True
         return row
 
-    def _get_election_date_special(self, election_link):
-        url = MAIN_URL + election_link['href']
+    def _get_election_date_special(self, election_link: soup):
+        try:
+            url = MAIN_URL + election_link['href']
+        except:
+            print(election_link.attrs)
         page_soup = self.get_page_as_soup(url)
         main_content = page_soup.find('div', {'id':'content-main'})
         date = re.search(r'[A-Z][a-z]+ \d{1,2}, \d{4}', main_content.text)
