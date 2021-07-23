@@ -1174,15 +1174,15 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
-# region Previous Election Data
+# region Election Data
 
 ##########################################
 # PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
 
-class PreviousElectionScraperUtils(ScraperUtils):
+class ElectionScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
-        super().__init__(country, table_name, row_type=PreviousElectionRow())
+        super().__init__(country, table_name, row_type=ElectionRow())
 
     def write_data(self, data, database_table=None) -> None:
         """
@@ -1191,30 +1191,7 @@ class PreviousElectionScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_previous_election_data(data, table)
 
-# class FedPreviousElectionScraperUtils(ScraperUtils):
-#     def __init__(self, country: str, table_name: str, row_type: PreviousElectionRow):
-#         super().__init__(country, table_name, row_type)
-
-# class CAFedPreviousElectionScraperUtils(FedPreviousElectionScraperUtils):
-#     def __init__(self, table_name='ca_prev_fed_election_by_division'):
-#         super().__init__('ca', table_name, CAFedPrevElectionByDivisionRow())
-
-#     def get_prov_terr_id(self, prov_terr_abbrev: str) -> int:
-#         """Returns the province/territory ID for a given province/territory"""
-#         df = self.divisions
-#         val = df.loc[df['abbreviation'] == prov_terr_abbrev]['id'].values[0]
-#         try:
-#             return int(val)
-#         except Exception:
-#             return val
-
-#     def get_party_id(self, party_name: str, location=None) -> int:
-#         """Returns the party ID for a given party. Party name must match database entry"""
-#         if not location:
-#             raise exceptions.MissingLocationException(self.get_party_id)
-#         df = self.parties
-#         try:
-#             return int(df.loc[(df['party'] == party_name) & (df['location'] == location), 'id'].values[0])
-#         except IndexError:
-#             raise IndexError(f'No party_id found while searching party_name={party_name}, location={location}')
+class ElectoralDistrictScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectoralDistrictsRow())
 # end region
