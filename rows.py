@@ -1123,8 +1123,8 @@ class ElectoralDistrictsRow:
     province_territory_id: int
     population: int
     census_year: int
-    name_previous: str
-    name_current: str
+    prev_district_names: List[str]
+    district_name: str
     region: str
     is_active: bool
     start_date: str
@@ -1133,8 +1133,8 @@ class ElectoralDistrictsRow:
         self._province_territory_id = None
         self._population = None
         self._census_year = None
-        self._name_previous = ''
-        self._name_current = ''
+        self._prev_district_names = []
+        self._district_name = ''
         self._region = ''
         self._is_active = None
         self._start_date = None
@@ -1153,7 +1153,7 @@ class ElectoralDistrictsRow:
         return self._population
     @population.setter
     def population(self, id: int) -> None:
-        if not isinstance(id, int):
+        if (not isinstance(id, int)) and id != None:
             raise TypeError("population must be an int")
         self._population = id
 
@@ -1167,22 +1167,24 @@ class ElectoralDistrictsRow:
         self._census_year = id
 
     @property
-    def name_previous(self) -> str:
-        return self._name_previous
-    @name_previous.setter
-    def name_previous(self, value: str) -> None:
-        if not isinstance(value, str):
-            raise TypeError("name_previous must be a str")
-        self._name_previous = value
+    def prev_district_names(self) -> list:
+        return self._prev_district_names
+    @prev_district_names.setter
+    def prev_district_names(self, value: list) -> None:
+        if not isinstance(value, list):
+            raise TypeError("prev_district_names must be a list of str")
+        if not all(isinstance(element, str) for element in value):
+            raise TypeError("prev_district_names must be a list of strs")
+        self._prev_district_names = value
 
     @property
-    def name_current(self) -> str:
-        return self._name_current
-    @name_current.setter
-    def name_current(self, value: str) -> None:
+    def district_name(self) -> str:
+        return self._district_name
+    @district_name.setter
+    def district_name(self, value: str) -> None:
         if not isinstance(value, str):
-            raise TypeError("name_current must be a str")
-        self._name_current = value
+            raise TypeError("district_name must be a str")
+        self._district_name = value
 
     @property
     def region(self) -> str:

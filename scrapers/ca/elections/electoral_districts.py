@@ -1,12 +1,8 @@
-import sys
 import os
 from pathlib import Path
-from time import sleep
 import re
-import datetime
-from numpy import NaN, nan
-
-from pandas.core.frame import DataFrame
+import sys
+from time import sleep
 
 NODES_TO_ROOT = 3
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -15,6 +11,7 @@ sys.path.insert(0, str(path_to_root))
 from bs4 import BeautifulSoup as soup
 from multiprocessing import Pool
 import pandas as pd
+from pandas.core.frame import DataFrame
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from scraper_utils import ElectoralDistrictScraperUtils
@@ -22,8 +19,10 @@ from urllib.request import urlopen
 
 COUNTRY = 'ca'
 TABLE = 'ca_electoral_districts'
-RIDING_BASE_URL = 'https://lop.parl.ca/'
-RIDING_URL = RIDING_BASE_URL + 'sites/ParlInfo/default/en_CA/ElectionsRidings/Ridings'
+RIDING_BASE_URL = 'https://lop.parl.ca'
+RIDING_URL = RIDING_BASE_URL + '/sites/ParlInfo/default/en_CA/ElectionsRidings/Ridings'
+ELECTIONS_BASE_URL = 'https://www.elections.ca'
+NAME_CHANGE_POPULATION_URL = ELECTIONS_BASE_URL + '/content.aspx?section=res&dir=cir/list&document=index338&lang=e'
 THREADS_FOR_POOL = 12
 
 DF_COLUMN_INDEX_KV = {
@@ -37,13 +36,41 @@ DF_COLUMN_INDEX_KV = {
 
 scraper_utils = ElectoralDistrictScraperUtils(COUNTRY, TABLE)
 
-riding_crawl_delay = scraper_utils.get_crawl_delay(RIDING_URL)
+riding_crawl_delay = scraper_utils.get_crawl_delay(RIDING_BASE_URL)
+elections_crawl_delay = scraper_utils.get_crawl_delay(ELECTIONS_BASE_URL)
 
 options = Options()
 options.headless = True
 
 def program_driver():
     district_data = Districts().get_data()
+
+class PreProgramFunction:
+    def get_population_csv(self):
+        page_html = self._get_site_as_html()
+        page_soup = soup(page_html, 'html.parser')
+        self.link_to_csv = ELECTIONS_BASE_URL + self._find_csv_link(page_soup)
+        csv_df = self._open_csv_file()
+        return csv_df
+    def _get_site_as_html(self):
+        uClient = urlopen(NAME_CHANGE_POPULATION_URL)
+        page_html = uClient.read()
+        uClient.close()
+        scraper_utils.crawl_delay(elections_crawl_delay)
+        return page_html
+
+    def _find_csv_link(self, page_soup: soup) -> str:
+        link = page_soup.find_all(self._has_CSV_in_link_text)[0]['href']
+        return link
+
+    def _has_CSV_in_link_text(self, tag: soup):
+        return "CSV" in tag.text and tag.name == 'a'
+
+    def _open_csv_file(self):
+        return pd.read_csv(self.link_to_csv, encoding='latin-1')
+
+    def get_census_year(self):
+        return int(re.search(r'[0-9]{4}', self.link_to_csv).group())
 
 class Districts:
     def __init__(self):
@@ -52,7 +79,7 @@ class Districts:
         try:
             self.data = self._get_district_data()
         except Exception as e:
-            print(e.with_traceback)
+            print(e.with_traceback())
             print(f"Error getting riding data")
         self.driver_instance.close_driver()
 
@@ -67,8 +94,8 @@ class Districts:
         try:
             rows_data = self._get_rows_data(data_df)
         except Exception as e:
-            print(e)
-        print(len(rows_data))
+            print(e.with_traceback())
+        print(rows_data)
 
     def _display_500_items(self):
         display_500_items = self.driver_instance.driver.find_element_by_css_selector("div[aria-label='Display 500 items on page']")
@@ -98,25 +125,71 @@ class Districts:
 
     def _get_rows_data(self, df: DataFrame) -> list:
         return_data = []
+        i = 0
+        length = len(df)
         for index, row in df.iterrows():
-            return_data.append(self._add_row_data(row))
+            i += 1
+            if i < length:
+                return_data.append(self._add_row_data(row))
         return return_data
 
     def _add_row_data(self, data_row):
         row = scraper_utils.initialize_row()
+        try:
+            row.province_territory_id = self._get_prov_terr_id(data_row)
+        except TypeError:
+            pass
+        row.district_name = self._get_district_name(data_row)
+        row.region = self._get_region(data_row)
+        row.is_active = self._get_active_status(data_row)
+        row.start_date = self._get_start_date(data_row)
+        row.population = self._get_population(row)
+        if row.population:
+            row.census_year = census_year
+        return row
+
+    def _get_prov_terr_id(self, data_row):
         province = data_row[DF_COLUMN_INDEX_KV.get('province')]
         if pd.notna(province):
-            row.province_territory_id = self._get_prov_terr_id(province)
-        print(row)
-        # return row
+            df = scraper_utils.divisions
+            value = df.loc[df["division"] == province]['id'].values[0]
+            try:
+                return int(value)
+            except Exception:
+                return value
 
-    def _get_prov_terr_id(self, province):
-        df = scraper_utils.divisions
-        value = df.loc[df["division"] == province]['id'].values[0]
-        try:
-            return int(value)
-        except Exception:
-            return value
+    def _get_district_name(self, data_row):
+        district_name = data_row[DF_COLUMN_INDEX_KV.get('name')]
+        if pd.notna(district_name):
+            return district_name
+        return ''
+
+    def _get_region(self, data_row):
+        region = data_row[DF_COLUMN_INDEX_KV.get('region')]
+        if pd.notna(region):
+            return region
+        return ''
+
+    def _get_active_status(self, data_row):
+        status = data_row[DF_COLUMN_INDEX_KV.get('currently_active')].lower()
+        if 'active' == status:
+            return True
+        return False
+
+    def _get_start_date(self, data_row):
+        start_date = data_row[DF_COLUMN_INDEX_KV.get('start_date')]
+        if pd.notna(start_date):
+            return start_date
+        return ''
+
+    def _get_population(self, row):
+        name = row.district_name.replace('’', '\'').replace('--', '-')
+        if row.is_active:
+            try:
+                value = population_df.loc[population_df["ED_NAMEE"].replace('--', '-') == name]['POPULATION'].values[0]
+                return int(value)
+            except:
+                pass
 
 class SeleniumDriver:
     def __init__(self):
@@ -144,6 +217,11 @@ class SeleniumDriver:
         except:
             self.close_driver()
             raise RuntimeError("Error in getting email table from selenium.")
+
+#global variable
+PreProgram = PreProgramFunction()
+population_df = PreProgram.get_population_csv()
+census_year = PreProgram.get_census_year()
 
 if __name__ == "__main__":
     program_driver()
