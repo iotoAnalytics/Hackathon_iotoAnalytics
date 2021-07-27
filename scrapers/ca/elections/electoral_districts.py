@@ -25,6 +25,12 @@ ELECTIONS_BASE_URL = 'https://www.elections.ca'
 NAME_CHANGE_POPULATION_URL = ELECTIONS_BASE_URL + '/content.aspx?section=res&dir=cir/list&document=index338&lang=e'
 THREADS_FOR_POOL = 12
 
+NAME_CHANGE_URLS = {
+    2016: 'https://www.elections.ca/content.aspx?section=res&dir=cir/maps2/chang&document=index&lang=e',
+    2004: 'https://www.elections.ca/content.aspx?section=res&dir=cir/list&document=index&lang=e',
+    2000: 'https://www12.statcan.gc.ca/fedprofil/eng/FedNameChange_E.cfm'
+}
+
 DF_COLUMN_INDEX_KV = {
     "name": 0,
     "province": 1,
