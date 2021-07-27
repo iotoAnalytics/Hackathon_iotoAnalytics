@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import os
 from pathlib import Path
 import re
@@ -25,11 +26,10 @@ ELECTIONS_BASE_URL = 'https://www.elections.ca'
 NAME_CHANGE_POPULATION_URL = ELECTIONS_BASE_URL + '/content.aspx?section=res&dir=cir/list&document=index338&lang=e'
 THREADS_FOR_POOL = 12
 
-NAME_CHANGE_URLS = {
-    2016: 'https://www.elections.ca/content.aspx?section=res&dir=cir/maps2/chang&document=index&lang=e',
-    2004: 'https://www.elections.ca/content.aspx?section=res&dir=cir/list&document=index&lang=e',
-    2000: 'https://www12.statcan.gc.ca/fedprofil/eng/FedNameChange_E.cfm'
-}
+NAME_CHANGE_URLS = OrderedDict()
+NAME_CHANGE_URLS[2016] = 'https://www.elections.ca/content.aspx?section=res&dir=cir/maps2/chang&document=index&lang=e'
+NAME_CHANGE_URLS[2004] = 'https://www.elections.ca/content.aspx?section=res&dir=cir/list&document=index&lang=e'
+NAME_CHANGE_URLS[2000] = 'https://www12.statcan.gc.ca/fedprofil/eng/FedNameChange_E.cfm'
 
 DF_COLUMN_INDEX_KV = {
     "name": 0,
@@ -152,6 +152,7 @@ class Districts:
         row.population = self._get_population(row)
         if row.population:
             row.census_year = census_year
+        row.prev_district_names = self._get_prev_district_names(row)
         return row
 
     def _get_prov_terr_id(self, data_row):
@@ -197,6 +198,19 @@ class Districts:
             except:
                 pass
 
+    def _get_prev_district_names(self, row):
+        '''
+        What I can try to do is recursively call a function
+        I can continue looking for previous names until none shows up.
+        whilst looking, I can update the districts I pass. 
+
+        This function should return a dictionary: 
+            Key = name
+            Value = previous_names []
+        
+        
+        '''
+
 class SeleniumDriver:
     def __init__(self):
         self.driver = webdriver.Chrome('web_drivers/chrome_win_92.0.4515.43/chromedriver.exe', options=options)
@@ -231,3 +245,4 @@ census_year = PreProgram.get_census_year()
 
 if __name__ == "__main__":
     program_driver()
+    pass
