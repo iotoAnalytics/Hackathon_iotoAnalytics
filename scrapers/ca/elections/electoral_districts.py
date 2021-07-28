@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import os
 from pathlib import Path
+from platform import python_revision
 import re
 import sys
 from time import sleep
@@ -46,7 +47,7 @@ riding_crawl_delay = scraper_utils.get_crawl_delay(RIDING_BASE_URL)
 elections_crawl_delay = scraper_utils.get_crawl_delay(ELECTIONS_BASE_URL)
 
 options = Options()
-options.headless = True
+# options.headless = True
 
 def program_driver():
     district_data = Districts().get_data()
@@ -97,6 +98,7 @@ class Districts:
         self._show_inactive_districts()
         sleep(2)
         data_df = self._get_data_as_df()
+        previous_names_dictionary = self._get_prev_district_names()
         try:
             rows_data = self._get_rows_data(data_df)
         except Exception as e:
@@ -121,6 +123,7 @@ class Districts:
             pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
             pages = pages_container.find_elements_by_class_name('dx-page')
             data = data.append(self._collect_data())
+        pages[0].click()
         return data
 
     def _collect_data(self):
@@ -128,6 +131,55 @@ class Districts:
         html_soup = soup(html, 'html.parser')
         html_data_table = html_soup.find('table', {'style':'table-layout: fixed;'})
         return pd.read_html(str(html_data_table))[0]
+
+    def _get_prev_district_names(self):
+        '''
+        What I can try to do is recursively call a function
+        I can continue looking for previous names until none shows up.
+        whilst looking, I can update the districts I pass. 
+
+        This function should return a dictionary: 
+            Key = name
+            Value = previous_names []
+        
+        
+        '''
+        pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
+        pages = pages_container.find_elements_by_class_name('dx-page')
+        prev_district_names = {}
+        for index in range(len(pages)):
+            pages[index].click()
+            sleep(2)
+            pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
+            pages = pages_container.find_elements_by_class_name('dx-page')
+            self._find_previous_names(prev_district_names)
+        print(prev_district_names)
+
+    def _find_previous_names(self, return_dict):
+        table = self.driver_instance.driver.find_elements_by_tag_name('table')[1]
+        links = table.find_elements_by_tag_name('a')
+        for link in links:
+            link.click()
+            sleep(3)
+
+            p = self.driver_instance.driver.window_handles[0]
+            c = self.driver_instance.driver.window_handles[1]
+            self.driver_instance.driver.switch_to_window(c)
+            self._add_to_return_dict(return_dict)
+            self.driver_instance.driver.close()
+            self.driver_instance.driver.switch_to_window(p)
+
+    def _add_to_return_dict(self, return_dict: dict):
+        paragraph = self.driver_instance.driver.find_element_by_id('RidingNotes').text
+        if "amended by substituting the name" in paragraph:
+            match = re.findall(r'\“(.*?)\”', paragraph)
+            if match:
+                name_current = match[0]
+                name_previous = match[1]
+                if return_dict.get(name_current):
+                    return_dict.get(name_current).extend(name_previous)
+                else:
+                    return_dict[name_current] = [name_previous]
 
     def _get_rows_data(self, df: DataFrame) -> list:
         return_data = []
@@ -152,7 +204,6 @@ class Districts:
         row.population = self._get_population(row)
         if row.population:
             row.census_year = census_year
-        row.prev_district_names = self._get_prev_district_names(row)
         return row
 
     def _get_prov_terr_id(self, data_row):
@@ -198,23 +249,11 @@ class Districts:
             except:
                 pass
 
-    def _get_prev_district_names(self, row):
-        '''
-        What I can try to do is recursively call a function
-        I can continue looking for previous names until none shows up.
-        whilst looking, I can update the districts I pass. 
-
-        This function should return a dictionary: 
-            Key = name
-            Value = previous_names []
-        
-        
-        '''
-
 class SeleniumDriver:
     def __init__(self):
         self.driver = webdriver.Chrome('web_drivers/chrome_win_92.0.4515.43/chromedriver.exe', options=options)
-        self.driver.switch_to.default_content()  
+        self.driver.switch_to.default_content()
+        self.tabs = 0
 
     def start_driver(self, url, crawl_delay):
         try:
