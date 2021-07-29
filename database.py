@@ -907,35 +907,13 @@ class Persistence:
                 'Data being written to database must be a list of Rows or dictionaries!')
 
         with CursorFromConnectionFromPool() as cur:
-            try:
-                create_table_query = sql.SQL("""
-                    CREATE TABLE IF NOT EXISTS {table} (
-                        election_id SERIAL PRIMARY KEY,
-                        election_name text UNIQUE,
-                        official_votes_record_url text,
-                        election_date date,
-                        description text,
-                        is_by_election boolean
-                    );
-
-                    ALTER TABLE {table} OWNER TO rds_ad;
-                    """).format(table=sql.Identifier(table))
-
-                cur.execute(create_table_query)
-                cur.connection.commit()
-
-            except Exception as e:
-                print(
-                    f'An exception occurred creating {table}:\n{e}')
-                cur.connection.rollback()
-
             insert_previous_election_query = sql.SQL("""
                 INSERT INTO {table}
                 VALUES (
                     DEFAULT, %s, %s, %s, %s, %s)
                 ON CONFLICT (election_name) DO UPDATE SET
-                    official_votes_record_url = excluded.official_votes_record_url,
                     election_date = excluded.election_date,
+                    official_votes_record_url = excluded.official_votes_record_url,
                     description = excluded.description,
                     is_by_election = excluded.is_by_election;
                 """).format(table=sql.Identifier(table))
@@ -945,7 +923,7 @@ class Persistence:
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
 
-                tup = (row.election_name, row.official_votes_record_url, row.election_date, row.description, row.is_by_election)
+                tup = (row.election_name, row.election_date, row.official_votes_record_url, row.description, row.is_by_election)
 
                 try:
                     cur.execute(insert_previous_election_query, tup)

@@ -14,7 +14,7 @@ from scraper_utils import ElectionScraperUtils
 from urllib.request import urlopen
 
 COUNTRY = 'ca'
-TABLE = 'ca_previous_elections'
+TABLE = 'elections'
 MAIN_URL = 'https://www.elections.ca/'
 PAST_ELECTIONS_URL = MAIN_URL + 'content.aspx?section=ele&dir=pas&document=index&lang=e'
 THREADS_FOR_POOL = 12
