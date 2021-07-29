@@ -1,7 +1,5 @@
-from collections import OrderedDict
 import os
 from pathlib import Path
-from platform import python_revision
 import re
 import sys
 from time import sleep
