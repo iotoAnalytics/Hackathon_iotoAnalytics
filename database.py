@@ -904,3 +904,71 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
                     cur.connection.rollback()
+
+    @staticmethod
+    def write_previous_election_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_previous_election_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s, %s)
+                ON CONFLICT (election_name) DO UPDATE SET
+                    election_date = excluded.election_date,
+                    official_votes_record_url = excluded.official_votes_record_url,
+                    description = excluded.description,
+                    is_by_election = excluded.is_by_election;
+                """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.election_name, row.election_date, row.official_votes_record_url, row.description, row.is_by_election)
+
+                try:
+                    cur.execute(insert_previous_election_query, tup)
+
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.election_name}:\n{e}')
+                    cur.connection.rollback()
+
+    @staticmethod
+    def write_electoral_districts_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_previous_election_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s);
+                """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.province_territory_id, 
+                       row.population, 
+                       row.census_year, 
+                       row.prev_district_names, 
+                       row.district_name,
+                       row.region,
+                       row.is_active,
+                       row.start_date)
+
+                try:
+                    cur.execute(insert_previous_election_query, tup)
+
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.district_name}:\n{e}')
+                    cur.connection.rollback()

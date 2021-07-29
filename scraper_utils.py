@@ -260,7 +260,6 @@ class LegislatorScraperUtils(ScraperUtils):
         except Exception:
             return val
 
-
     def scrape_wiki_bio(self, wiki_link):
         """
         Used for getting missing legislator fields from their wikipedia bios.
@@ -1175,19 +1174,31 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
-# region Election Scraper Utils
+# region Election Data
+
 ##########################################
-# Election SCRAPER UTILS
+# PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
 
-class ElectorsScraperUtils(ScraperUtils):
+class ElectionScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
-        super().__init__(country, table_name, row_type=ElectorsRow())
+        super().__init__(country, table_name, row_type=ElectionRow())
 
-    # def write_data(self, data, database_table=None) -> None:
-    #     """
-    #     Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
-    #     """
-    #     table = database_table if database_table else self.database_table_name
-    #     Persistence.write_electors(data, table)
-# endregion
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_previous_election_data(data, table)
+
+class ElectoralDistrictScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectoralDistrictsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_electoral_districts_data(data, table)
+# end region
