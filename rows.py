@@ -1039,3 +1039,68 @@ class CAFedLegislatorRow(CALegislatorRow):
             if element.get('organization') is None or type(element.get('organization')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value
+
+#########################################################
+#       ELECTION ROWS                                   #
+#########################################################
+
+@dataclass
+class ElectorsRow:
+    """
+    Data structure for housing data data for electors
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    province_territory_id: int
+    population: int
+    electors: int
+    election_id: int
+
+    def __init__(self):
+        self._province_territory_id = None
+        self._population = None
+        self._electors = None
+        self._election_id = None
+
+    @property
+    def province_territory_id(self) -> int:
+        return self._province_territory_id
+
+    @province_territory_id.setter
+    def province_territory_id(self, value: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("province_territory_id must be an int")
+        self._province_territory_id = value
+
+    @property
+    def population(self) -> int:
+        return self._population
+
+    @population.setter
+    def population(self, value: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("population must be an int")
+        self._population = value
+
+    @property
+    def electors(self) -> int:
+        return self._electors
+
+    @electors.setter
+    def electors(self, value: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("electors must be an int")
+        self._electors = value
+
+    @property
+    def election_id(self) -> int:
+        return self._election_id
+
+    @election_id.setter
+    def election_id(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("election_id must be aan int")
+        self._election_id = value

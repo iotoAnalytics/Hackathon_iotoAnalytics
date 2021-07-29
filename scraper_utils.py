@@ -1175,5 +1175,19 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
+# region Election Scraper Utils
+##########################################
+# Election SCRAPER UTILS
+##########################################
 
+class ElectorsScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectorsRow())
 
+    # def write_data(self, data, database_table=None) -> None:
+    #     """
+    #     Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+    #     """
+    #     table = database_table if database_table else self.database_table_name
+    #     Persistence.write_electors(data, table)
+# endregion

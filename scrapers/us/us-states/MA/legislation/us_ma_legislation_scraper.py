@@ -684,7 +684,7 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
 
     # data = [scrape(url) for url in urls]
 
-    with Pool(procesgit ses=4) as pool:
+    with Pool(processes=4) as pool:
         data = pool.map(scrape, urls)
 
     scraper_utils.write_data(data)
