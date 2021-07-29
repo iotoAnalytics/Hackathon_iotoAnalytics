@@ -47,7 +47,7 @@ riding_crawl_delay = scraper_utils.get_crawl_delay(RIDING_BASE_URL)
 elections_crawl_delay = scraper_utils.get_crawl_delay(ELECTIONS_BASE_URL)
 
 options = Options()
-# options.headless = True
+options.headless = True
 
 def program_driver():
     district_data = Districts().get_data()
@@ -95,10 +95,11 @@ class Districts:
 
     def _get_district_data(self) -> list:
         self._display_500_items()
+        sleep(2)
         self._show_inactive_districts()
         sleep(2)
         data_df = self._get_data_as_df()
-        previous_names_dictionary = self._get_prev_district_names()
+        self.previous_names_dictionary = self._get_prev_district_names()
         try:
             rows_data = self._get_rows_data(data_df)
         except Exception as e:
@@ -124,6 +125,7 @@ class Districts:
             pages = pages_container.find_elements_by_class_name('dx-page')
             data = data.append(self._collect_data())
         pages[0].click()
+        sleep(2)
         return data
 
     def _collect_data(self):
@@ -146,40 +148,31 @@ class Districts:
         '''
         pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
         pages = pages_container.find_elements_by_class_name('dx-page')
-        prev_district_names = {}
+        data = []
         for index in range(len(pages)):
             pages[index].click()
             sleep(2)
             pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
             pages = pages_container.find_elements_by_class_name('dx-page')
-            self._find_previous_names(prev_district_names)
-        print(prev_district_names)
+            data.extend(self._find_previous_names())
+        data_dictionary = {k:v for names in data for k, v in names.items()}
+        self._update_data_dictinary(data_dictionary)
+        return data_dictionary
 
-    def _find_previous_names(self, return_dict):
+    def _find_previous_names(self):
         table = self.driver_instance.driver.find_elements_by_tag_name('table')[1]
         links = table.find_elements_by_tag_name('a')
-        for link in links:
-            link.click()
-            sleep(3)
+        links = [link.get_attribute('href') for link in links]
+        return get_data_from_all_links(get_previous_data, links)
 
-            p = self.driver_instance.driver.window_handles[0]
-            c = self.driver_instance.driver.window_handles[1]
-            self.driver_instance.driver.switch_to_window(c)
-            self._add_to_return_dict(return_dict)
-            self.driver_instance.driver.close()
-            self.driver_instance.driver.switch_to_window(p)
-
-    def _add_to_return_dict(self, return_dict: dict):
-        paragraph = self.driver_instance.driver.find_element_by_id('RidingNotes').text
-        if "amended by substituting the name" in paragraph:
-            match = re.findall(r'\“(.*?)\”', paragraph)
-            if match:
-                name_current = match[0]
-                name_previous = match[1]
-                if return_dict.get(name_current):
-                    return_dict.get(name_current).extend(name_previous)
-                else:
-                    return_dict[name_current] = [name_previous]
+    def _update_data_dictinary(self, data_dictionary: dict):
+        for key in data_dictionary.keys():
+            for item in data_dictionary.get(key):
+                if item in data_dictionary.keys():
+                    data_dictionary.get(key).extend(data_dictionary.get(item))
+        
+        for key in data_dictionary.keys():
+            data_dictionary[key] = list(dict.fromkeys(data_dictionary[key]))
 
     def _get_rows_data(self, df: DataFrame) -> list:
         return_data = []
@@ -204,6 +197,7 @@ class Districts:
         row.population = self._get_population(row)
         if row.population:
             row.census_year = census_year
+        row.prev_district_names = self.previous_names_dictionary.setdefault(row.district_name, [])
         return row
 
     def _get_prov_terr_id(self, data_row):
@@ -276,6 +270,39 @@ class SeleniumDriver:
         except:
             self.close_driver()
             raise RuntimeError("Error in getting email table from selenium.")
+
+class PreviousNameCollector:
+    def __init__(self, url):
+        self.driver =  SeleniumDriver()
+        self.driver.start_driver(url, riding_crawl_delay)
+        self.data = []
+        self._extract_previous()
+        self.driver.close_driver()
+
+    def _extract_previous(self):
+        paragraph = self.driver.driver.find_element_by_id('RidingNotes').text
+        if "amended by substituting the name" in paragraph:
+            match = re.findall(r'\“(.*?)\”', paragraph)
+            if match:
+                name_current = match[0]
+                name_previous = match[1]
+                return {name_current: [name_previous]}
+        return {}
+
+    def get_previous_name_data(self):
+        return self.data
+
+
+def get_data_from_all_links(function, all_links):
+    data = []
+    with Pool() as pool:
+        data = pool.map(func=function,
+                        iterable=all_links)
+    return data
+
+def get_previous_data(link):
+    name_collector = PreviousNameCollector(link)
+    return name_collector.get_previous_name_data()
 
 #global variable
 PreProgram = PreProgramFunction()
