@@ -20,7 +20,7 @@ from scraper_utils import ElectoralDistrictScraperUtils
 from urllib.request import urlopen
 
 COUNTRY = 'ca'
-TABLE = 'ca_electoral_districts'
+TABLE = 'electoral_districts'
 RIDING_BASE_URL = 'https://lop.parl.ca'
 RIDING_URL = RIDING_BASE_URL + '/sites/ParlInfo/default/en_CA/ElectionsRidings/Ridings'
 ELECTIONS_BASE_URL = 'https://www.elections.ca'
@@ -170,8 +170,9 @@ class Districts:
 
     def _update_data_dictinary(self, data_dictionary: dict) -> None:
         for key, value in data_dictionary.items():
-            if value in data_dictionary.keys():
-                data_dictionary.get(key).extend(data_dictionary.get(value))
+            for name in value:
+                if name in data_dictionary.keys():
+                    data_dictionary.get(key).extend(data_dictionary.get(name))
         
         for key in data_dictionary.keys():
             data_dictionary[key] = list(dict.fromkeys(data_dictionary[key]))
@@ -234,7 +235,7 @@ class Districts:
         start_date = data_row[DF_COLUMN_INDEX_KV.get('start_date')]
         if pd.notna(start_date):
             return start_date
-        return ''
+        return None
 
     def _get_population(self, row):
         name = row.district_name.replace('’', '\'').replace('--', '-')
