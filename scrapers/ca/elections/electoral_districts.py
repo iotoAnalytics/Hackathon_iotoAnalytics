@@ -100,11 +100,11 @@ class Districts:
         sleep(2)
         data_df = self._get_data_as_df()
         self.previous_names_dictionary = self._get_prev_district_names()
+        print(self.previous_names_dictionary)
         try:
             rows_data = self._get_rows_data(data_df)
         except Exception as e:
             print(e.with_traceback())
-        print(rows_data)
 
     def _display_500_items(self):
         display_500_items = self.driver_instance.driver.find_element_by_css_selector("div[aria-label='Display 500 items on page']")
@@ -275,8 +275,7 @@ class PreviousNameCollector:
     def __init__(self, url):
         self.driver =  SeleniumDriver()
         self.driver.start_driver(url, riding_crawl_delay)
-        self.data = []
-        self._extract_previous()
+        self.data = self._extract_previous()
         self.driver.close_driver()
 
     def _extract_previous(self):
