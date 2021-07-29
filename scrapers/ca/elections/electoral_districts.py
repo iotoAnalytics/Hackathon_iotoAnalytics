@@ -27,11 +27,6 @@ ELECTIONS_BASE_URL = 'https://www.elections.ca'
 NAME_CHANGE_POPULATION_URL = ELECTIONS_BASE_URL + '/content.aspx?section=res&dir=cir/list&document=index338&lang=e'
 THREADS_FOR_POOL = 12
 
-NAME_CHANGE_URLS = OrderedDict()
-NAME_CHANGE_URLS[2016] = 'https://www.elections.ca/content.aspx?section=res&dir=cir/maps2/chang&document=index&lang=e'
-NAME_CHANGE_URLS[2004] = 'https://www.elections.ca/content.aspx?section=res&dir=cir/list&document=index&lang=e'
-NAME_CHANGE_URLS[2000] = 'https://www12.statcan.gc.ca/fedprofil/eng/FedNameChange_E.cfm'
-
 DF_COLUMN_INDEX_KV = {
     "name": 0,
     "province": 1,
@@ -52,6 +47,17 @@ options.headless = True
 def program_driver():
     district_data = Districts().get_data()
 
+def get_data_from_all_links(function, all_links):
+    data = []
+    with Pool(THREADS_FOR_POOL) as pool:
+        data = pool.map(func=function,
+                        iterable=all_links)
+    return data
+
+def get_previous_data(link):
+    name_collector = PreviousNameCollector(link)
+    return name_collector.get_previous_name_data()
+
 class PreProgramFunction:
     def get_population_csv(self):
         page_html = self._get_site_as_html()
@@ -59,6 +65,7 @@ class PreProgramFunction:
         self.link_to_csv = ELECTIONS_BASE_URL + self._find_csv_link(page_soup)
         csv_df = self._open_csv_file()
         return csv_df
+
     def _get_site_as_html(self):
         uClient = urlopen(NAME_CHANGE_POPULATION_URL)
         page_html = uClient.read()
@@ -83,102 +90,93 @@ class Districts:
     def __init__(self):
         self.driver_instance = SeleniumDriver()
         self.driver_instance.start_driver(RIDING_URL, riding_crawl_delay)
+
         try:
             self.data = self._get_district_data()
         except Exception as e:
             print(e.with_traceback())
             print(f"Error getting riding data")
+
         self.driver_instance.close_driver()
 
-    def get_data(self):
+    def get_data(self) -> list:
         return self.data
 
     def _get_district_data(self) -> list:
         self._display_500_items()
-        sleep(2)
         self._show_inactive_districts()
-        sleep(2)
-        data_df = self._get_data_as_df()
+        self.data_df = self._get_data_as_df()
+        
         self.previous_names_dictionary = self._get_prev_district_names()
-        print(self.previous_names_dictionary)
         try:
-            rows_data = self._get_rows_data(data_df)
+            rows_data = self._get_rows_data()
         except Exception as e:
             print(e.with_traceback())
+        return rows_data
 
-    def _display_500_items(self):
+    def _display_500_items(self) -> None:
         display_500_items = self.driver_instance.driver.find_element_by_css_selector("div[aria-label='Display 500 items on page']")
         display_500_items.click()
+        sleep(2)
         
-    def _show_inactive_districts(self):
+    def _show_inactive_districts(self) -> None:
         show_inactive_checkbox = self.driver_instance.driver.find_elements_by_class_name('dx-checkbox-icon')[-1]
         show_inactive_checkbox.click()
+        sleep(2)
 
     def _get_data_as_df(self) -> DataFrame:
         pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
         pages = pages_container.find_elements_by_class_name('dx-page')
-        data = self._collect_data()
-        for index in range(1, len(pages)):
-            pages[index].click()
-            sleep(2)
-            pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
-            pages = pages_container.find_elements_by_class_name('dx-page')
+        data = DataFrame()
+        for index in range(len(pages)):
+            self._change_pages(pages, index)
             data = data.append(self._collect_data())
         pages[0].click()
         sleep(2)
         return data
 
-    def _collect_data(self):
+    def _collect_data(self) -> DataFrame:
         html = self.driver_instance.get_html_source()
         html_soup = soup(html, 'html.parser')
         html_data_table = html_soup.find('table', {'style':'table-layout: fixed;'})
         return pd.read_html(str(html_data_table))[0]
 
     def _get_prev_district_names(self):
-        '''
-        What I can try to do is recursively call a function
-        I can continue looking for previous names until none shows up.
-        whilst looking, I can update the districts I pass. 
-
-        This function should return a dictionary: 
-            Key = name
-            Value = previous_names []
-        
-        
-        '''
         pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
         pages = pages_container.find_elements_by_class_name('dx-page')
         data = []
         for index in range(len(pages)):
-            pages[index].click()
-            sleep(2)
-            pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
-            pages = pages_container.find_elements_by_class_name('dx-page')
+            self._change_pages(pages, index)
             data.extend(self._find_previous_names())
         data_dictionary = {k:v for names in data for k, v in names.items()}
         self._update_data_dictinary(data_dictionary)
         return data_dictionary
 
-    def _find_previous_names(self):
+    def _change_pages(self, pages: list, index: int) -> None:
+        pages[index].click()
+        sleep(2)
+        pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
+        pages = pages_container.find_elements_by_class_name('dx-page')
+
+    def _find_previous_names(self) -> list:
         table = self.driver_instance.driver.find_elements_by_tag_name('table')[1]
         links = table.find_elements_by_tag_name('a')
         links = [link.get_attribute('href') for link in links]
         return get_data_from_all_links(get_previous_data, links)
 
-    def _update_data_dictinary(self, data_dictionary: dict):
-        for key in data_dictionary.keys():
-            for item in data_dictionary.get(key):
-                if item in data_dictionary.keys():
-                    data_dictionary.get(key).extend(data_dictionary.get(item))
+    def _update_data_dictinary(self, data_dictionary: dict) -> None:
+        for key, value in data_dictionary.items():
+            if value in data_dictionary.keys():
+                data_dictionary.get(key).extend(data_dictionary.get(value))
         
         for key in data_dictionary.keys():
             data_dictionary[key] = list(dict.fromkeys(data_dictionary[key]))
 
-    def _get_rows_data(self, df: DataFrame) -> list:
+    def _get_rows_data(self) -> list:
         return_data = []
         i = 0
-        length = len(df)
-        for index, row in df.iterrows():
+        length = len(self.data_df)
+        for index, row in self.data_df.iterrows():
             i += 1
             if i < length:
                 return_data.append(self._add_row_data(row))
@@ -291,18 +289,6 @@ class PreviousNameCollector:
     def get_previous_name_data(self):
         return self.data
 
-
-def get_data_from_all_links(function, all_links):
-    data = []
-    with Pool() as pool:
-        data = pool.map(func=function,
-                        iterable=all_links)
-    return data
-
-def get_previous_data(link):
-    name_collector = PreviousNameCollector(link)
-    return name_collector.get_previous_name_data()
-
 #global variable
 PreProgram = PreProgramFunction()
 population_df = PreProgram.get_population_csv()
@@ -310,4 +296,3 @@ census_year = PreProgram.get_census_year()
 
 if __name__ == "__main__":
     program_driver()
-    pass
