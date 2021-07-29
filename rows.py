@@ -1209,7 +1209,7 @@ class ElectoralDistrictsRow:
         return self._start_date
     @start_date.setter
     def start_date(self, value: str) -> None:
-        if not isinstance(value, str):
+        if not isinstance(value, str) and value != None:
             raise TypeError("start_date must be a str")
         if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
             raise ValueError("Improper date formating in start_date. Required format: YYYY-MM-DD")
