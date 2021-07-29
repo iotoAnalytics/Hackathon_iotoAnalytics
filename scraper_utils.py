@@ -1194,4 +1194,11 @@ class ElectionScraperUtils(ScraperUtils):
 class ElectoralDistrictScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
         super().__init__(country, table_name, row_type=ElectoralDistrictsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_electoral_districts_data(data, table)
 # end region

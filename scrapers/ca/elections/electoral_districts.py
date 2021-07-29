@@ -45,11 +45,15 @@ options = Options()
 options.headless = True
 
 def program_driver():
+    print("collecting data...")
     district_data = Districts().get_data()
+    print("writing_data")
+    scraper_utils.write_data(district_data)
+    print("complete")
 
 def get_data_from_all_links(function, all_links):
     data = []
-    with Pool(THREADS_FOR_POOL) as pool:
+    with Pool() as pool:
         data = pool.map(func=function,
                         iterable=all_links)
     return data
@@ -129,7 +133,10 @@ class Districts:
         pages = pages_container.find_elements_by_class_name('dx-page')
         data = DataFrame()
         for index in range(len(pages)):
-            self._change_pages(pages, index)
+            pages[index].click()
+            sleep(2)
+            pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
+            pages = pages_container.find_elements_by_class_name('dx-page')
             data = data.append(self._collect_data())
         pages[0].click()
         sleep(2)
@@ -146,17 +153,14 @@ class Districts:
         pages = pages_container.find_elements_by_class_name('dx-page')
         data = []
         for index in range(len(pages)):
-            self._change_pages(pages, index)
+            pages[index].click()
+            sleep(2)
+            pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
+            pages = pages_container.find_elements_by_class_name('dx-page')
             data.extend(self._find_previous_names())
         data_dictionary = {k:v for names in data for k, v in names.items()}
         self._update_data_dictinary(data_dictionary)
         return data_dictionary
-
-    def _change_pages(self, pages: list, index: int) -> None:
-        pages[index].click()
-        sleep(2)
-        pages_container = self.driver_instance.driver.find_element_by_class_name('dx-pages')
-        pages = pages_container.find_elements_by_class_name('dx-page')
 
     def _find_previous_names(self) -> list:
         table = self.driver_instance.driver.find_elements_by_tag_name('table')[1]
