@@ -1201,4 +1201,9 @@ class ElectoralDistrictScraperUtils(ScraperUtils):
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_electoral_districts_data(data, table)
+
+class CandidatesScraperUtils(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = 'candidates'
+        super().__init__(country, table_name, row_type=CandidatesRow())
 # end region
