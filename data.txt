@@ -1,0 +1,51 @@
+	1	2	3	Province or Territory	Constituency	Candidate	Gender	Occupation	Political Affiliation	Result	Votes
+	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)	Parliament: 43 (Continues on the next page)
+		Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)	Type of Election: General (Continues on the next page)
+			Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile	Date of Election: 2019-10-21 Profile
+				Alberta	Banff--Airdrie	Richards, Blake	Man	Parliamentarian	Conservative Party of Canada	Elected	55504
+				Alberta	Banff--Airdrie	Midgley, Gwyneth	Woman	Executive Director	Liberal Party of Canada	Defeated	8425
+				Alberta	Banff--Airdrie	Wilson, Anne	Woman	Lawyer	New Democratic Party	Defeated	8185
+				Alberta	Banff--Airdrie	Mullins, Austin	Man	Hospitality Services	Green Party of Canada	Defeated	3315
+				Alberta	Banff--Airdrie	Wellwood, Nadine	Woman	Investment Manager / Financial Advisor	People's Party of Canada	Defeated	2651
+				Alberta	Battle River--Crowfoot	Kurek, Damien C.	Man	Parliamentary Assistant / Farmer	Conservative Party of Canada	Elected	53309
+				Alberta	Battle River--Crowfoot	Fryzuk, Natasha	Woman	Postal Worker	New Democratic Party	Defeated	3185
+				Alberta	Battle River--Crowfoot	Clarke, Dianne	Woman	Business Owner	Liberal Party of Canada	Defeated	2557
+				Alberta	Battle River--Crowfoot	Nelson, Geordie	Man	University Support Staff Member	Green Party of Canada	Defeated	1689
+				Alberta	Battle River--Crowfoot	Michaud, David A.	Man	Security Service	People's Party of Canada	Defeated	1620
+				Alberta	Bow River	Shields, Martin	Man	Parliamentarian	Conservative Party of Canada	Elected	46279
+				Alberta	Bow River	Rhemtulla, Margaret	Woman	Retired	Liberal Party of Canada	Defeated	3173
+				Alberta	Bow River	Macwilliam, Lynn	Woman	Retired	New Democratic Party	Defeated	3086
+				Alberta	Bow River	Ikert, Tom	Man	Carpenter	People's Party of Canada	Defeated	1321
+				Alberta	Bow River	Tuithof de Jonge, Hendrika Maria	Woman	Social Worker	Green Party of Canada	Defeated	826
+				Alberta	Bow River	Lipp, Tom	Man	Financial Advisor	Christian Heritage Party of Canada	Defeated	453
+				Alberta	Calgary Centre	McLean, Greg	Man	Portfolio Manager	Conservative Party of Canada	Elected	37306
+				Alberta	Calgary Centre	Hehr, Kent	Man	Parliamentarian	Liberal Party of Canada	Defeated	17771
+				Alberta	Calgary Centre	Buresi, Jessica	Woman	Teacher	New Democratic Party	Defeated	6516
+				Alberta	Calgary Centre	Boonlert, Thana	Man	Environmental Engineer	Green Party of Canada	Defeated	2853
+				Alberta	Calgary Centre	Johnston, Chevy	Man	Commodity Broker	People's Party of Canada	Defeated	907
+				Alberta	Calgary Centre	Gould, Eden	Woman	Health Coach	Animal Protection Party of Canada	Defeated	247
+				Alberta	Calgary Centre	Pewtress, Michael	Man	Media Producer	Independent	Defeated	138
+				Alberta	Calgary Centre	Pawlowski, Dawid	Man	Preacher	Christian Heritage Party of Canada	Defeated	126
+				Alberta	Calgary Confederation	Webber, Len	Man	Parliamentarian	Conservative Party of Canada	Elected	36312
+				Alberta	Calgary Confederation	Stein, Jordan	Woman	Entrepreneur	Liberal Party of Canada	Defeated	14908
+				Alberta	Calgary Confederation	Sidhu, Gurcharan Singh	Man	Transportation	New Democratic Party	Defeated	7312
+				Alberta	Calgary Confederation	Odd, Natalie	Woman	Executive Management	Green Party of Canada	Defeated	5700
+				Alberta	Calgary Confederation	Korol, Colin	Man	Working Leader / Service Worker	People's Party of Canada	Defeated	1136
+				Alberta	Calgary Confederation	Moen, Tim	Man	Firefighter	Libertarian Party of Canada	Defeated	407
+				Alberta	Calgary Confederation	Hunter, Kevan	Man	Teacher	Marxist-Leninist Party of Canada	Defeated	117
+				Alberta	Calgary Forest Lawn	Hallan, Jasraj Singh	Man	General Manager	Conservative Party of Canada	Elected	23805
+				Alberta	Calgary Forest Lawn	Anand, Jag	Man	Medical Doctor	Liberal Party of Canada	Defeated	8690
+				Alberta	Calgary Forest Lawn	Pimlott, Joe	Man	Community Liaison/Resolution Health Support Worker	New Democratic Party	Defeated	4227
+				Alberta	Calgary Forest Lawn	Carnegie, William	Man	Project Manager	Green Party of Canada	Defeated	1318
+				Alberta	Calgary Forest Lawn	Levesque, Dave	Man	Engineering Technologist	People's Party of Canada	Defeated	1089
+				Alberta	Calgary Forest Lawn	Nichols, Brent	Man	Machine Operator	Independent	Defeated	388
+				Alberta	Calgary Forest Lawn	Sutherland, Esther	Woman	Housewife	Christian Heritage Party of Canada	Defeated	222
+				Alberta	Calgary Forest Lawn	Trautman, Jonathan	Man	Warehouse Labourer	Communist Party of Canada	Defeated	134
+				Alberta	Calgary Forest Lawn	Ryder, William James	Man	Cross-border Truck Driver	Veterans Coalition Party of Canada	Defeated	91
+				Alberta	Calgary Heritage	Benzen, Bob	Man	Businessman	Conservative Party of Canada	Elected	40817
+				Alberta	Calgary Heritage	Forsyth, Scott	Man	Physician	Liberal Party of Canada	Defeated	8057
+				Alberta	Calgary Heritage	Heffernan, Holly	Woman	Retired	New Democratic Party	Defeated	5278
+				Alberta	Calgary Heritage	Tulick, Allie	Woman	Chemist	Green Party of Canada	Defeated	2027
+				Alberta	Calgary Heritage	Hoeppner, Stephanie	Woman	Environmental Consultant	People's Party of Canada	Defeated	1123
+				Alberta	Calgary Heritage	Mills, Hunter	Man	Entrepreneur	Independent	Defeated	228
+				Alberta	Calgary Heritage	Heather, Larry R.	Man	Radio Show Producer	Christian Heritage Party of Canada	Defeated	185
