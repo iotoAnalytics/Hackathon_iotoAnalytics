@@ -1071,7 +1071,7 @@ class ElectorsRow:
 
     @province_territory_id.setter
     def province_territory_id(self, value: int) -> None:
-        if not isinstance(id, int):
+        if not isinstance(value, int):
             raise TypeError("province_territory_id must be an int")
         self._province_territory_id = value
 
@@ -1081,7 +1081,7 @@ class ElectorsRow:
 
     @population.setter
     def population(self, value: int) -> None:
-        if not isinstance(id, int):
+        if not isinstance(value, int):
             raise TypeError("population must be an int")
         self._population = value
 
@@ -1091,7 +1091,7 @@ class ElectorsRow:
 
     @electors.setter
     def electors(self, value: int) -> None:
-        if not isinstance(id, int):
+        if not isinstance(value, int):
             raise TypeError("electors must be an int")
         self._electors = value
 
