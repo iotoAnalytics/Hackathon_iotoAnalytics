@@ -20,7 +20,7 @@ class LegislationRow:
     source_id: str
     bill_name: str
     session: str
-    date_introduced: datetime
+    date_introduced: str
     source_url: str
     chamber_origin: str
     committees: List[dict]
@@ -48,7 +48,7 @@ class LegislationRow:
         self._source_id = ''
         self._bill_name = ''
         self._session = ''
-        self._date_introduced = None
+        self._date_introduced = ''
         self._source_url = ''
         self._chamber_origin = ''
         self._committees = []
@@ -1040,6 +1040,246 @@ class CAFedLegislatorRow(CALegislatorRow):
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value
 
+<<<<<<< HEAD
 #########################################################
 #       ELECTION ROWS                                   #
 #########################################################
+=======
+@dataclass
+class ElectionRow:
+    """
+    Data structure for housing election data
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    election_name: str
+    election_date: str
+    official_votes_record_url: str
+    description: str
+    is_by_election: bool
+
+    def __init__(self):
+        self._election_name = ''
+        self._election_date = None
+        self._official_votes_record_url = ''
+        self._description = ''
+        self._is_by_election = None
+
+    @property
+    def election_name(self) -> str:
+        return self._election_name
+    @election_name.setter
+    def election_name(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("election_name must be a str")
+        self._election_name = value
+
+    @property
+    def election_date(self) -> str:
+        return self._election_date
+    @election_date.setter
+    def election_date(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("election_date must be a str")
+        if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+            raise ValueError("Improper date formating in election_date. Required format: YYYY-MM-DD")
+        self._election_date = value
+
+    @property
+    def official_votes_record_url(self) -> str:
+        return self._official_votes_record_url
+    @official_votes_record_url.setter
+    def official_votes_record_url(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("official_votes_record_url must be a str")
+        self._official_votes_record_url = value
+
+    @property
+    def description(self) -> str:
+        return self._description
+    @description.setter
+    def description(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("description must be a str")
+        self._description = value
+
+    @property
+    def is_by_election(self) -> bool:
+        return self._is_by_election
+    @is_by_election.setter
+    def is_by_election(self, value: bool) -> None:
+        if type(value) != bool:
+            raise TypeError("is_by_election must be a bool")
+        self._is_by_election = value
+
+@dataclass
+class ElectoralDistrictsRow:
+    """
+    Data structure for housing data data for electoral districts
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    province_territory_id: int
+    population: int
+    census_year: int
+    prev_district_names: List[str]
+    district_name: str
+    region: str
+    is_active: bool
+    start_date: str
+
+    def __init__(self):
+        self._province_territory_id = None
+        self._population = None
+        self._census_year = None
+        self._prev_district_names = []
+        self._district_name = ''
+        self._region = ''
+        self._is_active = None
+        self._start_date = None
+
+    @property
+    def province_territory_id(self) -> int:
+        return self._province_territory_id
+    @province_territory_id.setter
+    def province_territory_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("province_territory_id must be an int")
+        self._province_territory_id = id
+
+    @property
+    def population(self) -> int:
+        return self._population
+    @population.setter
+    def population(self, id: int) -> None:
+        if (not isinstance(id, int)) and id != None:
+            raise TypeError("population must be an int")
+        self._population = id
+
+    @property
+    def census_year(self) -> int:
+        return self._census_year
+    @census_year.setter
+    def census_year(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("census_year must be an int")
+        self._census_year = id
+
+    @property
+    def prev_district_names(self) -> list:
+        return self._prev_district_names
+    @prev_district_names.setter
+    def prev_district_names(self, value: list) -> None:
+        if not isinstance(value, list):
+            raise TypeError("prev_district_names must be a list of str")
+        if not all(isinstance(element, str) for element in value):
+            raise TypeError("prev_district_names must be a list of strs")
+        self._prev_district_names = value
+
+    @property
+    def district_name(self) -> str:
+        return self._district_name
+    @district_name.setter
+    def district_name(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("district_name must be a str")
+        self._district_name = value
+
+    @property
+    def region(self) -> str:
+        return self._region
+    @region.setter
+    def region(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("region must be a str")
+        self._region = value
+
+    @property
+    def is_active(self) -> str:
+        return self._is_active
+    @is_active.setter
+    def is_active(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise TypeError("is_active must be a bool")
+        self._is_active = value
+
+    @property
+    def start_date(self) -> str:
+        return self._start_date
+    @start_date.setter
+    def start_date(self, value: str) -> None:
+        if not isinstance(value, str) and value != None:
+            raise TypeError("start_date must be a str")
+        if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+            raise ValueError("Improper date formating in start_date. Required format: YYYY-MM-DD")
+        self._start_date = value
+>>>>>>> bc03d4b2f85ea4309e5415c7081cb9b7fd1c3b77
+
+
+@dataclass
+class ElectorsRow:
+    """
+    Data structure for housing data data for electors
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    province_territory_id: int
+    population: int
+    electors: int
+    election_id: int
+
+    def __init__(self):
+        self._province_territory_id = None
+        self._population = None
+        self._electors = None
+        self._election_id = None
+
+    @property
+    def province_territory_id(self) -> int:
+        return self._province_territory_id
+
+    @province_territory_id.setter
+    def province_territory_id(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("province_territory_id must be an int")
+        self._province_territory_id = value
+
+    @property
+    def population(self) -> int:
+        return self._population
+
+    @population.setter
+    def population(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("population must be an int")
+        self._population = value
+
+    @property
+    def electors(self) -> int:
+        return self._electors
+
+    @electors.setter
+    def electors(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("electors must be an int")
+        self._electors = value
+
+    @property
+    def election_id(self) -> int:
+        return self._election_id
+
+    @election_id.setter
+    def election_id(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("election_id must be aan int")
+        self._election_id = value
+
