@@ -972,3 +972,39 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.district_name}:\n{e}')
                     cur.connection.rollback()
+
+    @staticmethod
+    def write_candidate_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_previous_election_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.current_party_id, 
+                       row.current_electoral_district_id, 
+                       row.name_full, 
+                       row.name_last, 
+                       row.name_first,
+                       row.name_middle,
+                       row.name_suffix,
+                       row.gender,
+                       row.candidate_image)
+
+                try:
+                    cur.execute(insert_previous_election_query, tup)
+
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.name_full}:\n{e}')
+                    cur.connection.rollback()
