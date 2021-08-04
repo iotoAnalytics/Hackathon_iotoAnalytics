@@ -141,7 +141,6 @@ class Scraper:
         image_div = self.driver.driver.find_element_by_id('PersonPic')
         img_url = CANDIDATES_BASE_URL + image_div.find_element_by_tag_name('img').get_attribute('src')
         self.driver.driver.close()
-        sleep(2)
         self.driver.tabs -= 1
         self.driver.driver.switch_to_window(self.driver.driver.window_handles[self.driver.tabs - 1])
         sleep(2)
