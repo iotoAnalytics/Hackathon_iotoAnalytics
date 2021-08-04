@@ -82,8 +82,8 @@ class Scraper:
     def _collect_data(self):
         data = DataFrame()
         images = []
-        # while self._get_next_page_button():
-        for i in range(0,3):
+        while self._get_next_page_button():
+        # for i in range(0,3):
             data = data.append(self._get_page_as_df())
             images.extend(self._get_candidate_images())
             self._get_next_page_button().click()
@@ -177,15 +177,19 @@ class Organizer:
         row.current_electoral_district_id = self._get_district_id(data_row)
         self._set_name_data(row, data_row)
         row.gender = self._get_gender(data_row)
-        # row.current_party_id = self._get_party_id(data_row)
+        row.current_party_id = self._get_party_id(data_row)
 
         self.rows.append(row)
 
     def _get_district_id(self, data_row):
         district_name = data_row['Constituency']
         df = scraper_utils.electoral_districts
-        district_id = df.loc[df["district_name"] == district_name]['id'].values[0]
-        return int(district_id)
+        try:
+            district_id = df.loc[df["district_name"] == district_name]['id'].values[0]
+            return int(district_id)
+        except:
+            print(f'District: {district_name}')
+            return None
     
     def _set_name_data(self, row, data_row):
         name = data_row['Candidate']
@@ -208,15 +212,26 @@ class Organizer:
             return 'O'
 
     def _get_party_id(self, data_row):
+        party_name_flags = ['Canada', 'Canadian', 'Canada\'s']
+
         party_name = data_row['Political Affiliation']
-        party_name = party_name.split(' Party')[0]
+        if party_name == 'Canada Party':
+            pass
+        elif party_name.split(' ')[0] in party_name_flags:
+            remove = party_name.split(' ')[0]
+            party_name = party_name.split(remove)[1].split(' Party')[0].strip()
+        else:
+            party_name = party_name.split(' Party')[0]
+
+        party_name = party_name.split(' (')[0]
         
         df = scraper_utils.parties
         try:
             party_id = df.loc[df["party"] == party_name]['id'].values[0]
         except:
-            party_id = -10
-            print(party_name)
+            party_id = df.loc[df["party"] == 'Other']['id'].values[0]
+            if party_name != 'Unknown':
+                print(f'Party: {party_name}')
         return int(party_id)
 
 if __name__ == '__main__':
