@@ -31,10 +31,12 @@ options.headless = True
 
 def program_driver():
     print("Collecting data...")
-    candidate_table_df = Scraper().get_data()
+    scraper = Scraper()
+    candidate_table_df = scraper.get_data()
+    images_data = scraper.get_images()
 
     data_organizer = Organizer()
-    data_organizer.set_rows(candidate_table_df)
+    data_organizer.set_rows(candidate_table_df, images_data)
     rows = data_organizer.get_rows()
     scraper_utils.write_data(rows)
     
@@ -46,7 +48,7 @@ class Scraper:
         self.driver.start_driver(CANDIDATES_URL, crawl_delay)
 
         try:
-            self.data = self._get_candidate_df()
+            self.data, self.images = self._get_candidate_data()
         except Exception as e:
             print(e.with_traceback(e.__traceback__))
 
@@ -55,7 +57,10 @@ class Scraper:
     def get_data(self):
         return self.data
 
-    def _get_candidate_df(self):
+    def get_images(self):
+        return self.images
+
+    def _get_candidate_data(self):
         self._prepare_page_for_collection()
         return self._collect_data()
     
@@ -76,12 +81,14 @@ class Scraper:
 
     def _collect_data(self):
         data = DataFrame()
+        images = []
         # while self._get_next_page_button():
         for i in range(0,3):
+            data = data.append(self._get_page_as_df())
+            images.extend(self._get_candidate_images())
             self._get_next_page_button().click()
             sleep(5)
-            data = data.append(self._get_page_as_df())
-        return data
+        return data, images
 
     def _get_next_page_button(self):
         next_page_button = self.driver.driver.find_elements_by_class_name('dx-navigate-button')[-1]
@@ -95,6 +102,30 @@ class Scraper:
         df = pd.read_html(str(html_table_data), index_col=[0, 1, 2, 3])[0]
         df.columns = ['Province or Territory', 'Constituency', 'Candidate', 'Gender', 'Occupation', 'Political Affiliation', 'Result', 'Votes']
         return df
+
+    def _get_candidate_images(self):
+        page_html = self.driver.get_html_source()
+        html_soup = soup(page_html, 'html.parser')
+        trs_with_images = html_soup.find_all(self._find_rows_with_image)
+        images_names = []
+        for tr in trs_with_images:
+            img_url = tr.find('img').get('src')
+            name = tr.find_all('td')[6].text
+            images_names.append(
+                {
+                    'name': name,
+                    'url': CANDIDATES_BASE_URL + img_url
+                }
+            )
+        
+        trs_without_images = html_soup.find_all(self._find_rows_without_images)
+        return images_names
+    
+    def _find_rows_with_image(self, tag: soup):
+        return tag.name == 'tr' and tag.find('img')
+
+    def _find_rows_without_images(self, tag: soup):
+        return tag.name == 'tr' and not tag.find('img')
 
 class SeleniumDriver:
     def __init__(self):
@@ -128,25 +159,25 @@ class Organizer:
     def __init__(self):
         self.rows = []
 
-    def set_rows(self, df: DataFrame):
+    def set_rows(self, df: DataFrame, images_data):
         for index, row in df.iterrows():
             value = row['Province or Territory']
             date_of_election = None
             if not ((pd.isna(value)) or 'Continued from'in value or 'Continues on' in value or 'Date of Election' in value or 
                         'Type of Election' in value):
-                self._add_row_data(row, date_of_election)
+                self._add_row_data(row, images_data, date_of_election)
             elif pd.notna(value) and 'Date of Election' in value:
                 date_of_election = re.search(r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', value).group()
 
     def get_rows(self):
         return self.rows
 
-    def _add_row_data(self, data_row, election_date):
+    def _add_row_data(self, data_row, images_data, election_date):
         row = scraper_utils.initialize_row()
         row.current_electoral_district_id = self._get_district_id(data_row)
         self._set_name_data(row, data_row)
         row.gender = self._get_gender(data_row)
-        row.current_party_id = self._get_party_id(data_row)
+        # row.current_party_id = self._get_party_id(data_row)
 
         self.rows.append(row)
 
