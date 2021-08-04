@@ -135,7 +135,7 @@ class Scraper:
     
     def _get_img_url_from_candidate_profile(self, url):
         self.driver.driver.execute_script(f'''window.open("{url}", "_blank");''')
-        sleep(5)
+        sleep(2)
         self.driver.tabs += 1
         self.driver.driver.switch_to_window(self.driver.driver.window_handles[self.driver.tabs - 1])
         image_div = self.driver.driver.find_element_by_id('PersonPic')
@@ -144,7 +144,7 @@ class Scraper:
         sleep(2)
         self.driver.tabs -= 1
         self.driver.driver.switch_to_window(self.driver.driver.window_handles[self.driver.tabs - 1])
-        sleep(5)
+        sleep(2)
         return img_url
 
 class SeleniumDriver:
