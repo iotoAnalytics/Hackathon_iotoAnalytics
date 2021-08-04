@@ -27,18 +27,19 @@ scraper_utils = CandidatesScraperUtils(COUNTRY)
 crawl_delay = scraper_utils.get_crawl_delay(CANDIDATES_BASE_URL)
 
 options = Options()
-options.headless = True
+# options.headless = True
 
 def program_driver():
     print("Collecting data...")
     scraper = Scraper()
     candidate_table_df = scraper.get_data()
     images_data = scraper.get_images()
+    print(images_data)
 
     data_organizer = Organizer()
     data_organizer.set_rows(candidate_table_df, images_data)
     rows = data_organizer.get_rows()
-    scraper_utils.write_data(rows)
+    # scraper_utils.write_data(rows)
     
     print("complete")
 
@@ -50,7 +51,7 @@ class Scraper:
         try:
             self.data, self.images = self._get_candidate_data()
         except Exception as e:
-            print(e.with_traceback(e.__traceback__))
+            print(e.with_traceback())
 
         self.driver.close_driver()
         
@@ -82,8 +83,8 @@ class Scraper:
     def _collect_data(self):
         data = DataFrame()
         images = []
-        while self._get_next_page_button():
-        # for i in range(0,3):
+        # while self._get_next_page_button():
+        for i in range(0,2):
             data = data.append(self._get_page_as_df())
             images.extend(self._get_candidate_images())
             self._get_next_page_button().click()
@@ -106,26 +107,45 @@ class Scraper:
     def _get_candidate_images(self):
         page_html = self.driver.get_html_source()
         html_soup = soup(page_html, 'html.parser')
-        trs_with_images = html_soup.find_all(self._find_rows_with_image)
+        trs_with_images = html_soup.find_all('tr', {'class':'dx-row dx-data-row dx-column-lines'})
         images_names = []
         for tr in trs_with_images:
-            img_url = tr.find('img').get('src')
             name = tr.find_all('td')[6].text
+
+            img_url = tr.find('img')
+            if img_url is not None:
+                img_url = img_url.get('src')
+                img_url = CANDIDATES_BASE_URL + img_url
+
+            candidate_url = tr.find_all('td')[6].a
+            if candidate_url is not None:
+                candidate_url = candidate_url['href']
+                candidate_url = CANDIDATES_BASE_URL + candidate_url
+                img_url = self._get_img_url_from_candidate_profile(candidate_url)
+
             images_names.append(
                 {
                     'name': name,
-                    'url': CANDIDATES_BASE_URL + img_url
+                    'image_url': img_url,
+                    'profile_url': candidate_url
                 }
             )
-        
-        trs_without_images = html_soup.find_all(self._find_rows_without_images)
+
         return images_names
     
-    def _find_rows_with_image(self, tag: soup):
-        return tag.name == 'tr' and tag.find('img')
-
-    def _find_rows_without_images(self, tag: soup):
-        return tag.name == 'tr' and not tag.find('img')
+    def _get_img_url_from_candidate_profile(self, url):
+        self.driver.driver.execute_script(f'''window.open("{url}", "_blank");''')
+        sleep(5)
+        self.driver.tabs += 1
+        self.driver.driver.switch_to_window(self.driver.driver.window_handles[self.driver.tabs - 1])
+        image_div = self.driver.driver.find_element_by_id('PersonPic')
+        img_url = CANDIDATES_BASE_URL + image_div.find_element_by_tag_name('img').get_attribute('src')
+        self.driver.driver.close()
+        sleep(2)
+        self.driver.tabs -= 1
+        self.driver.driver.switch_to_window(self.driver.driver.window_handles[self.driver.tabs - 1])
+        sleep(5)
+        return img_url
 
 class SeleniumDriver:
     def __init__(self):
@@ -135,9 +155,11 @@ class SeleniumDriver:
 
     def start_driver(self, url, crawl_delay):
         try:
+            self.tabs +=1
             self.driver.get(url)
             self.driver.maximize_window()
         except:
+            self.tabs -=1
             self.close_driver()
             raise RuntimeError("could not start webdriver")
         scraper_utils.crawl_delay(crawl_delay)
@@ -145,6 +167,7 @@ class SeleniumDriver:
 
     def close_driver(self):
         self.driver.close()
+        self.tabs -=1
         self.driver.quit()
 
     def get_html_source(self):
@@ -164,7 +187,7 @@ class Organizer:
             value = row['Province or Territory']
             date_of_election = None
             if not ((pd.isna(value)) or 'Continued from'in value or 'Continues on' in value or 'Date of Election' in value or 
-                        'Type of Election' in value):
+                        'Type of Election' in value or 'Parliament' in value):
                 self._add_row_data(row, images_data, date_of_election)
             elif pd.notna(value) and 'Date of Election' in value:
                 date_of_election = re.search(r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', value).group()
@@ -184,12 +207,8 @@ class Organizer:
     def _get_district_id(self, data_row):
         district_name = data_row['Constituency']
         df = scraper_utils.electoral_districts
-        try:
-            district_id = df.loc[df["district_name"] == district_name]['id'].values[0]
-            return int(district_id)
-        except:
-            print(f'District: {district_name}')
-            return None
+        district_id = df.loc[df["district_name"] == district_name]['id'].values[0]
+        return int(district_id)
     
     def _set_name_data(self, row, data_row):
         name = data_row['Candidate']
@@ -215,23 +234,22 @@ class Organizer:
         party_name_flags = ['Canada', 'Canadian', 'Canada\'s']
 
         party_name = data_row['Political Affiliation']
-        if party_name == 'Canada Party':
+        party_name = party_name.split(' (')[0]
+        if party_name == 'Canada Party' or party_name == 'Canadian Party':
             pass
         elif party_name.split(' ')[0] in party_name_flags:
             remove = party_name.split(' ')[0]
             party_name = party_name.split(remove)[1].split(' Party')[0].strip()
         else:
             party_name = party_name.split(' Party')[0]
-
-        party_name = party_name.split(' (')[0]
         
         df = scraper_utils.parties
         try:
             party_id = df.loc[df["party"] == party_name]['id'].values[0]
         except:
             party_id = df.loc[df["party"] == 'Other']['id'].values[0]
-            if party_name != 'Unknown':
-                print(f'Party: {party_name}')
+            if party_name != 'Unknown' and 'No affiliation' not in party_name:
+                print(f"Party: {data_row['Political Affiliation']}")
         return int(party_id)
 
 if __name__ == '__main__':
