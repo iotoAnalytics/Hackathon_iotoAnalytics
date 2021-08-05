@@ -980,26 +980,50 @@ class Persistence:
                 'Data being written to database must be a list of Rows or dictionaries!')
 
         with CursorFromConnectionFromPool() as cur:
-            insert_previous_election_query = sql.SQL("""
-                INSERT INTO {table}
-                VALUES (
-                    DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """).format(table=sql.Identifier(table))
+            '''
+                TODO: Need to change the insert for goverlytics_id so that if it's -10, i need to add the next val in 
+                goverlytics_id sequence
+            '''
 
             for row in data:
 
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
+                
+                if row.goverlytics_id == -10:
+                    insert_previous_election_query = sql.SQL("""
+                        INSERT INTO {table}
+                        VALUES (
+                            DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        """).format(table=sql.Identifier(table))
 
-                tup = (row.current_party_id, 
-                       row.current_electoral_district_id, 
-                       row.name_full, 
-                       row.name_last, 
-                       row.name_first,
-                       row.name_middle,
-                       row.name_suffix,
-                       row.gender,
-                       row.candidate_image)
+                    tup = (row.current_party_id, 
+                        row.current_electoral_district_id, 
+                        row.name_full, 
+                        row.name_last, 
+                        row.name_first,
+                        row.name_middle,
+                        row.name_suffix,
+                        row.gender,
+                        row.candidate_image)
+
+                else:
+                    insert_previous_election_query = sql.SQL("""
+                        INSERT INTO {table}
+                        VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        """).format(table=sql.Identifier(table))
+
+                    tup = (row.goverlytics_id,
+                        row.current_party_id, 
+                        row.current_electoral_district_id, 
+                        row.name_full, 
+                        row.name_last, 
+                        row.name_first,
+                        row.name_middle,
+                        row.name_suffix,
+                        row.gender,
+                        row.candidate_image)
 
                 try:
                     cur.execute(insert_previous_election_query, tup)
