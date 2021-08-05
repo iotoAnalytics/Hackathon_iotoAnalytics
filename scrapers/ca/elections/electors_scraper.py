@@ -84,7 +84,6 @@ def get_urls():
 
 
 def get_table_data(url):
-    print(url)
     data = None
     browser.get(url)
     if browser.find_elements_by_tag_name('frame'):
@@ -125,11 +124,6 @@ def get_table_data(url):
     except Exception as e:
         print(e)
 
-    try:
-        print(data)
-    except Exception as e:
-        print(e)
-
     if data is not None:
         row_list = []
         for i in data:
@@ -151,14 +145,9 @@ def get_table_data(url):
 
             if election_id != 0:
                 if province_id != 0:
-                    # print(province_id)
-                    # print(election_id)
-                    # print(i['electors'])
-                    # print(i['population'])
                     row_info = {'province_territory_id': province_id, 'election_id': election_id, 'electors': i['electors'], 'population': i['population']}
 
                     row_list.append(row_info)
-        # print(row_list)
         if row_list is None:
             row_list = []
         return row_list
@@ -174,7 +163,6 @@ def get_election_id(data):
             date = dparser.parse(election, fuzzy=True)
             date_name = date.strftime("%Y_%m_%d")
             election_name = date_name + '_by_election_' + province
-            print(election_name)
         except Exception as e:
             print(e)
         if pd.notna(province):
@@ -411,35 +399,6 @@ def get_province_data(election):
     return provincial_data_list
 
 
-def clear_none_value_rows(data):
-    df = pd.DataFrame(data)
-    list_of_dicts = df.to_dict('records')
-
-    for i in range(len(list_of_dicts)):
-        value = list_of_dicts[i]['election_id']
-        if value == 0:
-            print(i)
-            print(value)
-            index = i
-    try:
-        del list_of_dicts[index]
-    except Exception:
-        pass
-
-    for i in range(len(list_of_dicts)):
-        value = list_of_dicts[i]['province_territory_id']
-        if value == 0:
-            print(i)
-            print(value)
-            index = i
-    try:
-        del list_of_dicts[index]
-    except Exception:
-        pass
-
-    return list_of_dicts
-
-
 def get_row_data(data):
     row = scraper_utils.initialize_row()
     row.province_territory_id = int(data['province_territory_id'])
@@ -456,21 +415,19 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     urls = get_urls()
     data = []
     data_list = []
-    data.extend(get_table_data(url) for url in urls[:5])
-    print(data)
-    #get_table_data('https://www.elections.ca/content.aspx?section=res&dir=rep/off/dec3097&document=res_table01&lang=e')
-    #data.remove(None)
-    #data.remove([])
+    data.extend(get_table_data(url) for url in urls)
 
-    flat_ls = [item for sublist in data for item in sublist]
+    lambda_obj = lambda x: (x is not None)
+
+    list_out = list(filter(lambda_obj, data))
+
+    flat_ls = [item for sublist in list_out for item in sublist]
     #print(data)
     # with Pool(processes=4) as pool:
     #     data = pool.map(scrape, urls)
     #print(data_list)
     row_data = [get_row_data(d) for d in flat_ls]
-    print(row_data)
-
-    scraper_utils.write_data(data)
+    scraper_utils.write_data(row_data)
 
     print('Complete!')
 
