@@ -1006,3 +1006,39 @@ class Persistence:
                     cur.connection.rollback()
 
 
+    @staticmethod
+    def write_election_votes(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_electors_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (
+                        DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                    """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.province_territory_id,
+                       row.election_id,
+                       row.ordinary_stationary,
+                       row.ordinary_mobile,
+                       row.advanced_polling,
+                       row.special_voting_rules,
+                       row.invalid_votes,
+                       row.voter_turnout,
+                       row.total)
+
+                try:
+                    cur.execute(insert_electors_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.election_id}:\n{e}')
+                    cur.connection.rollback()
+

@@ -1221,7 +1221,6 @@ class ElectoralDistrictsRow:
         self._start_date = value
 
 
-
 @dataclass
 class ElectorsRow:
     """
@@ -1283,3 +1282,128 @@ class ElectorsRow:
             raise TypeError("election_id must be aan int")
         self._election_id = value
 
+
+@dataclass
+class ElectionVotesRow:
+    """
+    Data structure for housing data data for election votes
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    province_territory_id: int
+    election_id: int
+    ordinary_stationary: int
+    ordinary_mobile: int
+    advanced_polling: int
+    special_voting_rules: int
+    invalid_votes: int
+    voter_turnout: int
+    total: int
+
+
+    def __init__(self):
+        self._province_territory_id = None
+        self._election_id = None
+        self._ordinary_stationary = None
+        self._ordinary_mobile = None
+        self._advanced_polling = None
+        self._special_voting_rules = None
+        self._invalid_votes = None
+        self._voter_turnout = None
+        self._total = None
+
+    @property
+    def province_territory_id(self) -> int:
+        return self._province_territory_id
+
+    @province_territory_id.setter
+    def province_territory_id(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("province_territory_id must be an int")
+        self._province_territory_id = value
+
+    @property
+    def election_id(self) -> int:
+        return self._election_id
+
+    @election_id.setter
+    def election_id(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("election_id must be an int")
+        self._election_id = value
+
+    @property
+    def ordinary_stationary(self) -> int:
+        return self._ordinary_stationary
+
+    @ordinary_stationary.setter
+    def ordinary_stationary(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("ordinary_stationary must be an int")
+        self._ordinary_stationary = value
+
+    @property
+    def ordinary_mobile(self) -> int:
+        return self._ordinary_mobile
+
+    @ordinary_mobile.setter
+    def ordinary_mobile(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("ordinary_mobile must be an int")
+        self._ordinary_mobile = value
+
+    @property
+    def advanced_polling(self) -> int:
+        return self._advanced_polling
+
+    @advanced_polling.setter
+    def advanced_polling(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("advanced_polling must be an int")
+        self._advanced_polling = value
+
+    @property
+    def special_voting_rules(self) -> int:
+        return self._special_voting_rules
+
+    @special_voting_rules.setter
+    def special_voting_rules(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("special_voting_rules must be an int")
+        self._special_voting_rules = value
+
+
+    @property
+    def invalid_votes(self) -> int:
+        return self._invalid_votes
+
+    @invalid_votes.setter
+    def invalid_votes(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("invalid_votes must be an int")
+        self._invalid_votes = value
+
+
+    @property
+    def voter_turnout(self) -> int:
+        return self._voter_turnout
+
+    @voter_turnout.setter
+    def voter_turnout(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("voter_turnout must be an int")
+        self._voter_turnout = value
+
+
+    @property
+    def total(self) -> int:
+        return self._total
+
+    @total.setter
+    def total(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("total must be an int")
+        self._total = value
