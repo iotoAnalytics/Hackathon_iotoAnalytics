@@ -1040,11 +1040,11 @@ class CAFedLegislatorRow(CALegislatorRow):
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value
 
-<<<<<<< HEAD
+
 #########################################################
 #       ELECTION ROWS                                   #
 #########################################################
-=======
+
 @dataclass
 class ElectionRow:
     """
@@ -1219,7 +1219,7 @@ class ElectoralDistrictsRow:
         if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
             raise ValueError("Improper date formating in start_date. Required format: YYYY-MM-DD")
         self._start_date = value
->>>>>>> bc03d4b2f85ea4309e5415c7081cb9b7fd1c3b77
+
 
 
 @dataclass

@@ -1174,9 +1174,8 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
-<<<<<<< HEAD
 # region Election Scraper Utils
-=======
+
 # region Election Data
 
 ##########################################
@@ -1204,8 +1203,6 @@ class ElectoralDistrictScraperUtils(ScraperUtils):
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_electoral_districts_data(data, table)
-
->>>>>>> bc03d4b2f85ea4309e5415c7081cb9b7fd1c3b77
 
 class ElectorsScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
