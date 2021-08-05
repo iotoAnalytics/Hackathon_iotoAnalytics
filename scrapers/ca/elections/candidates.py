@@ -27,7 +27,7 @@ scraper_utils = CandidatesScraperUtils(COUNTRY)
 crawl_delay = scraper_utils.get_crawl_delay(CANDIDATES_BASE_URL)
 
 options = Options()
-# options.headless = True
+options.headless = True
 
 def program_driver():
     print("Collecting data...")
@@ -37,7 +37,7 @@ def program_driver():
     data_organizer = Organizer()
     data_organizer.set_rows(candidate_table_df)
     rows = data_organizer.get_rows()
-    # scraper_utils.write_data(rows)
+    scraper_utils.write_data(rows)
     
     print("complete")
 
@@ -186,6 +186,7 @@ class Organizer:
         self._set_name_data(row, data_row)
         row.gender = self._get_gender(data_row)
         row.current_party_id = self._get_party_id(data_row)
+        row.candidate_image = self._get_image_url(data_row)
 
         self.rows.append(row)
 
@@ -236,6 +237,12 @@ class Organizer:
             if party_name != 'Unknown' and 'No affiliation' not in party_name:
                 print(f"Party: {data_row['Political Affiliation']}")
         return int(party_id)
+
+    def _get_image_url(self, data_row):
+        image_url = data_row['Image URL']
+        if pd.isna(image_url) or image_url is None:
+            return ''
+        return image_url
 
 if __name__ == '__main__':
     program_driver()
