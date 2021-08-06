@@ -166,6 +166,8 @@ class SeleniumDriver:
 class Organizer:
     def __init__(self):
         self.rows = []
+        self.new_entries = []
+        self.new_entries_df = {}
 
     def set_rows(self, df: DataFrame):
         for index, row in df.iterrows():
@@ -253,19 +255,25 @@ class Organizer:
 
         name_last = row.name_last
         name_first = row.name_first
+        name_full = name_first + name_last
         ed_id = row.current_electoral_district_id
         party_id = row.current_party_id
 
         name_match_df = legislators_df.loc[(legislators_df["name_last"] == name_last) & (legislators_df["name_first"] == name_first)]
         '''
         TODO: Test Driven Development
-        TODO: What if the name_match_df length is greater than 1?
         TODO: Need to add new candidates to a dataframe and check if it exists there too... then do the SAME thing below.
+        TODO: Need to add just one instance of the candidate (most recent one)
         '''
         
-        if name_match_df.empty:
+        if name_match_df.empty and name_full not in self.new_entries:
+            '''
+            add name to new_entries
+            set default of a [] to self.new_entries_dfs and append to the list what we need
+            '''
             return -10 # This is the flag to note that there is 
         
+        occurences = len(name_match_df) + self.new_entries.count(name_full)
         if len(name_match_df) > 1:
             print("More than one instance of the candidate with the same name was found in the database")
             print(name_match_df)
