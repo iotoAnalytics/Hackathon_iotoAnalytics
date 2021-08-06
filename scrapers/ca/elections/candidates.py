@@ -187,7 +187,7 @@ class Organizer:
         row.gender = self._get_gender(data_row)
         row.current_party_id = self._get_party_id(data_row)
         row.candidate_image = self._get_image_url(data_row)
-        row.goverlytics_id = self._get_goverlytics_id(row)
+        row.goverlytics_id = self.get_goverlytics_id(row)
 
         self.rows.append(row)
 
@@ -245,8 +245,10 @@ class Organizer:
             return ''
         return image_url
 
-    def _get_goverlytics_id(self, row):
+    def get_goverlytics_id(self, row):
         legislators_df = scraper_utils.legislators
+        df_add_row = {'goverlytics_id':99999, 'name_full':'Blake Richards', 'name_last':'Richards', 'name_first':'Blake', 'name_middle':'', 'name_suffix':'', 'riding':'Banff-Airdrie', 'party_id':2}
+        legislators_df = legislators_df.append(df_add_row, ignore_index=True) #Test, remove later.
         ed_df = scraper_utils.electoral_districts
 
         name_last = row.name_last
@@ -255,36 +257,56 @@ class Organizer:
         party_id = row.current_party_id
 
         name_match_df = legislators_df.loc[(legislators_df["name_last"] == name_last) & (legislators_df["name_first"] == name_first)]
-        
         '''
         TODO: Test Driven Development
-        TODO: What is the name_match_df length is greater than 1?
+        TODO: What if the name_match_df length is greater than 1?
         TODO: Need to add new candidates to a dataframe and check if it exists there too... then do the SAME thing below.
         '''
         
         if name_match_df.empty:
             return -10 # This is the flag to note that there is 
+        
+        if len(name_match_df) > 1:
+            print("More than one instance of the candidate with the same name was found in the database")
+            print(name_match_df)
+            goverlytic_ids = name_match_df['goverlytics_id'].values
+            while True:
+                user_input_id = input("Enter the goverlytic_id of correct candidate. If none, please enter 'None': ")
+                if int(user_input_id) not in goverlytic_ids and user_input_id != "None":
+                    print("Make sure your input matches one of the goveryltic_ids or is None.")
+                else:
+                    while True:
+                        user_input = input(f"You entered: {user_input_id}. Is this correct? (y/n): ")
+                        if user_input == 'y' and user_input_id != "None":
+                            return int(user_input_id)
+                        elif user_input == 'y' and user_input_id == "None":
+                            return -10
+                        elif user_input == 'n':
+                            print("Try again.")
+                            break
+                        else:
+                            print("Please enter y or n")
+
         name_match_df_party_id = name_match_df['party_id'].values[0]
-        print(int(name_match_df_party_id), int(party_id))
         if int(name_match_df_party_id) != int(party_id):
             print("Candidate may already exist in the database, but the party does not match.")
             print(f"Please check if candidate [{row.name_full}] is the same based on the information below:")
             print(f"======================\n" +
                   f"==LEGISLATOR DB INFO==\n" +
                   f"======================\n" +
-                  f"Party: {scraper_utils.parties[name_match_df['party_id']]}\n" +
-                  f"Riding: {name_match_df['riding']}\n\n")
+                  f"Party: {scraper_utils.parties.loc[scraper_utils.parties['id'] == name_match_df_party_id]['party'].values[0]}\n" +
+                  f"Riding: {name_match_df['riding'].values[0]}\n\n")
             print(f"======================\n" +
                   f"====CANDIDATE INFO====\n" +
                   f"======================\n" +
-                  f"Party: {scraper_utils.parties[party_id]}\n" +
-                  f"Riding: {ed_df['ed_id']}\n\n")
+                  f"Party: {scraper_utils.parties.loc[scraper_utils.parties['id'] == party_id]['party'].values[0]}\n" +
+                  f"Riding: {ed_df.loc[ed_df['id'] == ed_id]['district_name'].values[0]}\n\n")
             
             while True:
                 user_input = input("Are these the same individual? y\\n:")
                 if user_input == 'y':
-                    return name_match_df['goverlytics_id']
-                elif user_input == 'y':
+                    return name_match_df['goverlytics_id'].values[0]
+                elif user_input == 'n':
                     return -10
                 else:
                     print("Please enter y or n")
@@ -292,26 +314,25 @@ class Organizer:
         riding = name_match_df['riding'].values[0]
         riding = riding.replace('—', '--')
         ed = ed_df.loc[ed_df['id'] == ed_id]['district_name'].values[0]
-        print(ed, riding)
         if ed != riding:
             print("Candidate may already exist in the database, but the riding does not match.")
             print(f"Please check if candidate [{row.name_full}] is the same based on the information below:")
             print(f"======================\n" +
                   f"==LEGISLATOR DB INFO==\n" +
                   f"======================\n" +
-                  f"Party: {scraper_utils.parties[name_match_df['party_id']]}\n" +
-                  f"Riding: {name_match_df['riding']}\n\n")
+                  f"Party: {scraper_utils.parties[scraper_utils.parties['id'] == name_match_df_party_id]['party'].values[0]}\n" +
+                  f"Riding: {name_match_df['riding'].values[0]}\n\n")
             print(f"======================\n" +
                   f"====CANDIDATE INFO====\n" +
                   f"======================\n" +
-                  f"Party: {scraper_utils.parties[party_id]}\n" +
-                  f"Riding: {ed_df['ed_id']}\n\n")
+                  f"Party: {scraper_utils.parties[scraper_utils.parties['id'] == party_id]['party'].values[0]}\n" +
+                  f"Riding: {ed}\n\n")
 
             while True:
                 user_input = input("Are these the same individual? y\\n:")
                 if user_input == 'y':
-                    return name_match_df['goverlytics_id']
-                elif user_input == 'y':
+                    return name_match_df['goverlytics_id'].values[0]
+                elif user_input == 'n':
                     return -10
                 else:
                     print("Please enter y or n")
