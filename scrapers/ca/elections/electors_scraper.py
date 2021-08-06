@@ -1,8 +1,6 @@
-import itertools
 import sys
 import os
 from pathlib import Path
-import requests
 import time
 from selenium import webdriver
 import scraper_utils
@@ -11,10 +9,6 @@ from database import CursorFromConnectionFromPool
 from bs4 import BeautifulSoup
 import pandas as pd
 import dateutil.parser as dparser
-import pdfplumber
-import requests
-import io
-import re
 
 NODES_TO_ROOT = 4
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
