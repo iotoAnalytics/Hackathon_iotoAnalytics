@@ -167,7 +167,7 @@ class Organizer:
     def __init__(self):
         self.rows = []
         self.new_entries = []
-        self.new_entries_df = {}
+        self.checked_list = {}
 
     def set_rows(self, df: DataFrame):
         for index, row in df.iterrows():
@@ -189,9 +189,9 @@ class Organizer:
         row.gender = self._get_gender(data_row)
         row.current_party_id = self._get_party_id(data_row)
         row.candidate_image = self._get_image_url(data_row)
-        row.goverlytics_id = self.get_goverlytics_id(row)
-
-        self.rows.append(row)
+        row.goverlytics_id = self.get_goverlytics_id(row, election_date)
+        if row.goverlytics_id:
+            self.rows.append(row)
 
     def _get_district_id(self, data_row):
         district_name = data_row['Constituency']
@@ -247,10 +247,10 @@ class Organizer:
             return ''
         return image_url
 
-    def get_goverlytics_id(self, row):
+    def get_goverlytics_id(self, row, election_date):
         legislators_df = scraper_utils.legislators
-        df_add_row = {'goverlytics_id':99999, 'name_full':'Blake Richards', 'name_last':'Richards', 'name_first':'Blake', 'name_middle':'', 'name_suffix':'', 'riding':'Banff-Airdrie', 'party_id':2}
-        legislators_df = legislators_df.append(df_add_row, ignore_index=True) #Test, remove later.
+        # df_add_row = {'goverlytics_id':99999, 'name_full':'Blake Richards', 'name_last':'Richards', 'name_first':'Blake', 'name_middle':'', 'name_suffix':'', 'riding':'Banff-Airdrie', 'party_id':2}
+        # legislators_df = legislators_df.append(df_add_row, ignore_index=True) #Test, remove later.
         ed_df = scraper_utils.electoral_districts
 
         name_last = row.name_last
@@ -258,44 +258,64 @@ class Organizer:
         name_full = name_first + name_last
         ed_id = row.current_electoral_district_id
         party_id = row.current_party_id
-
-        name_match_df = legislators_df.loc[(legislators_df["name_last"] == name_last) & (legislators_df["name_first"] == name_first)]
         '''
         TODO: Test Driven Development
         TODO: Need to add new candidates to a dataframe and check if it exists there too... then do the SAME thing below.
         TODO: Need to add just one instance of the candidate (most recent one)
         '''
         
-        if name_match_df.empty and name_full not in self.new_entries:
-            '''
-            add name to new_entries
-            set default of a [] to self.new_entries_dfs and append to the list what we need
-            '''
-            return -10 # This is the flag to note that there is 
-        
-        occurences = len(name_match_df) + self.new_entries.count(name_full)
+        if name_full in self.checked_list:
+            print("This candidate seems to have been added already.")
+            print(f"======================\n" +
+                  f"====CANDIDATE INFO====\n" +
+                  f"======================\n" +
+                  f"Party: {scraper_utils.parties.loc[scraper_utils.parties['id'] == party_id]['party'].values[0]}\n" +
+                  f"Riding: {ed_df.loc[ed_df['id'] == ed_id]['district_name'].values[0]}\n\n")
+            print(f"======================\n" +
+                  f"=====CHECKED_LIST=====\n" +
+                  f"======================\n")
+            potential_candidate = self.checked_list.get(name_full)
+            for potential in potential_candidate:
+                print(potential)
+            get_user_input = True
+            while get_user_input:
+                user_input = input("Is the candidate listed above? y/n: ")                
+                if user_input == 'y':
+                    return None
+                elif user_input == 'n':
+                    get_user_input = False
+                else:
+                    print("Please enter y or n")
+
+        name_match_df = legislators_df.loc[(legislators_df["name_last"] == name_last) & (legislators_df["name_first"] == name_first)]
+        name_match_df_party_id = name_match_df['party_id'].values[0]
+        name_match_df_riding = name_match_df['riding'].values[0]
+        name_match_df_riding = name_match_df_riding.replace('—', '--')
+
+        if name_match_df.empty:
+            return self._add_candidate_to_checked_list(name_full, None, party_id, ed_id, election_date)
+
         if len(name_match_df) > 1:
             print("More than one instance of the candidate with the same name was found in the database")
             print(name_match_df)
             goverlytic_ids = name_match_df['goverlytics_id'].values
             while True:
                 user_input_id = input("Enter the goverlytic_id of correct candidate. If none, please enter 'None': ")
-                if int(user_input_id) not in goverlytic_ids and user_input_id != "None":
-                    print("Make sure your input matches one of the goveryltic_ids or is None.")
-                else:
+                if user_input_id == "None" or (user_input_id.isnumeric() and int(user_input_id) in goverlytic_ids):
                     while True:
                         user_input = input(f"You entered: {user_input_id}. Is this correct? (y/n): ")
                         if user_input == 'y' and user_input_id != "None":
-                            return int(user_input_id)
+                            return self._add_candidate_to_checked_list(name_full, user_input_id, name_match_df_party_id, name_match_df_riding, election_date)
                         elif user_input == 'y' and user_input_id == "None":
-                            return -10
+                            return self._add_candidate_to_checked_list(name_full, None, party_id, ed_id, election_date)
                         elif user_input == 'n':
                             print("Try again.")
                             break
                         else:
                             print("Please enter y or n")
+                else:
+                    print("Make sure your input matches one of the goveryltic_ids or is None.")
 
-        name_match_df_party_id = name_match_df['party_id'].values[0]
         if int(name_match_df_party_id) != int(party_id):
             print("Candidate may already exist in the database, but the party does not match.")
             print(f"Please check if candidate [{row.name_full}] is the same based on the information below:")
@@ -313,16 +333,15 @@ class Organizer:
             while True:
                 user_input = input("Are these the same individual? y\\n:")
                 if user_input == 'y':
-                    return name_match_df['goverlytics_id'].values[0]
+                    gov_id =  name_match_df['goverlytics_id'].values[0]
+                    return self._add_candidate_to_checked_list(name_full, gov_id, name_match_df_party_id, name_match_df_riding, election_date)
                 elif user_input == 'n':
-                    return -10
+                    return self._add_candidate_to_checked_list(name_full, None, party_id, ed_id, election_date)
                 else:
                     print("Please enter y or n")
 
-        riding = name_match_df['riding'].values[0]
-        riding = riding.replace('—', '--')
         ed = ed_df.loc[ed_df['id'] == ed_id]['district_name'].values[0]
-        if ed != riding:
+        if ed != name_match_df_riding:
             print("Candidate may already exist in the database, but the riding does not match.")
             print(f"Please check if candidate [{row.name_full}] is the same based on the information below:")
             print(f"======================\n" +
@@ -337,16 +356,31 @@ class Organizer:
                   f"Riding: {ed}\n\n")
 
             while True:
-                user_input = input("Are these the same individual? y\\n:")
+                user_input = input("Are these the same individual? y/n:")
                 if user_input == 'y':
-                    return name_match_df['goverlytics_id'].values[0]
+                    gov_id =  name_match_df['goverlytics_id'].values[0]
+                    return self._add_candidate_to_checked_list(name_full, gov_id, name_match_df_party_id, name_match_df_riding, election_date)
                 elif user_input == 'n':
-                    return -10
+                    return self._add_candidate_to_checked_list(name_full, None, party_id, ed_id, election_date)
                 else:
                     print("Please enter y or n")
 
-        print(name_match_df['goverlytics_id'].values[0])
-        return int(name_match_df['goverlytics_id'].values[0])
+        gov_id = name_match_df['goverlytics_id'].values[0]
+        return self._add_candidate_to_checked_list(name_full, gov_id, name_match_df_party_id, name_match_df_riding, election_date)
+
+    def _add_candidate_to_checked_list(self, name_full, gov_id, party_id, ed_id, election_date):
+        self.checked_list.setdefault(name_full, [])
+        to_add = {
+            'goverlytic_id': gov_id,
+            'party': party_id,
+            'electoral_district': ed_id,
+            'most_recent_election_date': election_date
+        }
+        self.checked_list.get(name_full).append(to_add)
+        if gov_id is None:
+            return -10
+        else:
+            return int(gov_id)
 
 if __name__ == '__main__':
     program_driver()

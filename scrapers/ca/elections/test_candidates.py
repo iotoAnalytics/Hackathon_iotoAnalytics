@@ -16,6 +16,19 @@ test_row1.name_first = "Blake"
 test_row1.name_last = "Richards"
 test_row1.name_full = "Blake Richards"
 test_row1.current_party_id = 2
-test_row1.current_electoral_district_id = 49
+test_row1.current_electoral_district_id = 6
+row1_election_date = '2019-10-29'
 
-print(candidates.Organizer().get_goverlytics_id(test_row1))
+test_row2 = CandidatesRow()
+test_row2.name_first = "Blake"
+test_row2.name_last = "Richards"
+test_row2.name_full = "Blake Richards"
+test_row2.current_party_id = 5
+test_row2.current_electoral_district_id = 30
+row2_election_date = '2019-10-29'
+
+
+tester = candidates.Organizer()
+print(tester.get_goverlytics_id(test_row1, row1_election_date))
+print(tester.get_goverlytics_id(test_row2, row2_election_date))
+print(tester.checked_list)
