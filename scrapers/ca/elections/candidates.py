@@ -320,6 +320,24 @@ class Organizer:
         elif user_input == "NEW":
             return self._add_new_candidate_to_checked_list(row, election_date)
 
+    def _get_user_input_for_multiple_candidate_instances(self, user_input_gov_id, name_match_df: DataFrame):
+        possible_gov_ids = name_match_df['goverlytics_id'].values
+
+        if user_input_gov_id == "None" or (user_input_gov_id.isnumeric() and int(user_input_gov_id) in possible_gov_ids):
+            while True:
+                user_input = input(f"You entered: {user_input_gov_id}. Is this correct? (y/n): ")
+                if user_input == 'y' and user_input_gov_id != "None":
+                    return "EXISTS"
+                elif user_input == 'y' and user_input_gov_id == "None":
+                    return "NEW"
+                elif user_input == 'n':
+                    print("Try again.")
+                    return
+                else:
+                    print("Please enter y or n")
+        else:
+            print("Make sure your input matches one of the goveryltic_ids or is None.")
+
     def _handle_single_instance_of_candidate(self, row, name_match_df: DataFrame, election_date):
         row_party_id = row.current_party_id
         match_party_id = name_match_df['party_id'].values[0]
@@ -350,24 +368,6 @@ class Organizer:
                 return self._add_new_candidate_to_checked_list(row, election_date)
             else:
                 print("Please enter y or n")
-
-    def _get_user_input_for_multiple_candidate_instances(self, user_input_gov_id, name_match_df: DataFrame):
-        possible_gov_ids = name_match_df['goverlytics_id'].values
-
-        if user_input_gov_id == "None" or (user_input_gov_id.isnumeric() and int(user_input_gov_id) in possible_gov_ids):
-            while True:
-                user_input = input(f"You entered: {user_input_gov_id}. Is this correct? (y/n): ")
-                if user_input == 'y' and user_input_gov_id != "None":
-                    return "EXISTS"
-                elif user_input == 'y' and user_input_gov_id == "None":
-                    return "NEW"
-                elif user_input == 'n':
-                    print("Try again.")
-                    return
-                else:
-                    print("Please enter y or n")
-        else:
-            print("Make sure your input matches one of the goveryltic_ids or is None.")
 
     def _append_to_checked_list(self, name_full, gov_id, party, district, election_date):
         self.checked_list.setdefault(name_full, [])
