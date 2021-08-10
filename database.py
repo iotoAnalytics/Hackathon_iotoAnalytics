@@ -980,21 +980,17 @@ class Persistence:
                 'Data being written to database must be a list of Rows or dictionaries!')
 
         with CursorFromConnectionFromPool() as cur:
-            '''
-                TODO: Need to change the insert for goverlytics_id so that if it's -10, i need to add the next val in 
-                goverlytics_id sequence
-            '''
-
             for row in data:
 
                 if isinstance(row, dict):
                     row = utils.DotDict(row)
-                
+
                 if row.goverlytics_id == -10:
                     insert_previous_election_query = sql.SQL("""
+                        WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                         INSERT INTO {table}
                         VALUES (
-                            DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                            (SELECT leg_id FROM leg_id), %s, %s, %s, %s, %s, %s, %s, %s, %s);
                         """).format(table=sql.Identifier(table))
 
                     tup = (row.current_party_id, 
