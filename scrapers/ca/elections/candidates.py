@@ -1,9 +1,10 @@
+# TODO: Write documentation for code.
+
 import os
 from pathlib import Path
 import re
 import sys
 from time import sleep
-import traceback
 
 from pandas.core.frame import DataFrame
 
@@ -77,8 +78,8 @@ class Scraper:
 
     def _collect_data(self):
         data = DataFrame()
-        # while self._get_next_page_button():
-        for i in range(0,1):
+        while self._get_next_page_button():
+        # for i in range(0,1):
             data = data.append(self._get_page_as_df())
             self._get_next_page_button().click()
             sleep(1)
@@ -172,9 +173,6 @@ class Organizer:
         self.ed_df = scraper_utils.electoral_districts
         self.parties_df = scraper_utils.parties
         self.value_getter = DataValue()
-
-        # df_add_row = {'goverlytics_id':99999, 'name_full':'Blake Richards', 'name_last':'Richards', 'name_first':'Blake', 'name_middle':'', 'name_suffix':'', 'riding':'Calgary Rocky Ridge', 'party_id':6}
-        # self.legislators_df = self.legislators_df.append(df_add_row, ignore_index=True) #Test, remove later.
 
     def get_rows(self):
         return self.rows
@@ -303,8 +301,8 @@ class Organizer:
     def _get_legislator_name_match_df(self, row) -> DataFrame:
         name_last = row.name_last
         name_first = row.name_first
-        name_last_match = self.legislators_df["name_last"] == name_last
-        name_first_match = self.legislators_df["name_first"] == name_first
+        name_last_match = self.legislators_df["name_last"].apply(str.lower) == name_last
+        name_first_match = self.legislators_df["name_first"].apply(str.lower) == name_first
         return self.legislators_df.loc[(name_last_match) & (name_first_match)]
 
     def _handle_multiple_instances_of_candidate(self, row, name_match_df: DataFrame, election_date):
@@ -342,10 +340,11 @@ class Organizer:
         row_party_id = row.current_party_id
         match_party_id = name_match_df['party_id'].values[0]
         if int(match_party_id) != int(row_party_id):
-            self._get_user_input_for_candidate_info_mismatch("'party'", row, name_match_df, election_date)
+            return self._get_user_input_for_candidate_info_mismatch("'party'", row, name_match_df, election_date)
 
         row_ed_id = row.current_electoral_district_id
         match_district = name_match_df['riding'].values[0]
+        match_district = match_district.replace('—', '--')
         ed = self.value_getter.get_value(self.ed_df, 'id', row_ed_id, 'district_name')
         if ed != match_district:
             return self._get_user_input_for_candidate_info_mismatch("'district'", row, name_match_df, election_date)
@@ -360,7 +359,7 @@ class Organizer:
         Printer().print_legislator_info(name_match_df)
 
         while True:
-            user_input = input("Are these the same individual? y/n:")
+            user_input = input("Are these the same individual? y/n: ")
             if user_input == 'y':
                 gov_id =  name_match_df['goverlytics_id'].values[0]
                 return self._add_existing_candidate_to_checked_list(name_match_df, gov_id, election_date)
@@ -413,7 +412,7 @@ class Printer:
         for index, row in df.iterrows():
             goverlytics_id = row['goverlytics_id']
             party_id = row['party_id']
-            party = self.value_getter.get_value(self.parties_df, 'id', party_id, 'party')
+            party = DataValue().get_value(scraper_utils.parties, 'id', party_id, 'party')
             district = row['riding']
             district = district.replace('—', '--')
             print(f"goverlytics_id: {goverlytics_id}\n" +
@@ -423,24 +422,25 @@ class Printer:
 
     def print_candidate_info(self, row):
         party_id = row.current_party_id
-        party = self.value_getter.get_value(self.parties_df, 'id', party_id, 'party')
+        party = DataValue().get_value(scraper_utils.parties, 'id', party_id, 'party')
         ed_id = row.current_electoral_district_id
-        district = self.value_getter.get_value(self.ed_df, 'id', ed_id, 'district_name')
-        self.ed_df.loc[self.ed_df['id'] == ed_id]['district_name'].values[0]
-        self._print_info("==CANDIDATE INFO==", party, district)
+        district = DataValue().get_value(scraper_utils.electoral_districts, 'id', ed_id, 'district_name')
+        self._print_info("==CANDIDATE INFO==", party, district, row.name_full)
 
     def print_legislator_info(self, name_match_df: DataFrame):
         party_id = name_match_df['party_id'].values[0]
-        party = self.value_getter.get_value(self.parties_df, 'id', party_id, 'party')
+        party = DataValue().get_value(scraper_utils.parties, 'id', party_id, 'party')
         district = name_match_df['riding'].values[0]
         district = district.replace('—', '--')
         self._print_info('LEGISLATOR DB INFO', party, district)
 
-    def _print_info(self, label, party, district):
+    def _print_info(self, label, party, district, candidate_name=None):
         print(f"======================\n" +
               f"=={label}==\n" +
-              f"======================\n" +
-              f"Party: {party}\n" +
+              f"======================\n")
+        if candidate_name:
+            print(f"Name: {candidate_name}\n")
+        print(f"Party: {party}\n" +
               f"District: {district}\n\n")
 
 if __name__ == '__main__':
