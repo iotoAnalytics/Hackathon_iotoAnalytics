@@ -68,6 +68,7 @@ class Scraper:
     def __init__(self):
         self.driver = SeleniumDriver()
         self.driver.start_driver(CANDIDATES_URL, crawl_delay)
+        self.legislator_count = 0
 
         try:
             self.data = self._get_candidate_data()
@@ -118,6 +119,9 @@ class Scraper:
     def _get_candidate_images(self, html_soup: soup, df):
         trs_with_images = html_soup.find_all('tr', {'class':'dx-row dx-data-row dx-column-lines'})
         for tr in trs_with_images:
+            print(f"legislator number: {self.legislator_count}")
+            self.legislator_count += 1
+
             name = tr.find_all('td')[6].text
 
             img_url = tr.find('img')
