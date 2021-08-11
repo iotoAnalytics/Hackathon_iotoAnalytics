@@ -1340,3 +1340,71 @@ class CandidatesRow:
         if not isinstance(value, str):
             raise TypeError("candidate_image must be a str")
         self._candidate_image = value
+
+@dataclass
+class CandidateElectionDetailsRow:
+    """
+    Data structure for housing data for candidate election details since 1867
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    candidate_id: int
+    electoral_district_id: int
+    party_id: int
+    election_id: int
+    is_incumbent: bool
+
+    def __init__(self):
+        self._candidate_id = None
+        self._electoral_district_id = None
+        self._party_id = None
+        self._election_id = None
+        self._is_incumbent = False
+
+    @property
+    def candidate_id(self) -> int:
+        return self._candidate_id
+    @candidate_id.setter
+    def candidate_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("candidate_id must be an int")
+        self._candidate_id = id
+
+    @property
+    def electoral_district_id(self) -> int:
+        return self._electoral_district_id
+    @electoral_district_id.setter
+    def electoral_district_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("electoral_district_id must be an int")
+        self._electoral_district_id = id
+
+    @property
+    def party_id(self) -> int:
+        return self._party_id
+    @party_id.setter
+    def party_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("party_id must be an int")
+        self._party_id = id
+
+    @property
+    def election_id(self) -> int:
+        return self._election_id
+    @election_id.setter
+    def election_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("election_id must be an int")
+        self._election_id = id
+
+    @property
+    def is_incumbent(self) -> bool:
+        return self._is_incumbent
+    @is_incumbent.setter
+    def is_incumbent(self, value: bool) -> None:
+        if type(value) != bool:
+            raise TypeError("is_incumbent must be a bool")
+        self._is_incumbent = value
