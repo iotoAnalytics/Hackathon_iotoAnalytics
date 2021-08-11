@@ -52,6 +52,7 @@ def program_driver():
     print("Collecting data...")
     scraper = Scraper()
     candidate_table_df = scraper.get_data()
+    candidate_table_df.to_csv(r'candidate_table_df.csv', index=False)
 
     data_organizer = Organizer()
     data_organizer.set_rows(candidate_table_df)
@@ -223,8 +224,9 @@ class Organizer:
         row.gender = self._get_gender(data_row)
         row.current_party_id = self._get_party_id(data_row)
         row.candidate_image = self._get_image_url(data_row)
-        row.goverlytics_id = self.get_goverlytics_id(row, election_date)
-        if row.goverlytics_id:
+        goverlytics_id = self.get_goverlytics_id(row, election_date)
+        if goverlytics_id:
+            row.goverlytics_id = goverlytics_id
             self.rows.append(row)
 
     def _get_district_id(self, data_row):
