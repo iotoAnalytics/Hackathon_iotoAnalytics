@@ -26,9 +26,9 @@ def program_driver():
     print("Collecting data...")
     scraper = Scraper()
     row_data = scraper.get_data()
-    print(row_data)
+
     print("writing data...")
-    # scraper_utils.write_data(row_data)
+    scraper_utils.write_data(row_data)
     print("complete..")
 
 class Scraper:
