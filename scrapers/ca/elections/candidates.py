@@ -52,13 +52,13 @@ options = Options()
 def program_driver():
     print("Collecting data...")
     try:
-        candidate_table_df = pd.read_csv('candidate_table_df.csv')
+        candidate_table_df = pd.read_csv('scrapers/ca/elections/candidate_table_df.csv')
         print("Candidate dataframe found!")
     except FileNotFoundError:
         print("Candidate dataframe not found...")
         scraper = Scraper()
         candidate_table_df = scraper.get_data()
-        candidate_table_df.to_csv(r'candidate_table_df.csv_v2', index=False)
+        candidate_table_df.to_csv(r'scrapers/ca/elections/candidate_table_df.csv_v2', index=False)
     
     data_organizer = Organizer()
     try:
@@ -235,7 +235,7 @@ class Organizer:
         return self.rows
 
     def set_rows(self, df: DataFrame):
-        f = open('save_progress.txt', 'r')
+        f = open('scrapers/ca/elections/candidates_save_progress.txt', 'r')
         save_counter = int(f.read())
         f.close()
         
@@ -253,7 +253,7 @@ class Organizer:
                         date_of_election = re.search(r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', value).group()
                     save_counter += 1
         except:
-            f = open('save_progress.txt', 'w')
+            f = open('scrapers/ca/elections/candidates_save_progress.txt', 'w')
             f.write(str(save_counter))
             f.close()
             raise RuntimeError("Program interrupted")
