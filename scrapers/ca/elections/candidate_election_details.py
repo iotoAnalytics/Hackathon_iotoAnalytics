@@ -84,7 +84,7 @@ class Election:
         sleep(3)
 
     def _view_1000_items(self):
-        page_sizes = self.driver.driver.find_element_by_class_name('dx-page-sizes')
+        page_sizes = self.driver.driver.find_elements_by_class_name('dx-page-size')
         page_sizes[-1].click()
         sleep(3)
 
