@@ -19,6 +19,7 @@ Date: 2021-08-10
 """
 
 from io import FileIO
+import json
 import os
 from pathlib import Path
 import re
@@ -52,7 +53,7 @@ options = Options()
 def program_driver():
     print("Collecting data...")
     try:
-        candidate_table_df = pd.read_csv('scrapers/ca/elections/candidate_table_df.csv')
+        candidate_table_df = pd.read_csv('scrapers/ca/elections/candidate_table_df_v2.csv')
         print("Candidate dataframe found!")
     except FileNotFoundError:
         print("Candidate dataframe not found...")
@@ -225,7 +226,11 @@ class Organizer:
     def __init__(self):
         self.rows = []
         self.new_entries = []
-        self.checked_list = {}
+
+        with open('scrapers/ca/elections/candidates_checked_list_progress.json') as f:
+            data = json.load(f)
+            f.close()
+        self.checked_list = data
         self.legislators_df = scraper_utils.legislators
         self.ed_df = scraper_utils.electoral_districts
         self.parties_df = scraper_utils.parties
@@ -256,6 +261,10 @@ class Organizer:
             f = open('scrapers/ca/elections/candidates_save_progress.txt', 'w')
             f.write(str(save_counter))
             f.close()
+
+            with open('scrapers/ca/elections/candidates_checked_list_progress.json', 'w') as json_file:
+                json.dump(self.checked_list, json_file)
+                json_file.close()
             raise RuntimeError("Program interrupted")
 
     def _add_row_data(self, data_row, election_date):
