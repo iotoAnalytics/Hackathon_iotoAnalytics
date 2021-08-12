@@ -46,18 +46,18 @@ scraper_utils = CandidatesScraperUtils(COUNTRY)
 crawl_delay = scraper_utils.get_crawl_delay(CANDIDATES_BASE_URL)
 
 options = Options()
-options.headless = True
+# options.headless = True
 
 def program_driver():
     print("Collecting data...")
     try:
-        candidate_table_df = pd.read_csv('candidate_table_df.csv')
+        candidate_table_df = pd.read_csv('candidate_table_df_v2.csv')
         print("Candidate dataframe found!")
-    except:
+    except FileNotFoundError:
         print("Candidate dataframe not found...")
         scraper = Scraper()
         candidate_table_df = scraper.get_data()
-        candidate_table_df.to_csv(r'candidate_table_df.csv', index=False)
+        candidate_table_df.to_csv(r'candidate_table_df.csv_v2', index=False)
     
     data_organizer = Organizer()
     data_organizer.set_rows(candidate_table_df)
@@ -93,18 +93,30 @@ class Scraper:
     
     def _prepare_page_for_collection(self):
         self._expand_all_entries()
+        self._view_1000_items()
 
     def _expand_all_entries(self):
         expand_all_button = self.driver.driver.find_element_by_css_selector('#gridContainer > div > div.dx-datagrid-header-panel > div > div > div.dx-toolbar-after > div:nth-child(2) > div > div > div')
         expand_all_button.click()
+        sleep(3)
+
+    def _view_1000_items(self):
+        page_sizes = self.driver.driver.find_elements_by_class_name('dx-page-size')
+        page_sizes[-1].click()
         sleep(10)
 
     def _collect_data(self):
         data = DataFrame()
         while self._get_next_page_button():
             data = data.append(self._get_page_as_df())
-            self._get_next_page_button().click()
-            sleep(1)
+            click_count_try = 5
+            while click_count_try > 0:
+                try:
+                    self._get_next_page_button().click()
+                    sleep(4)
+                except:
+                    sleep(2)
+                    click_count_try -= 1
         return data
 
     def _get_next_page_button(self):
