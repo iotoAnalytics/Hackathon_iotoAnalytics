@@ -990,7 +990,17 @@ class Persistence:
                         WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                         INSERT INTO {table}
                         VALUES (
-                            (SELECT leg_id FROM leg_id), %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                            (SELECT leg_id FROM leg_id), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (goverlytics_id) DO UPDATE SET
+                            current_party_id = excluded.current_party_id,
+                            current_electoral_district_id = excluded.current_electoral_district_id,
+                            name_full = excluded.name_full,
+                            name_last = excluded.name_last,
+                            name_first = excluded.name_first,
+                            name_middle = excluded.name_middle,
+                            name_suffix = excluded.name_suffix,
+                            gender = excluded.gender,
+                            candidate_image = excluded.candidate_image;
                         """).format(table=sql.Identifier(table))
 
                     tup = (row.current_party_id, 
@@ -1002,12 +1012,21 @@ class Persistence:
                         row.name_suffix,
                         row.gender,
                         row.candidate_image)
-
                 else:
                     insert_previous_election_query = sql.SQL("""
                         INSERT INTO {table}
                         VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (goverlytics_id) DO UPDATE SET
+                            current_party_id = excluded.current_party_id,
+                            current_electoral_district_id = excluded.current_electoral_district_id,
+                            name_full = excluded.name_full,
+                            name_last = excluded.name_last,
+                            name_first = excluded.name_first,
+                            name_middle = excluded.name_middle,
+                            name_suffix = excluded.name_suffix,
+                            gender = excluded.gender,
+                            candidate_image = excluded.candidate_image;
                         """).format(table=sql.Identifier(table))
 
                     tup = (row.goverlytics_id,
