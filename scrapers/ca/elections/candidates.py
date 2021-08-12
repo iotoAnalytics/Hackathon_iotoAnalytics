@@ -18,6 +18,7 @@ Version: 1.0
 Date: 2021-08-10
 """
 
+from io import FileIO
 import os
 from pathlib import Path
 import re
@@ -51,7 +52,7 @@ options = Options()
 def program_driver():
     print("Collecting data...")
     try:
-        candidate_table_df = pd.read_csv('candidate_table_df_v2.csv')
+        candidate_table_df = pd.read_csv('candidate_table_df.csv')
         print("Candidate dataframe found!")
     except FileNotFoundError:
         print("Candidate dataframe not found...")
@@ -60,7 +61,10 @@ def program_driver():
         candidate_table_df.to_csv(r'candidate_table_df.csv_v2', index=False)
     
     data_organizer = Organizer()
-    data_organizer.set_rows(candidate_table_df)
+    try:
+        data_organizer.set_rows(candidate_table_df)
+    except RuntimeError:
+        print("\nProgress Saved...")
     print("Getting row data...")
     rows = data_organizer.get_rows()
     print("Writing data...")
@@ -231,14 +235,28 @@ class Organizer:
         return self.rows
 
     def set_rows(self, df: DataFrame):
-        for index, row in df.iterrows():
-            value = row['Province or Territory']
-            date_of_election = None
-            if not ((pd.isna(value)) or 'Continued from'in value or 'Continues on' in value or 'Date of Election' in value or 
-                        'Type of Election' in value or 'Parliament' in value):
-                self._add_row_data(row, date_of_election)
-            elif pd.notna(value) and 'Date of Election' in value:
-                date_of_election = re.search(r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', value).group()
+        f = open('save_progress.txt', 'r')
+        save_counter = int(f.read())
+        f.close()
+        
+        try:
+            for index, row in df.iterrows():
+                if index < save_counter:
+                    pass
+                else:
+                    value = row['Province or Territory']
+                    date_of_election = None
+                    if not ((pd.isna(value)) or 'Continued from'in value or 'Continues on' in value or 'Date of Election' in value or 
+                                'Type of Election' in value or 'Parliament' in value):
+                        self._add_row_data(row, date_of_election)
+                    elif pd.notna(value) and 'Date of Election' in value:
+                        date_of_election = re.search(r'[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}', value).group()
+                    save_counter += 1
+        except:
+            f = open('save_progress.txt', 'w')
+            f.write(str(save_counter))
+            f.close()
+            raise RuntimeError("Program interrupted")
 
     def _add_row_data(self, data_row, election_date):
         row = scraper_utils.initialize_row()
