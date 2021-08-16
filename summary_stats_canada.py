@@ -59,10 +59,10 @@ def get_bday_and_activity(legislator_data):
     return [bday_lst, years_active_lst]
 
 
-def get_topics(state):
+def get_topics(country, state):
     # print(f'getting state: {state}')
     topic_dict = {}
-    data =requests.get(f'{base_api}/division-legislation/us/{state}?limit=2000', headers=headers).json()['data']
+    data =requests.get(f'{base_api}/division-legislation/{country}/{state}?limit=2000', headers=headers).json()['data']
     for legislation in data:
         topic = legislation['topic']
         if topic:
@@ -73,21 +73,21 @@ def get_topics(state):
     return topic_dict
 
 
-def get_all_data(state):
+def get_all_data(country, state):
     ave_num_data = None
     ave_percentage_data = None
     ave_age = 0
     ave_years_active = 0
     legislator_count = None
-    topic_dict = get_topics(state)
+    topic_dict = get_topics(country, state)
     try:
-        legislator_requests = grab_data(state, 'division-legislators', 'us', 1000)
+        legislator_requests = grab_data(state, 'division-legislators', country, 1000)
         legislator_count = get_legislator_count(legislator_requests) if len(legislator_requests) > 200 else len(legislator_requests)
         birthday, years_active = get_bday_and_activity(legislator_requests)
         ave_age = round(sum(birthday)/ len(birthday) + 0.1, 2) if len(birthday) != 0 else 0
         ave_years_active = round(sum(years_active)/ len(years_active) + 0.1, 2) if len(years_active) != 0 else 0
 
-        legislation_requests = grab_data(state, 'division-legislation', 'us', 2000)
+        legislation_requests = grab_data(state, 'division-legislation', country, 2000)
 
         # gets average bills sponsored for legislator in state
         data = [grab_bills_sponsored(legislation_requests, x['name_last']) for x in legislator_requests]
@@ -115,13 +115,13 @@ def get_all_data(state):
 # def get_all_data(state):
 #     info_dict = get_ave_bills_sponsored(state)
 #     return info_dict
-
-state_lst = [x.lower() for x in os.listdir("./scrapers/us/us-states") if len(x) == 2]
+state_dir = "./scrapers/ca/ca-provinces"
+state_lst = [x.lower() for x in os.listdir(state_dir) if len(x) == 2]
 info_dict = []
-for state in state_lst[10:12]:
-    info_dict.append(get_all_data(state))
+for state in state_lst:
+    info_dict.append(get_all_data('ca', state))
 data = [x for x in info_dict if x]
 
-# print(data)
-Persistence.write_stats_data_test(data, 'test_table_sam_2')
+print(data)
+Persistence.write_stats_data_test(data, 'canadian_summary_data')
 print('Done!')
