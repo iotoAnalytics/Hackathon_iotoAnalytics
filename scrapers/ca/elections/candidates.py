@@ -59,12 +59,12 @@ def program_driver():
         print("Candidate dataframe not found...")
         scraper = Scraper()
         candidate_table_df = scraper.get_data()
-        candidate_table_df.to_csv(r'scrapers/ca/elections/candidate_table_df.csv_v2', index=False)
+        candidate_table_df.to_csv(r'scrapers/ca/elections/candidate_table_df_v2.csv', index=False)
     
     data_organizer = Organizer()
     try:
         data_organizer.set_rows(candidate_table_df)
-    except RuntimeError:
+    except RuntimeError as e:
         print("\nProgress Saved...")
     print("Getting row data...")
     rows = data_organizer.get_rows()
@@ -119,6 +119,7 @@ class Scraper:
                 try:
                     self._get_next_page_button().click()
                     sleep(4)
+                    break
                 except:
                     sleep(2)
                     click_count_try -= 1
@@ -288,11 +289,11 @@ class Organizer:
     def _set_name_data(self, row, data_row):
         name = data_row['Candidate']
         human_name = HumanName(name)
-        row.name_full = human_name.full_name
-        row.name_last = human_name.last
-        row.name_first = human_name.first
-        row.name_middle = human_name.middle
-        row.name_suffix = human_name.suffix
+        row.name_full = human_name.full_name.title()
+        row.name_last = human_name.last.title()
+        row.name_first = human_name.first.title()
+        row.name_middle = human_name.middle.title()
+        row.name_suffix = human_name.suffix.title()
 
     def _get_gender(self, data_row):
         gender = data_row['Gender']
@@ -336,8 +337,8 @@ class Organizer:
         return image_url
 
     def _get_full_name(self, row):
-        name_last = row.name_last
-        name_first = row.name_first
+        name_last = row.name_last.title()
+        name_first = row.name_first.title()
         return name_first + ' ' + name_last
 
     def get_goverlytics_id(self, row, election_date):
