@@ -1168,11 +1168,11 @@ class Persistence:
 
                 tup = (row.recipient_id,
                        row.recipient_party_id,
-                        row.recipient_name,
                         row.contributor_prov_terr_id,
                         row.contributor_name,
                         row.contributor_city,
                         row.contributor_postal_code,
+                        row.recipient_name,
                         row.date_received,
                         row.fiscal_year_or_event_date,
                         row.part_no_of_return,

@@ -153,7 +153,7 @@ def format_dicts(list_of_dicts):
         if 'date_received' in i.keys():
             date_received = i['Contribution Received date']
         else:
-            date_received = '1212-12-12'
+            date_received = "1212-12-12"
         goverlytics_id = get_goverlytics_id(i['Recipient'])
         new_dict = {
                     'recipient_id': goverlytics_id,
@@ -251,7 +251,7 @@ def get_goverlytics_id(recipient_name):
 
 
 def get_row_data(data):
-    #print(data['contributor_prov_terr_id'])
+    print(data)
     row = scraper_utils.initialize_row()
     row.recipient_id = int(data['recipient_id'])
     row.recipient_party_id = int(data['recipient_party_id'])
@@ -266,7 +266,6 @@ def get_row_data(data):
     row.contribution_type = str(data['contributor_type'])
     row.monetary_amount = float(data['monetary_amount'])
     row.non_monetary_amount = float(data['non_monetary_amount'])
-    print(row.contributor_prov_terr_id)
     return row
 
 

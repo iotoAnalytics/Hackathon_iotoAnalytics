@@ -1717,8 +1717,10 @@ class FinancialContributionsRow:
 
         @date_received.setter
         def date_received(self, value: str) -> None:
-            if not isinstance(value, str):
-                raise TypeError("date_received must be an str")
+            if (not isinstance(value, str)) and value != None:
+                raise TypeError("election_date must be a str")
+            if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+                raise ValueError("Improper date formating in date_received. Required format: YYYY-MM-DD")
             self._date_received = value
 
         @property
@@ -1727,8 +1729,10 @@ class FinancialContributionsRow:
 
         @fiscal_year_or_event_date.setter
         def fiscal_year_or_event_date(self, value: str) -> None:
-            if not isinstance(value, str):
-                raise TypeError("fiscal_year_or_event_date must be an str")
+            if (not isinstance(value, str)) and value != None:
+                raise TypeError("election_date must be a str")
+            if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+                raise ValueError("Improper date formating in fiscal_year_or_event_date. Required format: YYYY-MM-DD")
             self._fiscal_year_or_event_date = value
 
         @property
