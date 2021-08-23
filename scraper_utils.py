@@ -1204,8 +1204,6 @@ class ElectoralDistrictScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_electoral_districts_data(data, table)
 
-<<<<<<< HEAD
-
 class ElectorsScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
         super().__init__(country, table_name, row_type=ElectorsRow())
@@ -1229,7 +1227,6 @@ class ElectionVotesScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_election_votes(data, table)
 
-=======
 class CandidatesScraperUtils(ScraperUtils):
     def __init__(self, country: str):
         table_name = f'{country.lower()}_candidates'
@@ -1293,5 +1290,4 @@ class CandidatesElectionDetails(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_candidate_election_details_data(data, table)
         
->>>>>>> kevins-dev-branch
 # end region

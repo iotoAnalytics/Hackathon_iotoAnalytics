@@ -58,6 +58,7 @@ class Election:
         self.driver = SeleniumDriver()
 
         self._collect_data()
+        self.driver.close_driver()
 
     def get_row(self):
         return self.row
