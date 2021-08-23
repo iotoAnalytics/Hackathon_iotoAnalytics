@@ -737,6 +737,8 @@ class Persistence:
                     topic = excluded.topic,
                     bill_text = excluded.bill_text,
                     bill_description = excluded.bill_description,
+                    pm_party = excluded.pm_party,
+                    pm_party_id = excluded.pm_party_id,
                     bill_summary = excluded.bill_summary,
                     country_id = excluded.country_id,
                     country = excluded.country,

@@ -148,6 +148,7 @@ def get_table_data(url):
 
 
 def get_election_id(data):
+
     election = data['election']
     province = data['province']
     province = province.replace('–', '-')
@@ -156,40 +157,40 @@ def get_election_id(data):
         try:
             date = dparser.parse(election, fuzzy=True)
             date_name = date.strftime("%Y_%m_%d")
-            election_name = date_name + '_by_election_' + province
+            election_name = 'by_election_' + date_name
         except Exception as e:
             print(e)
         if pd.notna(province):
             df = elections
-            value = df.loc[(df['election_name'] == election_name)]['id'].values[0]
+            value = df.loc[df['election_name'].str.contains(election_name)]['id'].values[0]
             try:
                 return int(value)
             except Exception as e:
                 return value
     if 'general' in election.lower():
         general_elections = {
-            'fiftieth': '50th',
-            'forty-ninth': '49th',
-            'forty-eighth': '48th',
-            'forty-seventh': '47th',
-            'forty-sixth': '46th',
-            'forty-fifth': '45th',
-            'forty-fourth': '44th',
-            'forty-third': '43rd',
-            'forty-second': '42nd',
-            'forty-first': '41st',
-            'fortieth': '40th',
-            'thirty-ninth': '39th',
-            'thirty-eighth': '38th',
-            'thirty-seventh': '37th',
-            'thirty-sixth': '36th'
+            'fiftieth': '50',
+            'forty-ninth': '49',
+            'forty-eighth': '48',
+            'forty-seventh': '47',
+            'forty-sixth': '46',
+            'forty-fifth': '45',
+            'forty-fourth': '44',
+            'forty-third': '43',
+            'forty-second': '42',
+            'forty-first': '41',
+            'fortieth': '40',
+            'thirty-ninth': '39',
+            'thirty-eighth': '38',
+            'thirty-seventh': '37',
+            'thirty-sixth': '36'
         }
         election = election.split(' ')[0].lower()
         e_number = general_elections.get(election)
         election_name = e_number + '_general_election'
         if pd.notna(province):
             df = elections
-            value = df.loc[(df['election_name'] == election_name)]['id'].values[0]
+            value = df.loc[df['election_name'].str.contains(election_name)]['id'].values[0]
             try:
                 return int(value)
             except Exception as e:

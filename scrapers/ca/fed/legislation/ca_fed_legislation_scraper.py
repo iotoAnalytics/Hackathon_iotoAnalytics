@@ -528,8 +528,8 @@ def scrape(xml_url):
         pm_details = bill.find('PrimeMinister')
         pm_full_name = pm_details.find('Person').find('FullName').text
         pm_party = get_english_title(pm_details.find('PoliticalParty'))
-        pm_party_abbreviation = get_english_title(
-            pm_details.find('PoliticalParty').find('abbreviation'))
+        # pm_party_abbreviation = get_english_title(
+        #     pm_details.find('PoliticalParty').find('abbreviation'))
 
         statute = bill.find('Statute')
         statute_year = int(statute.find('Year').text)
@@ -611,7 +611,8 @@ def scrape(xml_url):
         row.sponsor_affiliation = sponsor_affiliation
         row.sponsor_gender = sponsor_gender
         row.pm_name_full = pm_full_name
-        row.pm_party = party_switcher[party] if party in party_switcher else party
+        # row.pm_party = party_switcher[pm_party] if pm_party_abbreviation in party_switcher else pm_party_abbreviation
+        row.pm_party = party_switcher.get(pm_party, pm_party)
         row.pm_party_id = scraper_utils.get_attribute(
             'party', 'party', row.pm_party)
         row.statute_year = statute_year
