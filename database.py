@@ -982,11 +982,11 @@ class Persistence:
 
         with CursorFromConnectionFromPool() as cur:
             insert_electors_query = sql.SQL("""
-                    INSERT INTO {table}
-                    VALUES (
-                        DEFAULT, %s, %s, %s, %s)
-                    ON CONFLICT DO NOTHING;
-                    """).format(table=sql.Identifier(table))
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
+                """).format(table=sql.Identifier(table))
 
             for row in data:
 
@@ -1000,11 +1000,11 @@ class Persistence:
 
                 try:
                     cur.execute(insert_electors_query, tup)
+
                 except Exception as e:
                     print(
                         f'An exception occurred inserting {row.election_id}:\n{e}')
                     cur.connection.rollback()
-
 
     @staticmethod
     def write_election_votes(data, table):
@@ -1042,3 +1042,108 @@ class Persistence:
                         f'An exception occurred inserting {row.election_id}:\n{e}')
                     cur.connection.rollback()
 
+    @staticmethod
+    def write_candidate_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                if row.goverlytics_id == -10:
+                    insert_previous_election_query = sql.SQL("""
+                        WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+                        INSERT INTO {table}
+                        VALUES (
+                            (SELECT leg_id FROM leg_id), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (goverlytics_id) DO UPDATE SET
+                            current_party_id = excluded.current_party_id,
+                            current_electoral_district_id = excluded.current_electoral_district_id,
+                            name_full = excluded.name_full,
+                            name_last = excluded.name_last,
+                            name_first = excluded.name_first,
+                            name_middle = excluded.name_middle,
+                            name_suffix = excluded.name_suffix,
+                            gender = excluded.gender,
+                            candidate_image = excluded.candidate_image;
+                        """).format(table=sql.Identifier(table))
+
+                    tup = (row.current_party_id, 
+                        row.current_electoral_district_id, 
+                        row.name_full, 
+                        row.name_last, 
+                        row.name_first,
+                        row.name_middle,
+                        row.name_suffix,
+                        row.gender,
+                        row.candidate_image)
+                else:
+                    insert_previous_election_query = sql.SQL("""
+                        INSERT INTO {table}
+                        VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (goverlytics_id) DO UPDATE SET
+                            current_party_id = excluded.current_party_id,
+                            current_electoral_district_id = excluded.current_electoral_district_id,
+                            name_full = excluded.name_full,
+                            name_last = excluded.name_last,
+                            name_first = excluded.name_first,
+                            name_middle = excluded.name_middle,
+                            name_suffix = excluded.name_suffix,
+                            gender = excluded.gender,
+                            candidate_image = excluded.candidate_image;
+                        """).format(table=sql.Identifier(table))
+
+                    tup = (row.goverlytics_id,
+                        row.current_party_id, 
+                        row.current_electoral_district_id, 
+                        row.name_full, 
+                        row.name_last, 
+                        row.name_first,
+                        row.name_middle,
+                        row.name_suffix,
+                        row.gender,
+                        row.candidate_image)
+
+                try:
+                    cur.execute(insert_previous_election_query, tup)
+
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.name_full}:\n{e}')
+                    cur.connection.rollback()
+
+    @staticmethod
+    def write_candidate_election_details_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_previous_election_query = sql.SQL("""
+                INSERT INTO {table}
+                VALUES (
+                    DEFAULT, %s, %s, %s, %s, %s);
+                """).format(table=sql.Identifier(table))
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.candidate_id,
+                       row.electoral_district_id, 
+                       row.party_id, 
+                       row.election_id, 
+                       row.is_incumbent)
+
+            try:
+                cur.execute(insert_previous_election_query, tup)
+
+            except Exception as e:
+                print(
+                    f'An exception occurred inserting {row.candidate_id}:\n{e}')
+                cur.connection.rollback()

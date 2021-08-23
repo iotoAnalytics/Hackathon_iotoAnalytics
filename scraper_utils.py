@@ -1204,6 +1204,7 @@ class ElectoralDistrictScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_electoral_districts_data(data, table)
 
+<<<<<<< HEAD
 
 class ElectorsScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
@@ -1228,4 +1229,69 @@ class ElectionVotesScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_election_votes(data, table)
 
+=======
+class CandidatesScraperUtils(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidates'
+        super().__init__(country, table_name, row_type=CandidatesRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_legislators'
+                cur.execute(query)
+                legislators = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.legislators = pd.DataFrame(legislators)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_data(data, table)
+
+class CandidatesElectionDetails(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidate_election_details'
+        super().__init__(country, table_name, row_type=CandidateElectionDetailsRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_candidates'
+                cur.execute(query)
+                candidates = cur.fetchall()
+
+                query = f'SELECT * FROM ca_elections'
+                cur.execute(query)
+                elections = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.candidates = pd.DataFrame(candidates)
+        self.elections = pd.DataFrame(elections)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_details_data(data, table)
+        
+>>>>>>> kevins-dev-branch
 # end region
