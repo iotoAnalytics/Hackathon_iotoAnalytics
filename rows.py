@@ -1118,7 +1118,7 @@ class ElectionRow:
 @dataclass
 class ElectoralDistrictsRow:
     """
-    Data structure for housing data data for electoral districts
+    Data structure for housing data for electoral districts
     """
 
     def __iter__(self):
@@ -1282,13 +1282,137 @@ class ElectorsRow:
             raise TypeError("election_id must be aan int")
         self._election_id = value
 
+@dataclass
+class CandidatesRow:
+    """
+    Data structure for housing data for candidates since 1867
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    goverlytics_id: int
+    current_party_id: int
+    current_electoral_district_id: int
+    name_full: str
+    name_last: str
+    name_first: str
+    name_middle: str
+    name_suffix: str
+    gender: str
+    candidate_image: str
+
+    def __init__(self):
+        self._goverlytics_id = None
+        self._current_party_id = None
+        self._current_electoral_district_id = None
+        self._name_full = ''
+        self._name_last = ''
+        self._name_first = ''
+        self._name_middle = ''
+        self._name_suffix = ''
+        self._gender = ''
+        self._candidate_image = '' 
+
+    @property
+    def goverlytics_id(self) -> int:
+        return self._goverlytics_id
+    @goverlytics_id.setter
+    def goverlytics_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("goverlytics_id must be an int")
+        self._goverlytics_id = id
+
+    @property
+    def current_party_id(self) -> int:
+        return self._current_party_id
+    @current_party_id.setter
+    def current_party_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("current_party_id must be an int")
+        self._current_party_id = id
+
+    @property
+    def current_electoral_district_id(self) -> int:
+        return self._current_electoral_district_id
+    @current_electoral_district_id.setter
+    def current_electoral_district_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("current_electoral_district_id must be an int")
+        self._current_electoral_district_id = id
+
+    @property
+    def name_full(self) -> str:
+        return self._name_full
+    @name_full.setter
+    def name_full(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("name_full must be a str")
+        self._name_full = value
+
+    @property
+    def name_last(self) -> str:
+        return self._name_last
+    @name_last.setter
+    def name_last(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("name_last must be a str")
+        self._name_last = value
+
+    @property
+    def name_first(self) -> str:
+        return self._name_first
+    @name_first.setter
+    def name_first(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("name_first must be a str")
+        self._name_first = value
+
+    @property
+    def name_middle(self) -> str:
+        return self._name_middle
+    @name_middle.setter
+    def name_middle(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("name_middle must be a str")
+        self._name_middle = value
+
+    @property
+    def name_suffix(self) -> str:
+        return self._name_suffix
+    @name_suffix.setter
+    def name_suffix(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("name_suffix must be a str")
+        self._name_suffix = value
+
+    @property
+    def gender(self) -> str:
+        return self._gender
+    @gender.setter
+    def gender(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("gender must be a str")
+        possible_genders = ['M', 'F', 'O', '']
+        if value not in possible_genders:
+            raise ValueError('gender must be one of M (Male), F (Female), O (Other), or Blank')
+        self._gender = value
+
+    @property
+    def candidate_image(self) -> str:
+        return self._candidate_image
+    @candidate_image.setter
+    def candidate_image(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise TypeError("candidate_image must be a str")
+        self._candidate_image = value
 
 @dataclass
 class ElectionVotesRow:
     """
     Data structure for housing data data for election votes
     """
-
     def __iter__(self):
         for attr, value in self.__dict__.items():
             yield attr, value
@@ -1407,6 +1531,76 @@ class ElectionVotesRow:
         if not isinstance(value, int):
             raise TypeError("total must be an int")
         self._total = value
+    
+
+@dataclass
+class CandidateElectionDetailsRow:
+    """
+    Data structure for housing data for candidate election details since 1867
+    """
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+
+    candidate_id: int
+    electoral_district_id: int
+    party_id: int
+    election_id: int
+    is_incumbent: bool
+
+    def __init__(self):
+        self._candidate_id = None
+        self._electoral_district_id = None
+        self._party_id = None
+        self._election_id = None
+        self._is_incumbent = False
+
+    @property
+    def candidate_id(self) -> int:
+        return self._candidate_id
+    @candidate_id.setter
+    def candidate_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("candidate_id must be an int")
+        self._candidate_id = id
+
+    @property
+    def electoral_district_id(self) -> int:
+        return self._electoral_district_id
+    @electoral_district_id.setter
+    def electoral_district_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("electoral_district_id must be an int")
+        self._electoral_district_id = id
+
+    @property
+    def party_id(self) -> int:
+        return self._party_id
+    @party_id.setter
+    def party_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("party_id must be an int")
+        self._party_id = id
+
+
+    @property
+    def election_id(self) -> int:
+        return self._election_id
+    @election_id.setter
+    def election_id(self, id: int) -> None:
+        if not isinstance(id, int):
+            raise TypeError("election_id must be an int")
+        self._election_id = id
+
+    @property
+    def is_incumbent(self) -> bool:
+        return self._is_incumbent
+    @is_incumbent.setter
+    def is_incumbent(self, value: bool) -> None:
+        if type(value) != bool:
+            raise TypeError("is_incumbent must be a bool")
+        self._is_incumbent = value
+
 
 @dataclass
 class FinancialContributionsRow:
@@ -1576,3 +1770,4 @@ class FinancialContributionsRow:
             if not isinstance(value, float):
                 raise TypeError("non_monetary_amount must be an str")
             self._non_monetary_amount = value
+

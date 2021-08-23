@@ -18,7 +18,7 @@ from scraper_utils import ElectoralDistrictScraperUtils
 from urllib.request import urlopen
 
 COUNTRY = 'ca'
-TABLE = 'electoral_districts'
+TABLE = 'ca_electoral_districts'
 RIDING_BASE_URL = 'https://lop.parl.ca'
 RIDING_URL = RIDING_BASE_URL + '/sites/ParlInfo/default/en_CA/ElectionsRidings/Ridings'
 ELECTIONS_BASE_URL = 'https://www.elections.ca'
