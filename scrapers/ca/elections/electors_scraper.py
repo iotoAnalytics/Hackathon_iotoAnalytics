@@ -209,6 +209,8 @@ def get_prov_terr_id_from_district(province):
 
 
 def get_prov_terr_id(province):
+    if not province:
+        return 0
     if pd.notna(province):
         df = scraper_utils.divisions
         value = df.loc[df["division"] == province]['id'].values[0]

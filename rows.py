@@ -1407,3 +1407,172 @@ class ElectionVotesRow:
         if not isinstance(value, int):
             raise TypeError("total must be an int")
         self._total = value
+
+@dataclass
+class FinancialContributionsRow:
+        """
+        Data structure for housing data data for election votes
+        """
+
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        recipient_id: int
+        recipient_party_id: int
+        recipient_name: str
+        contributor_prov_terr_id: str
+        contributor_name: str
+        contributor_city: str
+        contributor_postal_code: str
+        date_received: str
+        fiscal_year_or_event_date: str
+        part_no_of_return: str
+        contribution_type: str
+        monetary_amount: float
+        non_monetary_amount: float
+
+        def __init__(self):
+            self._recipient_id = None
+            self._recipient_party_id = None
+            self._recipient_name = None
+            self._contributor_prov_terr_id = None
+            self._contributor_name = None
+            self._contributor_city = None
+            self._contributor_postal_code = None
+            self._date_received = None
+            self._fiscal_year_or_event_date = None
+            self._part_no_of_return = None
+            self._contribution_type = None
+            self._monetary_amount = None
+            self._non_monetary_amount = None
+
+        @property
+        def recipient_id(self) -> int:
+            return self._recipient_id
+
+        @recipient_id.setter
+        def recipient_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("recipient_id must be an int")
+            self._recipient_id = value
+
+        @property
+        def recipient_party_id(self) -> int:
+            return self._recipient_party_id
+
+        @recipient_party_id.setter
+        def recipient_party_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("recipient_party_id must be an int")
+            self._recipient_party_id = value
+
+        @property
+        def recipient_name(self) -> str:
+            return self._recipient_name
+
+        @recipient_name.setter
+        def recipient_name(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("recipient_name must be an string")
+            self._recipient_name = value
+
+        @property
+        def contributor_prov_terr_id(self) -> int:
+            return self._contributor_prov_terr_id
+
+        @contributor_prov_terr_id.setter
+        def contributor_prov_terr_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("contributor_prov_terr_id must be an int")
+            self._contributor_prov_terr_id = value
+
+        @property
+        def contributor_name(self) -> str:
+            return self._contributor_name
+
+        @contributor_name.setter
+        def contributor_name(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("contributor_name must be an string")
+            self._contributor_name = value
+
+        @property
+        def contributor_city(self) -> str:
+            return self._contributor_city
+
+        @contributor_city.setter
+        def contributor_city(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("contributor_city must be an string")
+            self._contributor_city = value
+
+        @property
+        def contributor_postal_code(self) -> str:
+            return self._contributor_postal_code
+
+        @contributor_postal_code.setter
+        def contributor_postal_code(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("contributor_postal_code must be an string")
+            self._contributor_postal_code = value
+
+        @property
+        def date_received(self) -> str:
+            return self._date_received
+
+        @date_received.setter
+        def date_received(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("date_received must be an str")
+            self._date_received = value
+
+        @property
+        def fiscal_year_or_event_date(self) -> str:
+            return self._fiscal_year_or_event_date
+
+        @fiscal_year_or_event_date.setter
+        def fiscal_year_or_event_date(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("fiscal_year_or_event_date must be an str")
+            self._fiscal_year_or_event_date = value
+
+        @property
+        def part_no_of_return(self) -> str:
+            return self._part_no_of_return
+
+        @part_no_of_return.setter
+        def part_no_of_return(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("part_no_of_return must be an str")
+            self._part_no_of_return = value
+
+        @property
+        def contribution_type(self) -> str:
+            return self._contribution_type
+
+        @contribution_type.setter
+        def contribution_type(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("contribution_type must be an str")
+            self._contribution_type = value
+
+        @property
+        def monetary_amount(self) -> float:
+            return self._monetary_amount
+
+        @monetary_amount.setter
+        def monetary_amount(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("monetary_amount must be an str")
+            self._monetary_amount = value
+
+        @property
+        def non_monetary_amount(self) -> float:
+            return self._non_monetary_amount
+
+        @non_monetary_amount.setter
+        def non_monetary_amount(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("non_monetary_amount must be an str")
+            self._non_monetary_amount = value

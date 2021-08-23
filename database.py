@@ -1044,3 +1044,43 @@ class Persistence:
                         f'An exception occurred inserting {row.election_id}:\n{e}')
                     cur.connection.rollback()
 
+    @staticmethod
+    def write_financial_contributions(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_financial_contributions_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (
+                        DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                    """).format(table=sql.Identifier(table))
+
+            for row in data:
+
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.recipient_id,
+                       row.recipient_party_id,
+                        row.recipient_name,
+                        row.contributor_prov_terr_id,
+                        row.contributor_name,
+                        row.contributor_city,
+                        row.contributor_postal_code,
+                        row.date_received,
+                        row.fiscal_year_or_event_date,
+                        row.part_no_of_return,
+                        row.contribution_type,
+                        row.monetary_amount,
+                        row.non_monetary_amount)
+
+                try:
+                    cur.execute(insert_financial_contributions_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.recipient_id}:\n{e}')
+                    cur.connection.rollback()
+
