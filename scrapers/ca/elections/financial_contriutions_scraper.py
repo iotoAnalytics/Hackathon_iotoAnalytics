@@ -38,12 +38,16 @@ with CursorFromConnectionFromPool() as cur:
         cur.execute(query)
         candidates = cur.fetchall()
 
+        query = 'SELECT * FROM ca_electoral_districts'
+        cur.execute(query)
+        electoral_districts = cur.fetchall()
+
     except Exception as e:
         sys.exit(
             f'An exception occurred retrieving tables from database:\n{e}')
 
     candidates_df = pd.DataFrame(candidates)
-
+    districts = pd.DataFrame(electoral_districts)
 
 def get_urls():
     urls = []
@@ -107,7 +111,15 @@ def read_csv(url):
     print(list_of_dicts[1])
 
     new_list = format_dicts(list_of_dicts)
+    new_list = remove_bad_values(new_list)
     return new_list
+
+
+def remove_bad_values(new_list):
+    list = [i for i in new_list if not (i['recipient_id'] == 0)]
+    list = [i for i in list if not (i['recipient_party_id'] == 0)]
+    list = [i for i in list if not (i['contributor_prov_terr_id'] == 0)]
+    return list
 
 
 def format_dicts(list_of_dicts):
@@ -119,7 +131,7 @@ def format_dicts(list_of_dicts):
         else:
             party_id = get_party_id(i['Political Party'])
         if 'Contributor Province' in i.keys():
-            cont_prov_id = get_prov_terr_id(i['Contributor Province'])
+            cont_prov_id = get_prov_terr_id(i['Contributor Province'], i['Electoral District'])
         else:
             cont_prov_id = 0
         if ' Contributor name' in i.keys():
@@ -148,12 +160,24 @@ def format_dicts(list_of_dicts):
             non_money = 0
         if 'Fiscal date' in i.keys():
             fiscal_date = i['Fiscal date']
+            if fiscal_date == 0:
+                fiscal_date = None
+            if fiscal_date == 'None':
+                fiscal_date = None
         else:
             fiscal_date = i['Fiscal/Election date']
+            if fiscal_date == 0:
+                fiscal_date = None
+            if fiscal_date == 'None':
+                fiscal_date = None
         if 'date_received' in i.keys():
             date_received = i['Contribution Received date']
+            if date_received == 0:
+                date_received = None
+            if date_received == 'None':
+                date_received = None
         else:
-            date_received = "1212-12-12"
+            date_received = '1212-12-12'
         goverlytics_id = get_goverlytics_id(i['Recipient'])
         new_dict = {
                     'recipient_id': goverlytics_id,
@@ -175,7 +199,7 @@ def format_dicts(list_of_dicts):
     return new_list_of_dicts
 
 
-def get_prov_terr_id(province):
+def get_prov_terr_id(province, district):
     #print(province)
     if not province:
         return 0
@@ -201,7 +225,22 @@ def get_prov_terr_id(province):
                 return value
     except Exception as e:
         print(e)
+    try:
+        value = get_prov_terr_id_from_district(district)
+        return value
+    except:
         return 0
+
+
+def get_prov_terr_id_from_district(province):
+    province = province.replace('–', '--')
+    if pd.notna(province):
+        df = districts
+        value = df.loc[df["district_name"] == province]['province_territory_id'].values[0]
+        try:
+            return int(value)
+        except Exception:
+            return value
 
 
 def get_party_id(party):
@@ -222,11 +261,11 @@ def get_party_id(party):
         party = party_conversions.get(party)
     if pd.notna(party):
         df = scraper_utils.parties
-        value = df.loc[df["party"] == party]['id'].values[0]
         try:
+            value = df.loc[df["party"] == party]['id'].values[0]
             return int(value)
         except Exception:
-            return value
+            return 0
 
 
 def get_goverlytics_id(recipient_name):
@@ -238,6 +277,7 @@ def get_goverlytics_id(recipient_name):
     if recipient_id is None:
         try:
             first_name = recipient_name.split(', ')[1]
+            first_name = first_name.split(' ')[0]
             last_name = recipient_name.split(', ')[0]
             if pd.notna(recipient_name):
                 df = candidates_df
@@ -271,7 +311,7 @@ def get_row_data(data):
 
 if __name__ == '__main__':
     urls = get_urls()
-    data = [read_csv(url) for url in urls[1:2]]
+    data = [read_csv(url) for url in urls[:]]
     lambda_obj = lambda x: (x is not None)
 
     list_out = list(filter(lambda_obj, data))
