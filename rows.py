@@ -1214,7 +1214,7 @@ class ElectoralDistrictsRow:
         return self._start_date
     @start_date.setter
     def start_date(self, value: str) -> None:
-        if not isinstance(value, str) and value != None:
+        if value and not isinstance(value, str):
             raise TypeError("start_date must be a str")
         if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
             raise ValueError("Improper date formating in start_date. Required format: YYYY-MM-DD")
@@ -1634,7 +1634,7 @@ class FinancialContributionsRow:
             self._contributor_name = None
             self._contributor_city = None
             self._contributor_postal_code = None
-            self._date_received = ''
+            self._date_received = None
             self._fiscal_year_or_event_date = None
             self._part_no_of_return = None
             self._contribution_type = None
@@ -1717,7 +1717,7 @@ class FinancialContributionsRow:
 
         @date_received.setter
         def date_received(self, value: str) -> None:
-            if type(value) != str:
+            if value and (not isinstance(value, str)):
                 raise TypeError("election_date must be a str")
             if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
                 raise ValueError("Improper date formating in date_received. Required format: YYYY-MM-DD")
@@ -1729,7 +1729,7 @@ class FinancialContributionsRow:
 
         @fiscal_year_or_event_date.setter
         def fiscal_year_or_event_date(self, value: str) -> None:
-            if type(value) != str:
+            if (not isinstance(value, str)) and value != None:
                 raise TypeError("election_date must be a str")
             if value and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
                 raise ValueError("Improper date formating in fiscal_year_or_event_date. Required format: YYYY-MM-DD")

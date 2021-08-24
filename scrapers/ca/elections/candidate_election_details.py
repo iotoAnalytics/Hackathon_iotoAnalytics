@@ -58,18 +58,20 @@ class Election:
         self.driver = SeleniumDriver()
 
         self._collect_data()
+        self.driver.close_driver()
 
     def get_row(self):
         return self.row
 
     def _collect_data(self):
         self.row.election_id = int(self.id_and_link[0])
-        self._election_data_from_links()
+        self._open_election_link()
+        self._prepare_site_for_collection()
+        self._get_data_from_link()
 
-    def _election_data_from_links(self):
+    def _open_election_link(self):
         link = self.id_and_link[1]
         self.driver.start_driver(link, crawl_delay)
-        self._prepare_site_for_collection()
 
     def _prepare_site_for_collection(self):
         self._expand_all()
@@ -87,6 +89,14 @@ class Election:
         page_sizes = self.driver.driver.find_elements_by_class_name('dx-page-size')
         page_sizes[-1].click()
         sleep(3)
+
+    def _get_data_from_link(self):
+        page_source_html = self.driver.get_html_source()
+        page_soup = soup(page_source_html, 'html.parser')
+        table = page_soup.find_all('table', {'class':'dx-datagrid-table dx-datagrid-table-fixed'})[-1]
+        df = pd.read_html(str(table), index_col=[0, 1])[0]
+        df.columns = ['Candidate', 'Political Party', 'Gender', 'Occupation', 'Result', 'Votes']
+        print(df)
 
 class SeleniumDriver:
     """
