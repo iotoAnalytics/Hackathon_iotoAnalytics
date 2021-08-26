@@ -5,6 +5,8 @@ import sys
 from time import sleep
 from typing import Union
 
+from numpy.core.numeric import full
+
 NODES_TO_ROOT = 3
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
@@ -21,18 +23,20 @@ from selenium.webdriver.chrome.options import Options
 
 COUNTRY = 'ca'
 BASE_URL = 'https://lop.parl.ca'
+INCUMBENT_INFO_URL = BASE_URL + '/sites/ParlInfo/default/en_CA/ElectionsRidings/incumbentsRan'
 
 scraper_utils = CandidatesElectionDetails(COUNTRY)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 options = Options()
-# options.headless = True
+options.headless = True
 
 def program_driver():
     print("Collecting data...")
     election_id_and_links = DataFrames().get_election_links()
     row_data = get_data_from_all_links(collect_election_data, election_id_and_links[:2])
-    print(row_data)
+    data = [rows for rows in row_data]
+    print(data)
 
 def get_data_from_all_links(function, iterable):
     data = []
@@ -54,20 +58,84 @@ class DataFrames:
 class Election:
     def __init__(self, id_and_link):
         self.id_and_link = id_and_link
-        self.row = scraper_utils.initialize_row()
+        self.election_id = int(self.id_and_link[0])
         self.driver = SeleniumDriver()
+        
+        self.incumbent_df = self._get_incument_data()
+        self.df = self._get_data_df()
 
-        self._collect_data()
+        self.rows = []
+        self._set_rows()
+
         self.driver.close_driver()
 
     def get_row(self):
-        return self.row
+        return self.rows
 
-    def _collect_data(self):
-        self.row.election_id = int(self.id_and_link[0])
+    def _get_incument_data(self):
+        incumbent_driver = SeleniumDriver()
+        incumbent_driver.start_driver(INCUMBENT_INFO_URL, crawl_delay)
+        sleep(15)
+
+        try_count = 5
+        while try_count > 0:
+            try:
+                page_sizes = incumbent_driver.driver.find_elements_by_class_name('dx-page-size')
+                page_sizes[-1].click()
+                break
+            except:
+                sleep(2)
+                try_count -= 1
+        sleep(2)
+
+        trs = incumbent_driver.driver.find_elements_by_tag_name('tr')
+        tr = self._find_right_parliament_row(trs)
+
+        try:
+            expand_button = tr.find_element_by_class_name('dx-datagrid-group-closed')
+            expand_button.click()
+            sleep(3)
+
+        except:
+            print(f"No expand button found for election id: {self.election_id}")
+
+        html = incumbent_driver.get_html_source()
+        html_soup = soup(html, 'html.parser')
+        html_table_data = html_soup.find_all('table', {'class': 'dx-datagrid-table dx-datagrid-table-fixed'})[1]
+        df = pd.read_html(str(html_table_data), index_col=[0])[0]
+        df.columns = ['Name', 'Constituency', 'Province/Territory', 'Political Affiliation', 'Date of Next Election', 'Constituency at Next Election', 'Province/Territory at Next Election', 'Political Affiliation at Next Election', 'Result at Next Election']
+        incumbent_driver.close_driver()
+        return df
+
+    def _find_right_parliament_row(self, trs):
+        parliament_number_to_look_for = self._get_search_parliament_number()
+
+        for tr in trs:
+            if parliament_number_to_look_for in tr.text:
+                return tr
+
+    def _get_search_parliament_number(self):
+        elections_df = scraper_utils.elections
+        election_name = elections_df.loc[elections_df['id'] == self.election_id]['election_name'].values[0]
+        parliament_number = str(election_name).split('_')[0]
+        return str(int(parliament_number) - 1)
+
+    def _get_data_df(self):
         self._open_election_link()
         self._prepare_site_for_collection()
-        self._get_data_from_link()
+        df = self._get_data_from_link()
+        while self._get_next_page_button():
+            click_count_try = 5
+            while click_count_try > 0:
+                try:
+                    self._get_next_page_button().click()
+                    sleep(4)
+                    break
+                except:
+                    sleep(2)
+                    click_count_try -= 1
+            df = df.append(self._get_data_from_link())
+        return df
 
     def _open_election_link(self):
         link = self.id_and_link[1]
@@ -78,7 +146,7 @@ class Election:
         try:
             self._view_1000_items()
         except:
-            print(f"No 1000 items button for election_id: {self.row.election_id}")
+            print(f"No 1000 items button for election_id: {self.election_id}")
         
     def _expand_all(self):
         expand_all_checkbox = self.driver.driver.find_element_by_class_name('dx-checkbox-icon')
@@ -96,7 +164,105 @@ class Election:
         table = page_soup.find_all('table', {'class':'dx-datagrid-table dx-datagrid-table-fixed'})[-1]
         df = pd.read_html(str(table), index_col=[0, 1])[0]
         df.columns = ['Candidate', 'Political Party', 'Gender', 'Occupation', 'Result', 'Votes']
-        print(df)
+        return df
+
+    def _get_next_page_button(self):
+        try:
+            next_page_button = self.driver.driver.find_elements_by_class_name('dx-navigate-button')[-1]
+        except:
+            return False
+        if "dx-button-disable" not in next_page_button.get_attribute('class'):
+            return next_page_button
+
+    def _set_rows(self):
+        electoral_district = None
+        for index, row in self.df.iterrows():
+            value = row['Candidate']
+            if pd.notna(value) and 'Constituency' in value:
+                electoral_district = str(value).split(': ')[1].split(' (')[0]
+            elif pd.notna(value) and 'Province / Territory:' not in value:
+                self.rows.append(self._set_row_data(row, electoral_district))
+
+    def _set_row_data(self, table_row: DataFrame, electoral_district):
+        row = scraper_utils.initialize_row()
+        row.election_id = self.election_id
+        row.electoral_district_id = self._get_electoral_district_id(electoral_district)
+        row.party_id = self._get_party_id(table_row)
+        # row.candidate_id = self._get_candidate_id(table_row)
+        row.is_incumbent = self._get_is_incumbent(table_row)
+        return row
+
+    def _get_electoral_district_id(self, electoral_district):
+        df = scraper_utils.electoral_districts
+        id = df.loc[df['district_name'] == electoral_district]['id'].values[0]
+        return int(id)
+
+    def _get_party_id(self, table_row):
+        party = self._get_party_name(table_row)
+        df = scraper_utils.parties
+        try:
+            id = df.loc[df['party'] == party]['id'].values[0]
+        except:
+            id = df.loc[df['party'] == 'Other']['id'].values[0]
+            if party != 'Unknown' and 'No affiliation' not in party:
+                print(f"Party: {table_row['Political Affiliation']}")
+        return int(id)
+
+    def _get_party_name(self, table_row):
+        party_name_flags = ['Canada', 'Canadian', 'Canada\'s']
+
+        party_name = table_row['Political Party']
+        party_name = party_name.split(' (')[0]
+
+        if party_name == 'Canada Party' or party_name == 'Canadian Party':
+            return party_name
+        if party_name.split(' ')[0] in party_name_flags:
+            remove = party_name.split(' ')[0]
+            return party_name.split(remove)[1].split(' Party')[0].strip()
+        return party_name.split(' Party')[0]
+
+
+    '''
+    TODO
+    Find a nice way to get an exact match for candidate
+    '''
+    def _get_candidate_id(self, table_row):
+        candidate_name = table_row['Candidate']
+        full_name = HumanName(candidate_name)
+        name_last = full_name.last.lower()
+        name_first = full_name.first.lower()
+
+        df = scraper_utils.candidates
+        name_last_match = df["name_last"].apply(str.lower) == name_last
+        name_first_match = df["name_first"].apply(str.lower) == name_first
+
+        name_match = df.loc[(name_last_match) & (name_first_match)]
+        if len(name_match) > 1:
+            print(name_match)
+        if name_match.empty:
+            print("Empty for: ", full_name)
+        return 0
+
+    def _get_is_incumbent(self, table_row):
+        candidate_name = table_row['Candidate']
+
+        elections_df = scraper_utils.elections
+        parliament_number = elections_df.loc[elections_df['id'] == self.election_id]['election_name'].values[0]
+        parliament_number = str(parliament_number).split('_')[0]
+
+        if int(parliament_number) == 1:
+            return False
+        
+        '''
+        TODO 
+        Find additional checks for matching candidate 
+        '''
+
+        name_match = self.incumbent_df.loc[self.incumbent_df['Name'] == candidate_name]
+        if not name_match.empty:
+            return True
+
+        return False
 
 class SeleniumDriver:
     """
