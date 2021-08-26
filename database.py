@@ -975,7 +975,6 @@ class Persistence:
                         f'An exception occurred inserting {row.district_name}:\n{e}')
                     cur.connection.rollback()
 
-
     @staticmethod
     def write_electors(data, table):
         if not isinstance(data, list):
