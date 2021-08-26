@@ -12,7 +12,6 @@ path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 from bs4 import BeautifulSoup as soup
-from multiprocessing import Pool
 from nameparser import HumanName
 from numpy import nan
 import pandas as pd
@@ -34,16 +33,23 @@ options.headless = True
 def program_driver():
     print("Collecting data...")
     election_id_and_links = DataFrames().get_election_links()
-    row_data = get_data_from_all_links(collect_election_data, election_id_and_links[:2])
-    data = [rows for rows in row_data]
-    print(data)
+    get_data_from_all_links(election_id_and_links[:2])
 
-def get_data_from_all_links(function, iterable):
+
+def get_data_from_all_links(iterable):
     data = []
-    with Pool() as pool:
-        data = pool.map(func=function,
-                        iterable=iterable)
-    return data
+    for id_and_link in iterable:
+        f = open('scrapers/ca/elections/candidate_election_progress.txt', 'r')
+        current_progress = f.read()
+        f.close()
+
+        election_id = str(id_and_link[0])
+        if election_id > current_progress:
+            data = collect_election_data(id_and_link)
+            f = open('scrapers/ca/elections/candidate_election_progress.txt', 'w')
+            f.write(election_id)
+            f.close()
+            scraper_utils.write_data(data)
 
 def collect_election_data(id_and_link):
     election_data_scraper = Election(id_and_link)
@@ -59,6 +65,7 @@ class Election:
     def __init__(self, id_and_link):
         self.id_and_link = id_and_link
         self.election_id = int(self.id_and_link[0])
+        self.parliament_number = self._get_parliament_number()
         self.driver = SeleniumDriver()
         
         self.incumbent_df = self._get_incument_data()
@@ -72,10 +79,15 @@ class Election:
     def get_row(self):
         return self.rows
 
+    def _get_parliament_number(self):
+        elections_df = scraper_utils.elections
+        election_name = elections_df.loc[elections_df['id'] == self.election_id]['election_name'].values[0]
+        return int(str(election_name).split('_')[0])
+
     def _get_incument_data(self):
         incumbent_driver = SeleniumDriver()
         incumbent_driver.start_driver(INCUMBENT_INFO_URL, crawl_delay)
-        sleep(15)
+        sleep(20)
 
         try_count = 5
         while try_count > 0:
@@ -111,14 +123,11 @@ class Election:
         parliament_number_to_look_for = self._get_search_parliament_number()
 
         for tr in trs:
-            if parliament_number_to_look_for in tr.text:
+            if str(parliament_number_to_look_for) in tr.text:
                 return tr
 
     def _get_search_parliament_number(self):
-        elections_df = scraper_utils.elections
-        election_name = elections_df.loc[elections_df['id'] == self.election_id]['election_name'].values[0]
-        parliament_number = str(election_name).split('_')[0]
-        return str(int(parliament_number) - 1)
+        return self.parliament_number - 1
 
     def _get_data_df(self):
         self._open_election_link()
@@ -177,19 +186,22 @@ class Election:
     def _set_rows(self):
         electoral_district = None
         for index, row in self.df.iterrows():
+            count = 0
+            print(index, count)
             value = row['Candidate']
             if pd.notna(value) and 'Constituency' in value:
                 electoral_district = str(value).split(': ')[1].split(' (')[0]
             elif pd.notna(value) and 'Province / Territory:' not in value:
                 self.rows.append(self._set_row_data(row, electoral_district))
+            count += 1
 
     def _set_row_data(self, table_row: DataFrame, electoral_district):
         row = scraper_utils.initialize_row()
         row.election_id = self.election_id
         row.electoral_district_id = self._get_electoral_district_id(electoral_district)
         row.party_id = self._get_party_id(table_row)
-        # row.candidate_id = self._get_candidate_id(table_row)
         row.is_incumbent = self._get_is_incumbent(table_row)
+        row.candidate_id = self._get_candidate_id(table_row)
         return row
 
     def _get_electoral_district_id(self, electoral_district):
@@ -221,11 +233,6 @@ class Election:
             return party_name.split(remove)[1].split(' Party')[0].strip()
         return party_name.split(' Party')[0]
 
-
-    '''
-    TODO
-    Find a nice way to get an exact match for candidate
-    '''
     def _get_candidate_id(self, table_row):
         candidate_name = table_row['Candidate']
         full_name = HumanName(candidate_name)
@@ -237,20 +244,32 @@ class Election:
         name_first_match = df["name_first"].apply(str.lower) == name_first
 
         name_match = df.loc[(name_last_match) & (name_first_match)]
-        if len(name_match) > 1:
-            print(name_match)
-        if name_match.empty:
-            print("Empty for: ", full_name)
-        return 0
+
+        possible_gov_ids = name_match['goverlytics_id'].values
+
+        if len(name_match) > 1 or name_match.empty:
+            print("Candidate info: ", full_name, "\nParliament Number: ", self.parliament_number)
+            user_input = None
+            while user_input is None:
+                user_input_gov_id = input("Enter the goverlytic_id of correct candidate: ")
+                if user_input_gov_id.isnumeric() and (len(possible_gov_ids) == 0 or int(user_input_gov_id) in possible_gov_ids):
+                    while True:
+                        user_input = input(f"You entered: {user_input_gov_id}. Is this correct? (y/n): ")
+                        if user_input == 'y':
+                            return int(user_input_gov_id)
+                        elif user_input == 'n':
+                            print("Try again.")
+                            user_input = None
+                            break
+                        else:
+                            print("Please enter y or n")
+        return int(possible_gov_ids[0])
 
     def _get_is_incumbent(self, table_row):
-        candidate_name = table_row['Candidate']
+        candidate_name = str(table_row['Candidate']).strip()
+        print(candidate_name)
 
-        elections_df = scraper_utils.elections
-        parliament_number = elections_df.loc[elections_df['id'] == self.election_id]['election_name'].values[0]
-        parliament_number = str(parliament_number).split('_')[0]
-
-        if int(parliament_number) == 1:
+        if int(self.parliament_number) == 1:
             return False
         
         '''
@@ -260,8 +279,11 @@ class Election:
 
         name_match = self.incumbent_df.loc[self.incumbent_df['Name'] == candidate_name]
         if not name_match.empty:
-            return True
-
+            party_match = name_match.loc[name_match['Political Affiliation at Next Election'] == str(table_row['Political Party']).strip()]
+            result_match = name_match.loc[name_match['Result at Next Election'] == str(table_row['Result']).strip()]
+            if not (party_match.empty and result_match.empty):
+                print("Match found for: ", candidate_name)
+                return True
         return False
 
 class SeleniumDriver:
