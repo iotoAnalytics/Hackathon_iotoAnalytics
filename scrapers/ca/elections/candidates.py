@@ -5,6 +5,8 @@ The current version adds candidates based looking at all the Canadian Legislator
 and if it doesn't exists, assigns a new goverlytics_id. 
 Seriously, there are around 45000 data entries all using Selenium, so it takes a long time.
 
+!!! This program should not be run again.
+
 For version 2.0
 -------------------
 Version 2.0 should be made for subsequent elections so that candidates are checked against the ca_candidates table.
