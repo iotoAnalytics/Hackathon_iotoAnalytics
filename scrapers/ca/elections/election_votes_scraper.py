@@ -54,6 +54,7 @@ def find_election_votes_links(link):
         if "Voting" in link.text:
             voter_link = link.get('href')
             voter_link = MAIN_URL + voter_link
+            scraper_utils.crawl_delay(crawl_delay)
             return voter_link
 
 
@@ -73,7 +74,7 @@ def get_urls():
         link = find_election_votes_links(link)
         if link is not None:
             urls.append(link)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 

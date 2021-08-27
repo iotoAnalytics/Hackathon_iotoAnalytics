@@ -64,6 +64,7 @@ def get_urls():
         if "Download contributions" in l.text:
             if "submitted" not in l.text:
                 urls.append(MAIN_URL + l.get('href'))
+    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
@@ -364,7 +365,6 @@ def get_goverlytics_id(recipient_name):
 
 
 def get_row_data(data):
-    print(data)
     row = scraper_utils.initialize_row()
     row.recipient_id = int(data['recipient_id'])
     row.recipient_party_id = int(data['recipient_party_id'])
