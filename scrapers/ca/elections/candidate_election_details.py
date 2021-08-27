@@ -146,6 +146,14 @@ class Election:
             df = df.append(self._get_data_from_link())
         return df
 
+    def _get_data_from_link(self):
+        page_source_html = self.driver.get_html_source()
+        page_soup = soup(page_source_html, 'html.parser')
+        table = page_soup.find_all('table', {'class':'dx-datagrid-table dx-datagrid-table-fixed'})[-1]
+        df = pd.read_html(str(table), index_col=[0, 1])[0]
+        df.columns = ['Candidate', 'Political Party', 'Gender', 'Occupation', 'Result', 'Votes']
+        return df
+
     def _open_election_link(self):
         link = self.id_and_link[1]
         self.driver.start_driver(link, crawl_delay)
@@ -167,14 +175,6 @@ class Election:
         page_sizes[-1].click()
         sleep(3)
 
-    def _get_data_from_link(self):
-        page_source_html = self.driver.get_html_source()
-        page_soup = soup(page_source_html, 'html.parser')
-        table = page_soup.find_all('table', {'class':'dx-datagrid-table dx-datagrid-table-fixed'})[-1]
-        df = pd.read_html(str(table), index_col=[0, 1])[0]
-        df.columns = ['Candidate', 'Political Party', 'Gender', 'Occupation', 'Result', 'Votes']
-        return df
-
     def _get_next_page_button(self):
         try:
             next_page_button = self.driver.driver.find_elements_by_class_name('dx-navigate-button')[-1]
@@ -185,9 +185,8 @@ class Election:
 
     def _set_rows(self):
         electoral_district = None
+        count = 0
         for index, row in self.df.iterrows():
-            count = 0
-            print(index, count)
             value = row['Candidate']
             if pd.notna(value) and 'Constituency' in value:
                 electoral_district = str(value).split(': ')[1].split(' (')[0]
@@ -267,16 +266,10 @@ class Election:
 
     def _get_is_incumbent(self, table_row):
         candidate_name = str(table_row['Candidate']).strip()
-        print(candidate_name)
 
         if int(self.parliament_number) == 1:
             return False
         
-        '''
-        TODO 
-        Find additional checks for matching candidate 
-        '''
-
         name_match = self.incumbent_df.loc[self.incumbent_df['Name'] == candidate_name]
         if not name_match.empty:
             party_match = name_match.loc[name_match['Political Affiliation at Next Election'] == str(table_row['Political Party']).strip()]
