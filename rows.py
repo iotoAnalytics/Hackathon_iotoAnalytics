@@ -1775,3 +1775,40 @@ class FinancialContributionsRow:
                 raise TypeError("non_monetary_amount must be an str")
             self._non_monetary_amount = value
 
+@dataclass
+class CandidateElectionFinancesRow:
+        """
+        Data structure for housing data data for election votes
+        """
+
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        candidate_election_id: int
+        date_of_return: str
+
+        def __init__(self):
+            self._candidate_election_id = None
+            self._date_of_return = None
+
+        @property
+        def candidate_election_id(self) -> int:
+            return self._candidate_election_id
+
+        @candidate_election_id.setter
+        def candidate_election_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("candidate_election_id must be an int")
+            self._candidate_election_id = value
+
+        @property
+        def date_of_return(self) -> int:
+            return self._date_of_return
+
+        @date_of_return.setter
+        def date_of_return(self, value: str) -> None:
+            if not isinstance(value, str):
+                raise TypeError("date_of_return must be an str")
+            self._date_of_return = value
+

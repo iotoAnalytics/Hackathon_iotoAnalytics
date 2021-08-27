@@ -8,7 +8,7 @@ from pandas import DataFrame
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 
-from scraper_utils import FinancialContributionsScraperUtils
+from scraper_utils import CandidateElectionFinancesScraperUtils
 from database import CursorFromConnectionFromPool
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -29,7 +29,7 @@ ELECTION_FINANCES_URL = MAIN_URL + '/WPAPPS/WPF/EN/Home/Index'
 THREADS_FOR_POOL = 12
 
 #
-scraper_utils = FinancialContributionsScraperUtils(COUNTRY, TABLE)
+scraper_utils = CandidateElectionFinancesScraperUtils(COUNTRY, TABLE)
 crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
 
 with CursorFromConnectionFromPool() as cur:
@@ -304,11 +304,18 @@ def get_election_id(election):
 
 
 def get_row_data(data):
+    print(data)
     row = scraper_utils.initialize_row()
-
+    row.candidate_election_id = data['candidate_election_id']
+    row.date_of_return = data['date_of_return']
     return row
 
 
 if __name__ == '__main__':
     data = get_data()
-    print(data)
+    lambda_obj = lambda x: (x is not None)
+    list_out = list(filter(lambda_obj, data))
+    flat_ls = [item for sublist in list_out for item in sublist]
+    row_data = [get_row_data(d) for d in flat_ls]
+    #scraper_utils.write_data(row_data)
+    print(row_data)
