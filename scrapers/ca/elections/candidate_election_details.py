@@ -33,7 +33,7 @@ options.headless = True
 def program_driver():
     print("Collecting data...")
     election_id_and_links = DataFrames().get_election_links()
-    get_data_from_all_links(election_id_and_links[:2])
+    get_data_from_all_links(election_id_and_links)
 
 
 def get_data_from_all_links(iterable):
