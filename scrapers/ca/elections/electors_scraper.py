@@ -54,6 +54,7 @@ def find_electors_links(link):
         if "Voting" in link.text:
             voter_link = link.get('href')
             voter_link = MAIN_URL + voter_link
+            scraper_utils.crawl_delay(crawl_delay)
             return voter_link
 
 
@@ -73,7 +74,7 @@ def get_urls():
         link = find_electors_links(link)
         if link is not None:
             urls.append(link)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
@@ -406,9 +407,7 @@ def get_row_data(data):
 
 
 if __name__ == '__main__':
-    print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
-If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
-like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
+
     urls = get_urls()
     data = []
     data_list = []
