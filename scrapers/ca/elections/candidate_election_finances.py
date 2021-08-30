@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 import time
-
+from multiprocessing import Pool
 from pandas import DataFrame
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -142,7 +142,7 @@ def search_candidates(url):
     browser.find_element_by_id('button3').click()
     time.sleep(3)
     browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-    # browser.find_element_by_id('SelectAllCandidates').click()
+    #browser.find_element_by_id('SelectAllCandidates').click()
     time.sleep(3)
     browser.find_element_by_id('SearchSelected').click()
 
@@ -304,18 +304,14 @@ def get_election_id(election):
 
 
 def get_row_data(data):
-    print(data)
     row = scraper_utils.initialize_row()
-    row.candidate_election_id = data['candidate_election_id']
-    row.date_of_return = data['date_of_return']
+    row.candidate_election_id = int(data['candidate_election_id'])
+    row.date_of_return = str(data['date_of_return'])
     return row
 
 
 if __name__ == '__main__':
     data = get_data()
-    lambda_obj = lambda x: (x is not None)
-    list_out = list(filter(lambda_obj, data))
-    flat_ls = [item for sublist in list_out for item in sublist]
-    row_data = [get_row_data(d) for d in flat_ls]
-    #scraper_utils.write_data(row_data)
-    print(row_data)
+    row_data = [get_row_data(d) for d in data]
+    scraper_utils.write_data(row_data)
+    print('finished')

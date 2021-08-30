@@ -1311,5 +1311,5 @@ class CandidateElectionFinancesScraperUtils(ScraperUtils):
         Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
         """
         table = database_table if database_table else self.database_table_name
-        Persistence.write_financial_contributions(data, table)
+        Persistence.write_candidate_election_finances(data, table)
 # end region
