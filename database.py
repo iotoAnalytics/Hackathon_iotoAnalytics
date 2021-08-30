@@ -1128,7 +1128,8 @@ class Persistence:
             insert_previous_election_query = sql.SQL("""
                 INSERT INTO {table}
                 VALUES (
-                    DEFAULT, %s, %s, %s, %s, %s);
+                    DEFAULT, %s, %s, %s, %s, %s)
+                ON CONFLICT DO NOTHING;
                 """).format(table=sql.Identifier(table))
 
             for row in data:
@@ -1141,13 +1142,13 @@ class Persistence:
                        row.election_id, 
                        row.is_incumbent)
 
-            try:
-                cur.execute(insert_previous_election_query, tup)
+                try:
+                    cur.execute(insert_previous_election_query, tup)
 
-            except Exception as e:
-                print(
-                    f'An exception occurred inserting {row.candidate_id}:\n{e}')
-                cur.connection.rollback()
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.candidate_id}:\n{e}')
+                    cur.connection.rollback()
 
 
     @staticmethod

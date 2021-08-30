@@ -35,7 +35,6 @@ def program_driver():
     election_id_and_links = DataFrames().get_election_links()
     get_data_from_all_links(election_id_and_links)
 
-
 def get_data_from_all_links(iterable):
     data = []
     for id_and_link in iterable:
@@ -70,7 +69,6 @@ class Election:
         
         self.incumbent_df = self._get_incument_data()
         self.df = self._get_data_df()
-
         self.rows = []
         self._set_rows()
 
@@ -116,6 +114,8 @@ class Election:
         html_table_data = html_soup.find_all('table', {'class': 'dx-datagrid-table dx-datagrid-table-fixed'})[1]
         df = pd.read_html(str(html_table_data), index_col=[0])[0]
         df.columns = ['Name', 'Constituency', 'Province/Territory', 'Political Affiliation', 'Date of Next Election', 'Constituency at Next Election', 'Province/Territory at Next Election', 'Political Affiliation at Next Election', 'Result at Next Election']
+        df['name_last'] = df.apply(lambda row: HumanName(row.Name).last, axis=1)
+
         incumbent_driver.close_driver()
         return df
 
@@ -199,7 +199,7 @@ class Election:
         row.election_id = self.election_id
         row.electoral_district_id = self._get_electoral_district_id(electoral_district)
         row.party_id = self._get_party_id(table_row)
-        row.is_incumbent = self._get_is_incumbent(table_row)
+        row.is_incumbent = self._get_is_incumbent(table_row, electoral_district)
         row.candidate_id = self._get_candidate_id(table_row)
         return row
 
@@ -264,18 +264,22 @@ class Election:
                             print("Please enter y or n")
         return int(possible_gov_ids[0])
 
-    def _get_is_incumbent(self, table_row):
-        candidate_name = str(table_row['Candidate']).strip()
+    def _get_is_incumbent(self, table_row, electoral_district):
+        candidate_name = str(table_row['Candidate']).strip().lower()
+        name = HumanName(candidate_name)
+        name_last = name.last
+
+        name_last_match = self.incumbent_df["name_last"].apply(str.lower) == name_last.lower()
 
         if int(self.parliament_number) == 1:
             return False
         
-        name_match = self.incumbent_df.loc[self.incumbent_df['Name'] == candidate_name]
+        name_match = self.incumbent_df.loc[name_last_match]
         if not name_match.empty:
             party_match = name_match.loc[name_match['Political Affiliation at Next Election'] == str(table_row['Political Party']).strip()]
             result_match = name_match.loc[name_match['Result at Next Election'] == str(table_row['Result']).strip()]
-            if not (party_match.empty and result_match.empty):
-                print("Match found for: ", candidate_name)
+            electoral_match = name_match.loc[name_match['Constituency'] == electoral_district]
+            if not (party_match.empty or result_match.empty or electoral_match.empty):
                 return True
         return False
 
