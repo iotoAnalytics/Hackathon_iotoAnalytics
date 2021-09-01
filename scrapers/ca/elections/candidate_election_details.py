@@ -43,7 +43,8 @@ def get_data_from_all_links(iterable):
         f.close()
 
         election_id = str(id_and_link[0])
-        if election_id > current_progress:
+        if int(election_id) > int(current_progress):
+            print(f"Currently on election ID: {election_id}")
             data = collect_election_data(id_and_link)
             f = open('scrapers/ca/elections/candidate_election_progress.txt', 'w')
             f.write(election_id)
@@ -216,7 +217,7 @@ class Election:
         except:
             id = df.loc[df['party'] == 'Other']['id'].values[0]
             if party != 'Unknown' and 'No affiliation' not in party:
-                print(f"Party: {table_row['Political Affiliation']}")
+                print(f"Party: {table_row['Political Party']} not found for {table_row['Candidate']}")
         return int(id)
 
     def _get_party_name(self, table_row):
