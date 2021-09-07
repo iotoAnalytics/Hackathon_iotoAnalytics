@@ -6,3 +6,13 @@ BILL_TYPE_FULL = {
     'HR': 'Resolution',
     'SR': 'Resolution'
 }
+
+CHAMBER_FULL = {
+    'H': 'House',
+    'S': 'Senate'
+}
+
+CHAMBER_TO_ROLE = {
+    'house': 'Representative',
+    'senate': 'Senator'
+}

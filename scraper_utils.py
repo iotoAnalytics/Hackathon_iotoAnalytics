@@ -20,7 +20,6 @@ from database import Database, CursorFromConnectionFromPool, Persistence
 from dataclasses import dataclass, field
 from typing import List
 from rows import *
-import row_validator
 import copy
 # import atexit
 import utils
@@ -219,9 +218,6 @@ class ScraperUtils:
         row.country = self.country
         return row
 
-    def get_row_validator(self):
-        return row_validator.Validator(type(self.row_type))
-
     class Timer:
         """A timing decorator to test the speed of your functions. Call @scraper_utils.Timer() above your function to
         time your function."""
@@ -263,7 +259,6 @@ class LegislatorScraperUtils(ScraperUtils):
             return int(val)
         except Exception:
             return val
-
 
     def scrape_wiki_bio(self, wiki_link):
         """
@@ -1179,5 +1174,154 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
+# region Election Scraper Utils
+
+# region Election Data
+
+##########################################
+# PREVIOUS ELECTION SCRAPER UTILS
+##########################################
+
+class ElectionScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectionRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_previous_election_data(data, table)
+
+class ElectoralDistrictScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectoralDistrictsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_electoral_districts_data(data, table)
+
+class ElectorsScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectorsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting electors data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_electors(data, table)
+
+class ElectionVotesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectionVotesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_election_votes(data, table)
+
+class CandidatesScraperUtils(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidates'
+        super().__init__(country, table_name, row_type=CandidatesRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_legislators'
+                cur.execute(query)
+                legislators = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.legislators = pd.DataFrame(legislators)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_data(data, table)
+
+class CandidatesElectionDetails(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidate_election_details'
+        super().__init__(country, table_name, row_type=CandidateElectionDetailsRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_candidates'
+                cur.execute(query)
+                candidates = cur.fetchall()
+
+                query = f'SELECT * FROM ca_elections'
+                cur.execute(query)
+                elections = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.candidates = pd.DataFrame(candidates)
+        self.elections = pd.DataFrame(elections)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_details_data(data, table)
 
 
+class FinancialContributionsScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=FinancialContributionsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_financial_contributions(data, table)
+
+
+class CandidateElectionFinancesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=CandidateElectionFinancesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_finances(data, table)
+
+
+class InflowScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=InflowsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_inflows(data, table)
+# end region

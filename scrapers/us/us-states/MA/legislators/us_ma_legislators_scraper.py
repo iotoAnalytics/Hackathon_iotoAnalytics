@@ -1,8 +1,9 @@
-
+from database import CursorFromConnectionFromPool
 import sys
 import os
 from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
+from scraper_utils import USStateLegislationScraperUtils
 import re
 import numpy as np
 from nameparser import HumanName
@@ -22,6 +23,10 @@ database_table_name = 'us_ma_legislators'
 
 scraper_utils = USStateLegislatorScraperUtils(
     state_abbreviation, database_table_name)
+
+legislator_table_name = 'us_ma_legislators'
+legislation_scraper_utils = USStateLegislationScraperUtils(
+    state_abbreviation, database_table_name, legislator_table_name)
 
 base_url = 'https://malegislature.gov'
 # Get scraper delay from website robots.txt file
@@ -252,6 +257,7 @@ def scrape(url):
     get_biography(url, row)
     get_committees_page(url, row)
 
+
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -274,6 +280,8 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="years_active")
+
+
 
     # getting urls from wikipedia
     wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"

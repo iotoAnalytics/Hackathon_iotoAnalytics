@@ -21,7 +21,9 @@ BASE_URL = 'https://www.assembly.nu.ca'
 MLA_URL = BASE_URL + '/members/mla'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Nunavut'
 COMMITTEE_URL = BASE_URL + '/standing-and-special-committees'
-ELECTIONS_HISTORY_URL = 'https://www.elections.nu.ca/en/documents/election-results-and-financial-returns'
+
+# NOTE The website seems to change the layout sometimes. Might need to check.
+ELECTIONS_HISTORY_URL = 'https://www.elections.nu.ca/en/documents'
 THREADS_FOR_POOL = 12
 
 CURRENT_YEAR = datetime.datetime.now().year
@@ -88,13 +90,16 @@ class PreProgramFunctions:
         CURRENT_LEGISLATURE_TERM = self.__get_current_legislature()
 
     def __get_most_recent_election_year(self, soup):
-        sidebar = soup.find('ul', {'id' : 'document-tree'})
-        all_election_years = sidebar.findAll('li')
-        return self.__find_most_recent_year(all_election_years)
+        content = soup.find('ul', {'id' : 'document-tree'})
+
+        election_results_and_financial_returns = content.find(id='tid-37')
+        election_results = election_results_and_financial_returns.findAll('a')
+        return self.__find_most_recent_year(election_results)
 
     def __find_most_recent_year(self, options):
         for option in options:
             if 'General Election' in option.text:
+                print(option.text)
                 return self.__extract_year(option.text)
         return -1
 
@@ -355,7 +360,7 @@ class MLASiteScraper:
         return number.strip()
 
     def __set_most_recent_term_id(self):
-        self.row.most_recent_term_id = NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY[CURRENT_LEGISLATURE_TERM]
+        self.row.most_recent_term_id = str(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY[CURRENT_LEGISLATURE_TERM])
 
     def __set_years_active(self):
         member_information = self.main_container.find('div', {'class' : 'content clear-block'})
@@ -517,6 +522,8 @@ class CommitteeSiteScraper:
 PreProgramFunctions().set_legislative_office_address()
 elections_page_soup = MainFunctions().get_page_as_soup(ELECTIONS_HISTORY_URL)
 PreProgramFunctions().update_term_and_legislature_dict(elections_page_soup)
+print(CURRENT_LEGISLATURE_TERM)
+print(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY)
 
-if __name__ == '__main__':
-    program_driver()
+# if __name__ == '__main__':
+#     program_driver()

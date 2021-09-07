@@ -135,7 +135,7 @@ def _set_source_url(row, bill_id):
 
 def _set_chamber_origin(row, bill_data):
     chamber_origin_abvr = bill_data['BillType'][0]
-    chamber_origin = CHAMBER_FULL.get(chamber_origin_abvr)        
+    chamber_origin = CHAMBER_FULL.get(chamber_origin_abvr, '')        
     row.chamber_origin = chamber_origin
 
 def _set_committees(row, bill_data):
@@ -180,11 +180,11 @@ def _get_committee_name(committee_id, committee_type):
 def _get_committee_chamber(committee_id, committee_type):
     committee_data = _get_committee_data(committee_id, committee_type)
     chamber = committee_data['Body']
-    return CHAMBER_FULL.get(chamber)
+    return CHAMBER_FULL.get(chamber, '')
 
 def _set_bill_type(row, bill_data):
     bill_type_abrv = bill_data['BillType']
-    bill_type = BILL_TYPE_FULL.get(bill_type_abrv)
+    bill_type = BILL_TYPE_FULL.get(bill_type_abrv, '')
     row.bill_type = bill_type
 
 def _set_bill_title(row, bill_data):
@@ -292,7 +292,7 @@ def _set_actions(row, bill_id):
         if action_data['ActionCommittee']:
             action = {
                 'date': _format_date(action_data['ActionDate']),
-                'action_by': CHAMBER_FULL.get(action_data['ActionCommittee']['Body']),
+                'action_by': CHAMBER_FULL.get(action_data['ActionCommittee']['Body'], ''),
                 'description': action_data['Description']
             }
             actions.append(action)
@@ -351,7 +351,7 @@ def _get_votes_data(vote_ias):
         vote = {
             'goverlytics_id': scraper_utils.get_legislator_id(source_id=member_data['SessionMemberId']),
             'legislator': member_data['UniqueName'],
-            'votet': member_data['Vote1'].lower()
+            'votetext': member_data['Vote1'].lower()
         }
         members_vote.append(vote)
     votes_data['votes'] = members_vote

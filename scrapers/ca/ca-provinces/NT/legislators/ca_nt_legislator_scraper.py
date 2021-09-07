@@ -46,6 +46,8 @@ def program_driver():
     print("Getting data from MLA pages...")
     all_mla_links = Main_Site_Scraper().get_all_mla_links(main_page_soup)
     mla_data = main_functions.get_data_from_all_links(main_functions.get_mla_data, all_mla_links)
+    while None in mla_data:
+        mla_data.remove(None)
 
     print('Getting data from wiki pages...')
     all_wiki_links = main_functions.scrape_main_wiki_link(WIKI_URL)
@@ -160,11 +162,15 @@ class MLA_Site_Scraper:
         self.__set_row_data()
 
     def get_rows(self):
+        if self.row.name_full == 'VACANT':
+            return None
         return self.row
 
     def __set_row_data(self):
         self.row.source_url = self.url
         self.__set_name_data()
+        if self.row.name_full == 'VACANT':
+            return
         self.__set_role_data()
         self.__set_party_data()
         self.__set_riding_data()
@@ -243,7 +249,10 @@ class MLA_Site_Scraper:
         It seems that all member's have the same member office address. 
         This function exists in case that it might change. 
         '''
-        address = self.__format_member_address(container)
+        try:
+            address = self.__format_member_address(container)
+        except Exception as e:
+            print(self.row.name_full)
         return {'location' : 'member\'s office',
                 'address' : address}
         
@@ -338,7 +347,7 @@ class MLA_Site_Scraper:
         return number[:number_length].strip()
 
     def __set_most_recent_term_id(self):
-        self.row.most_recent_term_id = NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR[CURRENT_LEGISLATURE_TERM]
+        self.row.most_recent_term_id = str(NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR[CURRENT_LEGISLATURE_TERM])
 
     def __set_years_active(self):
         biography_paragraphs = self.__get_biography()
