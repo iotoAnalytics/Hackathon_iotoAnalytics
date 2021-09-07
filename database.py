@@ -260,7 +260,6 @@ class Persistence:
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-            
                         CREATE TABLE IF NOT EXISTS {table} (
                             goverlytics_id bigint PRIMARY KEY,
                             source_id text,
@@ -279,6 +278,7 @@ class Persistence:
                             party_id int,
                             party text,
                             role text,
+                            gender text,
                             district text,
                             years_active int[],
                             committees jsonb,
@@ -309,7 +309,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -320,6 +320,7 @@ class Persistence:
                         name_suffix = excluded.name_suffix,
                         district = excluded.district,
                         role = excluded.role,
+                        gender = excluded.gender,
                         committees = excluded.committees,
                         areas_served = excluded.areas_served,
                         phone_numbers = excluded.phone_numbers,
@@ -363,6 +364,7 @@ class Persistence:
                     item.party_id,
                     item.party,
                     item.role,
+                    item.gender,
                     item.district,
                     item.years_active,
                     json.dumps(item.committees, default=utils.json_serial),
@@ -407,6 +409,7 @@ class Persistence:
                             party_id int,
                             party text,
                             role text,
+                            gender text,
                             riding text,
                             years_active int[],
                             committees jsonb,
@@ -420,7 +423,7 @@ class Persistence:
                             military_experience text,
                             region text,
                             offices_roles_as_mp text[],
-                            parl_assoc_interparl_groups jsonb
+                            parl_assoc_interparl_groups jsonb,
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -436,9 +439,9 @@ class Persistence:
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                     INSERT INTO {table}
                     VALUES (
-                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        (SELECT leg_id FROM leg_id), %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
                         name_full = excluded.name_full,
@@ -452,6 +455,7 @@ class Persistence:
                         party = excluded.party,
                         party_id = excluded.party_id,
                         role = excluded.role,
+                        gender = excluded.gender,
                         committees = excluded.committees,
                         phone_numbers = excluded.phone_numbers,
                         addresses = excluded.addresses,
@@ -493,6 +497,7 @@ class Persistence:
                     item.party_id,
                     item.party,
                     item.role,
+                    item.gender,
                     item.riding,
                     item.years_active,
                     json.dumps(item.committees, default=utils.json_serial),
@@ -540,6 +545,7 @@ class Persistence:
                             party_id int,
                             party text,
                             role text,
+                            gender text,
                             riding text,
                             years_active int[],
                             committees jsonb,
@@ -569,7 +575,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -584,6 +590,7 @@ class Persistence:
                         party = excluded.party,
                         party_id = excluded.party_id,
                         role = excluded.role,
+                        gender = excluded.gender,
                         committees = excluded.committees,
                         phone_numbers = excluded.phone_numbers,
                         addresses = excluded.addresses,
@@ -623,6 +630,7 @@ class Persistence:
                         item.party_id,
                         item.party,
                         item.role,
+                        item.gender,
                         item.riding,
                         item.years_active,
                         json.dumps(item.committees, default=utils.json_serial),
