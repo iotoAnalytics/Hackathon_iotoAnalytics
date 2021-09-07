@@ -420,7 +420,8 @@ class Persistence:
                             military_experience text,
                             region text,
                             offices_roles_as_mp text[],
-                            parl_assoc_interparl_groups jsonb
+                            parl_assoc_interparl_groups jsonb,
+                            gender text
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -438,7 +439,7 @@ class Persistence:
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
                         name_full = excluded.name_full,
@@ -466,6 +467,7 @@ class Persistence:
                         offices_roles_as_mp = excluded.offices_roles_as_mp,
                         parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
                         region = excluded.region,
+                        gender = excluded.gender,
                         seniority = excluded.seniority;
                     """).format(table=sql.Identifier(table))
 
@@ -505,6 +507,7 @@ class Persistence:
                     json.dumps(item.education, default=utils.json_serial),
                     item.military_experience,
                     item.region,
+                    item.gender,
                     item.offices_roles_as_mp,
                     json.dumps(item.parl_assoc_interparl_groups,
                                default=utils.json_serial)
