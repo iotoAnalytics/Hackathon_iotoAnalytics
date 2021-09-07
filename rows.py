@@ -1825,7 +1825,7 @@ class InflowsRow:
         candidate_election_finances_id: int
         monetary: float
         non_monetary: float
-        contribution_detail: List[dict]
+        contribution_detail: dict
         contribution_totals: dict
         loans: float
         loans_received: dict
@@ -1845,7 +1845,7 @@ class InflowsRow:
             self._candidate_election_finances_id = None
             self._monetary = 0
             self._non_monetary = 0
-            self._contribution_detail = []
+            self._contribution_detail = {}
             self._contribution_totals = {}
             self._loans = 0
             self._loans_received = {}
@@ -1892,16 +1892,13 @@ class InflowsRow:
             self._non_monetary = value
 
         @property
-        def contribution_detail(self) -> List[dict]:
+        def contribution_detail(self) -> dict:
             return self._contribution_detail
 
         @contribution_detail.setter
-        def contribution_detail(self, value: List[dict]) -> None:
-            if type(value) != list:
-                raise TypeError("contribution_detail must be a list of dicts")
-            for element in value:
-                if type(element) != dict:
-                    raise TypeError("contribution_detail must a list of dicts")
+        def contribution_detail(self, value: dict) -> None:
+            if not isinstance(value, dict):
+                raise TypeError("contribution_detail must be a dict")
             self._contribution_detail = value
 
         @property
