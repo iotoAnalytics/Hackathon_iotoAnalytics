@@ -604,6 +604,7 @@ class LegislatorRow:
     party_id: int
     party: str 
     role: str 
+    gender: str
     years_active: List[int]
     committees: List[dict]
     phone_numbers: List[dict]
@@ -629,6 +630,7 @@ class LegislatorRow:
         self._party_id = None
         self._party = ''
         self._role = ''
+        self._gender = ''
         self._years_active = []
         self._committees = []
         self._phone_numbers = []
@@ -756,6 +758,18 @@ class LegislatorRow:
         if type(value) != str:
             raise TypeError("role must be a str")
         self._role = value
+
+    @property
+    def gender(self) -> str:
+        return self._gender
+    @gender.setter
+    def gender(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("gender must be a str")
+        accepted_values = ['M', 'F', 'O']
+        if value not in accepted_values:
+            raise ValueError("gender must be one of 'M' (Male), 'F' (Female), 'O' (Other)")
+        self._gender = value
 
     @property
     def years_active(self) -> List[int]:
