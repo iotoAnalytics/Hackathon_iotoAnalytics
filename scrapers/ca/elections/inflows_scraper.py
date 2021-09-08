@@ -820,7 +820,7 @@ def get_row_data(data):
     row.transfer_totals = data['transfer_totals']
     row.transfer_detail = data['transfer_detail']
     row.other_cash_inflow = float(data['other_cash_inflow'])
-    row.other_inflow_detail = float(data['other_inflow_detail'])
+    row.other_inflow_detail = data['other_inflow_detail']
     row.total_inflow = float(data['total_inflow'])
     return row
 
@@ -830,5 +830,5 @@ if __name__ == '__main__':
     #print(data)
     row_data = [get_row_data(d) for d in data]
     print(row_data)
-    #scraper_utils.write_data(row_data)
+    scraper_utils.write_data(row_data)
     print('finished')

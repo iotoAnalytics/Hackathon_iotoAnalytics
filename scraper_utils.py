@@ -1320,8 +1320,19 @@ class InflowScraperUtils(ScraperUtils):
 
     def write_data(self, data, database_table=None) -> None:
         """
-        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_inflows(data, table)
+
+class CandidateElectionVotesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=CandidateElectionVotesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_votes(data, table)
 # end region

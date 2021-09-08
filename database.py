@@ -1287,3 +1287,32 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
                     cur.connection.rollback()
+
+    @staticmethod
+    def write_candidate_election_votes(data, table):
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_candidate_election_votes_query = sql.SQL("""
+                                   INSERT INTO {table}
+                                   VALUES (
+                                       DEFAULT, %s, %s, %s, %s, %s)
+                                   ON CONFLICT DO NOTHING;
+                                   """).format(table=sql.Identifier(table))
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.candidate_election_id,
+                       row.votes_obtained,
+                       row.votes_percentage,
+                       row.majority,
+                       row.majority_percentage
+                       )
+
+                try:
+                    cur.execute(insert_candidate_election_votes_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
+                    cur.connection.rollback()

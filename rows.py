@@ -2067,4 +2067,75 @@ class InflowsRow:
                 raise TypeError("total_inflow must be a float")
             self._total_inflow = value
 
+@dataclass
+class CandidateElectionVotesRow:
+        """
+        Data structure for housing data data for election votes
+        """
 
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        candidate_election_id: int
+        votes_obtained: int
+        votes_percentage: float
+        majority: int
+        majority_percentage: float
+
+        def __init__(self):
+            self._candidate_election_id = None
+            self._votes_obtained = None
+            self._votes_percentage = None
+            self._majority = None
+            self._majority_percentage = None
+
+        @property
+        def candidate_election_id(self) -> int:
+            return self._candidate_election_id
+
+        @candidate_election_id.setter
+        def candidate_election_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("candidate_election_id must be an int")
+            self._candidate_election_id = value
+
+        @property
+        def votes_obtained(self) -> int:
+            return self._votes_obtained
+
+        @votes_obtained.setter
+        def votes_obtained(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("votes obtained must be an int")
+            self._votes_obtained = value
+
+        @property
+        def votes_percentage(self) -> float:
+            return self._votes_percentage
+
+        @votes_percentage.setter
+        def votes_percentage(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("votes percentage must be an float")
+            self._votes_percentage = value
+
+        @property
+        def majority(self) -> int:
+            return self._majority
+
+        @majority.setter
+        def majority(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("majority must be an int")
+            self._majority = value
+
+        @property
+        def majority_percentage(self) -> float:
+            return self._majority_percentage
+
+        @majority_percentage.setter
+        def majority_percentage(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("majority_percentage must be an float")
+            self._majority_percentage = value
