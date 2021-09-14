@@ -193,7 +193,7 @@ class Election:
         for index, row in self.df.iterrows():
             value = row['Candidate']
             if pd.notna(value) and 'Constituency' in value:
-                electoral_district = str(value).split(': ')[1]
+                electoral_district = str(value).split(': ')[1].split(' (Contin')[0]
             elif pd.notna(value) and 'Province / Territory:' not in value:
                 self.rows.append(self._set_row_data(row, electoral_district))
             count += 1
