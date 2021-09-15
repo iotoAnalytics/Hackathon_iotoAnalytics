@@ -1423,7 +1423,6 @@ class Persistence:
                         f'An exception occurred inserting {row.candidate_election_id}:\n{e}')
                     cur.connection.rollback()
 
-
     @staticmethod
     def write_candidate_election_finances(data, table):
 
@@ -1516,7 +1515,7 @@ class Persistence:
                     cur.execute(insert_candidate_election_votes_query, tup)
                 except Exception as e:
                     print(
-                        f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
+                        f'An exception occurred inserting {row.candidate_election_id}:\n{e}')
                     cur.connection.rollback()
 
     @staticmethod

@@ -1325,6 +1325,7 @@ class InflowScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_inflows(data, table)
 
+
 class CandidateElectionVotesScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
         super().__init__(country, table_name, row_type=CandidateElectionVotesRow())
