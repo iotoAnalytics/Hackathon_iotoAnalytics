@@ -334,7 +334,7 @@ class LegislatorScraperUtils(ScraperUtils):
 
                         asofbr = td.find("br")
 
-                        year_started = (asofbr.nextSibling)
+                        year_started = str(asofbr.nextSibling)
 
                         year_started = year_started.split('[')[0]
                         if "," in year_started:

@@ -38,16 +38,16 @@ class Database:
     """
     _connection = None
 
-    # @staticmethod
-    # def initialise():
-    #     """
-    #     Generates database connection token then connects to database via
-    #     connection pooling. Must be run before attempting to connect to
-    #     the database.
-    #     """
-    #     db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
+    @staticmethod
+    def initialise():
+        """
+        Generates database connection token then connects to database via
+        connection pooling. Must be run before attempting to connect to
+        the database.
+        """
+        db_token = client.generate_db_auth_token(db_host, db_port, db_user, Region=db_region)
 
-    #     Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
+        Database._connection = psycopg2.connect(database=db_name, host=db_host, user=db_user, password=db_token)
 
     @classmethod
     def get_connection(cls):
