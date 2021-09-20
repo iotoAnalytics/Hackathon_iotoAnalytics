@@ -1566,3 +1566,39 @@ class Persistence:
                     f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
                 cur.connection.rollback()
 
+    @staticmethod
+    def write_outlows(data, table):
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_outflows_query = sql.SQL("""
+                               INSERT INTO {table}
+                               VALUES (
+                                   DEFAULT, %s, %s, %s, %s, %s, %s, %s, %s,
+                                   %s, %s, %s, %s, %s, %s)
+                               ON CONFLICT DO NOTHING;
+                               """).format(table=sql.Identifier(table))
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.candidate_election_finances_id,
+                       row.expenses_limit,
+                       row.total_expenses_subject_to_limit,
+                       row.total_expenses_subject_to_limit_detail,
+                       row.personal_expenses,
+                       row.personal_expenses_detail,
+                       row.other_expenses,
+                       row.other_detail,
+                       row.campaign_expenses,
+                       row.contributed_transferred_property_or_service,
+                       row.non_monetary_transfers_sent_to_political_entities,
+                       row.unpaid_claims,
+                       row.unpaid_claims_detail,
+                       row.total_outflows)
+
+                try:
+                    cur.execute(insert_outflows_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
