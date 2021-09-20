@@ -84,11 +84,11 @@ def get_urls():
 
 
 def get_table_data(url):
-    print(url)
+    #print(url)
     data = None
     browser.get(url)
     if browser.find_elements_by_tag_name('frame'):
-        print('frame table')
+
         frames = (browser.find_elements_by_tag_name('frame'))
         browser.switch_to.frame(frames[0])
         input_tag = browser.find_element_by_tag_name("input")
@@ -120,21 +120,24 @@ def get_table_data(url):
             if 'candidates by electoral district and individual results' in l.text:
                 l.click()
                 data = get_candidate_data_by_district_table()
-                print('option 1')
+
                 break
             if 'List of candidates and individual results' in l.text:
                 l.click()
                 data = get_candidate_data()
-                print('option 2')
+
                 break
         except Exception as e:
             print(e)
-    for item in data:
-        gov_id = get_goverlytics_id(item['candidate_name'])
-        election_id = get_election_id(item['election_name'])
-        can_elec_id = get_candidate_election_details(gov_id, election_id)
-        item.update({'candidate_election_id': can_elec_id})
-        print(item)
+    try:
+        for item in data:
+            gov_id = get_goverlytics_id(item['candidate_name'])
+            election_id = get_election_id(item['election_name'])
+            can_elec_id = get_candidate_election_details(gov_id, election_id)
+            item.update({'candidate_election_id': can_elec_id})
+
+    except:
+        pass
     return data
         # if row_list is None:
         #     row_list = []
@@ -144,7 +147,7 @@ def get_table_data(url):
 
 
 def get_votes_with_frame(input_value, url):
-    print("get_election_with_frame")
+
     browser.get(url + f'{input_value}/table12.html')
     candidate_name_and_votes_list = []
     try:
@@ -177,7 +180,7 @@ def get_votes_with_frame(input_value, url):
                 try:
                     #print(r.text)
                     columns = r.find_elements_by_tag_name('td')
-                    candidate_name = columns[1].text.split('\n')[0].strip()
+                    candidate_name = columns[1].text.split('\n')[0].strip().replace(' **', '')
                     votes = columns[4].text.replace(' ', '')
                     votes_percent = columns[5].text
                     try:
@@ -186,23 +189,20 @@ def get_votes_with_frame(input_value, url):
                     except:
                         majority = 0
                         majority_percent = 0
-                    candidate = {'candidate_name': candidate_name, 'votes': votes,
+                    candidate = {'election_name': name, 'candidate_name': candidate_name, 'votes': votes,
                                  'votes_percent': votes_percent, 'majority': majority,
                                  'majority_percent': majority_percent}
                     candidate_name_and_votes_list.append(candidate)
                 except:
                     pass
-    try:
-        print(candidate_name_and_votes_list[0])
-    except:
-        pass
+
     return candidate_name_and_votes_list
 
 
 def get_candidate_data():
-    print('candidate data')
+
     candidate_name_and_votes_list = []
-    election_name = browser.find_element_by_tag_name('h1')
+    election_name = browser.find_element_by_tag_name('h1').text
     tables = browser.find_elements_by_tag_name('table')
     try:
         tbody = tables[10].find_element_by_tag_name('tbody')
@@ -215,7 +215,7 @@ def get_candidate_data():
                 votes = columns[5].text.split('\n')
                 votes_percent = columns[6].text.split('\n')
                 for i in range(0, len(candidate_name)):
-                    candidate = {'election_name': election_name, 'candidate_name': candidate_name[i], 'votes': votes[i],
+                    candidate = {'election_name': election_name, 'candidate_name': candidate_name[i].replace(' **', ''), 'votes': votes[i],
                                  'votes_percent': votes_percent[i], 'majority': None, 'majority_percent': None}
                     candidate_name_and_votes_list.append(candidate)
             except:
@@ -223,20 +223,40 @@ def get_candidate_data():
     except:
         pass
     if len(candidate_name_and_votes_list) < 1:
+        rows = []
         tables = browser.find_elements_by_tag_name('table')
-        rows = tables[2].find_elements_by_tag_name('tr')
+        titles = browser.find_elements_by_tag_name('caption')
+        count = 0
+        for t in titles:
+            if "List of candidates and individual results" in t.text:
+                count += 1
+
+        if count > 1:
+            for i in range(0, count-1):
+                rows.extend(tables[2+i].find_elements_by_tag_name('tr'))
+        else:
+            rows.append(tables[2].find_elements_by_tag_name('tr'))
         for r in rows:
+
             try:
                 columns = r.find_elements_by_tag_name('td')
                 try:
                     candidate_name = columns[1].text
+                    try:
+                        candidate_name = candidate_name.split('\n')[0]
+                    except:
+                        pass
                     votes = columns[4].text
                     votes_percent = columns[5].text
                 except:
                     candidate_name = columns[0].text
+                    try:
+                        candidate_name = candidate_name.split('\n')[0]
+                    except:
+                        pass
                     votes = columns[3].text
                     votes_percent = columns[4].text
-                candidate = {'election_name': election_name, 'candidate_name': candidate_name, 'votes': votes,
+                candidate = {'election_name': election_name, 'candidate_name': candidate_name.replace(' **', ''), 'votes': votes,
                              'votes_percent': votes_percent, 'majority': None, 'majority_percent': None}
                 candidate_name_and_votes_list.append(candidate)
             except Exception as e:
@@ -248,6 +268,8 @@ def get_candidate_data():
             for t in tables:
                 try:
                     if "List of candidates and individual results" in t.text:
+                        table = t
+                    elif "Candidate and affiliation" in t.text:
                         table = t
                 except Exception as e:
                     print(e)
@@ -266,17 +288,17 @@ def get_candidate_data():
                             candidate_name = candidate_name_list[i].split(', ')[1] + ' ' + candidate_name_list[i].split(', ')[0]
                             votes = votes_list[i].replace(' ', '')
                             votes_percent = votes_percent_list[i]
-                        candidate = {'election_name': election_name, 'candidate_name': candidate_name, 'votes': votes,
+                        candidate = {'election_name': election_name, 'candidate_name': candidate_name.replace(' **', ''), 'votes': votes,
                                  'votes_percent': votes_percent, 'majority': None, 'majority_percent': None}
                     candidate_name_and_votes_list.append(candidate)
                 except:
                     pass
-            print(candidate_name_and_votes_list)
+
     return candidate_name_and_votes_list
 
 
 def get_candidate_data_by_district_table():
-    print('called')
+
     candidate_name_and_votes_list = []
     try:
         election_name = browser.find_element_by_tag_name('h1').text
@@ -305,16 +327,12 @@ def get_candidate_data_by_district_table():
                 pass
     except:
          candidate_name_and_votes_list = get_data_by_province()
-    try:
-        print(candidate_name_and_votes_list[0])
-    except:
-        pass
 
     return candidate_name_and_votes_list
 
 
 def get_data_by_province():
-    print("data by province")
+
     candidate_name_and_votes_list = []
     links = browser.find_elements_by_tag_name('a')
     for l in links:
@@ -322,13 +340,13 @@ def get_data_by_province():
         if "12" in l.text:
             link = l.get_attribute('href')
             browser.get(link)
-            election_name = browser.find_elements_by_tag_name('h1')
+            election_name = browser.find_element_by_tag_name('h1').text
             table = browser.find_elements_by_tag_name('table')
             rows = table[1].find_elements_by_tag_name('tr')
             for r in rows[2:]:
                 try:
                     columns = r.find_elements_by_tag_name('td')
-                    candidate_name = columns[1].text
+                    candidate_name = columns[1].text.replace(' **', '')
                     votes = columns[4].text.replace(' ', '')
                     votes_percent = columns[5].text
                     try:
@@ -343,7 +361,7 @@ def get_data_by_province():
                     candidate_name_and_votes_list.append(candidate)
                 except:
                     pass
-            print(candidate_name_and_votes_list)
+        return candidate_name_and_votes_list
 
 
 def get_election_id(election):
@@ -394,12 +412,14 @@ def get_election_id(election):
 
 def get_goverlytics_id(name):
 
-    last_name = name.split(' ')[-1].capitalize()
-    first_name = name.split(' ')[0].capitalize()
+    last_name = name.split(' ')[-1]
+    #print(last_name)
+    first_name = name.split(' ')[0]
+    #print(first_name)
     if pd.notna(name):
         df = candidates_table
         try:
-            gov_id = df.loc[(df["name_first"].str.contains(first_name)) & (df["name_last"] == last_name)]['goverlytics_id'].values[0]
+            gov_id = df.loc[(df["name_first"].str.contains(first_name)) & (df["name_last"].str.contains(last_name))]['goverlytics_id'].values[0]
         except:
             gov_id = 0
     try:
@@ -425,15 +445,40 @@ def get_candidate_election_details(gov_id, election_id):
 
 def get_row_data(data):
     try:
-        row = scraper_utils.initialize_row()
-        row.candidate_election_id = data['candidate_election_id']
-        row.votes_obtained = data['votes']
-        row.votes_percentage = data['votes_percent']
-        row.majority = data['majority']
-        row.majority_percentage = data['majority_percent']
+        votes = data['votes'].replace(',', '').replace(' ', '')
+    except:
+        pass
+    try:
+        votes_percent = data['votes_percent'].replace(' ', '')
+    except:
+        pass
+    try:
+        majority = data['majority'].replace(',', '').replace(' ', '')
+        if majority == '':
+            majority = 0
+        else:
+            majority = data['majority']
+    except:
+        pass
+    try:
+        majority_percent = data['majority_percent'].replace(' ', '')
+        if data['majority_percent'] == '':
+            majority_percent = 0
+        else:
+            majority_percent = data['majority_percent']
+    except:
+        pass
+    try:
+        if data['candidate_election_id'] != 0:
+            row = scraper_utils.initialize_row()
+            row.candidate_election_id = int(data['candidate_election_id'])
+            row.votes_obtained = int(votes)
+            row.votes_percentage = float(votes_percent)
+            row.majority = int(majority)
+            row.majority_percentage = float(majority_percent)
+            return row
     except Exception as e:
         print(e)
-    return row
 
 
 if __name__ == '__main__':
@@ -445,18 +490,20 @@ like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     data_list = []
     data.extend(get_table_data(url) for url in urls)
 
-    #get_table_data('https://www.elections.ca//res/rep/off/ovr2019app/home.html')
+    #get_table_data('https://www.elections.ca//content.aspx?section=res&dir=rep/off/ovr_2012b&document=index&lang=e')
     lambda_obj = lambda x: (x is not None)
 
     list_out = list(filter(lambda_obj, data))
 
     flat_ls = [item for sublist in list_out for item in sublist]
-    #print(data)
+
     # with Pool(processes=4) as pool:
     #     data = pool.map(scrape, urls)
     # print(data_list)
+    #
     row_data = [get_row_data(d) for d in flat_ls]
-    print(row_data)
-    scraper_utils.write_data(row_data)
+    res = [i for i in row_data if i]
+
+    scraper_utils.write_data(res)
 
     print('Complete!')
