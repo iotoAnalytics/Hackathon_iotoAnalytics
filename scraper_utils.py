@@ -1347,5 +1347,5 @@ class OutflowScraperUtils(ScraperUtils):
         Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
         """
         table = database_table if database_table else self.database_table_name
-        Persistence.write_Outflows(data, table)
+        Persistence.write_outflows(data, table)
 # end region

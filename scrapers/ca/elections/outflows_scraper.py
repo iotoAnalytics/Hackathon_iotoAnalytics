@@ -112,7 +112,7 @@ def get_candidate_pages(option, o_2):
         if option in o.text:
             o.click()
     time.sleep(1)
-    select_2 =  browser.find_elements_by_tag_name('select')
+    select_2 = browser.find_elements_by_tag_name('select')
     select_2[1].click()
     time.sleep(1)
     options_2 = browser.find_elements_by_tag_name('option')
@@ -131,11 +131,8 @@ def get_candidate_pages(option, o_2):
     search_button.click()
     current_url = browser.current_url
     candidate_list = search_candidates(current_url)
-   # print('candidate list')
-    #print(candidate_list)
     candidate_election_finances_list.extend(get_candidate_election_details(candidate_list))
-    #print('finances list')
-    #print(candidate_election_finances_list)
+
     return candidate_election_finances_list
 
 
@@ -171,7 +168,8 @@ def search_candidates(url):
         except:
             date_of_return = "1212-12-12"
         print(candidate)
-        contribution_detail = get_contribution_detail()
+        #contribution_detail = get_contribution_detail()
+        unpaid_claims_detail = get_unpaid_claims_detail()
         # if not contribution_detail:
         #     contribution_detail = [{}]
         #print(contribution_detail)
@@ -188,12 +186,12 @@ def search_candidates(url):
         #     transfer_detail = [{}]
         other_inflow_detail = get_other_inflow_detail()
         candidate_info = {'election': election, 'name': candidate, 'date_of_return': date_of_return,
-                          'party_district': party_district, 'contributions_detail': contribution_detail,
+                          'party_district': party_district, 'unpaid claims detail': unpaid_claims_detail,
                           'loans_detail': loans_detail, 'returned_detail': returned_detail,
                           'transfer_detail': transfer_detail, 'other_inflow_detail': other_inflow_detail}
-        inflow_data = get_inflow_data()
+        outflow_data = get_outflow_data()
         #print(candidate_info)
-        candidate_info.update(inflow_data)
+        #candidate_info.update(inflow_data)
         print(candidate_info)
         candidate_list.append(candidate_info)
 
@@ -221,12 +219,12 @@ def get_candidate_election_finances_id(candidate):
         return 0
 
 
-def get_inflow_data():
+def get_outflow_data():
     browser.find_element_by_id('SelectedPart').click()
     time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for option in options:
-        if 'Part 2f' in option.text:
+        if 'Part 3c' in option.text:
             option.click()
     time.sleep(1)
     browser.find_element_by_id('ReportOptions').click()
@@ -235,65 +233,48 @@ def get_inflow_data():
     for i in items:
         line_header = i.find_element_by_tag_name('th')
         try:
-            if 'Total monetary' in line_header.text:
-                monetary = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total non-monetary' in line_header.text:
-                non_monetary = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total loans' in line_header.text:
-                loans = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Returned contributions - monetary' in line_header.text:
-                monetary_returned = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Returned contributions - non-monetary' in line_header.text:
-                non_monetary_returned = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total monetary transfers' in line_header.text:
-                monetary_transfer_received = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total non-monetary transfers' in line_header.text:
-                non_monetary_transfer_received = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total cash inflows' in line_header.text:
-                other_cash_inflow = i.find_element_by_tag_name('td').text.replace(',', '')
+            if 'Election expenses limit' in line_header.text:
+                expenses_limit = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(expenses_limit)
+            if 'Election expenses subject to the limit - Total' in line_header.text:
+                total_expenses_subject_to_limit = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(total_expenses_subject_to_limit)
+            if 'Personal expenses - Total' in line_header.text:
+                personal_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(personal_expenses)
+            if 'Other expenses and outflows - Total' in line_header.text:
+                other_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(other_expenses)
+            if 'Total - Unpaid claim' in line_header.text:
+                unpaid_claims = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(unpaid_claims)
             if 'Grand total' in line_header.text:
-                total_inflow = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total contributions' in line_header.text:
-                total_contributions = i.find_element_by_tag_name('td').text.replace(',', '')
-            if 'Total number of contributors' in line_header.text:
-                total_contributors = i.find_element_by_tag_name('td').text.replace(',', '')
-                contribution_totals = {'total contributons': float(total_contributions),
-                                   'total contributors': int(total_contributors)}
+                total_outflows = i.find_element_by_tag_name('td').text.replace(',', '')
+                print(total_outflows)
+
             loans_received = get_loans(items)
             transfer_totals = get_transfer_totals(items)
         except:
             pass
     try:
-        inflow_data = {
-            'monetary': float(monetary),
-            'non_monetary': float(non_monetary),
-            'contribution_totals': contribution_totals,
-            'loans': float(loans),
-            'loans_received': loans_received,
-            'monetary_returned': float(monetary_returned),
-            'non_monetary_returned': float(non_monetary_returned),
-            'monetary_transfer_received': float(monetary_transfer_received),
-            'non_monetary_transfer_received': float(non_monetary_transfer_received),
-            'transfer_totals': transfer_totals,
-            'other_cash_inflow': float(other_cash_inflow),
-            'total_inflow': float(total_inflow)
-            }
+        outflow_data = {
+            'expenses_limit': float(expenses_limit),
+            'total_expenses_subject_to_limit': float(total_expenses_subject_to_limit),
+            'personal_expenses': float(personal_expenses),
+            'other_expenses': float(other_expenses),
+            'unpaid_claims': float(unpaid_claims),
+            'total_outflows': float(total_outflows)
+              }
     except:
-        inflow_data = {
-            'monetary': 0.00,
-            'non_monetary': 0.00,
-            'contribution_totals': {},
-            'loans': 0.00,
-            'loans_received': {},
-            'monetary_returned': 0.00,
-            'non_monetary_returned': 0.00,
-            'monetary_transfer_received': 0.00,
-            'non_monetary_transfer_received': 0.00,
-            'transfer_totals': {},
-            'other_cash_inflow': 0.00,
-            'total_inflow': 0.00
+        outflow_data = {
+            'expenses_limit': 0.00,
+            'total_expenses_subject_to_limit': 0.00,
+            'personal_expenses': 0.00,
+            'other_expenses': 0.00,
+            'unpaid_claims': 0.00,
+            'total_outflows': 0.00
         }
-    return inflow_data
+    return outflow_data
 
 
 def get_transfer_totals(items):
@@ -416,75 +397,39 @@ def get_other_inflow_detail():
     return details
 
 
-def get_contribution_detail():
+def get_unpaid_claims_detail():
     details = []
     browser.find_element_by_id('SelectedPart').click()
     time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for option in options:
-        if 'Part 2a' in option.text:
+        if 'Part 5' in option.text:
             option.click()
     time.sleep(1)
     browser.find_element_by_id('ReportOptions').click()
     time.sleep(1)
     try:
-        items = browser.find_elements_by_tag_name('tr')
-        for i in items:
-            try:
-                line_header = i.find_element_by_tag_name('th')
-            except:
-                pass
-            if line_header:
-                if 'Total contributions greater than $200' in line_header.text:
-                    contribution_greater = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total contributions of $200 or less' in line_header.text:
-                    contribution_less = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total number of contributors of amounts of $200 or less' in line_header.text:
-                    contributors = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total anonymous contributions of $20 or less' in line_header.text:
-                    anonymous = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total number of anonymous contributors of amounts of $20 or less' in line_header.text:
-                    num_anonymous = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total contributions' in line_header.text:
-                    total = i.find_element_by_tag_name('td').text.replace(',', '')
-                if 'Total number of contributors' in line_header.text:
-                    total_num = i.find_element_by_tag_name('td').text.replace(',', '')
-            else:
-                contributions = i.find_elements_by_tag_name('td')
-                date = browser.find_element_by_class_name('date').text
-                dt_object = datetime.strptime(date, '%b %d, %Y')
-                date = dt_object.strftime("%Y-%m-%d")
-                contribution = {'date received': date,
-                                'name': contributions[1].text,
-                                'address': contributions[2].text,
-                                'monetary': float(contributions[4].text.replace(',', '')),
-                                'non-monetary': float(contributions[5].text.replace(',', '')),
-                                'total': float(contributions[6].text.replace(',', ''))
-                                 }
-                details.append(contribution)
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
 
-        contributions_received = {'total contributions greater than 200': float(contribution_greater),
-                                  'total contributions less than 200': float(contribution_less),
-                                  'total contributors less than 200': int(contributors),
-                                  'Total anonymous contributions of $20 or less': float(anonymous),
-                                  'Total number of anonymous contributors of amounts of $20 or less': int(
-                                      num_anonymous),
-                                  'Total contributions': float(total),
-                                  'Total number of contributors': int(total_num),
-                                  'details': details
-                                  }
+            items = r.find_elements_by_tag_name('td')
+            date = items[1].text
+            dt_object = datetime.strptime(date, '%b %d, %Y')
+            date = dt_object.strftime("%Y-%m-%d")
+            claim = {'date received': date,
+                     'supplier or lender': items[2].text,
+                     'unpaid claim': float(items[3].text),
+                     'Unpaid claim subject of legal proceedings': float(items[4].text.replace(',', '')),
+                     'Unpaid overdraft or line of credit': float(items[5].text.replace(',', '')),
+                     'Unpaid overdraft or line of credit subject of legal proceedings': float(items[6].text.replace(',', '')),
+                     'Unpaid loan': float(items[7].text.replace(',', '')),
+                     'Unpaid loan subject of legal proceedings': float(items[7].text.replace(',', ''))
+                    }
+            details.append(claim)
     except:
-        contributions_received = {'total contributions greater than 200': None,
-                                  'total contributions less than 200': None,
-                                  'total contributors less than 200': None,
-                                  'Total anonymous contributions of $20 or less': None,
-                                  'Total number of anonymous contributors of amounts of $20 or less': None,
-                                  'Total contributions': None,
-                                  'Total number of contributors': None,
-                                  'details': None
-                                  }
-    #print(contributions_received)
-    return contributions_received
+        pass
+
+    return details
 
 
 def get_loans_detail():

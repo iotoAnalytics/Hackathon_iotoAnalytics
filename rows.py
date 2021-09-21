@@ -2162,7 +2162,7 @@ class OutflowsRow:
         contributed_transferred_property_or_service: float
         non_monetary_transfers_sent_to_political_entities: dict
         unpaid_claims: float
-        unpaid_claims_detail: dict
+        unpaid_claims_detail: List[dict]
         total_outflows: float
 
         def __init__(self):
@@ -2212,11 +2212,11 @@ class OutflowsRow:
             self._total_expenses_subject_to_limit = value
 
         @property
-        def total_expenses_subject_to_limit_detaill(self) -> dict:
+        def total_expenses_subject_to_limit_detail(self) -> dict:
             return self._total_expenses_subject_to_limit_detail
 
         @total_expenses_subject_to_limit_detail.setter
-        def contribution_detail(self, value: dict) -> None:
+        def total_expenses_subject_to_limit_detail(self, value: dict) -> None:
             if not isinstance(value, dict):
                 raise TypeError("total_expenses_subject_to_limit_detail must be a dict")
             self._total_expenses_subject_to_limit_detail = value
@@ -2302,13 +2302,16 @@ class OutflowsRow:
             self._unpaid_claims = value
 
         @property
-        def unpaid_claims_detail(self) -> dict:
+        def unpaid_claims_detail(self) -> List[dict]:
             return self._unpaid_claims_detail
 
         @unpaid_claims_detail.setter
-        def unpaid_claims_detail(self, value: dict) -> None:
-            if not isinstance(value, dict):
-                raise TypeError("unpaid_claims_detail must be a dict")
+        def unpaid_claims_detail(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("unpaid_claims_detail be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("unpaid_claims_detail must a list of dicts")
             self._unpaid_claims_detail = value
 
         @property

@@ -144,8 +144,8 @@ def search_candidates(url):
     browser.get(url)
     browser.find_element_by_id('button3').click()
     time.sleep(3)
-    browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-    #browser.find_element_by_id('SelectAllCandidates').click()
+    #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
+    browser.find_element_by_id('SelectAllCandidates').click()
     time.sleep(3)
     browser.find_element_by_id('SearchSelected').click()
 

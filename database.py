@@ -1567,7 +1567,7 @@ class Persistence:
                 cur.connection.rollback()
 
     @staticmethod
-    def write_outlows(data, table):
+    def write_outflows(data, table):
 
         with CursorFromConnectionFromPool() as cur:
             insert_outflows_query = sql.SQL("""
