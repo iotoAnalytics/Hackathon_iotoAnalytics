@@ -154,7 +154,7 @@ def search_candidates(url):
         time.sleep(1)
         options = browser.find_elements_by_tag_name('option')
         for option in options:
-            if 'Part  4' in option.text:
+            if 'Part  4 - Campaign Financial Summary' in option.text:
                 option.click()
                 break
             elif 'Part 6' in option.text:
@@ -167,31 +167,26 @@ def search_candidates(url):
             date_of_return = dt_object.strftime("%Y-%m-%d")
         except:
             date_of_return = "1212-12-12"
-        print(candidate)
-        #contribution_detail = get_contribution_detail()
         unpaid_claims_detail = get_unpaid_claims_detail()
-        # if not contribution_detail:
-        #     contribution_detail = [{}]
-        #print(contribution_detail)
-        loans_detail = get_loans_detail()
-        # if not loans_detail:
-        #     loans_detail = [{}]
-        #print(loans_detail)
-        returned_detail = get_returned_detail()
-        # if not returned_detail:
-        #     returned_detail = [{}]
-        #print(returned_detail)
-        transfer_detail = get_transfer_detail()
-        # if not transfer_detail:
-        #     transfer_detail = [{}]
-        other_inflow_detail = get_other_inflow_detail()
+        print('unpaid claims')
+        print(unpaid_claims_detail)
+        total_expenses_subject_to_limit_detail = get_total_expenses_subject_to_limit_detail()
+        print('total expenses')
+        print(total_expenses_subject_to_limit_detail)
+        personal_expenses_detail = get_personal_expenses_detail()
+        print('personal expenses')
+        print(personal_expenses_detail)
+        other_detail = get_other_detail()
+        print("other")
+        print(other_detail)
+
         candidate_info = {'election': election, 'name': candidate, 'date_of_return': date_of_return,
                           'party_district': party_district, 'unpaid claims detail': unpaid_claims_detail,
-                          'loans_detail': loans_detail, 'returned_detail': returned_detail,
-                          'transfer_detail': transfer_detail, 'other_inflow_detail': other_inflow_detail}
+                          'total_expenses_subject_to_limit_detail': total_expenses_subject_to_limit_detail,
+                          'personal_expenses_detail': personal_expenses_detail, 'other_detail': other_detail}
         outflow_data = get_outflow_data()
         #print(candidate_info)
-        #candidate_info.update(inflow_data)
+        candidate_info.update(outflow_data)
         print(candidate_info)
         candidate_list.append(candidate_info)
 
@@ -224,44 +219,69 @@ def get_outflow_data():
     time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for option in options:
-        if 'Part 3c' in option.text:
+        if 'Part 3c - Summary of Electoral' in option.text:
             option.click()
+            break
+        elif 'Part 4 - Campaign Financial Summary' in option.text:
+            option.click()
+            break
     time.sleep(1)
     browser.find_element_by_id('ReportOptions').click()
     time.sleep(1)
     items = browser.find_elements_by_tag_name('tr')
     for i in items:
-        line_header = i.find_element_by_tag_name('th')
+        try:
+            line_header = i.find_element_by_tag_name('th')
+        except:
+            pass
         try:
             if 'Election expenses limit' in line_header.text:
                 expenses_limit = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(expenses_limit)
             if 'Election expenses subject to the limit - Total' in line_header.text:
                 total_expenses_subject_to_limit = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(total_expenses_subject_to_limit)
             if 'Personal expenses - Total' in line_header.text:
                 personal_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(personal_expenses)
             if 'Other expenses and outflows - Total' in line_header.text:
                 other_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(other_expenses)
             if 'Total - Unpaid claim' in line_header.text:
                 unpaid_claims = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(unpaid_claims)
+            if 'Total - Paid' in line_header.text:
+                campaign_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+            if 'Total - Contributed or transferred' in line_header.text:
+                contributed_transferred_property_or_service = i.find_element_by_tag_name('td').text.replace(',', '')
             if 'Grand total' in line_header.text:
                 total_outflows = i.find_element_by_tag_name('td').text.replace(',', '')
-                print(total_outflows)
 
-            loans_received = get_loans(items)
-            transfer_totals = get_transfer_totals(items)
         except:
-            pass
+            try:
+                if 'Election expenses limit' in line_header.text:
+                    expenses_limit = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'TOTAL ELECTION EXPENSES SUBJECT TO THE LIMIT' in line_header.text:
+                    total_expenses_subject_to_limit = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'personal expenses' in line_header.text:
+                    personal_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'Other expenses and outflows' in line_header.text:
+                    other_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'Unpaid claims' in line_header.text:
+                    unpaid_claims = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'TOTAL ELECTORAL CAMPAIGN EXPENSES' in line_header.text:
+                    campaign_expenses = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'Contributed or transferred' in line_header.text:
+                    contributed_transferred_property_or_service = i.find_element_by_tag_name('td').text.replace(',', '')
+                if 'TOTAL CAMPAIGN CASH OUTFLOWS' in line_header.text:
+                    total_outflows = i.find_element_by_tag_name('td').text.replace(',', '')
+
+            except:
+                pass
+
     try:
         outflow_data = {
             'expenses_limit': float(expenses_limit),
             'total_expenses_subject_to_limit': float(total_expenses_subject_to_limit),
             'personal_expenses': float(personal_expenses),
             'other_expenses': float(other_expenses),
+            'campaign_expenses': float(campaign_expenses),
+            'contributed_transferred_property_or_service': float(contributed_transferred_property_or_service),
             'unpaid_claims': float(unpaid_claims),
             'total_outflows': float(total_outflows)
               }
@@ -277,123 +297,179 @@ def get_outflow_data():
     return outflow_data
 
 
-def get_transfer_totals(items):
-    for i in items:
-        line_header = i.find_element_by_tag_name('th')
-        if 'Non-monetary transfers from registered party' in line_header.text:
-            party = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Non-monetary transfers from registered associations' in line_header.text:
-            association = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total non-monetary transfers' in line_header.text:
-            non_monetary = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Monetary transfers from registered party' in line_header.text:
-            party2 = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Monetary transfers from registered associations' in line_header.text:
-            association2 = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Monetary transfers from nomination contestants' in line_header.text:
-            contestants = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total monetary transfers' in line_header.text:
-            total_monetary = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total transfers' in line_header.text:
-            total = i.find_element_by_tag_name('td').text.replace(',', '')
-
-    transfer_totals = { 'Non-monetary transfers from registered party': party,
-                        'Non-monetary transfers from registered associations': association,
-                        'Total non-monetary transfers': non_monetary,
-                        'Monetary transfers from registered party': party2,
-                        'Monetary transfers from registered associations': association2,
-                        'Monetary transfers from nomination contestants': contestants,
-                        'Total monetary transfers': total_monetary,
-                        'Total transfers': total
-                        }
-
-    return transfer_totals
-
-
-def get_loans(items):
-    for i in items:
-        line_header = i.find_element_by_tag_name('th')
-        if 'Total loans from individuals' in line_header.text:
-            individuals = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total loans from financial institutions' in line_header.text:
-            institutions = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total loans from registered party' in line_header.text:
-            party = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total loans from registered associations' in line_header.text:
-            association = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total number of lenders - individuals' in line_header.text:
-            lender_i = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total number of lenders - financial institutions' in line_header.text:
-            lender_f = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total number of lenders - registered party' in line_header.text:
-            lender_r = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total number of lenders - registered associations' in line_header.text:
-            lender_a = i.find_element_by_tag_name('td').text.replace(',', '')
-        if 'Total number of lenders' in line_header.text:
-            lenders = i.find_element_by_tag_name('td').text.replace(',', '')
-
-    loans_received = {'loans from individuals': float(individuals),
-                      'loans from financial institutions': float(institutions),
-                      'loans from registered party': float(party),
-                      'loans from registered associations': float(association),
-                      'total lenders individuals': int(lender_i),
-                      'total lenders financial institutions': int(lender_f),
-                      'total lenders registered party': int(lender_r),
-                      'total lenders registered associations': int(lender_a),
-                      'total lenders': int(lenders)
-                      }
-    return loans_received
-
-
-def get_other_inflow_detail():
+def get_total_expenses_subject_to_limit_detail():
     details = []
     browser.find_element_by_id('SelectedPart').click()
     time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for option in options:
-        if 'Part 2i' in option.text:
+        if 'Part 3b - Statement of Election' in option.text:
             option.click()
+            break
+        # elif 'Part 3a - Statement of Electoral' in option.text:
+        #     option.click()
+        #     break
     time.sleep(1)
     browser.find_element_by_id('ReportOptions').click()
     time.sleep(1)
     try:
-        body = browser.find_element_by_tag_name('tbody')
-        items = body.find_elements_by_tag_name('tr')
-        for i in items:
-            information = i.find_elements_by_tag_name('td')
-            date_received = information[1].text
-            dt_object = datetime.strptime(date_received, '%b %d, %Y')
-            received = dt_object.strftime("%Y-%m-%d")
-            description = information[2].text
-            non_contribution_portion = information[3].text.replace(',', '')
-            bank_interest_earned = information[4].text.replace(',', '')
-            refunds_from_suppliers = information[5].text.replace(',', '')
-            returned_advances = information[6].text.replace(',', '')
-            proceeds = information[7].text.replace(',', '')
-            others = information[8].text.replace(',', '')
-            other_inflow_detail = {'date received': received,
-                        'description': description,
-                        'Non-contribution portion of fundraiser': non_contribution_portion,
-                        'Bank interest earned': bank_interest_earned,
-                        'Refunds from suppliers': refunds_from_suppliers,
-                        'Returned portion of advances': returned_advances,
-                        'Proceeds of sale from residual assets': proceeds,
-                        'others': others
-                        }
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
+            try:
+                items = r.find_elements_by_tag_name('td')
+                date = items[1].text
+                dt_object = datetime.strptime(date, '%b %d, %Y')
+                date = dt_object.strftime("%Y-%m-%d")
+                row_item = {'date': date,
+                         'supplier': items[2].text,
+                         'description': items[3].text,
+                         'Cheque no.': items[4].text,
+                         'Amount paid': float(items[5].text.replace(',', '')),
+                         'Contributed or transferred property or service': float(
+                             items[6].text.replace(',', '')),
+                         'Unpaid claim': float(items[7].text.replace(',', '')),
+                         'Advertising': float(items[8].text.replace(',', '')),
+                         'Voter contact calling services': float(items[9].text.replace(',', '')),
+                         'Office': float(items[10].text.replace(',', '')),
+                         'Salaries and wages': float(items[11].text.replace(',', '')),
+                         'Other': float(items[12].text.replace(',', ''))
+                         }
+                details.append(row_item)
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
 
-            details.append(other_inflow_detail)
-    except:
-        other_inflow_detail = {'date received': None,
-                               'description': None,
-                               'Non-contribution portion of fundraiser': None,
-                               'Bank interest earned': None,
-                               'Refunds from suppliers': None,
-                               'Returned portion of advances': None,
-                               'Proceeds of sale from residual assets': None,
-                               'others': None
-                               }
-        details.append(other_inflow_detail)
-    # print(details)
+    return details
+
+
+def get_personal_expenses_detail():
+    details = []
+    browser.find_element_by_id('SelectedPart').click()
+    time.sleep(1)
+    options = browser.find_elements_by_tag_name('option')
+    for option in options:
+        if 'Part 3c - Statement of' in option.text:
+            option.click()
+            break
+    time.sleep(1)
+    browser.find_element_by_id('ReportOptions').click()
+    time.sleep(1)
+    try:
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
+            try:
+                items = r.find_elements_by_tag_name('td')
+                date = items[1].text
+                dt_object = datetime.strptime(date, '%b %d, %Y')
+                date = dt_object.strftime("%Y-%m-%d")
+                row_item = {'date': date,
+                            'supplier': items[2].text,
+                            'description': items[3].text,
+                            'Cheque no.': items[4].text,
+                            'Amount paid': items[5].text.replace(',', ''),
+                            'Contributed or transferred property or service':
+                                items[6].text.replace(',', ''),
+                            'Unpaid claim': items[7].text.replace(',', ''),
+                            'Transportation': items[8].text.replace(',', ''),
+                            'Temporary lodging': items[9].text.replace(',', ''),
+                            'Meals and incidentals': items[10].text.replace(',', ''),
+                            'Childcare': items[11].text.replace(',', ''),
+                            'Care of a person with a physical or mental incapacity': items[12].text.replace(',', ''),
+                            'Disability - related expenses': items[13].text.replace(',', ''),
+                            'Remuneration of candidates representatives': items[14].text.replace(',', ''),
+                            'Other': items[15].text.replace(',', '')
+                            }
+                details.append(row_item)
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
+
+    return details
+
+
+def get_other_detail():
+    details = []
+    browser.find_element_by_id('SelectedPart').click()
+    time.sleep(1)
+    options = browser.find_elements_by_tag_name('option')
+    for option in options:
+        if 'Part 3d' in option.text:
+            option.click()
+            break
+    time.sleep(1)
+    browser.find_element_by_id('ReportOptions').click()
+    time.sleep(1)
+    try:
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
+            try:
+                items = r.find_elements_by_tag_name('td')
+                date = items[1].text
+                dt_object = datetime.strptime(date, '%b %d, %Y')
+                date = dt_object.strftime("%Y-%m-%d")
+                row_item = {'date': date,
+                            'ED code': items[2].text,
+                            'supplier': items[3].text,
+                            'description': items[4].text,
+                            'Cheque no.': items[5].text,
+                            'Amount paid': items[6].text.replace(',', ''),
+                            'Contributed or transferred property or service':
+                                items[6].text.replace(',', ''),
+                            'Unpaid claim': items[7].text.replace(',', ''),
+                            'Advances': items[8].text.replace(',', ''),
+                            'Transfers': items[9].text.replace(',', ''),
+                            'Principal payments on loan': items[10].text.replace(',', ''),
+                            'Other': items[11].text.replace(',', '')
+                            }
+                details.append(row_item)
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
+
+    return details
+
+
+def get_non_monetary_transfers_sent_to_political_entities():
+    details = []
+    browser.find_element_by_id('SelectedPart').click()
+    time.sleep(1)
+    options = browser.find_elements_by_tag_name('option')
+    for option in options:
+        if 'Part 3f' in option.text:
+            option.click()
+            break
+        elif 'Part 4 - Statement of Non-Monetary' in option.text:
+            option.click()
+            break
+    time.sleep(1)
+    browser.find_element_by_id('ReportOptions').click()
+    time.sleep(1)
+    try:
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
+            try:
+                items = r.find_elements_by_tag_name('td')
+                date = items[1].text
+                dt_object = datetime.strptime(date, '%b %d, %Y')
+                date = dt_object.strftime("%Y-%m-%d")
+                row_item = {'date': date,
+                            'ED code': items[2].text,
+                            'Name of political entity receiving transfer': items[3].text,
+                            'description': items[4].text,
+                            'Nomination contestant Non-monetary': items[5].text.replace(',', ''),
+                            'Registered association Non-monetary': items[6].text.replace(',', ''),
+                            'Registered party Non-monetary':
+                                items[6].text.replace(',', '')
+                            }
+                details.append(row_item)
+            except Exception as e:
+                print(e)
+    except Exception as e:
+        print(e)
+
     return details
 
 
@@ -405,216 +481,36 @@ def get_unpaid_claims_detail():
     for option in options:
         if 'Part 5' in option.text:
             option.click()
-    time.sleep(1)
-    browser.find_element_by_id('ReportOptions').click()
-    time.sleep(1)
-    try:
-        rows = browser.find_elements_by_tag_name('tr')
-        for r in rows:
-
-            items = r.find_elements_by_tag_name('td')
-            date = items[1].text
-            dt_object = datetime.strptime(date, '%b %d, %Y')
-            date = dt_object.strftime("%Y-%m-%d")
-            claim = {'date received': date,
-                     'supplier or lender': items[2].text,
-                     'unpaid claim': float(items[3].text),
-                     'Unpaid claim subject of legal proceedings': float(items[4].text.replace(',', '')),
-                     'Unpaid overdraft or line of credit': float(items[5].text.replace(',', '')),
-                     'Unpaid overdraft or line of credit subject of legal proceedings': float(items[6].text.replace(',', '')),
-                     'Unpaid loan': float(items[7].text.replace(',', '')),
-                     'Unpaid loan subject of legal proceedings': float(items[7].text.replace(',', ''))
-                    }
-            details.append(claim)
-    except:
-        pass
-
-    return details
-
-
-def get_loans_detail():
-    #print("get loans detail")
-    loan_list = []
-    lender_list = []
-    detail_list = []
-    browser.find_element_by_id('SelectedPart').click()
-    time.sleep(1)
-    options = browser.find_elements_by_tag_name('option')
-    for option in options:
-        if 'Part 2b' in option.text:
+            break
+        elif 'Part 3e' in option.text:
             option.click()
             break
     time.sleep(1)
     browser.find_element_by_id('ReportOptions').click()
     time.sleep(1)
     try:
-        tables = browser.find_elements_by_tag_name('table')
-        # number_of_tables = len(tables)
-        # print(number_of_tables)
-        for table in tables:
-            if 'Lender' in table.text:
-                lines = table.find_elements_by_tag_name('tr')
-                columns = lines[2].find_elements_by_tag_name('td')
-                name_of_lender = columns[0].text
-                address = columns[1].text
-                type_of_lender = columns[2].text
-                lender = {'name of lender': name_of_lender,
-                          'address': address,
-                          'type of lender': type_of_lender}
-                lender_list.append(lender)
-            elif 'Loan' in table.text:
-                lines = table.find_elements_by_tag_name('tr')
-                columns = lines[2].find_elements_by_tag_name('td')
-                date = columns[1].text
-                type_of_loan = columns[2].text
-                fixed_interest = columns[3].text
-                variable_interest = columns[4].text
-                amount = columns[5].text
-                principal_payments = columns[6].text
-                interest_payments = columns[7].text
-                balance = columns[8].text
-                detail = {'date received': date,
-                'type of loan': type_of_loan,
-                'fixed interest rate': fixed_interest,
-                'variable interest rate': variable_interest,
-                'amount borrowed': amount,
-                'principal payments': principal_payments,
-                'interest payments': interest_payments,
-                'balance':balance}
-                detail_list.append(detail)
-
-        for i in range(0, len(lender_list)):
-            #print(lender_list[i])
-            lender = lender_list[i]
-            loan = detail_list[i]
-            lender.update(loan)
-            #print(lender)
-            loan_list.append(lender)
-
+        rows = browser.find_elements_by_tag_name('tr')
+        for r in rows:
+            try:
+                items = r.find_elements_by_tag_name('td')
+                date = items[1].text
+                dt_object = datetime.strptime(date, '%b %d, %Y')
+                date = dt_object.strftime("%Y-%m-%d")
+                claim = {'date received': date,
+                         'supplier or lender': items[2].text,
+                         'unpaid claim': items[3].text.replace(',', ''),
+                         'Unpaid claim subject of legal proceedings': items[4].text.replace(',', ''),
+                         'Unpaid overdraft or line of credit': items[5].text.replace(',', ''),
+                         'Unpaid overdraft or line of credit subject of legal proceedings': items[6].text.replace(',', ''),
+                         'Unpaid loan': items[7].text.replace(',', ''),
+                         'Unpaid loan subject of legal proceedings': items[7].text.replace(',', '')
+                        }
+                details.append(claim)
+            except Exception as e:
+                print(e)
     except Exception as e:
         print(e)
-        detail = {'date received': None,
-                  'type of loan': None,
-                  'fixed interest rate': None,
-                  'variable interest rate': None,
-                  'amount borrowed': None,
-                  'principal payments': None,
-                  'interest payments': None,
-                  'balance': None}
-        loan_list.append(detail)
-    #print(loan_list)
-    return loan_list
 
-
-def get_returned_detail():
-    #print("returned detail")
-    details = []
-    browser.find_element_by_id('SelectedPart').click()
-    time.sleep(1)
-    options = browser.find_elements_by_tag_name('option')
-    for option in options:
-        if 'Part 2c' in option.text:
-            option.click()
-    time.sleep(1)
-    browser.find_element_by_id('ReportOptions').click()
-    time.sleep(1)
-    try:
-        body = browser.find_element_by_tag_name('tbody')
-        items = body.find_elements_by_tag_name('tr')
-        for i in items:
-            information = i.find_elements_by_tag_name('td')
-            date_received = information[1].text
-            dt_object = datetime.strptime(date_received, '%b %d, %Y')
-            received = dt_object.strftime("%Y-%m-%d")
-            name = information[3].text
-            address = information[4].text
-            c_type = information[2].text
-            monetary = information[5].text.replace(',','')
-            non_monetary = information[6].text.replace(',','')
-            date_returned = information[7].text
-            dt_object = datetime.strptime(date_returned, '%b %d, %Y')
-            returned = dt_object.strftime("%Y-%m-%d")
-            ceo = information[8].text
-            if ceo:
-                dt_object = datetime.strptime(ceo, '%b %d, %Y')
-                ceo_date = dt_object.strftime("%Y-%m-%d")
-            else:
-                ceo_date = ''
-            returned = {'date received': received,
-                        'name of contributor': name,
-                        'address': address,
-                        'type of contributor': c_type,
-                        'monetary': monetary,
-                        'non-monetary': non_monetary,
-                        'date returned': returned,
-                        'date remitted to CEO': ceo_date
-                        }
-
-            details.append(returned)
-    except:
-        returned = {'date received': None,
-                    'name of contributor': None,
-                    'address': None,
-                    'type of contributor': None,
-                    'monetary':  None,
-                    'non-monetary': None,
-                    'date returned': None,
-                    'date remitted to CEO': None
-                    }
-        details.append(returned)
-    #print(details)
-    return details
-
-
-def get_transfer_detail():
-    details = []
-    browser.find_element_by_id('SelectedPart').click()
-    time.sleep(1)
-    options = browser.find_elements_by_tag_name('option')
-    for option in options:
-        if 'Part 2d' in option.text:
-            option.click()
-    time.sleep(1)
-    browser.find_element_by_id('ReportOptions').click()
-    time.sleep(1)
-    try:
-        body = browser.find_element_by_tag_name('tbody')
-        items = body.find_elements_by_tag_name('tr')
-        for i in items:
-            information = i.find_elements_by_tag_name('td')
-            date_received = information[1].text
-            dt_object = datetime.strptime(date_received, '%b %d, %Y')
-            received = dt_object.strftime("%Y-%m-%d")
-            name = information[3].text
-            party_monetary = information[4].text.replace(',', '')
-            ed_code = information[2].text
-            party_non_monetary = information[5].text.replace(',', '')
-            reg_monetary = information[6].text.replace(',', '')
-            reg_non_monetary = information[7].text
-            nomination = information[8].text
-
-            transfers = {'Date received': received,
-                         'ED code of transferor': ed_code,
-                         'Name of political entity making transfer': name,
-                         'Registered party monetary': party_monetary,
-                         'Registered party non monetary': party_non_monetary,
-                         'Registered association monetary': reg_monetary,
-                         'Registered association non monetary': reg_non_monetary,
-                         'Nomination contestant monetary': nomination
-                        }
-            details.append(transfers)
-    except:
-        transfers = {'Date received': None,
-                     'ED code of transferor': None,
-                     'Name of political entity making transfer': None,
-                     'Registered party monetary': None,
-                     'Registered party non monetary': None,
-                     'Registered association monetary': None,
-                     'Registered association non monetary': None,
-                     'Nomination contestant monetary': None
-                     }
-        details.append(transfers)
-    #print(details)
     return details
 
 
@@ -749,24 +645,20 @@ def get_election_id(election):
 
 def get_row_data(data):
     row = scraper_utils.initialize_row()
-    row.candidate_election_finances_id = int(data['election_finances_id'])
-    row.monetary = float(data['monetary'])
-    row.non_monetary = float(data['non_monetary'])
-    row.contribution_detail = data['contributions_detail']
-    row.contribution_totals = data['contribution_totals']
-    row.loans = data['loans']
-    row.loans_received = data['loans_received']
-    row.loans_detail = data['loans_detail']
-    row.monetary_returned = float(data['monetary_returned'])
-    row.non_monetary_returned = float(data['non_monetary_returned'])
-    row.returned_detail = data['returned_detail']
-    row.monetary_transfer_received = float(data['monetary_transfer_received'])
-    row.non_monetary_transfer_received = float(data['non_monetary_transfer_received'])
-    row.transfer_totals = data['transfer_totals']
-    row.transfer_detail = data['transfer_detail']
-    row.other_cash_inflow = float(data['other_cash_inflow'])
-    row.other_inflow_detail = data['other_inflow_detail']
-    row.total_inflow = float(data['total_inflow'])
+    row.candidate_election_finances_id = data['candidate_election_finances_id']
+    row.expenses_limit = data['expenses_limit']
+    row.total_expenses_subject_to_limit = data['total_expenses_subject_to_limit']
+    row.total_expenses_subject_to_limit_detail = data['total_expenses_subject_to_limit_detail']
+    row.personal_expenses = data['personal_expenses']
+    row.personal_expenses_detail = data['personal_expenses_detail']
+    row.other_expenses = data['other_expenses']
+    row.other_detail = data['other_detail']
+    row.campaign_expenses = data['campaign_expenses']
+    row.contributed_transferred_property_or_service = data['contributed_transferred_property_or_service']
+    row.non_monetary_transfers_sent_to_political_entities = data['non_monetary_transfers_sent_to_political_entities']
+    row.unpaid_claims = data['unpaid_claims']
+    row.unpaid_claims_detail = data['unpaid_claims_detail']
+    row.total_outflows = data['total_outflows']
     return row
 
 

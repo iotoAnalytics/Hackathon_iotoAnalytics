@@ -100,47 +100,52 @@ def get_second_list_of_options(option, option_list):
 def get_candidate_pages(option, o_2):
     candidate_election_finances_list = []
     browser.get(ELECTION_FINANCES_URL)
-    select = browser.find_element_by_tag_name('select')
-    select.click()
-    time.sleep(3)
-    options = browser.find_elements_by_tag_name('option')
-    for o in options:
-        if option in o.text:
-            o.click()
-    time.sleep(3)
-    select_2 = browser.find_elements_by_tag_name('select')
-    select_2[1].click()
-    time.sleep(3)
-    options_2 = browser.find_elements_by_tag_name('option')
-    for o in options_2:
-        if o_2 in o.text:
-            o.click()
-            time.sleep(2)
-    select_3 = browser.find_element_by_id('reportTypeList')
-    select_3.click()
-    options_3 = browser.find_elements_by_tag_name('option')
-    for o_3 in options_3:
-        if "Campaign Returns" in o_3.text:
-            o_3.click()
-            time.sleep(2)
-    search_button = browser.find_element_by_id('SearchButton')
-    search_button.click()
-    current_url = browser.current_url
-    candidate_list = search_candidates(current_url)
-    candidate_election_finances_list.extend(get_candidate_election_details(candidate_list))
-
+    try:
+        select = browser.find_element_by_tag_name('select')
+        select.click()
+        time.sleep(3)
+        options = browser.find_elements_by_tag_name('option')
+        for o in options:
+            if option in o.text:
+                o.click()
+        time.sleep(3)
+        select_2 = browser.find_elements_by_tag_name('select')
+        select_2[1].click()
+        time.sleep(3)
+        options_2 = browser.find_elements_by_tag_name('option')
+        for o in options_2:
+            if o_2 in o.text:
+                o.click()
+                time.sleep(2)
+        select_3 = browser.find_element_by_id('reportTypeList')
+        select_3.click()
+        options_3 = browser.find_elements_by_tag_name('option')
+        for o_3 in options_3:
+            if "Campaign Returns" in o_3.text:
+                o_3.click()
+                time.sleep(2)
+        search_button = browser.find_element_by_id('SearchButton')
+        search_button.click()
+        current_url = browser.current_url
+        candidate_list = search_candidates(current_url)
+        candidate_election_finances_list.extend(get_candidate_election_details(candidate_list))
+    except:
+        pass
     return candidate_election_finances_list
 
 
 def search_candidates(url):
     candidate_list = []
-    browser.get(url)
-    browser.find_element_by_id('button3').click()
-    time.sleep(3)
-    #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-    browser.find_element_by_id('SelectAllCandidates').click()
-    time.sleep(3)
-    browser.find_element_by_id('SearchSelected').click()
+    try:
+        browser.get(url)
+        browser.find_element_by_id('button3').click()
+        time.sleep(2)
+        #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
+        browser.find_element_by_id('SelectAllCandidates').click()
+        time.sleep(2)
+        browser.find_element_by_id('SearchSelected').click()
+    except:
+        pass
 
     while True:
         election = browser.find_element_by_id('eventname').text

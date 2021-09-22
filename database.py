@@ -1602,3 +1602,58 @@ class Persistence:
                 except Exception as e:
                     print(
                         f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
+
+    @staticmethod
+    def write_bank_reconciliation(data, table):
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_bank_reconciliation_query = sql.SQL("""
+                               INSERT INTO {table}
+                               VALUES (
+                                   DEFAULT, %s, %s, %s)
+                               ON CONFLICT DO NOTHING;
+                               """).format(table=sql.Identifier(table))
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.candidate_election_finances_id,
+                       row.inflow,
+                       row.outflow,
+                       row.surplus)
+
+                try:
+                    cur.execute(insert_bank_reconciliation_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
+
+    @staticmethod
+    def write_bank_account(data, table):
+
+        with CursorFromConnectionFromPool() as cur:
+            insert_bank_account_query = sql.SQL("""
+                               INSERT INTO {table}
+                               VALUES (
+                                   DEFAULT, %s, %s, %s, %s, %s, %s, %s)
+                               ON CONFLICT DO NOTHING;
+                               """).format(table=sql.Identifier(table))
+
+            for row in data:
+                if isinstance(row, dict):
+                    row = utils.DotDict(row)
+
+                tup = (row.candidate_election_finances_id,
+                       row.total_credits,
+                       row.total_debits,
+                       row.total_balance,
+                       row.outstanding_cheques,
+                       row.deposits_in_transit,
+                       row.account_balance)
+
+                try:
+                    cur.execute(insert_bank_account_query, tup)
+                except Exception as e:
+                    print(
+                        f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
