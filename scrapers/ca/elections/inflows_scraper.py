@@ -828,7 +828,8 @@ def get_row_data(data):
 if __name__ == '__main__':
     data = get_data()
     #print(data)
-    row_data = [get_row_data(d) for d in data]
+    candidates_with_no_id_removed = [i for i in data if not (i['election_finances_id'] == 0)]
+    row_data = [get_row_data(d) for d in candidates_with_no_id_removed]
     print(row_data)
     scraper_utils.write_data(row_data)
     print('finished')

@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import time
 from selenium import webdriver
-from scraper_utils import InflowScraperUtils
+from scraper_utils import OutflowScraperUtils
 from database import CursorFromConnectionFromPool
 import pandas as pd
 import dateutil.parser as dparser
@@ -23,7 +23,7 @@ MAIN_URL = 'https://www.elections.ca'
 ELECTION_FINANCES_URL = MAIN_URL + '/WPAPPS/WPF/EN/Home/Index'
 
 #
-scraper_utils = InflowScraperUtils(COUNTRY, TABLE)
+scraper_utils = OutflowScraperUtils(COUNTRY, TABLE)
 crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
 
 with CursorFromConnectionFromPool() as cur:
@@ -141,8 +141,8 @@ def search_candidates(url):
     browser.get(url)
     browser.find_element_by_id('button3').click()
     time.sleep(3)
-    browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-    #browser.find_element_by_id('SelectAllCandidates').click()
+    #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
+    browser.find_element_by_id('SelectAllCandidates').click()
     time.sleep(3)
     browser.find_element_by_id('SearchSelected').click()
 
@@ -177,13 +177,17 @@ def search_candidates(url):
         print('personal expenses')
         print(personal_expenses_detail)
         other_detail = get_other_detail()
+
+        non_monetary_transfers_sent_to_political_entities = get_non_monetary_transfers_sent_to_political_entities()
         print("other")
         print(other_detail)
 
         candidate_info = {'election': election, 'name': candidate, 'date_of_return': date_of_return,
-                          'party_district': party_district, 'unpaid claims detail': unpaid_claims_detail,
+                          'party_district': party_district, 'unpaid_claims_detail': unpaid_claims_detail,
                           'total_expenses_subject_to_limit_detail': total_expenses_subject_to_limit_detail,
-                          'personal_expenses_detail': personal_expenses_detail, 'other_detail': other_detail}
+                          'personal_expenses_detail': personal_expenses_detail,
+                          'non_monetary_transfers_sent_to_political_entities': non_monetary_transfers_sent_to_political_entities,
+                          'other_detail': other_detail}
         outflow_data = get_outflow_data()
         #print(candidate_info)
         candidate_info.update(outflow_data)
@@ -291,6 +295,8 @@ def get_outflow_data():
             'total_expenses_subject_to_limit': 0.00,
             'personal_expenses': 0.00,
             'other_expenses': 0.00,
+            'campaign_expenses': 0.00,
+            'contributed_transferred_property_or_service': 0.00,
             'unpaid_claims': 0.00,
             'total_outflows': 0.00
         }
@@ -527,6 +533,7 @@ def get_candidate_election_details(candidate_list):
             candidate = {'candidate_election_id': candidate_election_id, 'date_of_return': c['date_of_return']}
             election_finances_id = get_candidate_election_finances_id(candidate)
             c.update({'election_finances_id': election_finances_id})
+            print(c)
             completed_list.append(c)
         except Exception as e:
             print(e)
@@ -645,7 +652,7 @@ def get_election_id(election):
 
 def get_row_data(data):
     row = scraper_utils.initialize_row()
-    row.candidate_election_finances_id = data['candidate_election_finances_id']
+    row.candidate_election_finances_id = data['election_finances_id']
     row.expenses_limit = data['expenses_limit']
     row.total_expenses_subject_to_limit = data['total_expenses_subject_to_limit']
     row.total_expenses_subject_to_limit_detail = data['total_expenses_subject_to_limit_detail']
@@ -665,7 +672,8 @@ def get_row_data(data):
 if __name__ == '__main__':
     data = get_data()
     #print(data)
-    row_data = [get_row_data(d) for d in data]
+    candidates_with_no_id_removed = [i for i in data if not (i['election_finances_id'] == 0)]
+    row_data = [get_row_data(d) for d in candidates_with_no_id_removed]
     print(row_data)
     scraper_utils.write_data(row_data)
     print('finished')
