@@ -7,20 +7,21 @@ from datetime import datetime
 import re
 from nameparser import HumanName
 import requests
+from webdriver_manager.chrome import ChromeDriverManager
 from scraper_utils import USStateLegislationScraperUtils
 import dateutil.parser as dparser
 from selenium import webdriver
 import time
-from selenium.common.exceptions import TimeoutException, ElementClickInterceptedException
 import pandas as pd
 from multiprocessing import Pool
 
-p = Path(os.path.abspath(__file__)).parents[5]
+NODES_TO_ROOT = 5
+path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
+sys.path.insert(0, str(path_to_root))
 
-sys.path.insert(0, str(p))
-
-PATH = "../../../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
-browser = webdriver.Chrome(PATH)
+#PATH = "../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
+#driver = webdriver.Chrome(PATH)
+browser = webdriver.Chrome(ChromeDriverManager().install())
 
 state_abbreviation = 'WY'
 database_table_name = 'us_wy_legislation'
@@ -94,7 +95,7 @@ def get_bill_title(row):
     title = browser.find_element_by_tag_name('h3').text
     title = title.split('-')[1]
     title = title.strip()
-    print(title)
+    #print(title)
     row.bill_title = title
 
 
@@ -132,7 +133,7 @@ def get_actions(row):
 def get_get_date_introduced(row, actions):
     action = actions[1]
     date = action['date']
-    print(date)
+    #print(date)
     row.date_introduced = date
 
 
@@ -205,6 +206,7 @@ def get_sponsors(row):
                     row.principal_sponsor = name
                 else:
                     committee = sponsor
+                    row.committees = committee
                     row.principal_sponsor = committee
             except:
                 pass
@@ -232,16 +234,92 @@ def get_summary(row):
         pass
 
 
+def get_individual_votes(text_list):
+    list_of_voters = []
+    ayes_list = text_list[1].replace('Ayes:', '').split(', ')
+    for i in ayes_list:
+        if i:
+            name = i.strip().capitalize()
+            gov_id = get_sponsor_id(name)
+            vote = 'Aye'
+            vote_detail = {'goverlytics_id': gov_id, 'legislator': name, 'vote_text': vote}
+            list_of_voters.append(vote_detail)
+    nays_list = text_list[2].replace('Nays:', '').split(', ')
+    for i in nays_list:
+        if i:
+            name = i.strip().capitalize()
+            gov_id = get_sponsor_id(name)
+            vote = 'Nay'
+            vote_detail = {'goverlytics_id': gov_id, 'legislator': name, 'vote_text': vote}
+            list_of_voters.append(vote_detail)
+    absent_list = text_list[4].replace('Absent:', '').split(', ')
+    for i in absent_list:
+        if i:
+            name = i.strip().capitalize()
+            gov_id = get_sponsor_id(name)
+            vote = 'Absent'
+            vote_detail = {'goverlytics_id': gov_id, 'legislator': name, 'vote_text': vote}
+            list_of_voters.append(vote_detail)
+    not_voting = text_list[3].replace('Excused:', '').split(', ') + text_list[5].replace('Conflict:', '').split(', ')
+    for i in not_voting:
+        if i:
+            name = i.strip().capitalize()
+            gov_id = get_sponsor_id(name)
+            vote = 'Not voting'
+            vote_detail = {'goverlytics_id': gov_id, 'legislator': name, 'vote_text': vote}
+            list_of_voters.append(vote_detail)
+
+        return list_of_voters
+
+
 def get_votes(row):
+    return_value = []
     try:
         votes = browser.find_element_by_xpath('//*[@id="tabsetTabs"]/li[5]/a')
         votes.click()
         time.sleep(10)
-        vote_text = browser.find_elements_by_class_name("panel-body")
+        vote_text = browser.find_elements_by_class_name("panel-title")
         for item in vote_text:
-            print(item.text)
+            description = item.text.split(':')[0]
+            if 'H' in item.text:
+                chamber = 'House'
+            elif "S" in item.text:
+                chamber = 'Senate'
+            item.click()
+            # time.sleep(2)
+            try:
+                vote_detail = browser.find_elements_by_class_name("panel-body")
+                for i in vote_detail:
+                    text_list = i.text.split('\n')
+                    if len(text_list) > 1:
+                        date = dparser.parse(text_list[0], fuzzy=True)
+                        date_of_vote = date.strftime("%Y-%m-%d")
+                        votes_list = get_individual_votes(text_list)
+                        count = text_list[6].split(' ')
+                        if count[2] > count[4]:
+                            passed = 1
+                        else:
+                            passed = 0
+                        full_vote_detail = {
+                            'date': date_of_vote,
+                            'description': description,
+                            'yea': int(count[2]),
+                            'nay': int(count[4]),
+                            'nv': int(count[6]) + int(count[10]),
+                            'absent': int(count[8]),
+                            'total': int(count[2]) + int(count[4]) + int(count[6]) + int(count[10]) + int(count[8]),
+                            'passed': passed,
+                            'chamber': chamber,
+                            'votes': votes_list
+                        }
+                        return_value.append(full_vote_detail)
+
+            except Exception as e:
+                print(e)
+
     except:
         pass
+    row.votes = return_value
 
 
 def scrape(url):
@@ -251,29 +329,30 @@ def scrape(url):
     row.source_url = url
     bill_name = url.split('/')[5]
     print(bill_name)
+    row.bill_name = bill_name
     if "H" in bill_name:
         row.chamber_origin = 'House'
     if "S" in bill_name:
         row.chamber_origin = 'Senate'
     session = datetime.now().year
-
+    row.session = str(session)
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
     row.goverlytics_id = goverlytics_id
 
     browser.get(url)
     time.sleep(10)
 
-    #get_bill_type(row)
-    #get_bill_title(row)
-   # get_current_status(row)
-   # get_sponsors(row)
-    #get_bill_text(row)
-    #get_summary(row)
-    #get_actions(row)
+    get_bill_type(row)
+    get_bill_title(row)
+    get_current_status(row)
+    get_sponsors(row)
+    get_bill_text(row)
+    get_summary(row)
+    get_actions(row)
     get_votes(row)
 
     scraper_utils.crawl_delay(crawl_delay)
-
+    print(row)
     return row
 
 
