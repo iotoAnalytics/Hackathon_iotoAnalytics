@@ -1176,8 +1176,6 @@ class PDF_Table_Reader(PDF_Reader):
 
 # region Election Scraper Utils
 
-# region Election Data
-
 ##########################################
 # PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
