@@ -144,8 +144,8 @@ def search_candidates(url):
     browser.get(url)
     browser.find_element_by_id('button3').click()
     time.sleep(3)
-    browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-    #browser.find_element_by_id('SelectAllCandidates').click()
+    #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
+    browser.find_element_by_id('SelectAllCandidates').click()
     time.sleep(3)
     browser.find_element_by_id('SearchSelected').click()
 
@@ -828,7 +828,8 @@ def get_row_data(data):
 if __name__ == '__main__':
     data = get_data()
     #print(data)
-    row_data = [get_row_data(d) for d in data]
+    candidates_with_no_id_removed = [i for i in data if not (i['election_finances_id'] == 0)]
+    row_data = [get_row_data(d) for d in candidates_with_no_id_removed]
     print(row_data)
     scraper_utils.write_data(row_data)
     print('finished')

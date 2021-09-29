@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import time
 from selenium import webdriver
-from scraper_utils import CandidateElectionFinancesScraperUtils
+from scraper_utils import BankReconciliationUtils
 from database import CursorFromConnectionFromPool
 import pandas as pd
 import dateutil.parser as dparser
@@ -18,13 +18,12 @@ browser = webdriver.Chrome(PATH)
 
 # https://www.elections.ca/WPAPPS/WPF/EN/Home/Index
 COUNTRY = 'ca'
-TABLE = 'ca_candidate_election_finances'
+TABLE = 'ca_bank_reconciliation'
 MAIN_URL = 'https://www.elections.ca'
 ELECTION_FINANCES_URL = MAIN_URL + '/WPAPPS/WPF/EN/Home/Index'
-THREADS_FOR_POOL = 12
 
 #
-scraper_utils = CandidateElectionFinancesScraperUtils(COUNTRY, TABLE)
+scraper_utils = BankReconciliationUtils(COUNTRY, TABLE)
 crawl_delay = scraper_utils.get_crawl_delay(MAIN_URL)
 
 with CursorFromConnectionFromPool() as cur:
@@ -41,6 +40,10 @@ with CursorFromConnectionFromPool() as cur:
         cur.execute(query)
         elections_table = cur.fetchall()
 
+        query = 'SELECT * FROM ca_candidate_election_finances'
+        cur.execute(query)
+        finances_table = cur.fetchall()
+
     except Exception as e:
         sys.exit(
             f'An exception occurred retrieving tables from database:\n{e}')
@@ -48,6 +51,7 @@ with CursorFromConnectionFromPool() as cur:
     candidates_election = pd.DataFrame(candidate_election_details)
     candidates_table = pd.DataFrame(candidates)
     elections = pd.DataFrame(elections_table)
+    finances_id = pd.DataFrame(finances_table)
 
 
 def get_data():
@@ -65,7 +69,7 @@ def get_first_list_of_options():
     browser.get(ELECTION_FINANCES_URL)
     select = browser.find_element_by_tag_name('select')
     select.click()
-    time.sleep(3)
+    time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for o_1 in options:
         if "Select" not in o_1.text:
@@ -79,15 +83,15 @@ def get_second_list_of_options(option, option_list):
     browser.get(ELECTION_FINANCES_URL)
     select = browser.find_element_by_tag_name('select')
     select.click()
-    time.sleep(3)
+    time.sleep(1)
     options = browser.find_elements_by_tag_name('option')
     for o in options:
         if option in o.text:
             o.click()
-    time.sleep(3)
+    time.sleep(1)
     select_2 = browser.find_elements_by_tag_name('select')
     select_2[1].click()
-    time.sleep(3)
+    time.sleep(1)
     options_2 = browser.find_elements_by_tag_name('option')
     for o_2 in options_2:
         if "Select" not in o_2.text:
@@ -100,52 +104,47 @@ def get_second_list_of_options(option, option_list):
 def get_candidate_pages(option, o_2):
     candidate_election_finances_list = []
     browser.get(ELECTION_FINANCES_URL)
-    try:
-        select = browser.find_element_by_tag_name('select')
-        select.click()
-        time.sleep(3)
-        options = browser.find_elements_by_tag_name('option')
-        for o in options:
-            if option in o.text:
-                o.click()
-        time.sleep(3)
-        select_2 = browser.find_elements_by_tag_name('select')
-        select_2[1].click()
-        time.sleep(3)
-        options_2 = browser.find_elements_by_tag_name('option')
-        for o in options_2:
-            if o_2 in o.text:
-                o.click()
-                time.sleep(2)
-        select_3 = browser.find_element_by_id('reportTypeList')
-        select_3.click()
-        options_3 = browser.find_elements_by_tag_name('option')
-        for o_3 in options_3:
-            if "Campaign Returns" in o_3.text:
-                o_3.click()
-                time.sleep(2)
-        search_button = browser.find_element_by_id('SearchButton')
-        search_button.click()
-        current_url = browser.current_url
-        candidate_list = search_candidates(current_url)
-        candidate_election_finances_list.extend(get_candidate_election_details(candidate_list))
-    except:
-        pass
+    select = browser.find_element_by_tag_name('select')
+    select.click()
+    time.sleep(1)
+    options = browser.find_elements_by_tag_name('option')
+    for o in options:
+        if option in o.text:
+            o.click()
+    time.sleep(1)
+    select_2 = browser.find_elements_by_tag_name('select')
+    select_2[1].click()
+    time.sleep(1)
+    options_2 = browser.find_elements_by_tag_name('option')
+    for o in options_2:
+        if o_2 in o.text:
+            o.click()
+            time.sleep(2)
+    select_3 = browser.find_element_by_id('reportTypeList')
+    select_3.click()
+    options_3 = browser.find_elements_by_tag_name('option')
+    for o_3 in options_3:
+        if "Campaign Returns" in o_3.text:
+            o_3.click()
+            time.sleep(2)
+    search_button = browser.find_element_by_id('SearchButton')
+    search_button.click()
+    current_url = browser.current_url
+    candidate_list = search_candidates(current_url)
+    candidate_election_finances_list.extend(get_candidate_election_details(candidate_list))
+
     return candidate_election_finances_list
 
 
 def search_candidates(url):
     candidate_list = []
-    try:
-        browser.get(url)
-        browser.find_element_by_id('button3').click()
-        time.sleep(2)
-        #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
-        browser.find_element_by_id('SelectAllCandidates').click()
-        time.sleep(2)
-        browser.find_element_by_id('SearchSelected').click()
-    except:
-        pass
+    browser.get(url)
+    browser.find_element_by_id('button3').click()
+    time.sleep(3)
+    #browser.find_element_by_xpath('//*[@id="SelectedClientIds"]/option[1]').click()
+    browser.find_element_by_id('SelectAllCandidates').click()
+    time.sleep(3)
+    browser.find_element_by_id('SearchSelected').click()
 
     while True:
         election = browser.find_element_by_id('eventname').text
@@ -155,10 +154,12 @@ def search_candidates(url):
         time.sleep(1)
         options = browser.find_elements_by_tag_name('option')
         for option in options:
-            if 'Part  6' in option.text:
+            if 'Part  4 - Campaign Financial Summary' in option.text:
                 option.click()
-            elif 'Campaign Financial Summary' in option.text:
+                break
+            elif 'Part 6' in option.text:
                 option.click()
+                break
         browser.find_element_by_id('ReportOptions').click()
         try:
             date = browser.find_element_by_class_name('date').text
@@ -166,8 +167,13 @@ def search_candidates(url):
             date_of_return = dt_object.strftime("%Y-%m-%d")
         except:
             date_of_return = "1212-12-12"
+
         candidate_info = {'election': election, 'name': candidate, 'date_of_return': date_of_return,
                           'party_district': party_district}
+        account_data = get_account_data()
+        #print(candidate_info)
+        candidate_info.update(account_data)
+        print(candidate_info)
         candidate_list.append(candidate_info)
 
         try:
@@ -180,17 +186,84 @@ def search_candidates(url):
     return candidate_list
 
 
+def get_candidate_election_finances_id(candidate):
+    if pd.notna(candidate):
+        df = finances_id
+        try:
+            election_finances_id = df.loc[(df['candidate_election_id'] == candidate['candidate_election_id']) &
+                                          (df['date_of_return'] == candidate['date_of_return'])]['id'].values[0]
+        except:
+            election_finances_id = 0
+    try:
+        return int(election_finances_id)
+    except Exception:
+        return 0
+
+
+def get_account_data():
+    browser.find_element_by_id('SelectedPart').click()
+    time.sleep(1)
+    options = browser.find_elements_by_tag_name('option')
+    for option in options:
+        if 'Campaign Bank Reconciliation' in option.text:
+            option.click()
+            break
+        elif 'Part 4 - Campaign Financial Summary' in option.text:
+            option.click()
+            break
+    time.sleep(1)
+    browser.find_element_by_id('ReportOptions').click()
+    time.sleep(1)
+    items = browser.find_elements_by_tag_name('tr')
+    for i in items:
+        try:
+            line_header = i.find_element_by_tag_name('th')
+        except:
+            pass
+        try:
+            if 'Total campaign cash inflows' in line_header.text:
+                inflow = i.find_element_by_tag_name('td').text.replace(',', '')
+            if 'Total campaign cash outflows' in line_header.text:
+                outflow = i.find_element_by_tag_name('td').text.replace(',', '')
+            if 'MONETARY SURPLUS' in line_header.text:
+                surplus = i.find_element_by_tag_name('td').text.replace(',', '')
+
+        except:
+            pass
+
+    try:
+        account_data = {
+            'inflow': float(inflow),
+            'outflow': float(outflow),
+            'surplus': float(surplus),
+
+              }
+    except:
+        account_data = {
+            'inflow': 0.00,
+            'outflow': 0.00,
+            'surplus': 0.00,
+        }
+    return account_data
+
+
 def get_candidate_election_details(candidate_list):
     completed_list = []
     for c in candidate_list:
-        party = c['party_district'].split('/')[0]
-        party_id = get_party_id(party)
-        name = c['name']
-        gov_id = get_goverlytics_id(name, party_id)
-        election_id = get_election_id(c['election'])
-        candidate_election_id = get_candidate_election_id(gov_id, party_id, election_id)
-        candidate = {'candidate_election_id': candidate_election_id, 'date_of_return': c['date_of_return']}
-        completed_list.append(candidate)
+        try:
+            party = c['party_district'].split('/')[0]
+            party_id = get_party_id(party)
+            name = c['name']
+            gov_id = get_goverlytics_id(name, party_id)
+            election_id = get_election_id(c['election'])
+            candidate_election_id = get_candidate_election_id(gov_id, party_id, election_id)
+            candidate = {'candidate_election_id': candidate_election_id, 'date_of_return': c['date_of_return']}
+            election_finances_id = get_candidate_election_finances_id(candidate)
+            c.update({'election_finances_id': election_finances_id})
+            print(c)
+            completed_list.append(c)
+        except Exception as e:
+            print(e)
     return completed_list
 
 
@@ -261,7 +334,7 @@ def get_election_id(election):
             election = election.split(' (')[0]
             try:
                 date = dparser.parse(election, fuzzy=True)
-                date_name = date.strftime("%Y_%m_%d")
+                date_name = date.strftime("%Y-%m-%d")
                 election_name = 'by_election_' + date_name
             except Exception as e:
                 print(e)
@@ -306,14 +379,18 @@ def get_election_id(election):
 
 def get_row_data(data):
     row = scraper_utils.initialize_row()
-    row.candidate_election_id = int(data['candidate_election_id'])
-    row.date_of_return = str(data['date_of_return'])
+    row.candidate_election_finances_id = data['election_finances_id']
+    row.inflow = data['inflow']
+    row.outflow = data['outflow']
+    row.surplus = data['surplus']
     return row
 
 
 if __name__ == '__main__':
     data = get_data()
-    candidates_with_no_id_removed = [i for i in data if not (i['candidate_election_id'] == 0)]
+    #print(data)
+    candidates_with_no_id_removed = [i for i in data if not (i['election_finances_id'] == 0)]
     row_data = [get_row_data(d) for d in candidates_with_no_id_removed]
+    print(row_data)
     scraper_utils.write_data(row_data)
     print('finished')

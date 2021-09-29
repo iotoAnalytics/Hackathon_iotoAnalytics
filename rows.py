@@ -2139,3 +2139,361 @@ class CandidateElectionVotesRow:
             if not isinstance(value, float):
                 raise TypeError("majority_percentage must be an float")
             self._majority_percentage = value
+
+@dataclass
+class OutflowsRow:
+        """
+        Data structure for housing data data for election votes
+        """
+
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        candidate_election_finances_id: int
+        expenses_limit: float
+        total_expenses_subject_to_limit: float
+        total_expenses_subject_to_limit_detail: List[dict]
+        personal_expenses: float
+        personal_expenses_detail: List[dict]
+        other_expenses: float
+        other_detail: List[dict]
+        campaign_expenses: float
+        contributed_transferred_property_or_service: float
+        non_monetary_transfers_sent_to_political_entities: List[dict]
+        unpaid_claims: float
+        unpaid_claims_detail: List[dict]
+        total_outflows: float
+
+        def __init__(self):
+            self._candidate_election_finances_id = None
+            self._expenses_limit = 0
+            self._total_expenses_subject_to_limit = 0
+            self._total_expenses_subject_to_limit_detail = []
+            self._personal_expenses = 0
+            self._personal_expenses_detail = []
+            self._other_expenses = 0
+            self._other_detail = []
+            self._campaign_expenses = 0
+            self._contributed_transferred_property_or_service = 0
+            self._non_monetary_transfers_sent_to_political_entities = []
+            self._unpaid_claims = 0
+            self._unpaid_claims_detail = []
+            self._total_outflows = 0
+
+        @property
+        def candidate_election_finances_id(self) -> int:
+            return self._candidate_election_finances_id
+
+        @candidate_election_finances_id.setter
+        def candidate_election_finances_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("candidate_election_finances_id must be an int")
+            self._candidate_election_finances_id = value
+
+        @property
+        def expenses_limit(self) -> float:
+            return self._expenses_limit
+
+        @expenses_limit.setter
+        def expenses_limit(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("expenses_limit must be a float")
+            self._expenses_limit = value
+
+        @property
+        def total_expenses_subject_to_limit(self) -> float:
+            return self._total_expenses_subject_to_limit
+
+        @total_expenses_subject_to_limit.setter
+        def total_expenses_subject_to_limit(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("total_expenses_subject_to_limit must be a float")
+            self._total_expenses_subject_to_limit = value
+
+        @property
+        def total_expenses_subject_to_limit_detail(self) -> List[dict]:
+            return self._total_expenses_subject_to_limit_detail
+
+        @total_expenses_subject_to_limit_detail.setter
+        def total_expenses_subject_to_limit_detail(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("total_expenses_subject_to_limit_detail be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("total_expenses_subject_to_limit_detail must a list of dicts")
+            self._total_expenses_subject_to_limit_detail = value
+
+        @property
+        def personal_expenses(self) -> float:
+            return self._personal_expenses
+
+        @personal_expenses.setter
+        def personal_expenses(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("personal_expenses must be a float")
+            self._personal_expenses = value
+
+        @property
+        def personal_expenses_detail(self) -> List[dict]:
+            return self._personal_expenses_detail
+
+        @personal_expenses_detail.setter
+        def personal_expenses_detail(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("personal_expenses_detail be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("personal_expenses_detail must a list of dicts")
+            self._personal_expenses_detail = value
+
+        @property
+        def other_expenses(self) -> float:
+            return self._other_expenses
+
+        @other_expenses.setter
+        def other_expenses(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("other_expenses must be a float")
+            self._other_expenses = value
+
+        @property
+        def other_detail(self) -> List[dict]:
+            return self._other_detail
+
+        @other_detail.setter
+        def other_detail(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("other_detail be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("other_detail must a list of dicts")
+            self._other_detail = value
+
+        @property
+        def campaign_expenses(self) -> float:
+            return self._campaign_expenses
+
+        @campaign_expenses.setter
+        def campaign_expenses(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("campaign_expenses must be a float")
+            self._campaign_expenses = value
+
+        @property
+        def contributed_transferred_property_or_service(self) -> float:
+            return self._contributed_transferred_property_or_service
+
+        @contributed_transferred_property_or_service.setter
+        def contributed_transferred_property_or_service(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("contributed_transferred_property_or_service must be a float")
+            self._contributed_transferred_property_or_service = value
+
+        @property
+        def non_monetary_transfers_sent_to_political_entities(self) -> List[dict]:
+            return self._non_monetary_transfers_sent_to_political_entities
+
+        @non_monetary_transfers_sent_to_political_entities.setter
+        def non_monetary_transfers_sent_to_political_entities(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("non_monetary_transfers_sent_to_political_entities be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("non_monetary_transfers_sent_to_political_entities must a list of dicts")
+            self._non_monetary_transfers_sent_to_political_entities = value
+
+        @property
+        def unpaid_claims(self) -> float:
+            return self._unpaid_claims
+
+        @unpaid_claims.setter
+        def unpaid_claims(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("unpaid_claims must be a float")
+            self._unpaid_claims = value
+
+        @property
+        def unpaid_claims_detail(self) -> List[dict]:
+            return self._unpaid_claims_detail
+
+        @unpaid_claims_detail.setter
+        def unpaid_claims_detail(self, value: List[dict]) -> None:
+            if type(value) != list:
+                raise TypeError("unpaid_claims_detail be a list of dicts")
+            for element in value:
+                if type(element) != dict:
+                    raise TypeError("unpaid_claims_detail must a list of dicts")
+            self._unpaid_claims_detail = value
+
+        @property
+        def total_outflows(self) -> float:
+            return self._total_outflows
+
+        @total_outflows.setter
+        def total_outflows(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("total_outflows must be a float")
+            self._total_outflows = value
+
+
+@dataclass
+class BankReconciliationRow:
+        """
+        Data structure for housing data data for election votes
+        """
+
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        candidate_election_finances_id: int
+        inflow: float
+        outflow: float
+        surplus: float
+
+        def __init__(self):
+            self._candidate_election_finances_id = None
+            self._inflow = None
+            self._outflow = None
+            self._surplus = None
+
+
+        @property
+        def candidate_election_finances_id(self) -> int:
+            return self._candidate_election_finances_id
+
+        @candidate_election_finances_id.setter
+        def candidate_election_finances_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("candidate_election_finances_id must be an int")
+            self._candidate_election_finances_id = value
+
+        @property
+        def inflow(self) -> float:
+            return self._inflow
+
+        @inflow.setter
+        def inflow(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("inflow must be an int")
+            self._inflow = value
+
+        @property
+        def outflow(self) -> float:
+            return self._outflow
+
+        @outflow.setter
+        def outflow(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("outflow must be an float")
+            self._outflow = value
+
+        @property
+        def surplus(self) -> float:
+            return self._surplus
+
+        @surplus.setter
+        def surplus(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("surplus must be an int")
+            self._surplus = value
+
+
+@dataclass
+class BankAccountRow:
+        """
+        Data structure for housing data data for election votes
+        """
+
+        def __iter__(self):
+            for attr, value in self.__dict__.items():
+                yield attr, value
+
+        candidate_election_finances_id: int
+        total_credits: float
+        total_debits: float
+        total_balance: float
+        outstanding_cheques: float
+        deposits_in_transit: float
+        account_balance: float
+
+        def __init__(self):
+            self._candidate_election_finances_id = None
+            self._total_credits = None
+            self._total_debits = None
+            self._total_balance = None
+            self._outstanding_cheques = None
+            self._deposits_in_transit = None
+            self._account_balance = None
+
+        @property
+        def candidate_election_finances_id(self) -> int:
+            return self._candidate_election_finances_id
+
+        @candidate_election_finances_id.setter
+        def candidate_election_finances_id(self, value: int) -> None:
+            if not isinstance(value, int):
+                raise TypeError("candidate_election_finances_id must be an int")
+            self._candidate_election_finances_id = value
+
+        @property
+        def total_credits(self) -> float:
+            return self._total_credits
+
+        @total_credits.setter
+        def total_credits(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("total_credits must be an float")
+            self._total_credits = value
+
+        @property
+        def total_debits(self) -> float:
+            return self._total_debits
+
+        @total_debits.setter
+        def total_debits(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("total_debits must be an float")
+            self._total_debits = value
+
+        @property
+        def total_balance(self) -> float:
+            return self._total_balance
+
+        @total_balance.setter
+        def total_balance(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("total_balance must be an float")
+            self._total_balance = value
+
+        @property
+        def outstanding_cheques(self) -> float:
+            return self._outstanding_cheques
+
+        @outstanding_cheques.setter
+        def outstanding_cheques(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("outstanding_cheques must be an float")
+            self._outstanding_cheques = value
+
+        @property
+        def deposits_in_transit(self) -> float:
+            return self._deposits_in_transit
+
+        @deposits_in_transit.setter
+        def deposits_in_transit(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("deposits_in_transit must be an float")
+            self._deposits_in_transit = value
+
+        @property
+        def account_balance(self) -> float:
+            return self._account_balance
+
+        @account_balance.setter
+        def account_balance(self, value: float) -> None:
+            if not isinstance(value, float):
+                raise TypeError("account_balance must be an float")
+            self._account_balance = value
+
