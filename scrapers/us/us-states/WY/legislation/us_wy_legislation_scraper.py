@@ -19,8 +19,8 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-#PATH = "../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
-#driver = webdriver.Chrome(PATH)
+# PATH = "../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
+# driver = webdriver.Chrome(PATH)
 browser = webdriver.Chrome(ChromeDriverManager().install())
 
 state_abbreviation = 'WY'
@@ -35,7 +35,6 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_urls():
-
     urls = []
     current_year = datetime.now().year
     path = f"Legislation/{current_year}"
@@ -95,7 +94,7 @@ def get_bill_title(row):
     title = browser.find_element_by_tag_name('h3').text
     title = title.split('-')[1]
     title = title.strip()
-    #print(title)
+    # print(title)
     row.bill_title = title
 
 
@@ -113,7 +112,8 @@ def get_actions(row):
     actions = []
     status = browser.find_element_by_xpath('//*[@id="tabsetTabs"]/li[2]/a')
     status.click()
-    table = browser.find_element_by_xpath('/html/body/div/div/div[2]/section/div/div[2]/div/div/div[2]/div/div/div/table/tbody')
+    table = browser.find_element_by_xpath(
+        '/html/body/div/div/div[2]/section/div/div[2]/div/div/div[2]/div/div/div/table/tbody')
     table_row = table.find_elements_by_tag_name('tr')
     for tr in reversed(table_row[1:]):
         date = tr.find_elements_by_tag_name('td')[0].text
@@ -133,7 +133,7 @@ def get_actions(row):
 def get_get_date_introduced(row, actions):
     action = actions[1]
     date = action['date']
-    #print(date)
+    # print(date)
     row.date_introduced = date
 
 
@@ -152,12 +152,15 @@ def get_bill_text(row):
                 pass
         text = text.replace('\n', '')
         row.bill_text = text
-    except Exception:
+    except Exception as e:
+        print(e)
         row.bill_text = text
 
 
+
 def get_bill_link():
-    section = browser.find_element_by_xpath('/html/body/div/div/div[2]/section/div/div[2]/div/div/div[1]/div[2]/div[2]/div')
+    section = browser.find_element_by_xpath(
+        '/html/body/div/div/div[2]/section/div/div[2]/div/div/div[1]/div[2]/div[2]/div')
     section_text = section.text
     links = section.find_elements_by_tag_name('div')
     if "Enrolled" in section_text:
@@ -179,6 +182,7 @@ def get_sponsor_id(name_last):
 
 
 def get_sponsors(row):
+    committees = []
     cosponsors = []
     sections = browser.find_elements_by_class_name('col-md-6')
     for section in sections:
@@ -191,7 +195,7 @@ def get_sponsors(row):
                 if ", " in sponsor:
                     cosponsors.extend(sponsor.split(','))
                 else:
-                    cosponsors.append(sponsor)
+                    cosponsors.append(sponsor.strip().replace(',', ''))
                 row.cosponsors = cosponsors
             except:
                 pass
@@ -199,28 +203,33 @@ def get_sponsors(row):
             try:
                 sponsor = section.split(":")[1].strip()
                 if "Representative" in sponsor:
-                    name = sponsor.split("Representative")[1].strip()
-                    row.principal_sponsor = name
+                    name = sponsor.split("Representative")[1].strip().replace(',', '')
+                    row.principal_sponsor = name.replace(',', '')
                 elif "Senator" in sponsor:
-                    name = sponsor.split("Senator")[1].strip()
+                    name = sponsor.split("Senator")[1].strip().replace(',', '')
                     row.principal_sponsor = name
                 else:
-                    committee = sponsor
-                    row.committees = committee
+                    committee = {'chamber': 'Joint', 'committee': sponsor}
+                    committees.append(committee)
+                    row.committees = committees
                     row.principal_sponsor = committee
-            except:
-                pass
-        try:
-            row.principal_sponsor = get_sponsor_id(name)
-        except:
-            pass
-    ids = []
-    for person in cosponsors:
-        if person != '':
-            person = person.strip()
-            s_id = get_sponsor_id(person)
-            ids.append(s_id)
-    row.cosponsors_id = ids
+            except Exception as e:
+                print(e)
+            try:
+                row.principal_sponsor_id = get_sponsor_id(name)
+            except Exception as e:
+                print(e)
+        ids = []
+        for person in cosponsors:
+            if person != '' and person != '\n':
+                person = person.strip()
+                s_id = get_sponsor_id(person)
+                print(s_id)
+                try:
+                    ids.append(int(s_id))
+                except:
+                    pass
+        row.cosponsors_id = ids
 
 
 def get_summary(row):
@@ -323,12 +332,11 @@ def get_votes(row):
 
 
 def scrape(url):
-
     row = scraper_utils.initialize_row()
 
     row.source_url = url
     bill_name = url.split('/')[5]
-    print(bill_name)
+
     row.bill_name = bill_name
     if "H" in bill_name:
         row.chamber_origin = 'House'
@@ -340,7 +348,8 @@ def scrape(url):
     row.goverlytics_id = goverlytics_id
 
     browser.get(url)
-    time.sleep(10)
+    browser.maximize_window()
+    time.sleep(5)
 
     get_bill_type(row)
     get_bill_title(row)
@@ -352,7 +361,7 @@ def scrape(url):
     get_votes(row)
 
     scraper_utils.crawl_delay(crawl_delay)
-    print(row)
+
     return row
 
 
@@ -362,14 +371,13 @@ If this occurs in your scraper, be sure to investigate. Check the database and m
 like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
     urls = get_urls()
 
-    data = [scrape(url) for url in urls]
-
-
-    # with Pool(processes=4) as pool:
-    #     data = pool.map(scrape, urls)
+    # data = [scrape(url) for url in urls]
+    #data = scrape('https://www.wyoleg.gov/Legislation/2021/SF0059')
+    with Pool(processes=4) as pool:
+        data = pool.map(scrape, urls)
     # data = clear_none_value_rows(data)
     # big_list_of_dicts = clear_none_value_rows(data)
     #
-    # scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(data)
 
     print('Complete!')
