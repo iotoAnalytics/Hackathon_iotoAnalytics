@@ -615,6 +615,7 @@ class LegislatorRow:
     occupation: List[str]
     education: List[dict]
     military_experience: str 
+    wiki_url: str
 
     def __init__(self):
         self._source_id = ''
@@ -641,6 +642,7 @@ class LegislatorRow:
         self._occupation = []
         self._education = []
         self._military_experience = ''
+        self._wiki_url = ''
 
     @property
     def source_id(self) -> str:
@@ -902,6 +904,16 @@ class LegislatorRow:
         if type(value) != str:
             raise TypeError("military_experience must be a str")
         self._military_experience = value
+
+    @property
+    def wiki_url(self) -> str:
+        return self._wiki_url
+    @wiki_url.setter
+    def wiki_url(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("wiki_url must be a str")
+        self._wiki_url = value
+
 
 @dataclass
 class USLegislatorRow(LegislatorRow):

@@ -487,7 +487,6 @@ class Persistence:
                             party_id int,
                             party text,
                             role text,
-                            gender text,
                             district text,
                             years_active int[],
                             committees jsonb,
@@ -499,7 +498,9 @@ class Persistence:
                             seniority int,
                             occupation text[],
                             education jsonb,
-                            military_experience text
+                            military_experience text,
+                            gender text,
+                            wiki_url text UNIQUE
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -518,7 +519,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -529,7 +530,6 @@ class Persistence:
                         name_suffix = excluded.name_suffix,
                         district = excluded.district,
                         role = excluded.role,
-                        gender = excluded.gender,
                         committees = excluded.committees,
                         areas_served = excluded.areas_served,
                         phone_numbers = excluded.phone_numbers,
@@ -546,7 +546,9 @@ class Persistence:
                         source_id = excluded.source_id,
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
-                        seniority = excluded.seniority;
+                        seniority = excluded.seniority
+                        gender = excluded.gender,
+                        wiki_url = excluded.wiki_url;
                     """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
@@ -573,7 +575,6 @@ class Persistence:
                     item.party_id,
                     item.party,
                     item.role,
-                    item.gender,
                     item.district,
                     item.years_active,
                     json.dumps(item.committees, default=utils.json_serial),
@@ -585,7 +586,9 @@ class Persistence:
                     item.seniority,
                     item.occupation,
                     json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience
+                    item.military_experience,
+                    item.gender,
+                    item.wiki_url
                 )
 
                 cur.execute(insert_legislator_query, tup)
@@ -632,7 +635,8 @@ class Persistence:
                             region text,
                             offices_roles_as_mp text[],
                             parl_assoc_interparl_groups jsonb,
-                            gender text
+                            gender text,
+                            wiki_url text UNIQUE
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -679,6 +683,7 @@ class Persistence:
                         parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
                         region = excluded.region,
                         gender = excluded.gender,
+                        wiki_url = excluded.wiki_url,
                         seniority = excluded.seniority;
                     """).format(table=sql.Identifier(table))
 
@@ -721,7 +726,8 @@ class Persistence:
                     item.offices_roles_as_mp,
                     json.dumps(item.parl_assoc_interparl_groups,
                                default=utils.json_serial),
-                    item.gender
+                    item.gender,
+                    item.wiki_url
                 )
 
                 cur.execute(insert_legislator_query, tup)
@@ -754,7 +760,6 @@ class Persistence:
                             party_id int,
                             party text,
                             role text,
-                            gender text,
                             riding text,
                             years_active int[],
                             committees jsonb,
@@ -766,7 +771,9 @@ class Persistence:
                             occupation text[],
                             education jsonb,
                             military_experience text,
-                            region text
+                            region text,
+                            gender text,
+                            wiki_url text UNIQUE
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -784,7 +791,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -799,7 +806,6 @@ class Persistence:
                         party = excluded.party,
                         party_id = excluded.party_id,
                         role = excluded.role,
-                        gender = excluded.gender,
                         committees = excluded.committees,
                         phone_numbers = excluded.phone_numbers,
                         addresses = excluded.addresses,
@@ -811,7 +817,9 @@ class Persistence:
                         source_id = excluded.source_id,
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
-                        seniority = excluded.seniority;
+                        seniority = excluded.seniority,
+                        gender = excluded.gender,
+                        wiki_url = excluded.wiki_url;
                     """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
@@ -839,7 +847,6 @@ class Persistence:
                         item.party_id,
                         item.party,
                         item.role,
-                        item.gender,
                         item.riding,
                         item.years_active,
                         json.dumps(item.committees, default=utils.json_serial),
@@ -851,7 +858,9 @@ class Persistence:
                         item.occupation,
                         json.dumps(item.education, default=utils.json_serial),
                         item.military_experience,
-                        item.region
+                        item.region,
+                        item.gender,
+                        item.wiki_url
                     )
 
                     cur.execute(insert_legislator_query, tup)
