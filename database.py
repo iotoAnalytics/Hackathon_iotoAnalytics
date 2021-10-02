@@ -790,8 +790,8 @@ class Persistence:
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                     INSERT INTO {table}
                     VALUES (
-                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        (SELECT leg_id FROM leg_id), %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -860,12 +860,11 @@ class Persistence:
                         item.military_experience,
                         item.region,
                         item.gender,
-                        item.wiki_url
-                    )
+                        item.wiki_url)
 
                     cur.execute(insert_legislator_query, tup)
-                except Exception:
-                    print(f'Exception occurred inserting the following data:\n{tup}')
+                except Exception as e:
+                    print(f'Exception occurred inserting the following data:\n{tup} \n{e}')
                     cur.connection.rollback()
 
 
