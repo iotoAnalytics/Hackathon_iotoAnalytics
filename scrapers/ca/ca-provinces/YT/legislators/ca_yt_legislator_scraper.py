@@ -9,6 +9,7 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
+from genderComputer.genderComputer import GenderComputer #Must download from github https://github.com/tue-mdse/genderComputer
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
@@ -18,6 +19,7 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 BASE_URL = 'https://yukonassembly.ca'
 MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -217,6 +219,8 @@ class ScraperForMLAs:
         self.__set_contact_info()
         self.__set_service_period()
         self.__set_most_recent_term_id()
+        self.__set_gender()
+        self.__set_wiki_url()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -347,6 +351,49 @@ class ScraperForMLAs:
     def __set_most_recent_term_id(self):
         self.row.most_recent_term_id = str(self.row.years_active[-1])
 
+    def __set_gender(self):
+        gc = GenderComputer()
+        name = self.row.name_first + ' ' + self.row.name_last
+
+        gender_mapping = {
+            'female': 'F',
+            'male': 'M',
+        }
+
+        legislator_gender = gc.resolveGender(name, 'Canada')
+        try:
+            self.row.gender = gender_mapping[legislator_gender]
+        except:
+            print(f"Gender not identified for {name}")
+            self.row.gender = self.__guess_gender_from_text()
+
+    def __guess_gender_from_text(self):
+        text_to_analyze = self.main_container.text
+
+        if 'Mr.' in text_to_analyze:
+            return 'M'
+        if 'Mrs.' in text_to_analyze or 'Ms.' in text_to_analyze:
+            return 'F'
+        if re.search(r'\she\W', text_to_analyze) or re.search('\sHe\W',text_to_analyze):
+            return 'M'
+        if re.search(r'\sshe\W', text_to_analyze) or re.search('\sShe\W',text_to_analyze):
+            return 'F'
+
+    def __set_wiki_url(self):
+        page_html = get_site_as_html(WIKI_URL)
+        page_soup = soup(page_html, "html.parser")
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+
+        legislator_name = self.row.name_first + ' ' + self.row.name_last
+        for tr in table:
+            td = tr.findAll("td")[1]
+            name = td.text
+            if legislator_name == str(name).strip():
+                self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
+                break
+
 class ScraperForCommitteesMainSite:
     def get_all_commitee_links(self, soup):
         committee_urls = []
@@ -382,7 +429,7 @@ class ScraperForCommitteesMainSite:
 class ScraperForCommittee:
     def __init__(self, committee_url):
         self.url = committee_url
-        self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
+        self.driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
         self.driver.switch_to.default_content()
         self.data = {}
         self.__collect_data()
