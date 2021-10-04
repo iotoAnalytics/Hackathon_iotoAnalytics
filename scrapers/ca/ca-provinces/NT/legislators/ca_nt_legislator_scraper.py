@@ -178,6 +178,8 @@ class MLA_Site_Scraper:
         self.__set_most_recent_term_id()
         self.__set_years_active()
         self.__set_committee_data()
+        self.__set_gender()
+        self.__set_wiki_url()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -207,7 +209,7 @@ class MLA_Site_Scraper:
         if riding == '':
             potential_containers_for_electoral_district = self.main_container.findAll('strong')
             riding = self.__find_electoral_district(potential_containers_for_electoral_district)
-        self.row.riding = riding
+        self.row.riding = riding.strip()
     
     def __find_electoral_district(self, list_of_containers):
         for container in list_of_containers:
@@ -356,14 +358,22 @@ class MLA_Site_Scraper:
 
     def __get_biography(self):
         all_paragraphs_in_main_container = self.main_container.findAll('p')
+        biography_paragraphs = None
+
         for index, paragraph in enumerate(all_paragraphs_in_main_container):
             text = paragraph.text
             if 'Biography' in text:
                 biography_paragraphs = all_paragraphs_in_main_container[index + 1:]
+        
+        if not biography_paragraphs:
+            biography_paragraphs = all_paragraphs_in_main_container
+
         for index, paragraph in enumerate(biography_paragraphs):
             text = paragraph.text
             if 'Oath of Office' in text:
                 return biography_paragraphs[:index]
+
+        return biography_paragraphs
 
     def __find_terms_worked(self, paragraphs):
         terms_worked = set({})
@@ -418,6 +428,24 @@ class MLA_Site_Scraper:
         role = committee.split(' - ')[1]
         return {'role' : role,
                 'committee' : committee_name}
+
+    def __set_gender(self):
+        self.row.gender = scraper_utils.get_legislator_gender(self.row.name_first, self.row.name_last, self.main_container.text)
+
+    def __set_wiki_url(self):
+        page_soup = Main_Functions().get_page_as_soup(WIKI_URL)
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+
+        for tr in table:
+            district = tr.findAll("td")[1].text
+            name_td = tr.findAll("td")[0]
+            name = name_td.text
+            if self.row.riding == district.strip() or (self.row.name_last in name.strip() and self.row.name_first in name.strip()):
+                self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+                return
+        print(f'wiki_link not found for: {self.row.name_full}')
 
 
 # updates global variables for nth term and current legislature year

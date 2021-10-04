@@ -453,11 +453,10 @@ class MLASiteScraper:
         table = page_soup.find("table", {"class": "wikitable sortable"})
         table = table.findAll("tr")[1:]
 
-        legislator_name_last = self.row.name_last
         for tr in table:
             td = tr.findAll("td")[1]
             name = td.text
-            if legislator_name_last in str(name).strip():
+            if self.row.name_last in str(name).strip() and self.row.name_first in str(name).strip():
                 self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
                 return
         print(f'wiki_link not found for: {name}')
