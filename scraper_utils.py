@@ -478,7 +478,7 @@ class LegislatorScraperUtils(ScraperUtils):
         """
         return info
 
-    def get_legislator_gender(self, name_first: str, name_last: str, biography: str) -> str or None:
+    def get_legislator_gender(self, name_first: str, name_last: str, biography=None) -> str or None:
         """
         Used for getting the gender of legislator. 
         This should be used when gender is not specified on the legislator website. 
@@ -495,6 +495,32 @@ class LegislatorScraperUtils(ScraperUtils):
         'F' if the gender is guessed to be female\n
         None if the gender cannot be guessed
         """
+
+        if biography:
+            try:
+                return self._guess_gender_from_text(biography)
+            except:
+                pass
+        return self._guess_gender_using_genderComputer(name_first, name_last)
+
+
+    def _guess_gender_from_text(self, biography):
+        count_masculine = 0
+        count_femanine = 0
+
+        count_masculine += len(re.findall('Mr. ', biography))
+        count_femanine += len(re.findall('Mrs. ', biography)) + len(re.findall('Ms. ', biography))
+        
+        count_masculine += len(re.findall(r'\she\W', biography)) or len(re.findall(r'\sHe\W', biography))
+        count_femanine += len(re.findall(r'\sshe\W', biography)) or len(re.findall(r'\sShe\W', biography))
+
+        if count_masculine > count_femanine:
+            return 'M'
+        if count_femanine > count_masculine:
+            return 'F'
+        raise ValueError('Cannot determine gender from biography')
+
+    def _guess_gender_using_genderComputer(self, name_first, name_last):
         gc = GenderComputer()
         name = name_first + ' ' + name_last
 
@@ -510,21 +536,7 @@ class LegislatorScraperUtils(ScraperUtils):
             country = 'USA'
 
         legislator_gender = gc.resolveGender(name, country)
-        try:
-            return gender_mapping[legislator_gender]
-        except:
-            print(f"Gender not identified for {name}")
-            return self._guess_gender_from_text(biography)
-
-    def _guess_gender_from_text(self, biography):
-        if 'Mr.' in biography:
-            return 'M'
-        if 'Mrs.' in biography or 'Ms.' in biography:
-            return 'F'
-        if re.search(r'\she\W', biography) or re.search(r'\sHe\W', biography):
-            return 'M'
-        if re.search(r'\sshe\W', biography) or re.search(r'\sShe\W', biography):
-            return 'F'
+        return gender_mapping.get(legislator_gender)
 
 class LegislationScraperUtils(ScraperUtils):
     """
