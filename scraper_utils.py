@@ -16,6 +16,7 @@ import functools
 
 import sys
 import pandas as pd
+from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
 from database import Database, CursorFromConnectionFromPool, Persistence
 from dataclasses import dataclass, field
 from typing import List
@@ -477,6 +478,53 @@ class LegislatorScraperUtils(ScraperUtils):
         """
         return info
 
+    def get_legislator_gender(self, name_first: str, name_last: str, biography: str) -> str or None:
+        """
+        Used for getting the gender of legislator. 
+        This should be used when gender is not specified on the legislator website. 
+        
+        PARAMS
+        -----------
+        name_first the first name of legislator
+        name_last the last name of the legislator
+        biography a block of text that contains legislator information
+
+        RETURNS
+        ----------
+        'M' if the gender is guessed to be male\n
+        'F' if the gender is guessed to be female\n
+        None if the gender cannot be guessed
+        """
+        gc = GenderComputer()
+        name = name_first + ' ' + name_last
+
+        gender_mapping = {
+            'female': 'F',
+            'male': 'M',
+        }
+        if self.country == 'ca':
+            country = 'Canada'
+        elif self.country == 'us':
+            country = 'USA'
+        else:
+            country = 'USA'
+
+        legislator_gender = gc.resolveGender(name, country)
+        try:
+            return gender_mapping[legislator_gender]
+        except:
+            print(f"Gender not identified for {name}")
+            return self._guess_gender_from_text(biography)
+
+    def _guess_gender_from_text(self, biography):
+        if 'Mr.' in biography:
+            return 'M'
+        if 'Mrs.' in biography or 'Ms.' in biography:
+            return 'F'
+        if re.search(r'\she\W', biography) or re.search(r'\sHe\W', biography):
+            return 'M'
+        if re.search(r'\sshe\W', biography) or re.search(r'\sShe\W', biography):
+            return 'F'
 
 class LegislationScraperUtils(ScraperUtils):
     """

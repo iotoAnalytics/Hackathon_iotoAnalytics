@@ -352,32 +352,8 @@ class ScraperForMLAs:
         self.row.most_recent_term_id = str(self.row.years_active[-1])
 
     def __set_gender(self):
-        gc = GenderComputer()
-        name = self.row.name_first + ' ' + self.row.name_last
-
-        gender_mapping = {
-            'female': 'F',
-            'male': 'M',
-        }
-
-        legislator_gender = gc.resolveGender(name, 'Canada')
-        try:
-            self.row.gender = gender_mapping[legislator_gender]
-        except:
-            print(f"Gender not identified for {name}")
-            self.row.gender = self.__guess_gender_from_text()
-
-    def __guess_gender_from_text(self):
-        text_to_analyze = self.main_container.text
-
-        if 'Mr.' in text_to_analyze:
-            return 'M'
-        if 'Mrs.' in text_to_analyze or 'Ms.' in text_to_analyze:
-            return 'F'
-        if re.search(r'\she\W', text_to_analyze) or re.search('\sHe\W',text_to_analyze):
-            return 'M'
-        if re.search(r'\sshe\W', text_to_analyze) or re.search('\sShe\W',text_to_analyze):
-            return 'F'
+        biography = self.main_container.text
+        self.row.gender = scraper_utils.get_legislator_gender(self.row.name_first, self.row.name_last, biography)
 
     def __set_wiki_url(self):
         page_html = get_site_as_html(WIKI_URL)
