@@ -64,6 +64,7 @@ def program_driver():
 
     complete_data_set = main_functions.configure_data(mla_data, wiki_data, committee_data)
     print('Writing data to database...')
+    print(complete_data_set)
     scraper_utils.write_data(complete_data_set)
     print("Complete")
 
@@ -99,7 +100,6 @@ class PreProgramFunctions:
     def __find_most_recent_year(self, options):
         for option in options:
             if 'General Election' in option.text:
-                print(option.text)
                 return self.__extract_year(option.text)
         return -1
 
@@ -244,6 +244,8 @@ class MLASiteScraper:
         self.__set_contact_info()
         self.__set_most_recent_term_id()
         self.__set_years_active()
+        self.__set_gender()
+        self.__set_wiki_url()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -389,7 +391,6 @@ class MLASiteScraper:
                 return_list.extend(text.split()[-4:])
             return return_list
 
-    # TODO
     def __get_service_periods_as_years(self, terms_worked):
         service_periods_as_years = []
         for term in terms_worked:
@@ -442,6 +443,25 @@ class MLASiteScraper:
             return 11
         else:
             return 0
+
+    def __set_gender(self):
+        self.row.gender = scraper_utils.get_legislator_gender(self.row.name_first, self.row.name_last, self.main_container.text)
+
+    def __set_wiki_url(self):
+        page_soup = MainFunctions().get_page_as_soup(WIKI_URL)
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+
+        legislator_name_last = self.row.name_last
+        for tr in table:
+            td = tr.findAll("td")[1]
+            name = td.text
+            if legislator_name_last in str(name).strip():
+                self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
+                return
+        print(f'wiki_link not found for: {name}')
+            
             
 class CommitteeMainSiteScraper:
     def get_all_committee_links(self, soup):
@@ -461,12 +481,12 @@ class CommitteeSiteScraper:
         self.soup = MainFunctions().get_page_as_soup(self.url)
         self.main_container = self.soup.find('div', {'class' : 'content-container-inner'})
         self.data = {}
-        self.__colect_data()
+        self.__collect_data()
 
     def get_committee_data(self):
         return self.data
 
-    def __colect_data(self):
+    def __collect_data(self):
         committee_name = self.__get_committee_name()
         membership = self.__get_committee_membership()
         self.data = {committee_name : membership}
@@ -483,7 +503,10 @@ class CommitteeSiteScraper:
 
     def __extract_members(self, container, return_list):
         for child in container.children:
-            role = container.find('span').text
+            try:
+                role = container.find('span').text
+            except:
+                role = 'Unknown'
             child_text = self.__get_text_from_navigable_string(child)
 
             if not child_text:
@@ -522,8 +545,8 @@ class CommitteeSiteScraper:
 PreProgramFunctions().set_legislative_office_address()
 elections_page_soup = MainFunctions().get_page_as_soup(ELECTIONS_HISTORY_URL)
 PreProgramFunctions().update_term_and_legislature_dict(elections_page_soup)
-print(CURRENT_LEGISLATURE_TERM)
-print(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY)
+# print(CURRENT_LEGISLATURE_TERM)
+# print(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY)
 
-# if __name__ == '__main__':
-#     program_driver()
+if __name__ == '__main__':
+    program_driver()
