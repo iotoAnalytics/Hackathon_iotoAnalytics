@@ -1023,6 +1023,204 @@ class CALegislatorRow(LegislatorRow):
         if type(value) != str:
             raise TypeError("region must be a str")
         self._region = value
+@dataclass
+class LegislatorSponsorTopicRow(LegislatorRow):
+    """ 
+    Data structure for housing the number of bills sponsored by a Legislator
+    and the bills respective CAP topic
+    """
+    agriculture: int
+    civil_rights: int
+    defense: int
+    domestic_commerce: int
+    education: int
+    energy: int
+    environment: int
+    foreign_trade: int
+    government_operations: int
+    health: int
+    immigration: int
+    international_affairs: int
+    labor: int
+    law_and_crime: int
+    macroeconomics: int
+    social_welfare: int
+    technology: int
+    transportation: int
+
+    def __init__(self):
+        super().__init__()
+        self.agriculture = None
+        self.civil_rights = None
+        self.defense = None
+        self.domestic_commerce = None
+        self.education = None
+        self.environment = None
+        self.foreign_trade = None
+        self.government_operations = None
+        self.health = None
+        self.immigration = None
+        self.international_affairs = None
+        self.labor = None
+        self.law_and_crime = None
+        self.macroeconomics = None
+        self.social_welfare = None
+        self.technology = None
+        self.transportation = None
+
+    @property
+    def agriculture(self) -> int:
+        return self.agriculture
+    @agriculture.setter
+    def agriculture(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("agriculture count must be an integer")
+        self.agriculture = count
+
+    @property
+    def civil_rights(self) -> int:
+        return self.civil_rights
+    @civil_rights.setter
+    def civil_rights(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("civil_rights count must be an integer")
+        self.civil_rights = count
+    
+    @property
+    def defense(self) -> int:
+        return self.defense
+    @defense.setter
+    def defense(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("defense count must be an integer")
+        self.defense = count
+
+    @property
+    def domestic_commerce(self) -> int:
+        return self.domestic_commerce
+    @domestic_commerce.setter
+    def domestic_commerce(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("domestic_commerce count must be an integer")
+        self.domestic_commerce = count
+
+    @property
+    def education(self) -> int:
+        return self.education
+    @education.setter
+    def education(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("education count must be an integer")
+        self.education = count
+
+    @property
+    def environment(self) -> int:
+        return self.environment
+    @environment.setter
+    def environment(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("environment count must be an integer")
+        self.environment = count
+
+    @property
+    def foreign_trade(self) -> int:
+        return self.foreign_trade
+    @foreign_trade.setter
+    def foreign_trade(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("foreign_trade count must be an integer")
+        self.foreign_trade = count
+
+    @property
+    def government_operations(self) -> int:
+        return self.government_operations
+    @government_operations.setter
+    def government_operations(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("government_operations count must be an integer")
+        self.government_operations = count
+
+    @property
+    def health(self) -> int:
+        return self.health
+    @health.setter
+    def health(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("health count must be an integer")
+        self.health = count
+
+    @property
+    def immigration(self) -> int:
+        return self.immigration
+    @immigration.setter
+    def immigration(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("immigration count must be an integer")
+        self.immigration = count
+
+    @property
+    def international_affairs(self) -> int:
+        return self.international_affairs
+    @international_affairs.setter
+    def international_affairs(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("international_affairs count must be an integer")
+        self.international_affairs = count
+
+    @property
+    def labor(self) -> int:
+        return self.labor
+    @labor.setter
+    def labor(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("labor count must be an integer")
+        self.labor = count
+
+    @property
+    def law_and_crime(self) -> int:
+        return self.law_and_crime
+    @law_and_crime.setter
+    def law_and_crime(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("law_and_crime count must be an integer")
+        self.law_and_crime = count
+
+    @property
+    def macroeconomics(self) -> int:
+        return self.macroeconomics
+    @macroeconomics.setter
+    def macroeconomics(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("macroeconomics count must be an integer")
+        self.macroeconomics = count
+
+    @property
+    def social_welfare(self) -> int:
+        return self.social_welfare
+    @social_welfare.setter
+    def social_welfare(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("social_welfare count must be an integer")
+        self.social_welfare = count
+
+    @property
+    def technology(self) -> int:
+        return self.technology
+    @technology.setter
+    def technology(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("technology count must be an integer")
+        self.technology = count
+
+    @property
+    def transportation(self) -> int:
+        return self.transportation
+    @transportation.setter
+    def transportation(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("transportation count must be an integer")
+        self.transportation = count
+
 
 @dataclass
 class CAFedLegislatorRow(CALegislatorRow):
