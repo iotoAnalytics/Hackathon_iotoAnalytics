@@ -1027,7 +1027,7 @@ class CALegislatorRow(LegislatorRow):
 class LegislatorSponsorTopicRow(LegislatorRow):
     """ 
     Data structure for housing the number of bills sponsored by a Legislator
-    and the bills respective CAP topic
+    and that bills respective CAP topic
     """
     agriculture: int
     civil_rights: int
