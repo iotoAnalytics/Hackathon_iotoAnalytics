@@ -1449,7 +1449,7 @@ class ElectoralDistrictsRow:
 @dataclass
 class ElectorsRow:
     """
-    Data structure for housing data data for electors
+    Data structure for housing data for electors
     """
 
     def __iter__(self):
@@ -1636,7 +1636,7 @@ class CandidatesRow:
 @dataclass
 class ElectionVotesRow:
     """
-    Data structure for housing data data for election votes
+    Data structure for housing data for election votes
     """
     def __iter__(self):
         for attr, value in self.__dict__.items():
@@ -1830,7 +1830,7 @@ class CandidateElectionDetailsRow:
 @dataclass
 class FinancialContributionsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for financial contributions
         """
 
         def __iter__(self):
@@ -2003,7 +2003,7 @@ class FinancialContributionsRow:
 @dataclass
 class CandidateElectionFinancesRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for candidate election finances
         """
 
         def __iter__(self):
@@ -2040,7 +2040,7 @@ class CandidateElectionFinancesRow:
 @dataclass
 class InflowsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for inflows
         """
 
         def __iter__(self):
@@ -2281,7 +2281,7 @@ class InflowsRow:
 @dataclass
 class CandidateElectionVotesRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for candidate election votes
         """
 
         def __iter__(self):
@@ -2354,7 +2354,7 @@ class CandidateElectionVotesRow:
 @dataclass
 class OutflowsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for outflows
         """
 
         def __iter__(self):
@@ -2551,7 +2551,7 @@ class OutflowsRow:
 @dataclass
 class BankReconciliationRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for bank reconciliations
         """
 
         def __iter__(self):
@@ -2614,7 +2614,7 @@ class BankReconciliationRow:
 @dataclass
 class BankAccountRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for bank accounts
         """
 
         def __iter__(self):
