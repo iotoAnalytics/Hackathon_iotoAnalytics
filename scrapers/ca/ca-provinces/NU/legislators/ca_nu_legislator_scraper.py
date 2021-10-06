@@ -64,7 +64,6 @@ def program_driver():
 
     complete_data_set = main_functions.configure_data(mla_data, wiki_data, committee_data)
     print('Writing data to database...')
-    print(complete_data_set)
     scraper_utils.write_data(complete_data_set)
     print("Complete")
 
@@ -454,10 +453,12 @@ class MLASiteScraper:
         table = table.findAll("tr")[1:]
 
         for tr in table:
-            td = tr.findAll("td")[1]
-            name = td.text
-            if self.row.name_last in str(name).strip() and self.row.name_first in str(name).strip():
-                self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
+            name_td = tr.findAll("td")[1]
+            name = name_td.text
+
+            district = tr.findAll("td")[0].text
+            if self.row.riding == district.strip() or (self.row.name_last in str(name).strip() and self.row.name_first in str(name).strip()):
+                self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
                 return
         print(f'wiki_link not found for: {name}')
             
