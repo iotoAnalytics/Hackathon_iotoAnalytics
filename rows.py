@@ -1143,15 +1143,6 @@ class LegislatorSponsorTopicRow:
         self._party = value
 
     @property
-    def party(self) -> str:
-        return self._party
-    @party.setter
-    def party(self, value: str) -> None:
-        if type(value) != str:
-            raise TypeError("party must be a str")
-        self._party = value
-
-    @property
     def agriculture(self) -> int:
         return self._agriculture
     @agriculture.setter
