@@ -9,7 +9,6 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-from genderComputer.genderComputer import GenderComputer #Must download from github https://github.com/tue-mdse/genderComputer
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup

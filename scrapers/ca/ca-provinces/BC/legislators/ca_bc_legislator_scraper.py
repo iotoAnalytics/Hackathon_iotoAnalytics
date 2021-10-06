@@ -1,5 +1,4 @@
-'''
-'''
+from platform import win32_is_iot
 import sys
 import os
 from pathlib import Path
@@ -23,17 +22,18 @@ from nameparser import HumanName
 import pandas as pd
 import unidecode
 import numpy as np
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('BC', 'ca_bc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.leg.bc.ca')
 
 #initialize selenium web driver
-chrome_options = webdriver.ChromeOptions()
-chrome_options.add_argument('--headless')
+chrome_options = Options()
+chrome_options.headless = True
 
-driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
-                          chrome_options=chrome_options)
+driver = webdriver.Chrome(ChromeDriverManager().install(), options=chrome_options)
 
 print("driver found")
 
@@ -74,29 +74,21 @@ def get_urls(myurl):
 
 
 def scrape(url):
+    row = scraper_utils.initialize_row()
+    row.source_url = url
     # scrape legislators' bio pages
     url_broken = url.split("/")
-    name_full = url_broken[len(url_broken) - 1].replace("-", ", ")
-    most_recent_term_id = url_broken[len(url_broken) - 2]
+    row.name_full = url_broken[len(url_broken) - 1].replace("-", ", ")
+    row.most_recent_term_id = url_broken[len(url_broken) - 2]
 
-    hn = HumanName(name_full)
-    name_last = hn.last
+    hn = HumanName(row.name_full)
+    row.name_last = hn.last
 
-    name_first = hn.first
-    name_suffix = hn.suffix
-    name_middle = hn.middle
+    row.name_first = hn.first
+    row.name_suffix = hn.suffix
+    row.name_middle = hn.middle
 
     driver.get(url)
-    timeout = 5
-
-    # try:
-    #     element_present = EC.presence_of_element_located((By.CLASS_NAME, 'col-xs-12 col-sm-12'))
-    #     # WebDriverWait(driver, timeout).until(element_present)
-    #
-    #
-    # except:
-    #
-    #     pass
 
     html = driver.page_source
 
@@ -106,56 +98,63 @@ def scrape(url):
 
     mlist = ministertitle.text.split('\n')
 
-    party = ""
-    years_active = []
-    # riding = ""
+    row.party = ""
+    row.years_active = []
+    row.riding = ""
     for item in mlist:
         try:
             if item.strip() != "":
                 if "20" in item:
                     years = item.split(",")
                     for year in years:
-                        if year.strip() not in years_active:
+                        if year.strip() not in row.years_active:
                             try:
                                 year = int(year.strip())
-                                years_active.append(year)
+                                row.years_active.append(year)
                             except:
                                 pass
                 elif "BC" in item:
-                    party = (item.strip())
+                    row.party = (item.strip())
                 elif "Minister" not in item and "Elected" not in item and "Speaker" not in item and \
                         "Deputy" not in item and "Council" not in item:
-                    riding = (item.strip())
+                    row.riding = (item.strip())
 
         except:
             pass
 
+    row.party = row.party.split("BC ")[1]
+    row.party = row.party.split(" Party")[0]
+    if row.party == "NDP":
+        row.party = "New Democratic"
+
     years_to_add = []
-    for year in years_active:
+    for year in row.years_active:
         for i in range(4):
             if (year + i) < 2022:
                 years_to_add.append(year + i)
     for y in years_to_add:
-        if y not in years_active:
-            years_active.append(y)
-    years_active.sort()
+        if y not in row.years_active:
+            row.years_active.append(y)
+    row.years_active.sort()
 
     try:
-        party_id = scraper_utils.get_party_id(party)
+        row.party_id = scraper_utils.get_party_id(row.party)
 
     except:
-        party_id = 0
+        row.party_id = 0
+
     email_class = page_soup.findAll("div", {"class": "convertToEmail"})
 
-    email = email_class[1].a.text
+    email = email_class[1].text
+    row.email = email
 
-    addresses = []
+    row.addresses = []
     office_info = page_soup.find(
         "div", {"class": "BCLASS-Member-Info BCLASS-Hide-For-Vacant"})
     office = " ".join(office_info.text.split())
     addr_info = {'location': office.split(
         ":")[0].strip(), 'address': office.split(":")[1].strip()}
-    addresses.append(addr_info)
+    row.addresses.append(addr_info)
 
     member_info = page_soup.findAll("div", {"class": "BCLASS-Constituency"})
 
@@ -167,9 +166,9 @@ def scrape(url):
     address = " ".join([constituency_one.strip(), constituency_two.strip()])
     address = " ".join(address.split())
     addr_info = {'location': 'Constituency', 'address': address}
-    addresses.append(addr_info)
+    row.addresses.append(addr_info)
 
-    committees = []
+    row.committees = []
     committee_info = page_soup.find("div", {"class": "BCLASS-member-cmts"})
     if committee_info is None:
         committee_info = page_soup.find(
@@ -180,25 +179,25 @@ def scrape(url):
             committee_name = com.a.text
 
             committee = {'role': 'Member', 'committee': committee_name}
-            committees.append(committee)
+            row.committees.append(committee)
     except Exception as ex:
 
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(ex).__name__, ex.args)
 
-    phone_numbers = []
+    row.phone_numbers = []
     contact = page_soup.find(
         "div", {"class": "BCLASS-Member-Info BCLASS-Contact"})
     contacts = contact.text.split('\n')
     opn = contacts[2].replace("(", "").strip()
     opn = opn.replace(") ", "-")
     office_phone = {'location': 'office phone', 'number': opn}
-    phone_numbers.append(office_phone)
+    row.phone_numbers.append(office_phone)
     if contacts[6] != "":
         ofn = contacts[6].replace("(", "").strip()
         ofn = ofn.replace(") ", "-")
         office_fax = {'location': 'office fax', 'number': ofn}
-        phone_numbers.append(office_fax)
+        row.phone_numbers.append(office_fax)
 
     const_info = page_soup.findAll("div", {"class": "col-xs-12 col-sm-6"})
     const_info = const_info[1].text
@@ -209,7 +208,7 @@ def scrape(url):
         cp_num = cp_num.replace("(", "")
         cp_num = cp_num.replace(") ", "-")
         cp = {'location': 'constituency phone', 'number': cp_num}
-        phone_numbers.append(cp)
+        row.phone_numbers.append(cp)
 
     c_fax = (const_info[6]).strip()
     if c_fax != "":
@@ -217,7 +216,7 @@ def scrape(url):
         c_fax = c_fax.replace(") ", "-")
         cf = {'location': 'constituency fax', 'number': c_fax}
 
-        phone_numbers.append(cf)
+        row.phone_numbers.append(cf)
 
     ctf_num = (const_info[10]).strip()
     if ctf_num != "" and "Constituency" not in ctf_num:
@@ -226,71 +225,92 @@ def scrape(url):
         ctf_num = ctf_num.replace(") ", "-")
         ctf = {'location': 'constituency toll free', 'number': ctf_num}
         # print(ctf)
-        phone_numbers.append(ctf)
+        row.phone_numbers.append(ctf)
 
-    #
-    # print(phone_numbers)
+    member_bio = page_soup.find("div", {"class":'row BCLASS-memberbio'}).text
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, member_bio)
 
-    infos = {'name_full': name_full, 'name_last': name_last, 'name_first': name_first, 'name_middle': name_middle,
-             'name_suffix': name_suffix, 'source_url': url, 'source_id': "", 'years_active': years_active,
-             'party': party, 'party_id': party_id, 'riding': riding, 'role': 'Member of the Legislative Assembly (MLA)',
-             'most_recent_term_id': most_recent_term_id, 'seniority': 0, 'email': email, 'addresses': addresses,
-             'committees': committees, 'phone_numbers': phone_numbers}
+    wiki_base_url = "https://en.wikipedia.org"
+    uClient = uReq(wiki_base_url + '/wiki/Parliament_of_British_Columbia')
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = soup(page_html, "html.parser")
+    parliaments_table = page_soup.findAll("table", {'class': "wikitable"})[0]
+    last_row = parliaments_table.findAll("tr")[-1]
+    link_to_most_recent_parliament = wiki_base_url + last_row.findAll("td")[0].a["href"]
+
+    uClient = uReq(link_to_most_recent_parliament)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = soup(page_html, "html.parser")
+    table = page_soup.findAll("table", {'class': 'wikitable sortable'})[0]
+    table = table.findAll("tr")[1:]
+
+
+    for table_row in table:
+        tds = table_row.findAll("td")
+        name_td = tds[0]
+        name = name_td.text
+        district = tds[-1].text
+        
+        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+            row.wiki_url = wiki_base_url + name_td.a['href']
+            break
+
     scraper_utils.crawl_delay(crawl_delay)
-    # print(infos)
-    return infos
+    return row
 
 
 def get_wiki_people(link):
+    wiki_base_url = "https://en.wikipedia.org"
     # get links to legislators' personal wikipedia pages
-    people_links = []
     uClient = uReq(link)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
     page_soup = soup(page_html, "html.parser")
-    tables_by_region = page_soup.findAll("table", {'border': "1"})
-    for table in tables_by_region:
-        trs = table.findAll("tr")[2:]
-        for tr in trs:
-            entries = tr.findAll("td")
-            entries = entries[1:]
-            for entry in entries:
-                try:
-                    link = "https://en.wikipedia.org" + entry.a["href"]
-                    if "cite" not in link and "Party" not in link:
-                        people_links.append(link)
-                        # print(link)
-                except:
-                    pass
+    parliaments_table = page_soup.findAll("table", {'class': "wikitable"})[0]
+    last_row = parliaments_table.findAll("tr")[-1]
+    link_to_most_recent_parliament = wiki_base_url + last_row.findAll("td")[0].a["href"]
+
+    uClient = uReq(link_to_most_recent_parliament)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = soup(page_html, "html.parser")
+    table = page_soup.findAll("table", {'class': 'wikitable sortable'})[0]
+    table = table.findAll("tr")[1:]
+
+    people_links = []
+    for row in table:
+        tds = row.findAll("td")
+        name_td = tds[0]
+        link = wiki_base_url + name_td.a["href"]
+        people_links.append(link)
+
     scraper_utils.crawl_delay(crawl_delay)
     return people_links
 
 
 if __name__ == '__main__':
+    pd.set_option('display.max_rows', None)
+    pd.set_option('display.max_columns', None)
     members_link = 'https://www.leg.bc.ca/learn-about-us/members'
     # First we'll get the URLs we wish to scrape:
     urls = get_urls(members_link)
-    less_urls = urls[:4]
 
     with Pool() as pool:
         data = pool.map(scrape, urls)
     big_df = pd.DataFrame(data)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
+    big_df = big_df.drop(columns = ["birthday", "occupation", "education"])
 
-    sample_row = scraper_utils.initialize_row()
-    big_df['province_territory'] = sample_row.province_territory
-    big_df['province_territory_id'] = sample_row.province_territory_id
-
-    big_df['country'] = sample_row.country
-
-    big_df['country_id'] = sample_row.country_id
 
     # get missing data from wikipedia
-    general_election_link = 'https://en.wikipedia.org/wiki/2020_British_Columbia_general_election'
 
-    wiki_people = get_wiki_people(general_election_link)
+    wiki_bc_parliaments_link = 'https://en.wikipedia.org/wiki/Parliament_of_British_Columbia'
+    wiki_people = get_wiki_people(wiki_bc_parliaments_link)
 
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
@@ -302,16 +322,12 @@ if __name__ == '__main__':
     mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
                               "name_first", "name_last"])
 
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({
-                                                                        np.nan: None})
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({
-                                                                    np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({
-                                                                      np.nan: None})
+    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
+    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
+    mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
 
     big_df = mergedRepsData
     big_list_of_dicts = big_df.to_dict('records')
-    print(big_df)
     # print(big_list_of_dicts)
 
     print('Writing data to database...')

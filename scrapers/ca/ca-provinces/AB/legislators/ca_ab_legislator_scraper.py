@@ -43,6 +43,7 @@ def scrape_members_link(link):
 
 def collect_mla_data(link):
     # scrape a member's bio page to get available information
+    page_html = None
     try_count = 5
     while try_count > 0:
         try:
@@ -59,9 +60,7 @@ def collect_mla_data(link):
     member_id = link.split("mid=")[1]
     member_id = member_id.split("&")[0]
     row.source_id = member_id
-
     name_class = page_soup.find("h2", {"class": "nott ls1"})
-
     name = name_class.text
 
     name = name.replace("Honourable", "").strip()
@@ -232,6 +231,7 @@ def collect_mla_data(link):
         name = name_td.text
         if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+            break
 
     return row
 
