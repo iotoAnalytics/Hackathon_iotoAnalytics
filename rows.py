@@ -849,6 +849,7 @@ class LegislatorRow:
         if not re.match(email_regex, value):
             raise ValueError("Improper email formatting in email. Required format: ExampleEmail@domain.com" +
                 "\nThere may be a problem with the email validator so please check rows.py for more details.")
+        self._email = value
 
     @property
     def birthday(self) -> datetime:
@@ -1024,6 +1025,7 @@ class CALegislatorRow(LegislatorRow):
         if type(value) != str:
             raise TypeError("region must be a str")
         self._region = value
+
 @dataclass
 class LegislatorSponsorTopicRow:
     """ 
@@ -1066,6 +1068,7 @@ class LegislatorSponsorTopicRow:
         self._name_first = ''
         self._name_middle = ''
         self._name_suffix = ''
+        self._party = ''
         self._agriculture = None
         self._civil_rights = None
         self._defense = None
@@ -1129,6 +1132,15 @@ class LegislatorSponsorTopicRow:
         if type(value) != str:
             raise TypeError("name_suffix must be a str")
         self._name_suffix = value
+
+    @property
+    def party(self) -> str:
+        return self._party
+    @party.setter
+    def party(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("party must be a str")
+        self._party = value
 
     @property
     def agriculture(self) -> int:
