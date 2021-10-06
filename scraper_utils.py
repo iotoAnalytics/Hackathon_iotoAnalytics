@@ -526,16 +526,12 @@ class LegislatorScraperUtils(ScraperUtils):
 
         gender_mapping = {
             'female': 'F',
+            'mostly female': 'F',
+            'mostly male': 'M',
             'male': 'M',
         }
-        if self.country == 'ca':
-            country = 'Canada'
-        elif self.country == 'us':
-            country = 'USA'
-        else:
-            country = 'USA'
 
-        legislator_gender = gc.resolveGender(name, country)
+        legislator_gender = gc.resolveGender(name, self.country)
         return gender_mapping.get(legislator_gender)
 
 class LegislationScraperUtils(ScraperUtils):
