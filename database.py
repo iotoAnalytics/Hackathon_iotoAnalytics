@@ -853,6 +853,7 @@ class Persistence:
                         phone_numbers = excluded.phone_numbers,
                         addresses = excluded.addresses,
                         email = excluded.email,
+                        region = excluded.region,
                         birthday = excluded.birthday,
                         military_experience = excluded.military_experience,
                         occupation = excluded.occupation,
