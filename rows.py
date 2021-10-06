@@ -817,7 +817,8 @@ class LegislatorRow:
                 raise ValueError("phone_numbers data must have valid 'office' information as a str")
             if number.get('number') is None or type(number.get('number')) != str:
                 raise ValueError("phone_numbers data must have valid 'number' information as a str")
-            if not re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number')):
+            if not (re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number')) or 
+                    re.match(r'[0-9]{1}-[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number'))):
                 raise ValueError("Improper number formatting in phone_numbers. Required format: ###-###-####")
         self._phone_numbers = value
 
