@@ -18,6 +18,7 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 BASE_URL = 'https://yukonassembly.ca'
 MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -217,6 +218,8 @@ class ScraperForMLAs:
         self.__set_contact_info()
         self.__set_service_period()
         self.__set_most_recent_term_id()
+        self.__set_gender()
+        self.__set_wiki_url()
 
     def __set_name_data(self):
         human_name = self.__get_full_human_name()
@@ -347,6 +350,25 @@ class ScraperForMLAs:
     def __set_most_recent_term_id(self):
         self.row.most_recent_term_id = str(self.row.years_active[-1])
 
+    def __set_gender(self):
+        biography = self.main_container.text
+        self.row.gender = scraper_utils.get_legislator_gender(self.row.name_first, self.row.name_last, biography)
+
+    def __set_wiki_url(self):
+        page_html = get_site_as_html(WIKI_URL)
+        page_soup = soup(page_html, "html.parser")
+
+        table = page_soup.find("table", {"class": "wikitable sortable"})
+        table = table.findAll("tr")[1:]
+
+        legislator_name = self.row.name_first + ' ' + self.row.name_last
+        for tr in table:
+            td = tr.findAll("td")[1]
+            name = td.text
+            if legislator_name == str(name).strip():
+                self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
+                break
+
 class ScraperForCommitteesMainSite:
     def get_all_commitee_links(self, soup):
         committee_urls = []
@@ -382,7 +404,7 @@ class ScraperForCommitteesMainSite:
 class ScraperForCommittee:
     def __init__(self, committee_url):
         self.url = committee_url
-        self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
+        self.driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
         self.driver.switch_to.default_content()
         self.data = {}
         self.__collect_data()

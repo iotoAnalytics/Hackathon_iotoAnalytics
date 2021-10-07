@@ -458,6 +458,27 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
                     cur.connection.rollback()
+    
+    @staticmethod
+    def update_legislator_active_column(cur, wiki_urls, table):
+        update_is_active_query = sql.SQL("""
+
+            UPDATE {table} 
+            SET {column} = false
+            WHERE {check_column} NOT IN %s OR {check_column} IS NULL;
+
+        """).format(
+            table=sql.Identifier(table),
+            column=sql.Identifier("is_active"),
+            check_column=sql.Identifier("wiki_url")
+        )
+
+        try:
+            cur.execute(update_is_active_query, (tuple(wiki_urls),))
+            cur.connection.commit()
+        except Exception as e:
+            print(f'An exception occurred executing a query:\n{e}')
+            cur.connection.rollback()
 
     @staticmethod
     def write_us_fed_legislators(data, table):
@@ -498,7 +519,10 @@ class Persistence:
                             seniority int,
                             occupation text[],
                             education jsonb,
-                            military_experience text
+                            military_experience text,
+                            gender text,
+                            wiki_url text UNIQUE,
+                            is_active boolean
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -517,8 +541,8 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s)
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, true)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
                         name_full = excluded.name_full,
@@ -544,48 +568,62 @@ class Persistence:
                         source_id = excluded.source_id,
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
-                        seniority = excluded.seniority;
+                        seniority = excluded.seniority
+                        gender = excluded.gender,
+                        wiki_url = excluded.wiki_url,
+                        is_active = excluded.is_active;
                     """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 
             # This is used to convert dictionaries to rows. Need to test it out!
+            wiki_url_for_legislators_being_updated = []
             for item in data:
-                if isinstance(item, dict):
-                    item = utils.DotDict(item)
+                try:
+                    if isinstance(item, dict):
+                        item = utils.DotDict(item)
 
-                tup = (
-                    item.source_id,
-                    item.most_recent_term_id,
-                    date_collected,
-                    item.source_url,
-                    item.name_full,
-                    item.name_last,
-                    item.name_first,
-                    item.name_middle,
-                    item.name_suffix,
-                    item.country_id,
-                    item.country,
-                    item.state_id,
-                    item.state,
-                    item.party_id,
-                    item.party,
-                    item.role,
-                    item.district,
-                    item.years_active,
-                    json.dumps(item.committees, default=utils.json_serial),
-                    item.areas_served,
-                    json.dumps(item.phone_numbers, default=utils.json_serial),
-                    json.dumps(item.addresses, default=utils.json_serial),
-                    item.email,
-                    item.birthday,
-                    item.seniority,
-                    item.occupation,
-                    json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience
-                )
+                    tup = (
+                        item.source_id,
+                        item.most_recent_term_id,
+                        date_collected,
+                        item.source_url,
+                        item.name_full,
+                        item.name_last,
+                        item.name_first,
+                        item.name_middle,
+                        item.name_suffix,
+                        item.country_id,
+                        item.country,
+                        item.state_id,
+                        item.state,
+                        item.party_id,
+                        item.party,
+                        item.role,
+                        item.district,
+                        item.years_active,
+                        json.dumps(item.committees, default=utils.json_serial),
+                        item.areas_served,
+                        json.dumps(item.phone_numbers, default=utils.json_serial),
+                        json.dumps(item.addresses, default=utils.json_serial),
+                        item.email,
+                        item.birthday,
+                        item.seniority,
+                        item.occupation,
+                        json.dumps(item.education, default=utils.json_serial),
+                        item.military_experience,
+                        item.gender,
+                        item.wiki_url
+                    )
 
-                cur.execute(insert_legislator_query, tup)
+                    cur.execute(insert_legislator_query, tup)
+                    wiki_url_for_legislators_being_updated.append(item.wiki_url)
+
+                except Exception as e:
+                    print(f'Exception occurred inserting the following data:\n{tup} \n{e}')
+                    cur.connection.rollback()
+
+            Persistence.update_legislator_active_column(cur, wiki_url_for_legislators_being_updated, table)
 
     @staticmethod
     def write_ca_fed_legislators(data, table):
@@ -629,7 +667,9 @@ class Persistence:
                             region text,
                             offices_roles_as_mp text[],
                             parl_assoc_interparl_groups jsonb,
-                            gender text
+                            gender text,
+                            wiki_url text UNIQUE,
+                            is_active boolean
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -647,7 +687,7 @@ class Persistence:
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
                         name_full = excluded.name_full,
@@ -676,52 +716,63 @@ class Persistence:
                         parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
                         region = excluded.region,
                         gender = excluded.gender,
-                        seniority = excluded.seniority;
+                        wiki_url = excluded.wiki_url,
+                        seniority = excluded.seniority,
+                        is_active = excluded.is_active;
                     """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 
             # This is used to convert dictionaries to rows. Need to test it out!
+            wiki_url_for_legislators_being_updated = []
             for item in data:
                 if isinstance(item, dict):
                     item = utils.DotDict(item)
+                try:
+                    tup = (
+                        item.source_id,
+                        item.most_recent_term_id,
+                        date_collected,
+                        item.source_url,
+                        item.name_full,
+                        item.name_last,
+                        item.name_first,
+                        item.name_middle,
+                        item.name_suffix,
+                        item.country_id,
+                        item.country,
+                        item.province_territory_id,
+                        item.province_territory,
+                        item.party_id,
+                        item.party,
+                        item.role,
+                        item.riding,
+                        item.years_active,
+                        json.dumps(item.committees, default=utils.json_serial),
+                        json.dumps(item.phone_numbers, default=utils.json_serial),
+                        json.dumps(item.addresses, default=utils.json_serial),
+                        item.email,
+                        item.birthday,
+                        item.seniority,
+                        item.occupation,
+                        json.dumps(item.education, default=utils.json_serial),
+                        item.military_experience,
+                        item.region,
+                        item.offices_roles_as_mp,
+                        json.dumps(item.parl_assoc_interparl_groups,
+                                default=utils.json_serial),
+                        item.gender,
+                        item.wiki_url
+                    )
 
-                tup = (
-                    item.source_id,
-                    item.most_recent_term_id,
-                    date_collected,
-                    item.source_url,
-                    item.name_full,
-                    item.name_last,
-                    item.name_first,
-                    item.name_middle,
-                    item.name_suffix,
-                    item.country_id,
-                    item.country,
-                    item.province_territory_id,
-                    item.province_territory,
-                    item.party_id,
-                    item.party,
-                    item.role,
-                    item.riding,
-                    item.years_active,
-                    json.dumps(item.committees, default=utils.json_serial),
-                    json.dumps(item.phone_numbers, default=utils.json_serial),
-                    json.dumps(item.addresses, default=utils.json_serial),
-                    item.email,
-                    item.birthday,
-                    item.seniority,
-                    item.occupation,
-                    json.dumps(item.education, default=utils.json_serial),
-                    item.military_experience,
-                    item.region,
-                    item.gender,
-                    item.offices_roles_as_mp,
-                    json.dumps(item.parl_assoc_interparl_groups,
-                               default=utils.json_serial)
-                )
+                    cur.execute(insert_legislator_query, tup)
+                    wiki_url_for_legislators_being_updated.append(item.wiki_url)
 
-                cur.execute(insert_legislator_query, tup)
+                except Exception as e:
+                    print(f'Exception occurred inserting the following data:\n{tup} \n{e}')
+                    cur.connection.rollback()
+
+            Persistence.update_legislator_active_column(cur, wiki_url_for_legislators_being_updated, table)
 
     @staticmethod
     def write_ca_prov_terr_legislators(data, table):
@@ -762,7 +813,10 @@ class Persistence:
                             occupation text[],
                             education jsonb,
                             military_experience text,
-                            region text
+                            region text,
+                            gender text,
+                            wiki_url text UNIQUE,
+                            is_active boolean
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -779,9 +833,9 @@ class Persistence:
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
                     INSERT INTO {table}
                     VALUES (
-                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s)
+                        (SELECT leg_id FROM leg_id), %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, true)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
                         name_full = excluded.name_full,
@@ -799,6 +853,7 @@ class Persistence:
                         phone_numbers = excluded.phone_numbers,
                         addresses = excluded.addresses,
                         email = excluded.email,
+                        region = excluded.region,
                         birthday = excluded.birthday,
                         military_experience = excluded.military_experience,
                         occupation = excluded.occupation,
@@ -806,12 +861,16 @@ class Persistence:
                         source_id = excluded.source_id,
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
-                        seniority = excluded.seniority;
+                        seniority = excluded.seniority,
+                        gender = excluded.gender,
+                        wiki_url = excluded.wiki_url,
+                        is_active = excluded.is_active;
                     """).format(table=sql.Identifier(table))
 
             date_collected = datetime.now()
 
             # This is used to convert dictionaries to rows. Need to test it out!
+            wiki_url_for_legislators_being_updated = []
             for item in data:
                 if isinstance(item, dict):
                     item = utils.DotDict(item)
@@ -845,14 +904,17 @@ class Persistence:
                         item.occupation,
                         json.dumps(item.education, default=utils.json_serial),
                         item.military_experience,
-                        item.region
-                    )
+                        item.region,
+                        item.gender,
+                        item.wiki_url)
 
                     cur.execute(insert_legislator_query, tup)
-                except Exception:
-                    print(f'Exception occurred inserting the following data:\n{tup}')
+                    wiki_url_for_legislators_being_updated.append(item.wiki_url)
+                except Exception as e:
+                    print(f'Exception occurred inserting the following data:\n{tup} \n{e}')
                     cur.connection.rollback()
-
+            
+            Persistence.update_legislator_active_column(cur, wiki_url_for_legislators_being_updated, table)
 
     @staticmethod
     def write_ca_fed_legislation(data, table):

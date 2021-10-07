@@ -615,6 +615,7 @@ class LegislatorRow:
     occupation: List[str]
     education: List[dict]
     military_experience: str 
+    wiki_url: str
 
     def __init__(self):
         self._source_id = ''
@@ -641,6 +642,7 @@ class LegislatorRow:
         self._occupation = []
         self._education = []
         self._military_experience = ''
+        self._wiki_url = ''
 
     @property
     def source_id(self) -> str:
@@ -815,7 +817,8 @@ class LegislatorRow:
                 raise ValueError("phone_numbers data must have valid 'office' information as a str")
             if number.get('number') is None or type(number.get('number')) != str:
                 raise ValueError("phone_numbers data must have valid 'number' information as a str")
-            if not re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number')):
+            if not (re.match(r'[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number')) or 
+                    re.match(r'[0-9]{1}-[0-9]{3}-[0-9]{3}-[0-9]{4}', number.get('number'))):
                 raise ValueError("Improper number formatting in phone_numbers. Required format: ###-###-####")
         self._phone_numbers = value
 
@@ -846,6 +849,7 @@ class LegislatorRow:
         if not re.match(email_regex, value):
             raise ValueError("Improper email formatting in email. Required format: ExampleEmail@domain.com" +
                 "\nThere may be a problem with the email validator so please check rows.py for more details.")
+        self._email = value
 
     @property
     def birthday(self) -> datetime:
@@ -902,6 +906,16 @@ class LegislatorRow:
         if type(value) != str:
             raise TypeError("military_experience must be a str")
         self._military_experience = value
+
+    @property
+    def wiki_url(self) -> str:
+        return self._wiki_url
+    @wiki_url.setter
+    def wiki_url(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("wiki_url must be a str")
+        self._wiki_url = value
+
 
 @dataclass
 class USLegislatorRow(LegislatorRow):
@@ -1011,6 +1025,285 @@ class CALegislatorRow(LegislatorRow):
         if type(value) != str:
             raise TypeError("region must be a str")
         self._region = value
+
+@dataclass
+class LegislatorSponsorTopicRow:
+    """ 
+    Data structure for housing the number of bills sponsored by a Legislator
+    and that bills respective CAP topic
+    """
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+    
+    name_full: str 
+    name_last: str 
+    name_first: str 
+    name_middle: str 
+    name_suffix: str 
+    party: str
+    agriculture: int
+    civil_rights: int
+    defense: int
+    domestic_commerce: int
+    education: int
+    energy: int
+    environment: int
+    foreign_trade: int
+    government_operations: int
+    health: int
+    immigration: int
+    international_affairs: int
+    labor: int
+    law_and_crime: int
+    macroeconomics: int
+    social_welfare: int
+    technology: int
+    transportation: int
+
+    def __init__(self):
+        super().__init__()
+        self._name_full = ''
+        self._name_last = ''
+        self._name_first = ''
+        self._name_middle = ''
+        self._name_suffix = ''
+        self._party = ''
+        self._agriculture = None
+        self._civil_rights = None
+        self._defense = None
+        self._domestic_commerce = None
+        self._education = None
+        self._energy = None
+        self._environment = None
+        self._foreign_trade = None
+        self._government_operations = None
+        self._health = None
+        self._immigration = None
+        self._international_affairs = None
+        self._labor = None
+        self._law_and_crime = None
+        self._macroeconomics = None
+        self._social_welfare = None
+        self._technology = None
+        self._transportation = None
+
+    @property
+    def name_full(self) -> str:
+        return self._name_full
+    @name_full.setter
+    def name_full(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("name_full must be a str")
+        self._name_full = value
+
+    @property
+    def name_last(self) -> str:
+        return self._name_last
+    @name_last.setter
+    def name_last(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("name_last must be a str")
+        self._name_last = value
+
+    @property
+    def name_first(self) -> str:
+        return self._name_first
+    @name_first.setter
+    def name_first(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("name_first must be a str")
+        self._name_first = value
+
+    @property
+    def name_middle(self) -> str:
+        return self._name_middle
+    @name_middle.setter
+    def name_middle(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("name_middle must be a str")
+        self._name_middle = value
+        
+    @property
+    def name_suffix(self) -> str:
+        return self._name_suffix
+    @name_suffix.setter
+    def name_suffix(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("name_suffix must be a str")
+        self._name_suffix = value
+    
+    @property
+    def party(self) -> str:
+        return self._party
+    @party.setter
+    def party(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("party must be a str")
+        self._party = value
+
+    @property
+    def agriculture(self) -> int:
+        return self._agriculture
+    @agriculture.setter
+    def agriculture(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("agriculture count must be an integer")
+        self._agriculture = count
+
+    @property
+    def civil_rights(self) -> int:
+        return self._civil_rights
+    @civil_rights.setter
+    def civil_rights(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("civil_rights count must be an integer")
+        self._civil_rights = count
+    
+    @property
+    def defense(self) -> int:
+        return self._defense
+    @defense.setter
+    def defense(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("defense count must be an integer")
+        self._defense = count
+
+    @property
+    def domestic_commerce(self) -> int:
+        return self._domestic_commerce
+    @domestic_commerce.setter
+    def domestic_commerce(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("domestic_commerce count must be an integer")
+        self._domestic_commerce = count
+
+    @property
+    def education(self) -> int:
+        return self._education
+    @education.setter
+    def education(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("education count must be an integer")
+        self._education = count
+
+    @property
+    def energy(self) -> int:
+        return self._energy
+    @energy.setter
+    def energy(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("energy count must be an integer")
+        self._energy = count
+
+    @property
+    def environment(self) -> int:
+        return self._environment
+    @environment.setter
+    def environment(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("environment count must be an integer")
+        self._environment = count
+
+    @property
+    def foreign_trade(self) -> int:
+        return self._foreign_trade
+    @foreign_trade.setter
+    def foreign_trade(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("foreign_trade count must be an integer")
+        self._foreign_trade = count
+
+    @property
+    def government_operations(self) -> int:
+        return self._government_operations
+    @government_operations.setter
+    def government_operations(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("government_operations count must be an integer")
+        self._government_operations = count
+
+    @property
+    def health(self) -> int:
+        return self._health
+    @health.setter
+    def health(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("health count must be an integer")
+        self._health = count
+
+    @property
+    def immigration(self) -> int:
+        return self._immigration
+    @immigration.setter
+    def immigration(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("immigration count must be an integer")
+        self._immigration = count
+
+    @property
+    def international_affairs(self) -> int:
+        return self._international_affairs
+    @international_affairs.setter
+    def international_affairs(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("international_affairs count must be an integer")
+        self._international_affairs = count
+
+    @property
+    def labor(self) -> int:
+        return self._labor
+    @labor.setter
+    def labor(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("labor count must be an integer")
+        self._labor = count
+
+    @property
+    def law_and_crime(self) -> int:
+        return self._law_and_crime
+    @law_and_crime.setter
+    def law_and_crime(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("law_and_crime count must be an integer")
+        self._law_and_crime = count
+
+    @property
+    def macroeconomics(self) -> int:
+        return self._macroeconomics
+    @macroeconomics.setter
+    def macroeconomics(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("macroeconomics count must be an integer")
+        self._macroeconomics = count
+
+    @property
+    def social_welfare(self) -> int:
+        return self._social_welfare
+    @social_welfare.setter
+    def social_welfare(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("social_welfare count must be an integer")
+        self._social_welfare = count
+
+    @property
+    def technology(self) -> int:
+        return self._technology
+    @technology.setter
+    def technology(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("technology count must be an integer")
+        self._technology = count
+
+    @property
+    def transportation(self) -> int:
+        return self._transportation
+    @transportation.setter
+    def transportation(self, count: int) -> None:
+        if type(count) != int:
+            raise TypeError("transportation count must be an integer")
+        self._transportation = count
+
 
 @dataclass
 class CAFedLegislatorRow(CALegislatorRow):
@@ -1238,7 +1531,7 @@ class ElectoralDistrictsRow:
 @dataclass
 class ElectorsRow:
     """
-    Data structure for housing data data for electors
+    Data structure for housing data for electors
     """
 
     def __iter__(self):
@@ -1425,7 +1718,7 @@ class CandidatesRow:
 @dataclass
 class ElectionVotesRow:
     """
-    Data structure for housing data data for election votes
+    Data structure for housing data for election votes
     """
     def __iter__(self):
         for attr, value in self.__dict__.items():
@@ -1619,7 +1912,7 @@ class CandidateElectionDetailsRow:
 @dataclass
 class FinancialContributionsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for financial contributions
         """
 
         def __iter__(self):
@@ -1792,7 +2085,7 @@ class FinancialContributionsRow:
 @dataclass
 class CandidateElectionFinancesRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for candidate election finances
         """
 
         def __iter__(self):
@@ -1829,7 +2122,7 @@ class CandidateElectionFinancesRow:
 @dataclass
 class InflowsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for inflows
         """
 
         def __iter__(self):
@@ -2070,7 +2363,7 @@ class InflowsRow:
 @dataclass
 class CandidateElectionVotesRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for candidate election votes
         """
 
         def __iter__(self):
@@ -2143,7 +2436,7 @@ class CandidateElectionVotesRow:
 @dataclass
 class OutflowsRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for outflows
         """
 
         def __iter__(self):
@@ -2340,7 +2633,7 @@ class OutflowsRow:
 @dataclass
 class BankReconciliationRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for bank reconciliations
         """
 
         def __iter__(self):
@@ -2403,7 +2696,7 @@ class BankReconciliationRow:
 @dataclass
 class BankAccountRow:
         """
-        Data structure for housing data data for election votes
+        Data structure for housing data for bank accounts
         """
 
         def __iter__(self):

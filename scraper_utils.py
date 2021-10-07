@@ -16,6 +16,7 @@ import functools
 
 import sys
 import pandas as pd
+from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
 from database import Database, CursorFromConnectionFromPool, Persistence
 from dataclasses import dataclass, field
 from typing import List
@@ -477,6 +478,61 @@ class LegislatorScraperUtils(ScraperUtils):
         """
         return info
 
+    def get_legislator_gender(self, name_first: str, name_last: str, biography=None) -> str or None:
+        """
+        Used for getting the gender of legislator. 
+        This should be used when gender is not specified on the legislator website. 
+        
+        PARAMS
+        -----------
+        name_first the first name of legislator
+        name_last the last name of the legislator
+        biography a block of text that contains legislator information
+
+        RETURNS
+        ----------
+        'M' if the gender is guessed to be male\n
+        'F' if the gender is guessed to be female\n
+        None if the gender cannot be guessed
+        """
+
+        if biography:
+            try:
+                return self._guess_gender_from_text(biography)
+            except:
+                pass
+        return self._guess_gender_using_genderComputer(name_first, name_last)
+
+
+    def _guess_gender_from_text(self, biography):
+        count_masculine = 0
+        count_femanine = 0
+
+        count_masculine += len(re.findall('Mr. ', biography))
+        count_femanine += len(re.findall('Mrs. ', biography)) + len(re.findall('Ms. ', biography))
+        
+        count_masculine += len(re.findall(r'\she\W', biography)) or len(re.findall(r'\sHe\W', biography))
+        count_femanine += len(re.findall(r'\sshe\W', biography)) or len(re.findall(r'\sShe\W', biography))
+
+        if count_masculine > count_femanine:
+            return 'M'
+        if count_femanine > count_masculine:
+            return 'F'
+        raise ValueError('Cannot determine gender from biography')
+
+    def _guess_gender_using_genderComputer(self, name_first, name_last):
+        gc = GenderComputer()
+        name = name_first + ' ' + name_last
+
+        gender_mapping = {
+            'female': 'F',
+            'mostly female': 'F',
+            'mostly male': 'M',
+            'male': 'M',
+        }
+
+        legislator_gender = gc.resolveGender(name, self.country)
+        return gender_mapping.get(legislator_gender)
 
 class LegislationScraperUtils(ScraperUtils):
     """
