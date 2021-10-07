@@ -39,7 +39,7 @@ transformers==4.5.1
 Unidecode==1.2.0
 urllib3==1.26.4
 utils==1.0.1
-webdriver_manager
+webdriver_manager==3.4.2
 
 pip~=20.1.1
 click~=8.0.0
