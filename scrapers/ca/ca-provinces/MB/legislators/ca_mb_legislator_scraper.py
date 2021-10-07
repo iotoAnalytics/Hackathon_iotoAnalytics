@@ -17,9 +17,10 @@ import pandas as pd
 import unidecode
 import numpy as np
 
+base_url = 'https://www.gov.mb.ca'
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('MB', 'ca_mb_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('https://www.gov.mb.ca/')
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def scrape_main_page(link):
@@ -34,22 +35,25 @@ def scrape_main_page(link):
     table_items = table.findAll("tr")[1:]
 
     for ti in table_items:
-        ti_info = ti.findAll("td")
+        try:
+            ti_info = ti.findAll("td")
 
-        url = 'https://www.gov.mb.ca/legislature/members/' + \
-            (ti_info[1].a["href"])
-        party_abbrev = ti_info[2].text
-        if party_abbrev == 'PC':
-            party = 'Progressive Conservative Party of Manitoba'
-        elif party_abbrev == 'NDP':
-            party = 'New Democratic Party of Manitoba'
-        elif party_abbrev == 'IND LIB':
-            party = 'Manitoba Independent Liberals'
-        party_id = scraper_utils.get_party_id(party)
+            url = 'https://www.gov.mb.ca/legislature/members/' + \
+                (ti_info[1].a["href"])
+            party_abbrev = ti_info[2].text
+            if party_abbrev == 'PC':
+                party = 'Progressive Conservative'
+            elif party_abbrev == 'NDP':
+                party = 'New Democratic'
+            elif party_abbrev == 'IND LIB':
+                party = 'Liberal'
+            party_id = scraper_utils.get_party_id(party)
 
-        main_info = {'source_url': url, 'party': party, 'party_id': party_id}
+            main_info = {'source_url': url, 'party': party, 'party_id': party_id}
 
-        members.append(main_info)
+            members.append(main_info)
+        except:
+            pass
     scraper_utils.crawl_delay(crawl_delay)
     return members
 
@@ -82,8 +86,10 @@ def collect_mla_data(link_party):
 
     row.riding = riding
     name = name.replace("Hon. ", "").strip()
+    if name == "Catherine Cox":
+        name = "Cathy Cox"
     hn = HumanName(name)
-    row.name_full = name
+    row.name_full = hn.full_name
     row.name_last = hn.last
     row.name_first = hn.first
     row.name_middle = hn.middle
@@ -133,7 +139,7 @@ def collect_mla_data(link_party):
             phone = a.split("Phone: ")[1].strip()
             phone = phone.replace("(", "")
             phone = phone.replace(") ", "-")
-            phone_info = {'office': address_location, 'phone_numbers': phone}
+            phone_info = {'office': address_location, 'number': phone}
             phone_numbers.append(phone_info)
             stop = 1
     addr_info = {'location': address_location,
@@ -162,7 +168,7 @@ def collect_mla_data(link_party):
                 phone = phone.replace("(", "")
                 phone = phone.replace(")", "-")
                 phone_info = {'office': address_location,
-                              'phone_numbers': phone}
+                              'number': phone}
                 phone_numbers.append(phone_info)
 
             except:
@@ -176,8 +182,34 @@ def collect_mla_data(link_party):
 
     row.phone_numbers = phone_numbers
     scraper_utils.crawl_delay(crawl_delay)
+
+    uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba')
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = soup(page_html, "html.parser")
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    table = table.findAll("tr")[1:]
+    for tr in table:
+        name_td = tr.findAll("td")[1]
+        name = name_td.text
+        district = tr.findAll("td")[3].text
+        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+            row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+            bio = get_biography_from_wiki(row.wiki_url)
+            row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
+            break
+
+    scraper_utils.crawl_delay(crawl_delay)
     return row
 
+def get_biography_from_wiki(link):
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = soup(page_html, "html.parser")
+    main_content = page_soup.find("div", {"id" : "content"}).text
+    return main_content
 
 def scrape_main_wiki(link):
     # get links to members' personal wikipedia pages
@@ -191,10 +223,13 @@ def scrape_main_wiki(link):
     table = page_soup.find("table", {"class": "wikitable sortable"})
     table = table.findAll("tr")[1:]
     for tr in table:
-        td = tr.findAll("td")[1]
-        url = 'https://en.wikipedia.org' + (td.span.span.span.a["href"])
+        try:
+            td = tr.findAll("td")[1]
+            url = 'https://en.wikipedia.org' + (td.span.span.span.a["href"])
 
-        wiki_urls.append(url)
+            wiki_urls.append(url)
+        except:
+            continue
     scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
 
@@ -224,7 +259,6 @@ if __name__ == '__main__':
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
-    print(big_df)
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
