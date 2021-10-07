@@ -244,6 +244,7 @@ def scrape(url):
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
 
     return row
 

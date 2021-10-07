@@ -268,6 +268,7 @@ class LegislatorScraperUtils(ScraperUtils):
         Takes in a link to the personal wikipedia page of the legislator
         """
         # get available birthday
+        wiki_url = wiki_link
         try:
             uClient = uReq(wiki_link)
             page_html = uClient.read()
@@ -463,7 +464,7 @@ class LegislatorScraperUtils(ScraperUtils):
 
         info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
                 'education': education, 'occupation': occupation, 'years_active': years_active,
-                'most_recent_term_id': str(most_recent_term_id)}
+                'most_recent_term_id': str(most_recent_term_id), 'wiki_url': wiki_url}
 
         """
             returns dictionary with the following fields if available
