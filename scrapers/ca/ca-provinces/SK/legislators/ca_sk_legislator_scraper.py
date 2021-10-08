@@ -1,3 +1,11 @@
+import sys
+import os
+from pathlib import Path
+
+p = Path(os.path.abspath(__file__)).parents[5]
+
+sys.path.insert(0, str(p))
+
 import pandas as pd
 import bs4
 from urllib.request import urlopen as uReq
@@ -14,9 +22,6 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
-import sys
-import os
-from pathlib import Path
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 
 header = {
@@ -25,9 +30,6 @@ url = 'https://www.legassembly.sk.ca/mlas/'
 base_url = 'https://www.legassembly.sk.ca'
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Saskatchewan'
 wiki_base = 'https://en.wikipedia.org'
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('SK', 'ca_sk_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
@@ -39,7 +41,7 @@ def get_legislator_links(url):
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     table = url_soup.find('table', {'id': 'MLAs'})
     for item in table.find_all('tr'):
-        if item.find('td', {'class': 'mla-name'}):
+        if item.find('td', {'class': 'mla-name'}) and "Vacant" not in item.text:
             links.append(base_url + item.find('a').get('href'))
     return links
 
@@ -67,7 +69,7 @@ def scrape(info_dict):
     url_request = UrlRequest.make_request(url, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_header = url_soup.find('div', {
-                               'class': 'mla-header'}).text.replace('\xa0', ' ').replace('\n', ' ').split('-')
+                            'class': 'mla-header'}).text.replace('\xa0', ' ').replace('\n', ' ').split(' - ')
 
     row = scraper_utils.initialize_row()
 
@@ -96,17 +98,21 @@ def scrape(info_dict):
                         phone.append(phone_dict)
         elif 'Online' in item.text:
             lst = item.find_all('div')
-            for el in lst:
+            for el in lst: 
                 if 'E-mail' in el.text:
                     email = el.find('a').get('href')
+    
+    email = email.replace('mailto:', '')
 
     row.name_full = name_full
     row.name_first = name_first
     row.name_last = name_last
     row.name_middle = name.middle
     row.party = party
+    if row.party == "New Democratic Party":
+        row.party = "New Democratic"
     try:
-        row.party_id = scraper_utils.get_party_id(party)
+        row.party_id = scraper_utils.get_party_id(row.party)
     except:
         row.party_id = 0
     row.riding = url_riding
@@ -115,13 +121,17 @@ def scrape(info_dict):
     row.phone_numbers = phone
     row.source_url = url
     for item in info_dict['wiki_list']:
-        if name_first in item and name_last in item:
+        if (name_first in item and name_last in item) or ("Dave" in item and name_last in item):
             wiki_info = scraper_utils.scrape_wiki_bio(item)
             row.education = wiki_info['education']
             row.birthday = wiki_info['birthday']
             row.occupation = wiki_info['occupation']
             row.years_active = wiki_info['years_active']
             row.most_recent_term_id = wiki_info['most_recent_term_id']
+            row.wiki_url = wiki_info['wiki_url']
+
+    bio = url_soup.find('div', {'class' : 'biography-cell'}).text
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
 
     print('Done row for: '+name_full)
     scraper_utils.crawl_delay(crawl_delay)
