@@ -856,7 +856,7 @@ class LegislatorRow:
         return self._birthday
     @birthday.setter
     def birthday(self, value: datetime) -> None:
-        if type(value) != datetime:
+        if type(value) != datetime and value is not None:
             raise TypeError("birthday must be a datetime")
         self._birthday = value
 
