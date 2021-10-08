@@ -189,7 +189,6 @@ def scrape(diction):
 
     print('Done row for ' + name_full)
     scraper_utils.crawl_delay(crawl_delay)
-    print(row)
     return row
 
 def get_biography_from_wiki(link):
@@ -202,8 +201,8 @@ def get_biography_from_wiki(link):
 
 
 if __name__ == '__main__':
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
 
     legislator_links = get_links(url)
     wiki_links = get_wiki_links(wiki_url)
@@ -215,13 +214,14 @@ if __name__ == '__main__':
 
     leg_df = pd.DataFrame(mla_data)
     # drop columns that we'll get from wikipedia instead
-    leg_df = leg_df.drop(columns=[
-                         'birthday', 'education', 'occupation'])
+    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
 
     with Pool() as pool:
         wiki_data = pool.map(
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+    ]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
@@ -230,7 +230,6 @@ if __name__ == '__main__':
     big_df['education'] = big_df['education'].replace({np.nan: None})
 
     big_list_of_dicts = big_df.to_dict('records')
-
     print('done collecting data')
     scraper_utils.write_data(big_list_of_dicts)
     print('complete!')
