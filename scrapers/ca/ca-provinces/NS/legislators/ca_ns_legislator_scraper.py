@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -49,6 +51,7 @@ def get_urls():
 
 
 def get_current_general_assembly_link(general_assembly_link):
+
     uClient = uReq(general_assembly_link)
     page_html = uClient.read()
     uClient.close()
@@ -59,6 +62,7 @@ def get_current_general_assembly_link(general_assembly_link):
     link = current_assembly.find('a').get('href')
 
     scraper_utils.crawl_delay(crawl_delay)
+
     return link
 
 
@@ -131,15 +135,18 @@ def get_phone_number(bio_container, row):
     phone_detail = bio_container.findAll('dd', {'class': 'numbers'})
     try:
         office_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[0].text)[0]
+        office_phone = office_phone.replace('(', '').replace(')', '').replace(' ', '-')
         phone = {'office': 'Constituency office', 'number': office_phone}
         phone_numbers.append(phone)
     except Exception:
         pass
     try:
         business_phone = re.findall(r'\(?[0-9]{3}\)?[-, ][0-9]{3}[-, ][0-9]{4}', phone_detail[1].text)[0]
+        business_phone = business_phone.replace('(', '').replace(')', '').replace(' ', '-')
         phone_numbers.append({'office': 'Business', 'number': business_phone})
     except Exception:
         pass
+
     row.phone_numbers = phone_numbers
 
 
@@ -173,9 +180,12 @@ def get_addresses(bio_container, row):
 
 def get_email(bio_container, row):
     contact_detail = bio_container.find('dd', {'class': 'numbers'})
-    email = contact_detail.find('a').get('href')
-    email = email.split('mailto:')[1]
-    row.email = email
+    try:
+        email = contact_detail.find('a').get('href')
+        email = email.split('mailto:')[1]
+        row.email = email
+    except:
+        pass
 
 
 def get_years_active(bio_container, row):
@@ -253,6 +263,7 @@ def scrape(url):
     get_years_active(bio_container, row)
     get_committees(bio_container, row, name)
 
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio_container.text)
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -271,26 +282,43 @@ if __name__ == '__main__':
     print('URLs Collected.')
 
     print('Scraping data...')
-
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    #data = [scrape(url) for url in urls]
+    for url in urls:
+        try:
+            data = scrape(url)
+        except Exception as e:
+            print(e)
+    print(data)
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="occupation")
+    try:
+        leg_df = leg_df.drop(columns="birthday")
+        leg_df = leg_df.drop(columns="education")
+        leg_df = leg_df.drop(columns="occupation")
+        leg_df = leg_df.drop(columns="wiki_url")
+    except:
+        pass
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
     wiki_mla_link = get_current_general_assembly_link(wiki_general_assembly_link)
-    mla_wiki = find_mla_wiki('https://en.wikipedia.org' + wiki_mla_link)
+    mla_wiki = find_mla_wiki('http://en.wikipedia.org' + wiki_mla_link)
 
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+        ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+
+    with pd.option_context('display.max_rows', 5, 'display.max_columns', 20):
+        print(wiki_df)
+    wiki_index = wiki_df.index[wiki_df['name_first'] == ''].tolist()
+    for index in wiki_index:
+        print(index)
+        wiki_df = wiki_df.drop(wiki_df.index[index])
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
+                      on=['name_first', "name_last"])
 
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
