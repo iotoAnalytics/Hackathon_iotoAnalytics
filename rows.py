@@ -848,6 +848,7 @@ class LegislatorRow:
         email_regex = r'\b[A-Za-z0-9._%\'!+-]+@[A-Za-z0-9.-]+.[A-Z|a-z]{2,}\b'
         if not re.match(email_regex, value):
             raise ValueError("Improper email formatting in email. Required format: ExampleEmail@domain.com" +
+                f"\nEmail passed in was {value}" +
                 "\nThere may be a problem with the email validator so please check rows.py for more details.")
         self._email = value
 
@@ -856,8 +857,8 @@ class LegislatorRow:
         return self._birthday
     @birthday.setter
     def birthday(self, value: datetime) -> None:
-        if type(value) != datetime and value is not None:
-            raise TypeError("birthday must be a datetime")
+        if value is not None and not re.match(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', str(value)):
+            raise ValueError("Improper birthday formatting. Required format: ####-##-##")
         self._birthday = value
 
     @property
