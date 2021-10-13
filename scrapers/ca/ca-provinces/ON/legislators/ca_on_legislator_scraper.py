@@ -112,7 +112,7 @@ def get_info(soup):
             elif item.find('h2').text == 'Current party':
                 temp = item.find(
                     'div', {'class': 'field-content'}).text.split('of')[0].strip()
-                party = temp.replace('party', '').replace('Party', '').strip()
+                party = temp.replace('party', '').replace('Party', '').replace('Ontario', '').strip()
 
     date_lst = sorted(list(dict.fromkeys(date_lst)))
     return [com_lst, party, address_lst, phone_lst, date_lst, current_term]

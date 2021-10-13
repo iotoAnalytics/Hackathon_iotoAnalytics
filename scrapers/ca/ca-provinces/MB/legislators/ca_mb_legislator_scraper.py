@@ -181,8 +181,7 @@ def collect_mla_data(link_party):
     row.addresses = addresses
 
     row.phone_numbers = phone_numbers
-    scraper_utils.crawl_delay(crawl_delay)
-
+    
     uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba')
     page_html = uClient.read()
     uClient.close()
