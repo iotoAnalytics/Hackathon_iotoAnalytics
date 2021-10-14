@@ -535,6 +535,13 @@ class LegislatorScraperUtils(ScraperUtils):
         legislator_gender = gc.resolveGender(name, self.country)
         return gender_mapping.get(legislator_gender)
 
+    def write_data(self, data, database_table=None):
+        """
+        Inserts legislator sponsor by topic data into database table. Data must be either a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_sponsor_topic_legislators(data, table)
+
 class LegislationScraperUtils(ScraperUtils):
     """
     Base class containing common methods and attributes used by all
