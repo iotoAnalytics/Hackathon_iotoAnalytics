@@ -72,4 +72,4 @@ for i in range(0,len(df)):
 
     ca_fed_lst.append(row)
 
-    scraper_utils.write_data(ca_fed_lst, 'ca_fed_legislator_sponsor_topics')
+scraper_utils.write_data(ca_fed_lst, 'ca_fed_legislator_sponsor_topics')
