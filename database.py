@@ -686,7 +686,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
@@ -1179,6 +1179,125 @@ class Persistence:
                     print(
                         f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
                     cur.connection.rollback()
+
+    @staticmethod
+    def write_sponsor_topic_legislators(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+                        
+                        CREATE TABLE IF NOT EXISTS {table} (
+                            goverlytics_id text PRIMARY KEY,
+                            name_full text,
+                            name_last text,
+                            name_first text,
+                            name_middle text,
+                            name_suffix text,
+                            party text,
+                            country text,
+                            agriculture int, 
+                            civil_rights int,
+                            defense int,
+                            domestic_commerce int,
+                            edu_cation int,
+                            energy int,
+                            environment int,
+                            foreign_trade int,
+                            government_operations int,
+                            health int,
+                            immigration int,
+                            international_affairs int,
+                            labor int,
+                            law_and_crime int,
+                            macroeconomics int,
+                            social_welfare int,
+                            technology int,
+                            transportation int
+                        );
+
+                        ALTER TABLE {table} OWNER TO rds_ad;
+                        """).format(table=sql.Identifier(table))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            except Exception as e:
+                print(f'An exception occurred executing a query:\n{e}')
+                cur.connection.rollback()
+
+            insert_legislator_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (goverlytics_id) DO UPDATE SET
+                        goverlytics_id = excluded.goverlytics_id,
+                        name_full = excluded.name_full,
+                        name_last = excluded.name_last,
+                        name_first = excluded.name_first,
+                        name_middle = excluded.name_middle,
+                        name_suffix = excluded.name_suffix,
+                        party = excluded.party,
+                        country = excluded.country,
+                        agriculture = excluded.agriculture,
+                        civil_rights = excluded.civil_rights,
+                        defense = excluded.defense,
+                        domestic_commerce = excluded.domestic_commerce,
+                        edu_cation = excluded.edu_cation,
+                        energy = excluded.energy,
+                        environment = excluded.environment,
+                        foreign_trade = excluded.foreign_trade,
+                        government_operations = excluded.government_operations,
+                        health = excluded.health,
+                        immigration = excluded.immigration,
+                        international_affairs = excluded.international_affairs,
+                        labor = excluded.labor,
+                        law_and_crime = excluded.law_and_crime,
+                        macroeconomics = excluded.macroeconomics,
+                        social_welfare = excluded.social_welfare,
+                        technology = excluded.technology,
+                        transportation = excluded.transportation;
+                    """).format(table=sql.Identifier(table))
+
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
+
+                tup = (
+                    item.goverlytics_id,
+                    item.name_full,
+                    item.name_last,
+                    item.name_first,
+                    item.name_middle,
+                    item.name_suffix,
+                    item.party,
+                    item.country,
+                    item.agriculture,
+                    item.civil_rights,
+                    item.defense,
+                    item.domestic_commerce,
+                    item.edu_cation,
+                    item.energy,
+                    item.environment,
+                    item.foreign_trade,
+                    item.government_operations,
+                    item.health,
+                    item.immigration,
+                    item.international_affairs,
+                    item.labor,
+                    item.law_and_crime,
+                    item.macroeconomics,
+                    item.social_welfare,
+                    item.technology,
+                    item.transportation
+                )
+
+                cur.execute(insert_legislator_query, tup)
+
 
     @staticmethod
     def write_previous_election_data(data, table):

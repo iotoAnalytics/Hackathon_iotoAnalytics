@@ -42,8 +42,8 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 
 scrape_mps = True
-scrape_senators = False
-write_results_to_database = True
+scrape_senators = True
+write_results_to_database = False
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
@@ -252,7 +252,7 @@ def get_mp_fine_details():
         mp_df.at[i, 'occupation'] = wiki_data['occupation']
         mp_df.at[i, 'years_active'] = wiki_data['years_active']
         mp_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
-
+        mp_df.at[i, 'wiki_url'] = wiki_url
 
 def mp_scrape():
     """
@@ -316,8 +316,8 @@ def get_sen_basic_details():
         row.region = scraper_utils.get_region(prov_terr)
 
         row.role = 'Senator'
-        row.offices_roles_as_mp = None
-        row.parl_assoc_interparl_groups = None
+        row.offices_roles_as_mp = []
+        row.parl_assoc_interparl_groups = []
 
         sen_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)

@@ -14,6 +14,7 @@ from pathlib import Path
 from pprint import pprint
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 from time import sleep
 from tqdm import tqdm
 
@@ -46,7 +47,7 @@ def scrape(url):
     options = Options()
     options.headless = False
 
-    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL + MEMBER_PATH + '/members.aspx')
     driver.maximize_window()
@@ -73,6 +74,7 @@ def scrape(url):
         _set_party(row, fields[2].text)
         _set_phone_numbers(row, fields[3].text)
         _set_email(row, fields[4].text)
+        _set_gender(row, fields[0])
 
         data.append(row)
 
@@ -151,7 +153,12 @@ def get_wiki_urls():
     wiki_url_path = '/wiki/Newfoundland_and_Labrador_House_of_Assembly'
     wiki_url = WIKI_URL + wiki_url_path
 
-    soup = _create_soup(wiki_url, SOUP_PARSER_TYPE)
+    soup = _create_soup(wiki_url, 'html.parser')
+
+    infobox = soup.find('table', {'class':'infobox vcard'})
+    current_assembly_url = WIKI_URL + infobox.find_all('tr')[1].td.a['href']
+
+    soup = _create_soup(current_assembly_url, 'html.parser')
     scraper_utils.crawl_delay(crawl_delay)
 
     urls = []
@@ -165,7 +172,6 @@ def get_wiki_urls():
         if '/wiki' in path:
             url = WIKI_URL + path
             urls.append(url)
-
     return urls
 
 def scrape_wiki(url):
@@ -201,7 +207,7 @@ def _set_source_url(row, text):
     row.source_url = text
 
 def _set_name(row, text):
-    human_name = HumanName(text)
+    human_name = HumanName(text.replace('’', '\''))
 
     row.name_first = human_name.first
     row.name_last = human_name.last
@@ -284,32 +290,49 @@ def _get_committees(committees_data_list, full_name, riding):
 
     return committees
 
+def _set_gender(row, td_element):
+    try:
+        url = td_element.a["href"]
+        url = BASE_URL + url
+        page_soup = _create_soup(url, 'html.parser')
+        bio = page_soup.text
+    except:
+        bio = None
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
+
 def _get_legislator_row(legislator_data, name_full):
+    name_first = name_full.split(' ')[0]
+    name_last = name_full.split(' ')[1]
+    if name_full == 'Helen Conway-Ottenheimer':
+        name_last = 'Conway Ottenheimer'
     for row in legislator_data:
-        if name_full == row.name_full:
+        if name_first == row.name_first and name_last == row.name_last:
             return row
 
     return None
 
-def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
+def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
     full_name = wiki_data['name_first'] + ' ' + wiki_data['name_last']
+    if full_name == 'Jim Dinn':
+        full_name = 'James Dinn'
 
     legislator_row = _get_legislator_row(legislator_data, full_name)
 
     if not legislator_row:
         return
 
-    for bio_info in wiki_data:
-        if birthday:
-            legislator_row.birthday = wiki_data['birthday']
-        if education:
-            legislator_row.education = wiki_data['education']
-        if occupation:
-            legislator_row.occupation = wiki_data['occupation']
-        if years_active:
-            legislator_row.years_active = wiki_data['years_active']
-        if most_recent_term_id:
-            legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
+    if birthday:
+        legislator_row.birthday = wiki_data['birthday']
+    if education:
+        legislator_row.education = wiki_data['education']
+    if occupation:
+        legislator_row.occupation = wiki_data['occupation']
+    if years_active:
+        legislator_row.years_active = wiki_data['years_active']
+    if most_recent_term_id:
+        legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
+    if wiki_url:
+        legislator_row.wiki_url = wiki_data['wiki_url']
 
 def main():
     print('NEWFOUNDLAND AND LABRADOR!')
