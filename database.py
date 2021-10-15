@@ -686,7 +686,7 @@ class Persistence:
                     INSERT INTO {table}
                     VALUES (
                         (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
                     ON CONFLICT (source_url) DO UPDATE SET
                         date_collected = excluded.date_collected,
