@@ -52,12 +52,12 @@ def get_urls():
 
 
 def find_mla_wiki(mlalink):
-    print(mlalink)
+
     bio_links = []
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
-    print("hello")
+
     # # html parsing
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
@@ -92,6 +92,7 @@ def get_name(bio_container, row):
     name_full = bio_container.find('span', {'class': 'field--name-title'}).text
     if "," in name_full:
         name_full = name_full.split(',')[0]
+    name_full = name_full.replace('Hon. ', '')
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -300,8 +301,7 @@ if __name__ == '__main__':
         big_df = big_df.drop(big_df.index[index])
 
     big_list_of_dicts = big_df.to_dict('records')
-    for item in big_list_of_dicts:
-        print(item['wiki_url'])
+
     print(big_list_of_dicts)
     print('Writing data to database...')
 

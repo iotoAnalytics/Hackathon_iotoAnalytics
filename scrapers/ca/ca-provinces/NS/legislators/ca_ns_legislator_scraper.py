@@ -60,7 +60,6 @@ def get_current_general_assembly_link(general_assembly_link):
     current_assembly_row = table.findAll('tr')[1]
     current_assembly = current_assembly_row.findAll('td')[0]
     link = current_assembly.find('a').get('href')
-
     scraper_utils.crawl_delay(crawl_delay)
 
     return link
@@ -68,21 +67,24 @@ def get_current_general_assembly_link(general_assembly_link):
 
 def find_mla_wiki(mlalink):
     bio_links = []
+    print(mlalink)
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
-    people = tables[1].findAll("tr")
+    people = tables[4].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
         try:
             biolink = "https://en.wikipedia.org" + (info[2].a["href"])
+            print(biolink)
             bio_links.append(biolink)
         except Exception:
             pass
 
     scraper_utils.crawl_delay(crawl_delay)
+    print(bio_links)
     return bio_links
 
 
@@ -241,7 +243,7 @@ def get_committees(bio_container, row, name):
 
 
 def scrape(url):
-
+    print(url)
     row = scraper_utils.initialize_row()
     row.source_url = url
 
@@ -267,7 +269,7 @@ def scrape(url):
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
-
+    print(row)
     return row
 
 
@@ -282,16 +284,14 @@ if __name__ == '__main__':
     print('URLs Collected.')
 
     print('Scraping data...')
-    #data = [scrape(url) for url in urls]
-    for url in urls:
-        try:
-            data = scrape(url)
-        except Exception as e:
-            print(e)
+    data = [scrape(url) for url in urls]
+
+
     print(data)
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
+    print(leg_df)
     try:
         leg_df = leg_df.drop(columns="birthday")
         leg_df = leg_df.drop(columns="education")
@@ -310,12 +310,12 @@ if __name__ == '__main__':
     wiki_df = pd.DataFrame(wiki_data)[
         ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
 
-    with pd.option_context('display.max_rows', 5, 'display.max_columns', 20):
-        print(wiki_df)
     wiki_index = wiki_df.index[wiki_df['name_first'] == ''].tolist()
     for index in wiki_index:
-        print(index)
         wiki_df = wiki_df.drop(wiki_df.index[index])
+
+    leg_df.to_csv('C:/Users/kasuk/Desktop/leg_df.csv')
+    wiki_df.to_csv('C:/Users/kasuk/Desktop/wiki_df.csv')
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=['name_first', "name_last"])
@@ -329,7 +329,6 @@ if __name__ == '__main__':
     # dropping rows with vacant seat
     vacant_index = big_df.index[big_df['name_first'] == "Vacant"].tolist()
     for index in vacant_index:
-        print(index)
         big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')
