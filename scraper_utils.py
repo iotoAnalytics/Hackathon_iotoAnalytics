@@ -327,7 +327,7 @@ class LegislatorScraperUtils(ScraperUtils):
             table = page_soup.find("table", {"class": "infobox vcard"})
 
             tds = table.findAll("td", {"colspan": "2"})
-            td = tds[0]
+            # td = tds[0]
 
             for td in tds:
                 asof = (td.find("span", {"class": "nowrap"}))
@@ -357,7 +357,8 @@ class LegislatorScraperUtils(ScraperUtils):
             # create a list of years from that year to current year
             # use current year + 1 since it doesn't include endpoint
             # will need to be updated each year
-            years_active = list(range(int(year_started), 2022))
+            year_today = datetime.now().year
+            years_active = list(range(int(year_started), year_today + 1))
 
         else:
             years_active = []
@@ -422,10 +423,11 @@ class LegislatorScraperUtils(ScraperUtils):
             head = page_soup.find("h1", {"id": "firstHeading"})
             name = head.text
             name = name.split("(")[0].strip()
+            name = name.replace('é', 'é')
 
         except:
             name = ""
-        name = unidecode.unidecode(name)
+        # name = unidecode.unidecode(name)
 
         hN = HumanName(name)
 
