@@ -43,7 +43,7 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 scrape_mps = True
 scrape_senators = True
-write_results_to_database = False
+write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
@@ -104,6 +104,8 @@ def get_mp_basic_details():
         row.name_first = hn.first
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix if hn.suffix else name_suffix
+        gender = scraper_utils.get_legislator_gender(hn.first, hn.last)
+        row.gender = gender
 
         party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
         row.party = mp_party_switcher[party] if party in mp_party_switcher else party
@@ -297,6 +299,17 @@ def get_sen_basic_details():
         row.name_first = hn.first
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix
+        gender = scraper_utils.get_legislator_gender(hn.first, hn.last)
+        if type(gender) != str:
+            if hn.first == 'Mobina':
+                gender = 'F'
+            if hn.first == 'Yuen':
+                gender = 'M'
+            if hn.first == 'Mohamed-Iqbal':
+                gender = 'M'
+        else:
+            gender = gender
+        row.gender = gender
 
         # Source url
         source_url = f"{sen_base_url}{tds[0].a.get('href')}"
@@ -390,6 +403,7 @@ def get_sen_fine_details():
         sen_df.at[i, 'occupation'] = wiki_data['occupation']
         sen_df.at[i, 'years_active'] = wiki_data['years_active']
         sen_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
+        sen_df.at[i, 'wiki_url'] = wiki_url
 
 
 def senator_scrape():
@@ -417,7 +431,7 @@ if __name__ == '__main__':
 
     # Coalesce dataframes
     result = pd.concat([mp_df, sen_df])
-
+    
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
         scraper_utils.write_data(result.to_dict('records'))
