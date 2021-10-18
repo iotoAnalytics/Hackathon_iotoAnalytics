@@ -393,7 +393,7 @@ class Persistence:
                     f'An exception occurred creating {table}:\n{e}')
                 cur.connection.rollback()
 
-            insert_legislator_query = sql.SQL("""
+            insert_legislation_query = sql.SQL("""
                 INSERT INTO {table}
                 VALUES (
                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
@@ -452,7 +452,7 @@ class Persistence:
                        row.source_topic, row.topic, row.country_id, row.country)
 
                 try:
-                    cur.execute(insert_legislator_query, tup)
+                    cur.execute(insert_legislation_query, tup)
 
                 except Exception as e:
                     print(
@@ -568,7 +568,7 @@ class Persistence:
                         source_id = excluded.source_id,
                         most_recent_term_id = excluded.most_recent_term_id,
                         years_active = excluded.years_active,
-                        seniority = excluded.seniority
+                        seniority = excluded.seniority,
                         gender = excluded.gender,
                         wiki_url = excluded.wiki_url,
                         is_active = excluded.is_active;
