@@ -129,12 +129,12 @@ class Main_Functions:
         mla_df = mla_df.drop(columns = columns_not_on_main_site)
     
         wiki_df = pd.DataFrame(wiki_data)[
-            ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+            ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']
         ]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                             how='left',
-                            on=['name_first', 'name_last'])
+                            on=['wiki_url', 'name_last'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -209,6 +209,10 @@ class MLA_Site_Scraper:
         if riding == '':
             potential_containers_for_electoral_district = self.main_container.findAll('strong')
             riding = self.__find_electoral_district(potential_containers_for_electoral_district)
+
+        # Website is stupid and didn't format this for Jane yet
+        if riding == '' and self.row.name_full == 'Jane Weyallon Armstrong':
+            riding = "Monfwi"
         self.row.riding = riding.strip()
     
     def __find_electoral_district(self, list_of_containers):
@@ -442,7 +446,7 @@ class MLA_Site_Scraper:
             district = tr.findAll("td")[1].text
             name_td = tr.findAll("td")[0]
             name = name_td.text
-            if self.row.riding == district.strip() or (self.row.name_last in name.strip() and self.row.name_first in name.strip()):
+            if self.row.riding == district.strip() and self.row.name_last in name.strip():
                 self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
                 return
         print(f'wiki_link not found for: {self.row.name_full}')

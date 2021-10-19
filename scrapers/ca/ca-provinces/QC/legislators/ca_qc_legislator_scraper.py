@@ -62,7 +62,13 @@ def collect_leg_data(myurl):
     name = (img[12]["alt"])
     hn = HumanName(name)
     row.name_full = hn.full_name
-    row.name_last = hn.last
+    # Names are not correct on the candidate images... hardcode fix here but should make more robust later
+    if row.name_full == 'Carlos J Leitao':
+        row.name_last = 'Leitão'
+    elif row.name_full == 'Simon Jolin-Barette':
+        row.name_last = "Barrette"
+    else:
+        row.name_last = hn.last
     row.name_first = hn.first
     row.name_middle = hn.middle
     row.name_suffix = hn.suffix
@@ -76,7 +82,7 @@ def collect_leg_data(myurl):
     personal_info = page_soup.find("div", {"class": "enteteFicheDepute"})
     personal_info = personal_info.findAll("li")
     riding = personal_info[0].text
-    row.riding = riding.split("for ")[1]
+    row.riding = riding.split("for ")[1].replace('’', '\'')
     row.party = personal_info[1].text.strip()
 
     row.committees = []
@@ -243,7 +249,7 @@ def collect_leg_data(myurl):
         district = tds[3].text
         name_td = tds[1]
         name = name_td.text
-        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+        if row.riding.lower() == district.lower().strip() and row.name_last.lower() in name.strip().lower():
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
             bio = get_biography_from_wiki(row.wiki_url)
             try:
@@ -284,7 +290,7 @@ def get_wiki_people(repLink):
         try:
             info = person.findAll("td")
 
-            biolink = "https://en.wikipedia.org/" + \
+            biolink = "https://en.wikipedia.org" + \
                 (info[1].span.span.span.a["href"])
 
             bio_lnks.append(biolink)
@@ -321,10 +327,10 @@ if __name__ == '__main__':
     wiki_df = pd.DataFrame(wiki_data)
 
     wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation', 'years_active']]
+        ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
     # print(wikidf)
     big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url"])
 
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})

@@ -100,12 +100,12 @@ def configure_data(mla_data, wiki_data, committee_data):
     mla_df = mla_df.drop(columns = columns_not_on_main_site)
   
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+        ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']
     ]
 
     mla_wiki_df = pd.merge(mla_df, wiki_df, 
                            how='left',
-                           on=['name_first', 'name_last'])
+                           on=['wiki_url', 'name_last'])
     mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
     mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
     mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -361,11 +361,11 @@ class ScraperForMLAs:
         table = page_soup.find("table", {"class": "wikitable sortable"})
         table = table.findAll("tr")[1:]
 
-        legislator_name = self.row.name_first + ' ' + self.row.name_last
         for tr in table:
             td = tr.findAll("td")[1]
             name = td.text
-            if legislator_name == str(name).strip():
+            district = tr.findAll("td")[3].text
+            if self.row.riding == district.strip() and self.row.name_last in name.strip():
                 self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
                 break
 

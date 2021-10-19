@@ -18,21 +18,30 @@ import numpy as np
 
 BASE_GOV_WEBSITE = 'https://www.gnb.ca'
 GOV_SITE_WITH_LINK_TO_MLAS = BASE_GOV_WEBSITE + '/legis/index-e.asp'
+
 MLA_CONTACT_BASE_URL = 'https://www2.gnb.ca/content/gnb/en/contacts'
 MLA_REPORT_URL = MLA_CONTACT_BASE_URL + '/MLAReport.html'
-THREADS_FOR_POOL = 12
+
+COMMITTEES_BASE_URL = 'https://www1.gnb.ca/legis/committees/'
+COMMITTEES_MAIN_URL = COMMITTEES_BASE_URL + 'comm-index-e.asp'
+
 WIKI_BASE_URL = 'https://en.wikipedia.org'
 WIKI_URL = WIKI_BASE_URL + '/wiki/Legislative_Assembly_of_New_Brunswick'
+
+THREADS_FOR_POOL = 12
+
+COMMITTEES = []
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NB', 'ca_nb_legislators')
 
 pd.set_option('display.max_rows', None)
 pd.set_option('display.max_columns', None)
 
-COLUMNS_NOT_ON_MAIN_SITE = ["years_active", "birthday", "occupation", "education", "wiki_url"]
+COLUMNS_NOT_ON_MAIN_SITE = ["years_active", "birthday", "occupation", "education"]
 
 def program_driver():
     utils = Utils()
+
     mla_biography_links_by_district_id = utils.get_mla_bio_links()
     mla_contact_info_links = utils.get_mla_contacts_link()
     legislators = []
@@ -52,8 +61,6 @@ def program_driver():
     complete_data_set = utils.configure_data(mla_data, wiki_data)
     print("Writing to database...")
     scraper_utils.write_data(complete_data_set)
-
-    # TODO make committee class and get committee information
     
 class Legislator:
     def __init__(self, name_and_party: str, contact_info_url, bio_url, district, email):
@@ -77,6 +84,8 @@ class Legislator:
         self.row.addresses = self.__get_addresses()
         self.row.email = self.email.strip()
         self.row.gender = self.__get_legislator_gender()
+        self.row.wiki_url = self.__get_wiki_url()
+        self.row.committees = self.__get_committee_data()
 
     def __get_source_id(self):
         source_id = self.contact_info_url.split('renderer.')[1]
@@ -141,6 +150,64 @@ class Legislator:
         bio = bio_container.text
 
         return scraper_utils.get_legislator_gender(self.row.name_first, self.row.name_last, bio)
+
+    def __get_wiki_url(self):
+        page_soup = Utils().get_page_as_soup(WIKI_URL)
+        table = page_soup.find("table", {"class": "wikitable sortable"}).find('tbody')
+        trs = table.findAll("tr")[1:]
+        for tr in trs:
+            name_td = tr.findAll("td")[1]
+            name = name_td.text
+            district = tr.findAll("td")[3].text
+            
+            if "Vacant" in name:
+                continue
+
+            if self.row.riding == district.strip() and self.row.name_last in name.strip():
+                return WIKI_BASE_URL + name_td.a["href"]
+
+    def __get_committee_data(self):
+        committees = []
+        for committee in COMMITTEES:
+            membership = committee.get_committee_member_bio_urls()
+            try:
+                role = membership[self.bio_url]
+                committees.append({
+                    "role": role,
+                    "committee": committee.get_committee_name()
+                })
+            except:
+                pass
+        return committees
+
+class Committee:
+    def __init__(self, url, name):
+        self.url = url
+        self.committee_name = name
+
+        self.page_soup = Utils().get_page_as_soup(url)
+        self.members_bio_urls = self.__find_bio_urls()
+
+    def get_committee_name(self):
+        return self.committee_name
+
+    def get_committee_member_bio_urls(self):
+        return self.members_bio_urls
+
+    def __find_bio_urls(self):
+        bio_urls = {}
+        div = self.page_soup.find('div', {'class':'grid_6 alpha'})
+        member_divs = div.find_all(self.__is_div_and_has_a_tag)
+        for div in member_divs:
+            if len(div.find_all("br")) == 2:
+                role = div.find_all("br")[-1].nextSibling.strip()
+            else:
+                role = "member"
+            bio_urls[div.a["href"]] = role
+        return bio_urls
+
+    def __is_div_and_has_a_tag(self, tag):
+        return tag.a is not None and tag.name == 'div' and tag.has_attr('class')
 
 class Utils:
     def get_page_as_soup(self, url):
@@ -221,6 +288,22 @@ class Utils:
                     print(f"Error finding link for region {district}")
         return urls
 
+    def get_committees_urls_and_names(self):
+        page_soup = self.get_page_as_soup(COMMITTEES_MAIN_URL)
+        div = page_soup.find("div", {'id':'committees-menu'})
+        relevant_uls = div.find_all('ul')[:-1]
+        lis = []
+        for ul in relevant_uls:
+            lis.extend(ul.find_all('li'))
+
+        urls = []
+        for li in lis:
+            urls.append({
+                "url": COMMITTEES_BASE_URL + li.a["href"],
+                "committee_name": li.text.strip()
+            })
+        return urls
+
     def get_data_from_all_iterable(self, function, iterable):
         data = []
         with Pool(THREADS_FOR_POOL) as pool:
@@ -237,19 +320,22 @@ class Utils:
         mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
 
         wiki_df = pd.DataFrame(wiki_data)[[
-            "name_last", "name_first", "birthday", "years_active", "wiki_url", "occupation", "education"
+            "name_last", "birthday", "years_active", "wiki_url", "occupation", "education"
         ]]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                             how='left',
-                            on=['name_first', 'name_last'])
+                            on=['wiki_url', 'name_last'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
         mla_wiki_df['years_active'] = mla_wiki_df['years_active'].replace({np.nan: None})
-        mla_wiki_df['wiki_url'] = mla_wiki_df['wiki_url'].replace({np.nan: None})
 
         return mla_wiki_df.to_dict('records')
+
+committees_urls_and_names = Utils().get_committees_urls_and_names()
+for url_and_name in committees_urls_and_names:
+    COMMITTEES.append(Committee(url_and_name.get('url'), url_and_name.get('committee_name')))
 
 if __name__ == '__main__':
     time_before_running = time.time()
