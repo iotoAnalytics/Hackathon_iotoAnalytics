@@ -87,7 +87,8 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:3]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
+        
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -105,8 +106,51 @@ def get_mp_basic_details():
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix if hn.suffix else name_suffix
         gender = scraper_utils.get_legislator_gender(hn.first, hn.last)
+        if type(gender) != str:
+            if hn.first == "Shafqat":
+                gender = "M"
+            if hn.first == "Taylor":
+                gender = "O"
+            if hn.first == "Jenica":
+                gender = "F"
+            if hn.first == "Parm":
+                gender = "M"
+            if hn.first == "Yves-François":
+                gender = "M"
+            if hn.first == "Bardish":
+                gender = "F"
+            if hn.first == "Sukh":
+                gender = "M"
+            if hn.first == "Kerry-Lynne":
+                gender = "F"
+            if hn.first == "Rhéal":
+                gender = "M"
+            if hn.first == "Chrystia":
+                gender = "F"
+            if hn.first == "Iqwinder":
+                gender = "M"
+            if hn.first == "Gudie":
+                gender = "F"
+            if hn.first == "Taleeb":
+                gender = "M"
+            if hn.first == "Churence":
+                gender = "M"
+            if hn.first == "Harjit":
+                gender = "M"
+            if hn.first == "Ya'ara":
+                gender = "F"
+            if hn.first == "Rechie":
+                gender = "F"
+            if hn.first == "Tako":
+                gender = "M"
+            if hn.first == "Dominique":
+                gender = "F"
+            if hn.first == "Cathay":
+                gender = "F"
+        else:
+            gender = gender
         row.gender = gender
-
+            
         party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
         row.party = mp_party_switcher[party] if party in mp_party_switcher else party
         row.party_id = scraper_utils.get_party_id(row.party, 'Fed - MP')
@@ -434,7 +478,7 @@ if __name__ == '__main__':
     
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
-        scraper_utils.write_data(result.to_dict('records'))
+        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators_temp')
     else:
         print('Either write to database switch set to false or no data collected. No data written to database.')
 
