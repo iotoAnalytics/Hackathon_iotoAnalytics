@@ -1,3 +1,11 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
+
 import re
 import numpy as np
 from nameparser import HumanName
@@ -8,16 +16,8 @@ import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 from datetime import datetime
-import sys
-import os
-from pathlib import Path
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 prov_abbreviation = 'PE'
 database_table_name = 'ca_pe_legislators'
@@ -65,7 +65,7 @@ def find_mla_wiki(mlalink):
     for person in people[0:]:
         info = person.findAll("td")
         try:
-            biolink = "http://en.wikipedia.org" + (info[1].a["href"])
+            biolink = "https://en.wikipedia.org" + (info[1].a["href"])
             bio_links.append(biolink)
         except Exception:
             pass
@@ -104,7 +104,7 @@ def get_name(bio_container, row):
 
 def get_riding(bio_container, row):
     riding = bio_container.find('div', {'class': 'views-field-field-member-constituency'}).text.strip()
-    row.riding = riding
+    row.riding = riding.replace(' - ', '-')
 
 
 def get_phone_number(bio_container, row):
@@ -222,6 +222,27 @@ def get_committees(bio_container, row):
         pass
     row.committees = committees
 
+def get_wiki_url(row):
+    uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island')
+    page_html = uClient.read()
+    uClient.close()
+
+    wiki_base_url = "https://en.wikipedia.org"
+
+    page_soup = BeautifulSoup(page_html, "html.parser")
+    table = page_soup.findAll("table", {'class': 'wikitable sortable'})[0]
+    table = table.findAll("tr")[1:]
+
+
+    for table_row in table:
+        tds = table_row.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        district = tds[-1].text
+        
+        if row.riding == district.strip() and row.name_last in name.strip():
+            row.wiki_url = wiki_base_url + name_td.a['href']
+            return
 
 def scrape(url):
     row = scraper_utils.initialize_row()
@@ -245,6 +266,7 @@ def scrape(url):
     get_email(bio_container, row)
     get_years_active(bio_container, row)
     get_committees(bio_container, row)
+    get_wiki_url(row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
@@ -274,7 +296,6 @@ if __name__ == '__main__':
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="occupation")
-    leg_df = leg_df.drop(columns='wiki_url')
 
     # getting urls from wikipedia
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
@@ -283,22 +304,23 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+        ['occupation', 'birthday', 'education', 'name_last', 'wiki_url']
+    ]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url", "name_last"])
 
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+#     isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
 
     print('Scraping complete')
-    vacant_index = big_df.index[big_df['wiki_url'] == None].tolist()
-    for index in vacant_index:
-        big_df = big_df.drop(big_df.index[index])
+    # vacant_index = big_df.index[big_df['wiki_url'] == None].tolist()
+    # for index in vacant_index:
+    #     big_df = big_df.drop(big_df.index[index])
 
     big_list_of_dicts = big_df.to_dict('records')
 

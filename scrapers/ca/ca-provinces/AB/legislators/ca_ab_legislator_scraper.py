@@ -97,7 +97,7 @@ def collect_mla_data(link):
     const = page_soup.find("div", {"class": "col-lg-6 my-3 px-3 px-lg-0"})
     const = const.findAll("p")
     riding = const[1].text
-    riding = riding.split("for")[1].strip()
+    riding = riding.split(" for ")[1].strip()
     row.riding = riding
 
     # years active
@@ -229,7 +229,7 @@ def collect_mla_data(link):
         district = tds[3].text
         name_td = tds[1]
         name = name_td.text
-        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+        if row.riding == district.strip() and row.name_last in name.strip():
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
             break
 
@@ -278,10 +278,10 @@ if __name__ == '__main__':
         wiki_data = pool.map(
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']]
+        ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']]
     # print(wikidf)
     big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url", "name_last"])
 
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})

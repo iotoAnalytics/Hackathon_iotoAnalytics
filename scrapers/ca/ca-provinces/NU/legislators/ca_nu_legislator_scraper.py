@@ -187,12 +187,12 @@ class MainFunctions:
         mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
     
         wiki_df = pd.DataFrame(wiki_data)[
-            ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+            ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']
         ]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                                how='left',
-                               on=['name_first', 'name_last'])
+                               on=['wiki_url', 'name_last'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -457,7 +457,7 @@ class MLASiteScraper:
             name = name_td.text
 
             district = tr.findAll("td")[0].text
-            if self.row.riding == district.strip() or (self.row.name_last in str(name).strip() and self.row.name_first in str(name).strip()):
+            if self.row.riding == district.strip() and self.row.name_last in str(name).strip():
                 self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
                 return
         print(f'wiki_link not found for: {name}')

@@ -2,6 +2,11 @@
 import sys
 import os
 from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
+
 import re
 import numpy as np
 from nameparser import HumanName
@@ -13,11 +18,6 @@ from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
 
 prov_abbreviation = 'NS'
 database_table_name = 'ca_ns_legislators'
@@ -116,6 +116,7 @@ def get_party(bio_container, row):
 
 def get_name(bio_container, row):
     name_full = bio_container.find('div', {'class': 'views-field-field-last-name'}).text.strip()
+    name_full = name_full.replace('Honourable ', '')
     hn = HumanName(name_full)
     row.name_full = name_full
     row.name_last = hn.last
@@ -241,6 +242,27 @@ def get_committees(bio_container, row, name):
         pass
     row.committees = committees
 
+def get_wiki_url(row):
+    wiki_base_url = "https://en.wikipedia.org"
+    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
+    uClient = uReq(wiki_base_url + get_current_general_assembly_link(wiki_general_assembly_link))
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "html.parser")
+    table = page_soup.findAll("table", {'class': 'wikitable'})[0]
+    table = table.findAll("tr")[1:]
+    
+
+    for table_row in table:
+        tds = table_row.findAll("td")
+        name_td = tds[2]
+        name = name_td.text
+        district = tds[1].text
+        
+        if row.riding == district.strip() and row.name_last in name.strip():
+            row.wiki_url = wiki_base_url + name_td.a['href']
+            break
 
 def scrape(url):
     print(url)
@@ -264,6 +286,7 @@ def scrape(url):
     get_email(bio_container, row)
     get_years_active(bio_container, row)
     get_committees(bio_container, row, name)
+    get_wiki_url(row)
 
     row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio_container.text)
     row.role = "Member of the Legislative Assembly"
@@ -296,7 +319,7 @@ if __name__ == '__main__':
         leg_df = leg_df.drop(columns="birthday")
         leg_df = leg_df.drop(columns="education")
         leg_df = leg_df.drop(columns="occupation")
-        leg_df = leg_df.drop(columns="wiki_url")
+        leg_df = leg_df.drop(columns="name_first")
     except:
         pass
 
@@ -308,17 +331,17 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+        ['occupation', 'birthday', 'education', 'name_first' 'name_last', 'wiki_url']]
 
     wiki_index = wiki_df.index[wiki_df['name_first'] == ''].tolist()
     for index in wiki_index:
         wiki_df = wiki_df.drop(wiki_df.index[index])
 
-    leg_df.to_csv('C:/Users/kasuk/Desktop/leg_df.csv')
-    wiki_df.to_csv('C:/Users/kasuk/Desktop/wiki_df.csv')
+    # leg_df.to_csv('C:/Users/kasuk/Desktop/leg_df.csv')
+    # wiki_df.to_csv('C:/Users/kasuk/Desktop/wiki_df.csv')
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=['name_first', "name_last"])
+                      on=["wiki_url", "name_last"])
 
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
