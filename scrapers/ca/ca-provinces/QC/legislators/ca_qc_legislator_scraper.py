@@ -63,7 +63,7 @@ def collect_leg_data(myurl):
     hn = HumanName(name)
     row.name_full = hn.full_name
     # Names are not correct on the candidate images... hardcode fix here but should make more robust later
-    if row.name_full == 'Carlos J. Leitao':
+    if row.name_full == 'Carlos J Leitao':
         row.name_last = 'Leitão'
     elif row.name_full == 'Simon Jolin-Barette':
         row.name_last = "Barrette"
@@ -290,7 +290,7 @@ def get_wiki_people(repLink):
         try:
             info = person.findAll("td")
 
-            biolink = "https://en.wikipedia.org/" + \
+            biolink = "https://en.wikipedia.org" + \
                 (info[1].span.span.span.a["href"])
 
             bio_lnks.append(biolink)
