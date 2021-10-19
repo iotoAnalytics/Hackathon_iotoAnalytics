@@ -360,7 +360,7 @@ def scrape(url):
 
     gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
     if not gender:
-        gender = 'F'
+        gender = 'O'
     row.gender = gender
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -408,6 +408,7 @@ if __name__ == '__main__':
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
 
     final_df = get_areas_served(big_df)
 

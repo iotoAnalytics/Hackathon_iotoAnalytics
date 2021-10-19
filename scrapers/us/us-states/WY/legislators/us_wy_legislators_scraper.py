@@ -172,13 +172,14 @@ def get_contact_info(browser, row):
             number = phone[1]
             number = number.replace('(', '')
             number = number.replace(')', '')
-            number = number.replace('', '-')
+            number = number.replace(' ', '-')
             location = phone[0].split(':')[1].strip()
             phone_detail = {"office": location, "number": number}
+            print(phone_detail)
             phone_numbers.append(phone_detail)
         if 'Address' in item:
             address = item.split(':')[1].strip()
-            address = {'office': 'Mailing',
+            address = {'location': 'Mailing',
                        'address': address}
             addresses.append(address)
         if 'E-Mail' in item:
@@ -260,7 +261,10 @@ def get_bio(browser, row):
     time.sleep(5)
     bio_detail = browser.find_element_by_xpath('/html/body/div/div/div[2]/section/div/div[2]/div[3]/div/div/div[1]')
     detail = bio_detail.text
-    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, detail)
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, detail)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     get_occupation(detail, row)
     get_years_of_service(detail, row)
 
@@ -321,10 +325,10 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
-    # data = [scrape(url) for url in urls]
+    data = [scrape(url) for url in urls]
 
-    with Pool(processes=6) as pool:
-        data = pool.map(scrape, urls)
+    # with Pool(processes=6) as pool:
+    #     data = pool.map(scrape, urls)
 
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
@@ -336,11 +340,14 @@ if __name__ == '__main__':
     wikipage_senate = "https://en.wikipedia.org/wiki/Wyoming_Senate"
 
     all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    print(all_wiki_links)
 
-    with Pool() as pool:
+    with Pool(processes=4) as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
         ['birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+
+    print(wiki_df)
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
