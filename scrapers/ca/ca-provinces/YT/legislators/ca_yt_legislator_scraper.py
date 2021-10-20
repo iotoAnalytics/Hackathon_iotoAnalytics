@@ -19,6 +19,7 @@ import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from unidecode import unidecode
 
 BASE_URL = 'https://yukonassembly.ca'
 MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -100,12 +101,12 @@ def configure_data(mla_data, wiki_data, committee_data):
     mla_df = mla_df.drop(columns = columns_not_on_main_site)
   
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+        ['birthday', 'education', 'wiki_url', 'occupation']
     ]
 
     mla_wiki_df = pd.merge(mla_df, wiki_df, 
                            how='left',
-                           on=['name_first', 'name_last'])
+                           on=['wiki_url'])
     mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
     mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
     mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -361,11 +362,11 @@ class ScraperForMLAs:
         table = page_soup.find("table", {"class": "wikitable sortable"})
         table = table.findAll("tr")[1:]
 
-        legislator_name = self.row.name_first + ' ' + self.row.name_last
         for tr in table:
             td = tr.findAll("td")[1]
             name = td.text
-            if legislator_name == str(name).strip():
+            district = tr.findAll("td")[3].text
+            if unidecode(self.row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(self.row.name_last.lower()) in unidecode(name.strip().lower()):
                 self.row.wiki_url = 'https://en.wikipedia.org' + td.a['href']
                 break
 

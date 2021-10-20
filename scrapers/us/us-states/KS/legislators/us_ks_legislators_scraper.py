@@ -13,6 +13,9 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 import time
 from io import StringIO
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
@@ -158,18 +161,19 @@ def get_name_and_role(main_div, row):
 
 def get_phone_numbers(capitol_office, home, business, row):
     phone_numbers = []
-
-    number = capitol_office.text.split("Phone: ")[1].strip()
-    phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', number)[0]
-    phone_info = {'office': 'capitol office',
-                  'number': phone_number}
-    phone_numbers.append(phone_info)
-
+    try:
+        number = capitol_office.text.split("Phone: ")[1].strip()
+        phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', number)[0]
+        phone_info = {'office': 'capitol office',
+                      'number': phone_number.replace(' ', '-')}
+        phone_numbers.append(phone_info)
+    except:
+        pass
     try:
         numbers = home.text.split("Phone: ")[1].strip()
         phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
         phone_info = {'office': 'home',
-                      'number': phone_number}
+                      'number': phone_number.replace(' ', '-')}
         phone_numbers.append(phone_info)
     except Exception:
         pass
@@ -178,7 +182,7 @@ def get_phone_numbers(capitol_office, home, business, row):
         numbers = business.text.split("Phone: ")[1].strip()
         phone_number = re.findall(r'[0-9]{3}[-, ][0-9]{3}[-, ][0-9]{4}', numbers)[0]
         phone_info = {'office': 'business',
-                      'number': phone_number}
+                      'number': phone_number.replace(' ', '-')}
         phone_numbers.append(phone_info)
     except Exception:
         pass
@@ -193,10 +197,19 @@ def get_email(capitol_office, row):
 
 def get_address(capitol_office, row):
     addresses = []
-    room_number = capitol_office.text.split("Room: ")[1].strip()
-    room_number = room_number[:room_number.index('\n')]
-    address = {'office': 'capitol office',
-               'address': room_number + ' - 300 SW 10th St. - Topeka, Kansas 66612'}
+    try:
+        room_number = capitol_office.text.split("Room: ")[1].strip()
+        room_number = room_number[:room_number.index('\n')]
+    except:
+        pass
+
+    try:
+        address = {'location': 'capitol office',
+               'address': str(room_number) + ' - 300 SW 10th St. - Topeka, Kansas 66612'}
+    except Exception as e:
+        address = {'location': 'capitol office',
+                   'address': '300 SW 10th St. - Topeka, Kansas 66612'}
+
     addresses.append(address)
     row.addresses = addresses
 
@@ -345,6 +358,10 @@ def scrape(url):
     get_years_active(contact_sidebar, row)
     get_committees(main_div, row)
 
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -360,12 +377,15 @@ if __name__ == '__main__':
     print('URLs Collected.')
 
     print('Scraping data...')
-
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
+    leg_df = leg_df.drop(columns="wiki_url")
+
+
 
     # getting urls from wikipedia
     wiki_rep_link = 'https://en.wikipedia.org/wiki/Kansas_House_of_Representatives'
@@ -380,7 +400,7 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last']]
+        ['birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])
@@ -388,6 +408,7 @@ if __name__ == '__main__':
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
 
     final_df = get_areas_served(big_df)
 

@@ -18,13 +18,15 @@ import time
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-PATH = "../../../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
+PATH = "../../../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
 browser = webdriver.Chrome(PATH)
 
 state_abbreviation = 'WY'
@@ -54,9 +56,12 @@ def get_urls():
     items = browser.find_elements_by_tag_name('tr')
 
     for tr in items[2:]:
-        td = tr.find_elements_by_tag_name('td')[1]
-        link = td.find_element_by_tag_name('a').get_attribute('href')
-        urls.append(link)
+        try:
+            td = tr.find_elements_by_tag_name('td')[1]
+            link = td.find_element_by_tag_name('a').get_attribute('href')
+            urls.append(link)
+        except:
+            pass
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -68,9 +73,12 @@ def get_urls():
     items = browser.find_elements_by_tag_name('tr')
 
     for tr in items[2:]:
-        td = tr.find_elements_by_tag_name('td')[1]
-        link = td.find_element_by_tag_name('a').get_attribute('href')
-        urls.append(link)
+        try:
+            td = tr.find_elements_by_tag_name('td')[1]
+            link = td.find_element_by_tag_name('a').get_attribute('href')
+            urls.append(link)
+        except:
+            pass
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -164,13 +172,14 @@ def get_contact_info(browser, row):
             number = phone[1]
             number = number.replace('(', '')
             number = number.replace(')', '')
-            number = number.replace('', '-')
+            number = number.replace(' ', '-')
             location = phone[0].split(':')[1].strip()
             phone_detail = {"office": location, "number": number}
+            print(phone_detail)
             phone_numbers.append(phone_detail)
         if 'Address' in item:
             address = item.split(':')[1].strip()
-            address = {'office': 'Mailing',
+            address = {'location': 'Mailing',
                        'address': address}
             addresses.append(address)
         if 'E-Mail' in item:
@@ -252,6 +261,10 @@ def get_bio(browser, row):
     time.sleep(5)
     bio_detail = browser.find_element_by_xpath('/html/body/div/div/div[2]/section/div/div[2]/div[3]/div/div/div[1]')
     detail = bio_detail.text
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, detail)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     get_occupation(detail, row)
     get_years_of_service(detail, row)
 
@@ -312,25 +325,29 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
-    # data = [scrape(url) for url in urls]
+    data = [scrape(url) for url in urls]
 
-    with Pool(processes=6) as pool:
-        data = pool.map(scrape, urls)
+    # with Pool(processes=6) as pool:
+    #     data = pool.map(scrape, urls)
 
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
+    leg_df = leg_df.drop(columns="wiki_url")
 
     # getting urls from wikipedia
     wikipage_reps = "https://en.wikipedia.org/wiki/Wyoming_House_of_Representatives"
     wikipage_senate = "https://en.wikipedia.org/wiki/Wyoming_Senate"
 
     all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    print(all_wiki_links)
 
-    with Pool() as pool:
+    with Pool(processes=4) as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last']]
+        ['birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+
+    print(wiki_df)
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_first", "name_last"])

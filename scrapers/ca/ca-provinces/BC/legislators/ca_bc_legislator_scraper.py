@@ -20,7 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from nameparser import HumanName
 import pandas as pd
-import unidecode
+from unidecode import unidecode 
 import numpy as np
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
@@ -78,15 +78,7 @@ def scrape(url):
     row.source_url = url
     # scrape legislators' bio pages
     url_broken = url.split("/")
-    row.name_full = url_broken[len(url_broken) - 1].replace("-", ", ")
     row.most_recent_term_id = url_broken[len(url_broken) - 2]
-
-    hn = HumanName(row.name_full)
-    row.name_last = hn.last
-
-    row.name_first = hn.first
-    row.name_suffix = hn.suffix
-    row.name_middle = hn.middle
 
     driver.get(url)
 
@@ -98,6 +90,13 @@ def scrape(url):
 
     mlist = ministertitle.text.split('\n')
 
+    name_container = page_soup.find('h2', {'class':'BCLASS-pagetitle'})
+    row.name_full = name_container.text.replace('MLA: ', '').split(',')[0].strip()
+    hn = HumanName(row.name_full)
+    row.name_last = hn.last
+    row.name_first = hn.first
+    row.name_suffix = hn.suffix
+    row.name_middle = hn.middle
     row.party = ""
     row.years_active = []
     row.riding = ""
@@ -255,7 +254,7 @@ def scrape(url):
         name = name_td.text
         district = tds[-1].text
         
-        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = wiki_base_url + name_td.a['href']
             break
 
@@ -316,11 +315,11 @@ if __name__ == '__main__':
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
 
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'education', 'birthday', 'name_first', 'name_last']]
+        ['occupation', 'education', 'birthday', 'wiki_url']]
     # print(wiki_df)
 
     mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
-                              "name_first", "name_last"])
+                              "wiki_url"])
 
     mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
     mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})

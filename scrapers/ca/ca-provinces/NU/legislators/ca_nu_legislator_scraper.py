@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup as soup
 from bs4 import NavigableString
 from multiprocessing import Pool
 from nameparser import HumanName
+from unidecode import unidecode
 import pandas as pd
 import numpy as np
 
@@ -187,12 +188,12 @@ class MainFunctions:
         mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
     
         wiki_df = pd.DataFrame(wiki_data)[
-            ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+            ['birthday', 'education', 'wiki_url', 'occupation']
         ]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                                how='left',
-                               on=['name_first', 'name_last'])
+                               on=['wiki_url'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -457,7 +458,7 @@ class MLASiteScraper:
             name = name_td.text
 
             district = tr.findAll("td")[0].text
-            if self.row.riding == district.strip() or (self.row.name_last in str(name).strip() and self.row.name_first in str(name).strip()):
+            if unidecode(self.row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(self.row.name_last.lower()) in unidecode(name.strip().lower()):
                 self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
                 return
         print(f'wiki_link not found for: {name}')

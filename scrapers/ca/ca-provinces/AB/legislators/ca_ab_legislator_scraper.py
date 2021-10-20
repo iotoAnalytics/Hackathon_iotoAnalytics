@@ -7,7 +7,7 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 import numpy as np
-import unidecode
+from unidecode import unidecode
 import pandas as pd
 from nameparser import HumanName
 
@@ -97,7 +97,7 @@ def collect_mla_data(link):
     const = page_soup.find("div", {"class": "col-lg-6 my-3 px-3 px-lg-0"})
     const = const.findAll("p")
     riding = const[1].text
-    riding = riding.split("for")[1].strip()
+    riding = riding.split(" for ")[1].strip()
     row.riding = riding
 
     # years active
@@ -229,7 +229,7 @@ def collect_mla_data(link):
         district = tds[3].text
         name_td = tds[1]
         name = name_td.text
-        if row.riding == district.strip() or (row.name_last in name.strip() and row.name_first in name.strip()):
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
             break
 
@@ -278,14 +278,13 @@ if __name__ == '__main__':
         wiki_data = pool.map(
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']]
+        ['birthday', 'education', 'wiki_url', 'occupation']]
     # print(wikidf)
     big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url"])
 
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
 
     big_list_of_dicts = big_df.to_dict('records')
