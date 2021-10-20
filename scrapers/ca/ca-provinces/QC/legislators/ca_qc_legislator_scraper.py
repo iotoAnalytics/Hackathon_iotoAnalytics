@@ -23,6 +23,7 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
+from unidecode import unidecode
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
@@ -249,7 +250,7 @@ def collect_leg_data(myurl):
         district = tds[3].text
         name_td = tds[1]
         name = name_td.text
-        if row.riding.lower() == district.lower().strip() and row.name_last.lower() in name.strip().lower():
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
             bio = get_biography_from_wiki(row.wiki_url)
             try:
