@@ -20,7 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from nameparser import HumanName
 import pandas as pd
-import unidecode
+from unidecode import unidecode 
 import numpy as np
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
@@ -254,7 +254,7 @@ def scrape(url):
         name = name_td.text
         district = tds[-1].text
         
-        if row.riding == district.strip() and row.name_last in name.strip():
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = wiki_base_url + name_td.a['href']
             break
 
@@ -315,11 +315,11 @@ if __name__ == '__main__':
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
 
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'education', 'birthday', 'wiki_url', 'name_last']]
+        ['occupation', 'education', 'birthday', 'wiki_url']]
     # print(wiki_df)
 
     mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
-                              "wiki_url", "name_last"])
+                              "wiki_url"])
 
     mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
     mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
