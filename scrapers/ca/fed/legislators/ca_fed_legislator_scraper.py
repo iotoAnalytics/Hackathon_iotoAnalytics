@@ -43,7 +43,7 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 scrape_mps = True
 scrape_senators = True
-write_results_to_database = False
+write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
 sen_base_url = 'https://sencanada.ca'
@@ -529,7 +529,7 @@ if __name__ == '__main__':
     
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
-        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators_temp')
+        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators')
     else:
         print('Either write to database switch set to false or no data collected. No data written to database.')
 
