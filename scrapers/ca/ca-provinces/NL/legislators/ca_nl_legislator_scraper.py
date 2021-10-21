@@ -213,6 +213,8 @@ def _set_name(row, text):
 
     row.name_first = human_name.first
     row.name_last = human_name.last
+    if row.name_last == 'Conway Ottenheimer':
+        row.name_last = 'Conway-Ottenheimer'
     row.name_middle = human_name.middle
     row.name_suffix = human_name.suffix
     row.name_full = human_name.full_name
