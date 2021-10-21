@@ -168,7 +168,47 @@ def get_mp_basic_details():
 
         mp_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)
-    mp_df = pd.DataFrame(mp_data)
+    mp_build_df = pd.DataFrame(mp_data)
+
+    wiki_base_url = "https://en.wikipedia.org"
+    page = scraper_utils.request("https://en.wikipedia.org/wiki/List_of_House_members_of_the_44th_Parliament_of_Canada")
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    wiki_page = soup.find('div', {'class': 'vector-body'})
+    prov_tables = wiki_page.find_all('tbody')
+    anchor_lst = []
+    for i in range(2, 13):
+        anchors = prov_tables[i].find_all('a')
+        for j in range(0,len(anchors)):
+            if "Party" in anchors[j]['href']:
+                continue
+            elif "cite_note" in anchors[j]['href']:
+                continue
+            elif "Independent_politician" in anchors[j]['href']:
+                continue
+            elif "Bloc_Qu" in anchors[j]['href']:
+                continue
+            else:
+                anchor_lst.append(anchors[j])
+    mp_href_lst = anchor_lst[::2] # removes district links
+    riding_href_lst = anchor_lst[1::2]
+    wiki_url_lst = []
+    riding_lst = []
+    for i in range(0,len(mp_href_lst)):
+        wiki_url = wiki_base_url + mp_href_lst[i]['href']
+        wiki_url_lst.append(wiki_url)
+        riding = riding_href_lst[i].text
+        if "South Shore—St. Margaret's" in riding:
+            riding = "South Shore—St. Margarets"
+        elif "Ville-Marie—Le Sud-Ouest—Île-des-Sœurs" in riding:
+            riding = "Ville-Marie—Le Sud-Ouest—Île-des-Soeurs"
+        else:
+            riding = riding
+        riding_lst.append(riding)
+    wiki_df = pd.DataFrame({"wiki_url": wiki_url_lst, "riding": riding_lst})
+
+    mp_df = mp_build_df.merge(wiki_df, on='riding', how='outer', suffixes=('_y',''))
+    mp_df.drop(mp_df.filter(regex='_y$').columns.tolist(),axis=1, inplace=True)
 
 
 def get_mp_contact_details(contact_url):
