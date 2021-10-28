@@ -107,10 +107,12 @@ def get_most_recent_term_id(soup, row):
 
 
 def find_party_and_district(soup, row):
-    party_block = soup.find('span', {'class': 'subTitle'}).text
-    party = party_block.split(' -')[0].strip()
-    row.party = party
-
+    try:
+        party_block = soup.find('span', {'class': 'subTitle'}).text
+        party = party_block.split(' -')[0].strip()
+        row.party = party
+    except:
+        pass
     try:
         row.party_id = scraper_utils.get_party_id(party)
     except Exception:
@@ -161,33 +163,57 @@ def get_phone_numbers(soup, row):
         for contact in contacts:
             location = contact.find('h4').text.strip()
             number = contact.find('div', {'class': 'col-xs-12 col-lg-9'}).text.strip()
+            number = number.replace("(", "").replace(")", "").replace(" ", "-")
+            try:
+                number = number.split("-x")[0]
+            except:
+                pass
+            number = number.strip()
             phone_number = {"office": location, "number": number}
             phone_numbers.append(phone_number)
+            print(phone_numbers)
+        row.phone_numbers = phone_numbers
     except Exception:
         pass
-    row.phone_numbers = phone_numbers
 
 
 def get_email(soup, row):
-    email = soup.find('address', {'class': 'repEmail'}).text.strip()
-    row.email = email
+    try:
+        email = soup.find('address', {'class': 'repEmail'}).text.strip()
+        row.email = email
+    except:
+        pass
 
 
 def get_address(soup, row):
     addresses = []
-    contacts = soup.find('div', {'class': 'col-xs-12 col-sm-5'})
-    address = contacts.find('a').text.strip()
-    address = address.replace('  ', '')
-    address = {'office': 'capitol office',
-               'address': address}
-    addresses.append(address)
-    row.addresses = addresses
+    try:
+        contacts = soup.find('div', {'class': 'col-xs-12 col-sm-5'})
+        address = contacts.find('a').text.strip()
+        address = address.replace('  ', '')
+        address = {'location': 'capitol office',
+                   'address': address}
+        addresses.append(address)
+        row.addresses = addresses
+    except:
+        pass
 
 
 def get_biography(url, row):
     bio_url = url + '/Biography'
     page = scraper_utils.request(bio_url)
     soup = BeautifulSoup(page.content, 'lxml')
+    #print(soup.text)
+    try:
+        gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, soup.text)
+    except:
+        try:
+            gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+        except:
+            gender = 'O'
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     get_occupation(soup, row)
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -239,8 +265,71 @@ def get_committees(soup, row):
     row.committees = committees_list
 
 
-def scrape(url):
+def get_wiki_url(row):
 
+    wikipage_reps = "https://ballotpedia.org/Wyoming_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Wyoming_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                if row.party == party and row.name_last in name.strip():
+                    row.wiki_url = name_td.a['href']
+                    break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                if row.party == party.strip() and row.name_last in name.strip():
+                    row.wiki_url = name_td.a['href']
+                    break
+        except Exception as e:
+            print(e)
+            pass
+
+
+def scrape(url):
+    print(url)
     row = scraper_utils.initialize_row()
 
     row.source_url = url
@@ -256,7 +345,7 @@ def scrape(url):
     get_address(soup, row)
     get_biography(url, row)
     get_committees_page(url, row)
-
+    get_wiki_url(row)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -265,7 +354,7 @@ def scrape(url):
 
 
 if __name__ == '__main__':
-    start = time.time()
+
     print(
         f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) since the crawl delay is very large (ie: {crawl_delay} seconds). If you need to abort, press ctrl + c.')
     print('Collecting URLS...')
@@ -306,6 +395,11 @@ if __name__ == '__main__':
     # dropping rows with vacant seat
     vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
     for index in vacant_index:
+        big_df = big_df.drop(big_df.index[index])
+
+    vacant_index = big_df.index[big_df['wiki_url'] == ''].tolist()
+    for index in vacant_index:
+        print(index)
         big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')

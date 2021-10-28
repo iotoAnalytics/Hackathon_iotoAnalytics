@@ -116,9 +116,11 @@ def get_party(bio_container, row):
 
 def get_name(bio_container, row):
     name_full = bio_container.find('div', {'class': 'views-field-field-last-name'}).text.strip()
-    name_full = name_full.replace('Honourable ', '')
+    name_full = name_full.replace('Honourable', '').strip()
+    name_full = name_full.replace('Hon.', '').strip()
     hn = HumanName(name_full)
     row.name_full = name_full
+
     row.name_last = hn.last
     row.name_first = hn.first
     row.name_middle = hn.middle
@@ -242,6 +244,7 @@ def get_committees(bio_container, row, name):
         pass
     row.committees = committees
 
+
 def get_wiki_url(row):
     wiki_base_url = "https://en.wikipedia.org"
     wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/General_Assembly_of_Nova_Scotia'
@@ -252,7 +255,6 @@ def get_wiki_url(row):
     page_soup = BeautifulSoup(page_html, "html.parser")
     table = page_soup.findAll("table", {'class': 'wikitable'})[0]
     table = table.findAll("tr")[1:]
-    
 
     for table_row in table:
         tds = table_row.findAll("td")
@@ -263,6 +265,7 @@ def get_wiki_url(row):
         if row.riding == district.strip() and row.name_last in name.strip():
             row.wiki_url = wiki_base_url + name_td.a['href']
             break
+
 
 def scrape(url):
     print(url)
@@ -314,7 +317,7 @@ if __name__ == '__main__':
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
-    print(leg_df)
+
     try:
         leg_df = leg_df.drop(columns="birthday")
         leg_df = leg_df.drop(columns="education")
@@ -331,14 +334,11 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first' 'name_last', 'wiki_url']]
+        ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
 
     wiki_index = wiki_df.index[wiki_df['name_first'] == ''].tolist()
     for index in wiki_index:
         wiki_df = wiki_df.drop(wiki_df.index[index])
-
-    # leg_df.to_csv('C:/Users/kasuk/Desktop/leg_df.csv')
-    # wiki_df.to_csv('C:/Users/kasuk/Desktop/wiki_df.csv')
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["wiki_url", "name_last"])
