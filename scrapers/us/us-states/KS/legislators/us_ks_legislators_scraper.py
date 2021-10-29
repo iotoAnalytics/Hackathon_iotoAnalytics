@@ -328,13 +328,17 @@ def get_wiki_url(row):
                     party = "Democrat"
 
                 try:
-                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
                         row.wiki_url = name_td.a['href']
                         break
                 except:
-                    if row.party == party and row.name_last in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
+                    pass
         except Exception as e:
             print(e)
     if row.role == "Senator":
@@ -359,9 +363,18 @@ def get_wiki_url(row):
                 if party == "Democratic":
                     party = "Democrat"
 
-                if row.party == party.strip() and row.name_last in name.strip():
-                    row.wiki_url = name_td.a['href']
-                    break
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
         except Exception as e:
             print(e)
             pass
@@ -426,7 +439,7 @@ if __name__ == '__main__':
     print('URLs Collected.')
 
     print('Scraping data...')
-    #data = scrape('http://www.kslegislature.org/li/b2021_22/members/rep_sawyer_tom_1/')
+    #data = scrape('http://www.kslegislature.org/li/b2021_22/members/rep_smith_adam_1/')
     data = [scrape(url) for url in urls]
 
     # with Pool() as pool:
@@ -468,6 +481,7 @@ if __name__ == '__main__':
         print(index)
         print(big_df.index[index])
         big_df = big_df.drop(big_df.index[index])
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
 
     big_list_of_dicts = big_df.to_dict('records')
 

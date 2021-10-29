@@ -10,6 +10,7 @@ from multiprocessing import Pool
 from nameparser import HumanName as hn
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
+from unidecode import unidecode
 
 import pandas as pd
 import re
@@ -163,7 +164,7 @@ class Legislator:
             if "Vacant" in name:
                 continue
 
-            if self.row.riding == district.strip() and self.row.name_last in name.strip():
+            if unidecode(self.row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(self.row.name_last.lower()) in unidecode(name.strip().lower()):
                 return WIKI_BASE_URL + name_td.a["href"]
 
     def __get_committee_data(self):
@@ -320,12 +321,12 @@ class Utils:
         mla_df = mla_df.drop(columns = COLUMNS_NOT_ON_MAIN_SITE)
 
         wiki_df = pd.DataFrame(wiki_data)[[
-            "name_last", "birthday", "years_active", "wiki_url", "occupation", "education"
+            "birthday", "years_active", "wiki_url", "occupation", "education"
         ]]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                             how='left',
-                            on=['wiki_url', 'name_last'])
+                            on=['wiki_url'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})

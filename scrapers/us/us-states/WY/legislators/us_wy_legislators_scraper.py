@@ -325,9 +325,18 @@ def get_wiki_url(row):
                 if party == "Democratic":
                     party = "Democrat"
 
-                if row.party == party and row.name_last in name.strip():
-                    row.wiki_url = name_td.a['href']
-                    break
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
         except Exception as e:
             print(e)
     if row.role == "Senator":
@@ -353,9 +362,18 @@ def get_wiki_url(row):
                 if party == "Democratic":
                     party = "Democrat"
 
-                if row.party == party.strip() and row.name_last in name.strip():
-                    row.wiki_url = name_td.a['href']
-                    break
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
         except Exception as e:
             print(e)
             pass

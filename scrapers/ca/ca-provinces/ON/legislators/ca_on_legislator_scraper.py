@@ -12,7 +12,7 @@ import numpy as np
 import re
 import datetime
 from multiprocessing import Pool
-import unidecode
+from unidecode import unidecode
 import datefinder
 import requests
 from request_url import UrlRequest
@@ -181,7 +181,7 @@ def scrape(diction):
         name_td = tr.findAll("td")[1]
         name = name_td.text
         district = tr.findAll("td")[3].text
-        if row.riding == district.strip() and row.name_last in name.strip():
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
             bio = get_biography_from_wiki(row.wiki_url)
             row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
@@ -220,11 +220,11 @@ if __name__ == '__main__':
         wiki_data = pool.map(
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']
+        ['birthday', 'education', 'wiki_url', 'occupation']
     ]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["wiki_url", "name_last"])
+                      on=["wiki_url"])
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})

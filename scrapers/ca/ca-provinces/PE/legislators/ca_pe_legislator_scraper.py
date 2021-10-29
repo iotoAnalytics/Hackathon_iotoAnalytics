@@ -15,6 +15,7 @@ from bs4 import BeautifulSoup
 import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
+from unidecode import unidecode
 from datetime import datetime
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -240,7 +241,7 @@ def get_wiki_url(row):
         name = name_td.text
         district = tds[-1].text
         
-        if row.riding == district.strip() and row.name_last in name.strip():
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
             row.wiki_url = wiki_base_url + name_td.a['href']
             return
 
@@ -304,11 +305,11 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_last', 'wiki_url']
+        ['occupation', 'birthday', 'education', 'wiki_url']
     ]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["wiki_url", "name_last"])
+                      on=["wiki_url"])
 
 #     isna = big_df['education'].isna()
     # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values

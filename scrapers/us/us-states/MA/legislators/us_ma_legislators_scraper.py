@@ -11,6 +11,8 @@ from multiprocessing import Pool
 import pandas as pd
 from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 import time
 
 # Get path to the root directory so we can import necessary modules
@@ -80,17 +82,17 @@ def find_individual_wiki(wiki_page_link):
     uClient.close()
 
     page_soup = BeautifulSoup(page_html, "lxml")
-    tables = page_soup.findAll("tbody")
-    people = tables[2].findAll("tr") + tables[4].findAll("tr")
-    for person in people[1:]:
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
         info = person.findAll("td")
         try:
-            biolink = "https://en.wikipedia.org" + (info[1].a["href"])
+            biolink = info[1].a["href"]
             bio_lnks.append(biolink)
 
         except Exception:
             pass
-
     scraper_utils.crawl_delay(crawl_delay)
     return bio_lnks
 
@@ -171,7 +173,6 @@ def get_phone_numbers(soup, row):
             number = number.strip()
             phone_number = {"office": location, "number": number}
             phone_numbers.append(phone_number)
-            print(phone_numbers)
         row.phone_numbers = phone_numbers
     except Exception:
         pass
@@ -190,7 +191,7 @@ def get_address(soup, row):
     try:
         contacts = soup.find('div', {'class': 'col-xs-12 col-sm-5'})
         address = contacts.find('a').text.strip()
-        address = address.replace('  ', '')
+        address = address.replace('  ', '').replace('\n', '').replace('\r', '')
         address = {'location': 'capitol office',
                    'address': address}
         addresses.append(address)
@@ -267,8 +268,8 @@ def get_committees(soup, row):
 
 def get_wiki_url(row):
 
-    wikipage_reps = "https://ballotpedia.org/Wyoming_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Wyoming_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/Massachusetts_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Massachusetts_State_Senate"
 
     if row.role == "Representative":
         try:
@@ -292,13 +293,22 @@ def get_wiki_url(row):
                 if party == "Democratic":
                     party = "Democrat"
 
-                if row.party == party and row.name_last in name.strip():
-                    row.wiki_url = name_td.a['href']
-                    break
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
         except Exception as e:
             print(e)
-    if row.role == "Senator":
-
+    if "Senat" in row.role:
         try:
             uClient = uReq(wikipage_senate)
             page_html = uClient.read()
@@ -320,9 +330,18 @@ def get_wiki_url(row):
                 if party == "Democratic":
                     party = "Democrat"
 
-                if row.party == party.strip() and row.name_last in name.strip():
-                    row.wiki_url = name_td.a['href']
-                    break
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
         except Exception as e:
             print(e)
             pass
@@ -349,7 +368,7 @@ def scrape(url):
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
-
+    print(row)
     return row
 
 
@@ -362,20 +381,20 @@ if __name__ == '__main__':
     print('URLs Collected.')
 
     print('Scraping data...')
-
+    # data = scrape('https://malegislature.gov/Legislators/Profile/MJM1')
     with Pool() as pool:
         data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
     leg_df = leg_df.drop(columns="years_active")
+    leg_df.drop(leg_df.index[leg_df['email'] == 'firstsuffolkandmiddlesex@masenate.gov'], inplace=True)
 
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Massachusetts_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Massachusetts_State_Senate"
 
-
-    # getting urls from wikipedia
-    wikipage_link = "https://en.wikipedia.org/wiki/2021-2022_Massachusetts_legislature"
-
-    all_wiki_links = find_individual_wiki(wikipage_link)
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
@@ -393,14 +412,25 @@ if __name__ == '__main__':
     big_df.loc[isna, 'years_active'] = pd.Series([[]] * isna.sum()).values
 
     # dropping rows with vacant seat
-    vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
-    for index in vacant_index:
-        big_df = big_df.drop(big_df.index[index])
+    try:
+        vacant_index = big_df.index[big_df['party'] == "Unenrolled"].tolist()
+        for index in vacant_index:
+            big_df = big_df.drop(big_df.index[index])
+    except:
+        pass
+    try:
+        email_index = big_df.index[big_df['email'] == 'firstsuffolkandmiddlesex@masenate.gov'].tolist()
+        for index in email_index:
+            big_df = big_df.drop(big_df.index[index])
+    except:
+        pass
+    try:
+        name_index = big_df.index[big_df['name_full'] == ''].tolist()
+        for index in name_index:
+            big_df = big_df.drop(big_df.index[index])
+    except:
+        pass
 
-    vacant_index = big_df.index[big_df['wiki_url'] == ''].tolist()
-    for index in vacant_index:
-        print(index)
-        big_df = big_df.drop(big_df.index[index])
 
     print('Scraping complete')
 

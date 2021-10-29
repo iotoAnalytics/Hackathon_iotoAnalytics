@@ -17,6 +17,7 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from time import sleep
 from tqdm import tqdm
+from unidecode import unidecode
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -75,6 +76,7 @@ def scrape(url):
         _set_phone_numbers(row, fields[3].text)
         _set_email(row, fields[4].text)
         _set_gender(row, fields[0])
+        _set_wiki_url(row)
 
         data.append(row)
 
@@ -211,6 +213,8 @@ def _set_name(row, text):
 
     row.name_first = human_name.first
     row.name_last = human_name.last
+    if row.name_last == 'Conway Ottenheimer':
+        row.name_last = 'Conway-Ottenheimer'
     row.name_middle = human_name.middle
     row.name_suffix = human_name.suffix
     row.name_full = human_name.full_name
@@ -245,7 +249,7 @@ def _set_email(row, text):
     row.email = text
     
 def _set_riding(row, text):
-    row.riding = text
+    row.riding = text.replace(' - ', '-')
 
 def _format_roles(text):
     # Format given text into role and name
@@ -268,7 +272,7 @@ def _get_committee_list(soup, committee_name):
         # Currently, there are no special roles listed for committees
         committee_member = {
             'name': member_data[0].strip(),
-            'riding': member_data[1].strip(),
+            'riding': member_data[1].strip().replace(' - ', '-'),
             'role': 'member',
             'committee': committee_name,
         }
@@ -300,23 +304,38 @@ def _set_gender(row, td_element):
         bio = None
     row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
 
-def _get_legislator_row(legislator_data, name_full):
-    name_first = name_full.split(' ')[0]
-    name_last = name_full.split(' ')[1]
-    if name_full == 'Helen Conway-Ottenheimer':
-        name_last = 'Conway Ottenheimer'
+def _set_wiki_url(row):
+    wiki_url_path = '/wiki/Newfoundland_and_Labrador_House_of_Assembly'
+    wiki_url = WIKI_URL + wiki_url_path
+
+    soup = _create_soup(wiki_url, 'html.parser')
+
+    infobox = soup.find('table', {'class':'infobox vcard'})
+    current_assembly_url = WIKI_URL + infobox.find_all('tr')[1].td.a['href']
+    page_soup = _create_soup(current_assembly_url, 'html.parser')
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    trs = table.findAll("tr")[1:]
+    for tr in trs:
+        name_td = tr.findAll("td")[1]
+        name = name_td.text
+        district = tr.findAll("td")[3].text
+        
+        if "Vacant" in name:
+            continue
+
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = WIKI_URL + name_td.a["href"]    
+
+def _get_legislator_row(legislator_data, wiki_url):
     for row in legislator_data:
-        if name_first == row.name_first and name_last == row.name_last:
+        if wiki_url == row.wiki_url:
             return row
 
     return None
 
 def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
-    full_name = wiki_data['name_first'] + ' ' + wiki_data['name_last']
-    if full_name == 'Jim Dinn':
-        full_name = 'James Dinn'
-
-    legislator_row = _get_legislator_row(legislator_data, full_name)
+    legislator_row = _get_legislator_row(legislator_data, wiki_data['wiki_url'])
 
     if not legislator_row:
         return
@@ -331,8 +350,6 @@ def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, e
         legislator_row.years_active = wiki_data['years_active']
     if most_recent_term_id:
         legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
-    if wiki_url:
-        legislator_row.wiki_url = wiki_data['wiki_url']
 
 def main():
     print('NEWFOUNDLAND AND LABRADOR!')

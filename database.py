@@ -681,47 +681,13 @@ class Persistence:
                 print(f'An exception occurred executing a query:\n{e}')
                 cur.connection.rollback()
 
-            insert_legislator_query = sql.SQL("""
-                    WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
-                    INSERT INTO {table}
-                    VALUES (
-                        (SELECT leg_id FROM leg_id), %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
-                    ON CONFLICT (source_url) DO UPDATE SET
-                        date_collected = excluded.date_collected,
-                        name_full = excluded.name_full,
-                        name_last = excluded.name_last,
-                        name_first = excluded.name_first,
-                        name_middle = excluded.name_middle,
-                        name_suffix = excluded.name_suffix,
-                        riding = excluded.riding,
-                        province_territory = excluded.province_territory,
-                        province_territory_id = excluded.province_territory_id,
-                        party = excluded.party,
-                        party_id = excluded.party_id,
-                        role = excluded.role,
-                        committees = excluded.committees,
-                        phone_numbers = excluded.phone_numbers,
-                        addresses = excluded.addresses,
-                        email = excluded.email,
-                        birthday = excluded.birthday,
-                        military_experience = excluded.military_experience,
-                        occupation = excluded.occupation,
-                        education = excluded.education,
-                        source_id = excluded.source_id,
-                        most_recent_term_id = excluded.most_recent_term_id,
-                        years_active = excluded.years_active,
-                        offices_roles_as_mp = excluded.offices_roles_as_mp,
-                        parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
-                        region = excluded.region,
-                        gender = excluded.gender,
-                        wiki_url = excluded.wiki_url,
-                        seniority = excluded.seniority,
-                        is_active = excluded.is_active;
-                    """).format(table=sql.Identifier(table))
-
             date_collected = datetime.now()
+
+            select_all_from_ca_legislators = f'SELECT * FROM ca_legislators'
+        
+            cur.execute(select_all_from_ca_legislators)
+            ca_legislators = cur.fetchall()
+            ca_legislators = pd.DataFrame(ca_legislators)
 
             # This is used to convert dictionaries to rows. Need to test it out!
             wiki_url_for_legislators_being_updated = []
@@ -764,6 +730,69 @@ class Persistence:
                         item.gender,
                         item.wiki_url
                     )
+
+                    wiki_url_exists = False
+                    if item.wiki_url in ca_legislators['wiki_url'].values:
+                        wiki_url_exists = True
+
+                    if wiki_url_exists:
+                        gov_id = ca_legislators.loc[ca_legislators['wiki_url'] == item.wiki_url]['goverlytics_id'].values[0]
+                        insert_query = sql.SQL('''
+                            INSERT INTO {table}
+                            VALUES (
+                                {gov_id}, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                        ''').format(
+                            table=sql.Identifier(table),
+                            gov_id=sql.Literal(int(gov_id))
+                        )
+                    else:
+                        insert_query = sql.SQL('''
+                            WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+                            INSERT INTO {table}
+                            VALUES (
+                                (SELECT leg_id FROM leg_id), 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                        ''').format(
+                            table=sql.Identifier(table)
+                        )
+
+                    insert_legislator_query = sql.SQL("""
+                            {insert_query}
+                            ON CONFLICT (source_url) DO UPDATE SET
+                                date_collected = excluded.date_collected,
+                                name_full = excluded.name_full,
+                                name_last = excluded.name_last,
+                                name_first = excluded.name_first,
+                                name_middle = excluded.name_middle,
+                                name_suffix = excluded.name_suffix,
+                                riding = excluded.riding,
+                                province_territory = excluded.province_territory,
+                                province_territory_id = excluded.province_territory_id,
+                                party = excluded.party,
+                                party_id = excluded.party_id,
+                                role = excluded.role,
+                                committees = excluded.committees,
+                                phone_numbers = excluded.phone_numbers,
+                                addresses = excluded.addresses,
+                                email = excluded.email,
+                                birthday = excluded.birthday,
+                                military_experience = excluded.military_experience,
+                                occupation = excluded.occupation,
+                                education = excluded.education,
+                                source_id = excluded.source_id,
+                                most_recent_term_id = excluded.most_recent_term_id,
+                                years_active = excluded.years_active,
+                                offices_roles_as_mp = excluded.offices_roles_as_mp,
+                                parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
+                                region = excluded.region,
+                                gender = excluded.gender,
+                                wiki_url = excluded.wiki_url,
+                                seniority = excluded.seniority,
+                                is_active = excluded.is_active;
+                            """).format(insert_query=insert_query)
 
                     cur.execute(insert_legislator_query, tup)
                     wiki_url_for_legislators_being_updated.append(item.wiki_url)
@@ -828,46 +857,13 @@ class Persistence:
                 print(f'An exception occurred executing a query:\n{e}')
                 cur.connection.rollback()
 
-            insert_legislator_query = sql.SQL("""
-                    
-                    WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
-                    INSERT INTO {table}
-                    VALUES (
-                        (SELECT leg_id FROM leg_id), %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s, %s, true)
-                    ON CONFLICT (source_url) DO UPDATE SET
-                        date_collected = excluded.date_collected,
-                        name_full = excluded.name_full,
-                        name_last = excluded.name_last,
-                        name_first = excluded.name_first,
-                        name_middle = excluded.name_middle,
-                        name_suffix = excluded.name_suffix,
-                        riding = excluded.riding,
-                        province_territory = excluded.province_territory,
-                        province_territory_id = excluded.province_territory_id,
-                        party = excluded.party,
-                        party_id = excluded.party_id,
-                        role = excluded.role,
-                        committees = excluded.committees,
-                        phone_numbers = excluded.phone_numbers,
-                        addresses = excluded.addresses,
-                        email = excluded.email,
-                        region = excluded.region,
-                        birthday = excluded.birthday,
-                        military_experience = excluded.military_experience,
-                        occupation = excluded.occupation,
-                        education = excluded.education,
-                        source_id = excluded.source_id,
-                        most_recent_term_id = excluded.most_recent_term_id,
-                        years_active = excluded.years_active,
-                        seniority = excluded.seniority,
-                        gender = excluded.gender,
-                        wiki_url = excluded.wiki_url,
-                        is_active = excluded.is_active;
-                    """).format(table=sql.Identifier(table))
-
             date_collected = datetime.now()
+
+            select_all_from_ca_legislators = f'SELECT * FROM ca_legislators'
+        
+            cur.execute(select_all_from_ca_legislators)
+            ca_legislators = cur.fetchall()
+            ca_legislators = pd.DataFrame(ca_legislators)
 
             # This is used to convert dictionaries to rows. Need to test it out!
             wiki_url_for_legislators_being_updated = []
@@ -907,6 +903,67 @@ class Persistence:
                         item.region,
                         item.gender,
                         item.wiki_url)
+
+                    wiki_url_exists = False
+                    if item.wiki_url in ca_legislators['wiki_url'].values:
+                        wiki_url_exists = True
+
+                    if wiki_url_exists:
+                        gov_id = ca_legislators.loc[ca_legislators['wiki_url'] == item.wiki_url]['goverlytics_id'].values[0]
+                        insert_query = sql.SQL('''
+                            INSERT INTO {table}
+                            VALUES (
+                                {gov_id}, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                        ''').format(
+                            table=sql.Identifier(table),
+                            gov_id=sql.Literal(int(gov_id))
+                        )
+                    else:
+                        insert_query = sql.SQL('''
+                            WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+                            INSERT INTO {table}
+                            VALUES (
+                                (SELECT leg_id FROM leg_id), 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                        ''').format(
+                            table=sql.Identifier(table)
+                        )
+
+                    insert_legislator_query = sql.SQL("""
+                            {insert_query}
+                            ON CONFLICT (wiki_url) DO UPDATE SET
+                                date_collected = excluded.date_collected,
+                                name_full = excluded.name_full,
+                                name_last = excluded.name_last,
+                                name_first = excluded.name_first,
+                                name_middle = excluded.name_middle,
+                                name_suffix = excluded.name_suffix,
+                                riding = excluded.riding,
+                                province_territory = excluded.province_territory,
+                                province_territory_id = excluded.province_territory_id,
+                                party = excluded.party,
+                                party_id = excluded.party_id,
+                                role = excluded.role,
+                                committees = excluded.committees,
+                                phone_numbers = excluded.phone_numbers,
+                                addresses = excluded.addresses,
+                                email = excluded.email,
+                                region = excluded.region,
+                                birthday = excluded.birthday,
+                                military_experience = excluded.military_experience,
+                                occupation = excluded.occupation,
+                                education = excluded.education,
+                                source_id = excluded.source_id,
+                                most_recent_term_id = excluded.most_recent_term_id,
+                                years_active = excluded.years_active,
+                                seniority = excluded.seniority,
+                                gender = excluded.gender,
+                                source_url = excluded.source_url,
+                                is_active = excluded.is_active;
+                            """).format(insert_query=insert_query)
 
                     cur.execute(insert_legislator_query, tup)
                     wiki_url_for_legislators_being_updated.append(item.wiki_url)

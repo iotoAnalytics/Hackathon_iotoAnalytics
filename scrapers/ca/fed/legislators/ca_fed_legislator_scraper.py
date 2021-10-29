@@ -168,7 +168,47 @@ def get_mp_basic_details():
 
         mp_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)
-    mp_df = pd.DataFrame(mp_data)
+    mp_build_df = pd.DataFrame(mp_data)
+
+    wiki_base_url = "https://en.wikipedia.org"
+    page = scraper_utils.request("https://en.wikipedia.org/wiki/List_of_House_members_of_the_44th_Parliament_of_Canada")
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    wiki_page = soup.find('div', {'class': 'vector-body'})
+    prov_tables = wiki_page.find_all('tbody')
+    anchor_lst = []
+    for i in range(2, 13):
+        anchors = prov_tables[i].find_all('a')
+        for j in range(0,len(anchors)):
+            if "Party" in anchors[j]['href']:
+                continue
+            elif "cite_note" in anchors[j]['href']:
+                continue
+            elif "Independent_politician" in anchors[j]['href']:
+                continue
+            elif "Bloc_Qu" in anchors[j]['href']:
+                continue
+            else:
+                anchor_lst.append(anchors[j])
+    mp_href_lst = anchor_lst[::2] # removes district links
+    riding_href_lst = anchor_lst[1::2]
+    wiki_url_lst = []
+    riding_lst = []
+    for i in range(0,len(mp_href_lst)):
+        wiki_url = wiki_base_url + mp_href_lst[i]['href']
+        wiki_url_lst.append(wiki_url)
+        riding = riding_href_lst[i].text
+        if "South Shore—St. Margaret's" in riding:
+            riding = "South Shore—St. Margarets"
+        elif "Ville-Marie—Le Sud-Ouest—Île-des-Sœurs" in riding:
+            riding = "Ville-Marie—Le Sud-Ouest—Île-des-Soeurs"
+        else:
+            riding = riding
+        riding_lst.append(riding)
+    wiki_df = pd.DataFrame({"wiki_url": wiki_url_lst, "riding": riding_lst})
+
+    mp_df = mp_build_df.merge(wiki_df, on='riding', how='outer', suffixes=('_y',''))
+    mp_df.drop(mp_df.filter(regex='_y$').columns.tolist(),axis=1, inplace=True)
 
 
 def get_mp_contact_details(contact_url):
@@ -291,7 +331,7 @@ def get_mp_fine_details():
         mp_df.at[i, 'committees'] = roles['committees']
         mp_df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
 
-        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_url = mp_df['wiki_url'].iloc[i]
         wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
         mp_df.at[i, 'birthday'] = wiki_data['birthday']
         mp_df.at[i, 'education'] = wiki_data['education']
@@ -299,7 +339,6 @@ def get_mp_fine_details():
         mp_df.at[i, 'years_active'] = wiki_data['years_active']
         mp_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
         mp_df.at[i, 'wiki_url'] = wiki_url
-
 def mp_scrape():
     """
     Entry point for scraper. Begins by collecting details directly from House of Commons
@@ -354,7 +393,7 @@ def get_sen_basic_details():
         else:
             gender = gender
         row.gender = gender
-
+        
         # Source url
         source_url = f"{sen_base_url}{tds[0].a.get('href')}"
         row.source_url = source_url
@@ -379,6 +418,18 @@ def get_sen_basic_details():
         sen_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)
     sen_df = pd.DataFrame(sen_data)
+
+    wiki_base_url = "https://en.wikipedia.org"
+    page = scraper_utils.request("https://en.wikipedia.org/wiki/List_of_current_senators_of_Canada")
+    soup = BeautifulSoup(page.content, 'html.parser')
+    wiki_page = soup.find('div', {'class': 'vector-body'})
+    wiki_table = wiki_page.find_all('tbody')
+    tds = wiki_table[0].select("td:nth-of-type(2)")
+    wiki_url_lst = []
+    for td in tds:
+        anchor = td.find('a')
+        wiki_url_lst.append(wiki_base_url + anchor['href'])
+    sen_df['wiki_url'] = wiki_url_lst
 
 
 def get_individual_sen_page_details(sen_page_url):
@@ -440,7 +491,7 @@ def get_sen_fine_details():
         sen_df.at[i, 'email'] = sen_details['email']
         sen_df.at[i, 'committees'] = sen_details['committees']
 
-        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_url = sen_df['wiki_url'].iloc[i]
         wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
         sen_df.at[i, 'birthday'] = wiki_data['birthday']
         sen_df.at[i, 'education'] = wiki_data['education']
@@ -478,7 +529,7 @@ if __name__ == '__main__':
     
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
-        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators_temp')
+        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators')
     else:
         print('Either write to database switch set to false or no data collected. No data written to database.')
 

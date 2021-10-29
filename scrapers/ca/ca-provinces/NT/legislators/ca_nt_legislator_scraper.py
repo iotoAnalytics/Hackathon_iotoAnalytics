@@ -13,6 +13,7 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup as soup
 from multiprocessing import Pool
 from nameparser import HumanName
+from unidecode import unidecode
 import pandas as pd
 import numpy as np
 
@@ -118,7 +119,7 @@ class Main_Functions:
         table = page_soup.find("table", {"class": "wikitable sortable"})
         table = table.findAll("tr")[1:]
         for tr in table:
-            td = tr.findAll("td")[1]
+            td = tr.findAll("td")[0]
             url = 'https://en.wikipedia.org' + (td.a["href"])
 
             wiki_urls.append(url)
@@ -129,12 +130,12 @@ class Main_Functions:
         mla_df = mla_df.drop(columns = columns_not_on_main_site)
     
         wiki_df = pd.DataFrame(wiki_data)[
-            ['birthday', 'education', 'wiki_url', 'name_last', 'occupation']
+            ['birthday', 'education', 'wiki_url', 'occupation']
         ]
 
         mla_wiki_df = pd.merge(mla_df, wiki_df, 
                             how='left',
-                            on=['wiki_url', 'name_last'])
+                            on=['wiki_url'])
         mla_wiki_df['birthday'] = mla_wiki_df['birthday'].replace({np.nan: None})
         mla_wiki_df['occupation'] = mla_wiki_df['occupation'].replace({np.nan: None})
         mla_wiki_df['education'] = mla_wiki_df['education'].replace({np.nan: None})
@@ -446,7 +447,7 @@ class MLA_Site_Scraper:
             district = tr.findAll("td")[1].text
             name_td = tr.findAll("td")[0]
             name = name_td.text
-            if self.row.riding == district.strip() and self.row.name_last in name.strip():
+            if unidecode(self.row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(self.row.name_last.lower()) in unidecode(name.strip().lower()):
                 self.row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
                 return
         print(f'wiki_link not found for: {self.row.name_full}')
