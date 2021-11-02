@@ -286,29 +286,40 @@ def get_wiki_url(row):
                 name_td = tds[1]
                 name = name_td.text
                 name = name.replace('\n', '')
-
                 party = tds[2].text
                 party = party.strip()
-
+                party = party.replace('\n', '')
                 if party == "Democratic":
                     party = "Democrat"
 
-
                 try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
                         row.wiki_url = name_td.a['href']
                         break
                 except:
                     pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
         except Exception as e:
             print(e)
-    if "Senat" in row.role:
+    if row.role == "Senator":
+
         try:
             uClient = uReq(wikipage_senate)
             page_html = uClient.read()
@@ -323,7 +334,6 @@ def get_wiki_url(row):
                 name_td = tds[1]
                 name = name_td.text
                 name = name.replace('\n', '')
-
                 party = tds[2].text
                 party = party.strip()
 
@@ -331,17 +341,29 @@ def get_wiki_url(row):
                     party = "Democrat"
 
                 try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
                         row.wiki_url = name_td.a['href']
                         break
                 except:
                     pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip().split()[-1]:
+                        row.wiki_url = name_td.a['href']
+                        break
         except Exception as e:
             print(e)
             pass
@@ -397,7 +419,7 @@ if __name__ == '__main__':
     all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
     with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
         ['birthday', 'years_active', 'education', 'name_first', 'name_last']]
 
@@ -427,6 +449,12 @@ if __name__ == '__main__':
     try:
         name_index = big_df.index[big_df['name_full'] == ''].tolist()
         for index in name_index:
+            big_df = big_df.drop(big_df.index[index])
+    except:
+        pass
+    try:
+        url_index = big_df.index[big_df['wiki_url'] == ''].tolist()
+        for index in url_index:
             big_df = big_df.drop(big_df.index[index])
     except:
         pass
