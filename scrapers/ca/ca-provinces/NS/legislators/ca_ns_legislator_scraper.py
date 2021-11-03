@@ -334,12 +334,8 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wiki)
-    wiki_df = pd.DataFrame(wiki_data)[
-<<<<<<< HEAD
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
-=======
-        ['occupation', 'birthday', 'education', 'name_first', 'wiki_url']]
->>>>>>> 4b03dcdfcff152e76ccde755dce2b0fa0893d7f0
+    wiki_df = pd.DataFrame(wiki_data)[['occupation', 'birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
+
 
     wiki_index = wiki_df.index[wiki_df['name_first'] == ''].tolist()
     for index in wiki_index:
