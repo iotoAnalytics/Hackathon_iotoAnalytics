@@ -21,6 +21,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import ssl
+import unidecode
 ssl._create_default_https_context = ssl._create_unverified_context
 
 WASHINGTON_STATE_LEGISLATURE_BASE_URL = 'https://leg.wa.gov/'
@@ -292,10 +293,14 @@ class MainScraper:
         return address.replace('\n', ', ')
 
     def __get_email(self, row):
-        name_to_look_for = row.name_full
-        data_row = every_email_as_df.loc[every_email_as_df['Name'].str.contains(name_to_look_for)]
-        email = data_row['Email'].values[0]
-        return email.split()[1].strip()
+        '''
+        Update Nov 3, 2021: Email's from website seemed to be taken down.
+        Upon inspection, looks like emails are just a combination of name_first and name_last
+        '''
+        name_first = unidecode.unidecode(row.name_first.lower().replace(' ', ''))
+        name_last = unidecode.unidecode(row.name_last.lower().replace(' ', ''))
+
+        return name_first + '.' + name_last + '@leg.wa.gov'
 
     def __get_numbers(self, offices_web_element):
         numbers = []
@@ -540,7 +545,7 @@ class WikiScraper:
         return data
 
 #global variable
-every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
+# every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
 every_county_as_df = PreprogramFunctions(ALL_MEMBER_COUNTY_LIST_URL).get_county_as_dataframe()
 
 if __name__ == '__main__':
