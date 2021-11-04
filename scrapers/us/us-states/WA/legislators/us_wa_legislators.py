@@ -76,7 +76,7 @@ def configure_data(mla_data, wiki_data):
 
     big_df = pd.merge(mla_df, wiki_df, 
                            how='left',
-                           on=['name_last', 'wiki_url'])
+                           on=['wiki_url'])
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
