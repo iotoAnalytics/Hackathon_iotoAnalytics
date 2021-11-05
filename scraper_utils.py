@@ -1,46 +1,33 @@
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
-# import datetime
-from datetime import date, datetime
-import json
-import numpy as np
-import torch
-import boto3
-import tempfile
-from transformers import BertTokenizer
-from torch.utils.data import TensorDataset
-from transformers import BertForSequenceClassification
-from torch.utils.data import DataLoader, SequentialSampler
-import functools
-
-import sys
-import pandas as pd
-from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
-from database import Database, CursorFromConnectionFromPool, Persistence
-from dataclasses import dataclass, field
-from typing import List
-from rows import *
-import copy
 # import atexit
-import utils
-from urllib.request import urlopen as uReq
+import boto3
+import copy
+import exceptions
+import functools
+import io
+import numpy as np
+import pandas as pd
+import pdfplumber
+import random
 import re
 import requests
-import unidecode
+import sys
+import tempfile
+import time
+import torch
+
 from bs4 import BeautifulSoup as soup
+from database import Database, CursorFromConnectionFromPool, Persistence
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
 from nameparser import HumanName
+from pandas.core.computation.ops import UndefinedVariableError
+from rows import *
+from transformers import BertTokenizer, BertForSequenceClassification
+from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
+from urllib.request import urlopen as uReq
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
-from bs4 import BeautifulSoup
-import time
-import random
-from collections import namedtuple
-import exceptions
-from pandas.core.computation.ops import UndefinedVariableError
-import numpy
-import pdfplumber
-import io
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -764,7 +751,7 @@ class LegislationScraperUtils(ScraperUtils):
                     'Can only search columns of type str/text when using legislators_search_startswith!')
             except Exception as e:
                 print('An exception occurred: {e}')
-        if isinstance(val, numpy.int64):
+        if isinstance(val, np.int64):
             val = int(val)
         return val
 
