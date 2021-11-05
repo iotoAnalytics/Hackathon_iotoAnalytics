@@ -763,7 +763,7 @@ class Persistence:
 
                     insert_legislator_query = sql.SQL("""
                             {insert_query}
-                            ON CONFLICT (source_url) DO UPDATE SET
+                            ON CONFLICT (wiki_url) DO UPDATE SET
                                 date_collected = excluded.date_collected,
                                 name_full = excluded.name_full,
                                 name_last = excluded.name_last,
@@ -791,7 +791,7 @@ class Persistence:
                                 parl_assoc_interparl_groups = excluded.parl_assoc_interparl_groups,
                                 region = excluded.region,
                                 gender = excluded.gender,
-                                wiki_url = excluded.wiki_url,
+                                source_url = excluded.source_url,
                                 seniority = excluded.seniority,
                                 is_active = excluded.is_active
                                 years_of_service = excluded.years_of_service;

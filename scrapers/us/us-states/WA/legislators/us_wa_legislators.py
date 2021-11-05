@@ -19,6 +19,10 @@ import pandas as pd
 import numpy as np
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+import ssl
+import unidecode
+ssl._create_default_https_context = ssl._create_unverified_context
 
 WASHINGTON_STATE_LEGISLATURE_BASE_URL = 'https://leg.wa.gov/'
 REPRESENTATIVE_PAGE_URL = WASHINGTON_STATE_LEGISLATURE_BASE_URL + 'house/representatives/Pages/default.aspx'
@@ -28,6 +32,8 @@ ALL_MEMBER_COUNTY_LIST_URL = 'https://app.leg.wa.gov/Rosters/MembersByDistrictAn
 
 WIKI_BASE_URL = 'https://en.wikipedia.org'
 WIKI_URL = WIKI_BASE_URL+ '/wiki/Washington_State_Legislature'
+BALLOTPEDIA_SEN = 'https://ballotpedia.org/Washington_State_Senate'
+BALLOTPEDIA_REP = 'https://ballotpedia.org/Washington_House_of_Representatives'
 
 THREADS_FOR_POOL = 12
 CURRENT_YEAR = datetime.datetime.now().year
@@ -50,8 +56,8 @@ def program_driver():
     mla_data = MainScraper("Representative").get_data()
     mla_data.extend(MainScraper("Senator").get_data())
 
-    all_wiki_links = WikiScraper().scrape_main_wiki_link()
-    wiki_data = WikiScraper().get_data_from_all_links(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    all_wiki_links = WikiScraper().scrape_main_wiki_link(BALLOTPEDIA_REP) + WikiScraper().scrape_main_wiki_link(BALLOTPEDIA_SEN)
+    wiki_data = WikiScraper().get_data_from_all_links(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
 
     print("Configuring data...")
     complete_data_set = configure_data(mla_data, wiki_data)
@@ -65,12 +71,12 @@ def configure_data(mla_data, wiki_data):
     mla_df = mla_df.drop(columns = columns_not_on_main_site)
   
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']
+        ['birthday', 'education', 'name_first', 'name_last', 'occupation', 'wiki_url']
     ]
 
     big_df = pd.merge(mla_df, wiki_df, 
                            how='left',
-                           on=['name_first', 'name_last'])
+                           on=['wiki_url'])
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
@@ -95,7 +101,7 @@ class PreprogramFunctions:
 
     def __extract_emails_table_as_df(self, html):
         html_soup = soup(html, 'html.parser')
-        html_email_table = html_soup.find('table', {'id' : 'membertable'})
+        html_email_table = html_soup.find('table', {'id': 'membertable'})
         table = pd.read_html(str(html_email_table))
         return table[0]
 
@@ -106,7 +112,7 @@ class PreprogramFunctions:
     
     def __extract_county_table_as_df(self, html):
         html_soup = soup(html, 'html.parser')
-        html_email_table = html_soup.find('table', {'id' : 'memberbydistrictandcountytable'})
+        html_email_table = html_soup.find('table', {'id': 'memberbydistrictandcountytable'})
         table = pd.read_html(str(html_email_table))
         return table[0]
 
@@ -124,7 +130,7 @@ class SoupMaker:
 
 class SeleniumDriver:
     def __init__(self):
-        self.driver = webdriver.Chrome('web_drivers/chrome_win_90.0.4430.24/chromedriver.exe', options=options)
+        self.driver = webdriver.Chrome(ChromeDriverManager().install())
         self.driver.switch_to.default_content()  
 
     def start_driver(self, url, crawl_delay):
@@ -198,6 +204,8 @@ class MainScraper:
         self.__set_most_recent_term_id(row)
         self.__set_source_url(row, member_web_element)
         self.__set_committee(row, member_web_element)
+        self.__set_wiki_url(row)
+        self.__set_gender(row)
         return row
 
     def __set_name_data(self, row, web_element):
@@ -285,10 +293,14 @@ class MainScraper:
         return address.replace('\n', ', ')
 
     def __get_email(self, row):
-        name_to_look_for = row.name_full
-        data_row = every_email_as_df.loc[every_email_as_df['Name'].str.contains(name_to_look_for)]
-        email = data_row['Email'].values[0]
-        return email.split()[1].strip()
+        '''
+        Update Nov 3, 2021: Email's from website seemed to be taken down.
+        Upon inspection, looks like emails are just a combination of name_first and name_last
+        '''
+        name_first = unidecode.unidecode(row.name_first.lower().replace(' ', ''))
+        name_last = unidecode.unidecode(row.name_last.lower().replace(' ', ''))
+
+        return name_first + '.' + name_last + '@leg.wa.gov'
 
     def __get_numbers(self, offices_web_element):
         numbers = []
@@ -411,19 +423,119 @@ class MainScraper:
         roles = role.split(',')
         return roles
 
+    def __set_wiki_url(self, row):
+
+        if row.role == "Representative":
+            try:
+                page_soup = SoupMaker().get_page_as_soup(BALLOTPEDIA_REP, wiki_crawl_delay)
+                tables = page_soup.findAll("table")
+                rows = tables[3].findAll("tr")
+
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+                    party = party.replace('\n', '')
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    try:
+                        if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                            row.wiki_url = name_td.a['href']
+                            break
+                    except:
+                        pass
+                    if not row.wiki_url:
+                        for person in rows[1:]:
+                            tds = person.findAll("td")
+                            name_td = tds[1]
+                            name = name_td.text
+                            name = name.replace('\n', '')
+                            party = tds[2].text
+                            party = party.strip()
+
+                            if party == "Democratic":
+                                party = "Democrat"
+
+                            if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                                row.wiki_url = name_td.a['href']
+                                break
+                            elif row.party == party and row.name_last in name.strip().split()[-1]:
+                                row.wiki_url = name_td.a['href']
+                                break
+            except Exception as e:
+                print(e)
+        if row.role == "Senator":
+
+            try:
+                page_soup = SoupMaker().get_page_as_soup(BALLOTPEDIA_SEN, wiki_crawl_delay)
+                tables = page_soup.findAll("table")
+                rows = tables[3].findAll("tr")
+
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+                    party = party.replace('\n', '')
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    try:
+                        if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                            row.wiki_url = name_td.a['href']
+                            break
+                    except:
+                        pass
+                    if not row.wiki_url:
+                        for person in rows[1:]:
+                            tds = person.findAll("td")
+                            name_td = tds[1]
+                            name = name_td.text
+                            name = name.replace('\n', '')
+                            party = tds[2].text
+                            party = party.strip()
+
+                            if party == "Democratic":
+                                party = "Democrat"
+
+                            if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                                row.wiki_url = name_td.a['href']
+                                break
+                            elif row.party == party and row.name_last in name.strip().split()[-1]:
+                                row.wiki_url = name_td.a['href']
+                                break
+            except Exception as e:
+                print(e)
+                pass
+
+    def __set_gender(self, row):
+        gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+        if not gender:
+            gender = 'O'
+        row.gender = gender
+
+
 class WikiScraper:
-    def scrape_main_wiki_link(self):
+    def scrape_main_wiki_link(self, wiki_url):
         wiki_urls = []
-        page_soup = SoupMaker().get_page_as_soup(WIKI_URL, wiki_crawl_delay)
-        table = page_soup.find("table", {"class": "nowraplinks mw-collapsible mw-collapsed navbox-inner"})
-        index_of_member_names = 2
-        table = table.findAll("tr")[index_of_member_names]
-        members = table.findAll('li')
-        for member in members:
-            link = member.a["href"]
-            url = WIKI_BASE_URL + link
-            wiki_urls.append(url)
+        page_soup = SoupMaker().get_page_as_soup(wiki_url, wiki_crawl_delay)
+        tables = page_soup.findAll("table")
+        rows = tables[3].findAll("tr")
+        for member in rows:
+            info = member.findAll("td")
+            try:
+                biolink = info[1].a["href"]
+                wiki_urls.append(biolink)
+            except Exception as e:
+                pass
         return wiki_urls
+
 
     def get_data_from_all_links(self, function, all_links):
         data = []
@@ -433,7 +545,7 @@ class WikiScraper:
         return data
 
 #global variable
-every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
+# every_email_as_df = PreprogramFunctions(ALL_MEMBER_EMAIL_LIST_URL).get_emails_as_dataframe()
 every_county_as_df = PreprogramFunctions(ALL_MEMBER_COUNTY_LIST_URL).get_county_as_dataframe()
 
 if __name__ == '__main__':

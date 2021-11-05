@@ -31,6 +31,8 @@ import gzip
 import numpy as np
 import pickle
 from scraper_utils import USStateLegislatorScraperUtils
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # import html.parser
 
@@ -257,6 +259,132 @@ def get_house_wiki_links(repLink):
         i += 1
 
     return bio_lnks
+
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = soup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Wisconsin_State_Assembly"
+    wikipage_senate = "https://ballotpedia.org/Wisconsin_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = soup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+                party = party.replace('\n', '')
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                        pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = soup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+        except Exception as e:
+            print(e)
+            pass
 
 
 def find_wiki_data(repLink):
@@ -528,9 +656,34 @@ if __name__ == '__main__':
     big_df['source_url'] = big_df['state_url']
     big_df['source_id'] = big_df['state_member_id']
     big_df['seniority'] = 0
-    print(big_df)
+    get_wiki_url(sample_row)
+    print(sample_row.name_first)
+    print(sample_row.name_last)
+    gender = scraper_utils.get_legislator_gender(sample_row.name_first, sample_row.name_last)
+    if not gender:
+        gender = 'O'
+    sample_row.gender = gender
 
-    big_list_of_dicts = big_df.to_dict('records')
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Wisconsin_State_Assembly"
+    wikipage_senate = "https://ballotpedia.org/Wisconsin_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    ballot_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    bigger_df = pd.merge(big_df, ballot_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    isna = bigger_df['education'].isna()
+    bigger_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+    bigger_df['birthday'] = bigger_df['birthday'].replace({np.nan: None})
+    bigger_df['wiki_url'] = bigger_df['wiki_url'].replace({np.nan: None})
+
+    big_list_of_dicts = bigger_df.to_dict('records')
     # print(big_list_of_dicts)
 
     print('Writing data to database...')

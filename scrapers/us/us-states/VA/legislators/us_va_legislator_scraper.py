@@ -25,6 +25,8 @@ import unidecode
 from multiprocessing import Pool
 import datetime
 import re
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 
@@ -667,13 +669,17 @@ def find_wiki_sen_data(repLink):
 
     except:
         pass
+    try:
+        print(years_active)
 
-    info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
-            'education': education, 'occupation': occupation, 'years_active': years_active,
-            'most_recent_term_id': str(years_active[len(years_active) - 1])}
+        info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+                'education': education, 'occupation': occupation, 'years_active': years_active,
+                'most_recent_term_id': str(years_active[-1])}
 
-    # print(info)
-    return info
+        # print(info)
+        return info
+    except:
+        pass
 
 
 if __name__ == '__main__':
