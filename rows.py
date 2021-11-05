@@ -990,6 +990,7 @@ class CALegislatorRow(LegislatorRow):
         self._province_territory = ''
         self._riding = ''
         self._region = ''
+        
 
     @property
     def province_territory_id(self) -> int:
@@ -1313,11 +1314,13 @@ class CAFedLegislatorRow(CALegislatorRow):
     """
     offices_roles_as_mp: List[str]
     parl_assoc_interparl_groups: List[dict]
+    years_of_service: str
 
     def __init__(self):
         super().__init__()
         self._offices_roles_as_mp = []
         self._parl_assoc_interparl_groups = []
+        self._years_of_service = ''
 
     @property
     def offices_roles_as_mp(self) -> List[str]:
@@ -1347,6 +1350,15 @@ class CAFedLegislatorRow(CALegislatorRow):
             if element.get('organization') is None or type(element.get('organization')) != str:
                 raise ValueError("parl_assoc_interparl_groups data must have valid 'organization' information as a str")
         self._parl_assoc_interparl_groups = value
+
+    @property
+    def years_of_service(self) -> str:
+        return self._years_of_service
+    @years_of_service.setter
+    def years_of_service(self, value: str) -> None:
+        if type(value) != str:
+            raise TypeError("years_of_service must be a str")
+        self._years_of_service = value
 
 @dataclass
 class LegislatorSponsorTopicRow:
