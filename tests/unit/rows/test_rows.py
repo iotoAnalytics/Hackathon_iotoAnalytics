@@ -59,3 +59,19 @@ class TestRows(unittest.TestCase):
     def test_invalid_principal_sponsor(self):
         with self.assertRaises(ValueError):
             self.ca_legislation_row.principal_sponsor = ""
+
+    def test_valid_sponsors(self):
+        self.ca_legislation_row.sponsors = ["john", "david", "beth"]
+        self.assertTrue(all(isinstance(sponsor, str) for sponsor in self.ca_legislation_row.sponsors))
+
+    def test_invalid_sponsors(self):
+        with self.assertRaises(TypeError):
+            self.ca_legislation_row.sponsors = [1, 2, 3]
+
+    def test_valid_sponsor_ids(self):
+        self.ca_legislation_row.sponsor_ids = [1, 2, 3]
+        self.assertTrue(all(isinstance(sponsor_id, int) for sponsor_id in self.ca_legislation_row.sponsor_ids))
+
+    def test_invalid_sponsor_ids(self):
+        with self.assertRaises(TypeError):
+            self.ca_legislation_row.sponsors_id = ["1ad", "2asd", "3asda"]

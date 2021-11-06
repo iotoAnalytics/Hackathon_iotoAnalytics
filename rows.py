@@ -197,8 +197,7 @@ class LegislationRow:
     def principal_sponsor(self, value: str) -> None:
         if type(value) != str:
             raise TypeError("principal_sponsor must be a str")
-        names_split = value.split()
-        if len(names_split) == 0:
+        if len(value) == 0:
             raise ValueError("principal_sponsor cannot be empty")
         self._principal_sponsor = value
 
