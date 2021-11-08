@@ -1,6 +1,7 @@
 # import atexit
 import boto3
 import copy
+import dateutil.parser as dparser
 import exceptions
 import functools
 import io
@@ -924,6 +925,196 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislators(data, table)
+
+    def scrape_ballotpedia_bio(self, link):
+        """
+        Used for getting missing legislator fields from their ballotpedia bios.
+        Useful for getting things like a legislator's birthday or education.
+        Takes in a link to the personal wikipedia page of the legislator
+        """
+        # get available birthday
+        ballotpedia_url = link
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            paragraphs = page_soup.find_all('p')
+            for p in paragraphs:
+                if "born on" in p.text:
+                    birthday_para = p.text
+                    birthday_sentence = birthday_para.split['.'][0]
+                    repBirth = dparser.parse(birthday_sentence, fuzzy=True)
+            # convert to proper data format
+                    b = datetime.strptime(repBirth, "%Y-%m-%d").date()
+
+            birthday = b
+
+        except:
+            # couldn't find birthday in side box
+            birthday = None
+
+        # get years_active,based off years in position
+        years_active = []
+        year_started = ""
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            infobox = page_soup.find("div", {"class": "infobox person"})
+
+            divs = infobox.findAll("div")
+            count = 0
+            for div in divs:
+                if 'Years in position' in div.text:
+                    break
+                count += 1
+            tenure = divs[count+1].text
+            tenure = tenure.replace('\n', '').replace('\t', '')
+            this_year = date.today()
+            this_year = this_year.year
+
+            # creating a list of the years worked based on tenure and current year
+            for i in range(int(tenure)+1):
+                year = this_year - i
+                years_active.append(year)
+            years_active.sort()
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+
+
+        # get education
+        education = []
+        # possible education levels that might show up, feel free to add more
+        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
+                "DDS", "MS", "BS", "MBA", "MS", "MD"]
+
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            infobox = page_soup.find("div", {"class": "infobox person"})
+            divs = infobox.findAll("div", {"class": "widget-row"})
+            paragraphs = page_soup.find_all('p')
+            paragraph = "".join([item.text for item in paragraphs])
+            count = 0
+            for div in divs:
+                if "Education" in div.text:
+                    edu = count + 1
+                if "Personal" in div.text:
+                    personal = count
+                count += 1
+            for i in range(edu, personal):
+                lvl = divs[i].findAll("div")[0].text
+                lvl = lvl.replace("\n", "").replace("\t", "")
+                if "Highschool" in lvl:
+                    continue
+                if "Law" in lvl:
+                    level = "JD"
+                if "Bachelor" in lvl:
+                    if "B.A." in paragraph:
+                        level = "BA"
+                    if "B.S." in paragraph:
+                        level = "BS"
+                school = divs[i].findAll("div")[1].text
+                school = school.replace("\n", "").replace("\t", "")
+                try:
+                    edinfo = {'level': level,
+                            'field': "", 'school': school}
+                    if edinfo not in education:
+                        education.append(edinfo)
+                except:
+                    pass
+
+        except Exception as ex:
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+
+        # get full name
+        # this is necessary as it will be use to merge the resulting dataframe with the rest of your data
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # # #grabs each product
+            head = page_soup.find("h1", {"id": "firstHeading"})
+            name = head.text
+            name = name.split("(")[0].strip()
+            name = name.replace('é', 'é')
+
+        except:
+            name = ""
+        # name = unidecode.unidecode(name)
+
+        hN = HumanName(name)
+
+        # get occupation
+        occupation = []
+
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            infobox = page_soup.find("div", {"class": "infobox person"})
+            divs = infobox.findAll("div", {"class": "widget-row"})
+
+            count = 0
+            for div in divs:
+                if "Personal" in div.text:
+                    break
+                count += 1
+
+            for i in range(count, len(divs)):
+                try:
+                    key = divs[i].findAll("div")[0].text
+                    if "Profession" in key:
+                        occupation = divs[i].findAll("div")[1].text
+                except Exception as e:
+                    print(e)
+
+
+        except Exception as e:
+            # no occupation available
+            pass
+
+        most_recent_term_id = ""
+
+        try:
+            most_recent_term_id = (years_active[len(years_active) - 1])
+
+        except:
+            pass
+
+        info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+                'education': education, 'occupation': occupation, 'years_active': years_active,
+                'most_recent_term_id': str(most_recent_term_id), 'wiki_url': ballotpedia_url}
+
+        """
+            returns dictionary with the following fields if available
+            choose the ones that you weren't able to find from the gov website 
+
+            merge the resulting data with the data you scraped from the gov website, on name_first and name_last
+
+            Note: not all legislators will have a wikipedia page.  
+            This may cause some fields to be 'NaN' after the merge.
+            Replace all NaN fields with "None" or something similar or you may get a type error when uploading to db
+
+        """
+        return info
 
 
 class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):

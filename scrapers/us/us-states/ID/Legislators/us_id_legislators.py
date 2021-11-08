@@ -217,6 +217,7 @@ def get_wiki_url(row):
 def scrape(info):
     
     url = info['url']
+    print(url)
     chamber = info['chamber']
 
     page = scraper_utils.request(url)
@@ -250,9 +251,10 @@ def scrape(info):
             row.party = parties[party]
             row.party_id = scraper_utils.get_party_id(row.party)
 
-            row.source_url = url
+            #row.source_url = url
 
             row.email = a_tag[0].text
+            row.source_url = row.email
             row.district = a_tag[1].text.split(' ')[1]
 
             offset = 0
@@ -392,7 +394,10 @@ if __name__ == '__main__':
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
 
-    # Once we collect the data, we'll write it to the database:
-    scraper_utils.write_data(data)
+    big_list_of_dicts = big_df.to_dict('records')
+    print(big_list_of_dicts)
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
 
     print('Complete!')
