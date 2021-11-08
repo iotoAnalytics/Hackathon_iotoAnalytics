@@ -1095,7 +1095,8 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
                 try:
                     key = divs[i].findAll("div")[0].text
                     if "Profession" in key:
-                        occupation = divs[i].findAll("div")[1].text
+                        job = divs[i].findAll("div")[1].text
+                        occupation.append(job)
                 except Exception as e:
                     print(e)
 
