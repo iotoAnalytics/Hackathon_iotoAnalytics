@@ -669,7 +669,8 @@ class Persistence:
                             parl_assoc_interparl_groups jsonb,
                             gender text,
                             wiki_url text UNIQUE,
-                            is_active boolean
+                            is_active boolean, 
+                            years_of_service text
                         );
 
                         ALTER TABLE {table} OWNER TO rds_ad;
@@ -728,7 +729,8 @@ class Persistence:
                         json.dumps(item.parl_assoc_interparl_groups,
                                 default=utils.json_serial),
                         item.gender,
-                        item.wiki_url
+                        item.wiki_url,
+                        item.years_of_service
                     )
 
                     wiki_url_exists = False
@@ -742,7 +744,7 @@ class Persistence:
                             VALUES (
                                 {gov_id}, 
                                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s)
                         ''').format(
                             table=sql.Identifier(table),
                             gov_id=sql.Literal(int(gov_id))
@@ -754,7 +756,7 @@ class Persistence:
                             VALUES (
                                 (SELECT leg_id FROM leg_id), 
                                 %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
-                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+                                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, %s)
                         ''').format(
                             table=sql.Identifier(table)
                         )
@@ -791,7 +793,8 @@ class Persistence:
                                 gender = excluded.gender,
                                 source_url = excluded.source_url,
                                 seniority = excluded.seniority,
-                                is_active = excluded.is_active;
+                                is_active = excluded.is_active
+                                years_of_service = excluded.years_of_service;
                             """).format(insert_query=insert_query)
 
                     cur.execute(insert_legislator_query, tup)
