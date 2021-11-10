@@ -2,10 +2,11 @@ name: provincial scrapers
 
 on:
   schedule:
-    - cron: '20 * * * *' 
+    - cron: "*/5 * * * *"
+    
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
 
       - name: checkout repo content
@@ -22,11 +23,11 @@ jobs:
           pip install -r requirements.txt
           
       - name: echo
-        run: ECHO "test"
+        run: echo "test"
         
       - name: execute py script 
         run: |
-          for py_file in $(find scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
+          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
           do 
           python $py_file 
           done
