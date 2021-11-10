@@ -2,9 +2,8 @@ name: provincial scrapers
 
 on:
   schedule:
-    cron: '0 0 1 * *' 
-    branches:
-      - main 
+    - cron: '0 0 1 * *' 
+
 jobs:
   build:
     runs-on: windows-latest
