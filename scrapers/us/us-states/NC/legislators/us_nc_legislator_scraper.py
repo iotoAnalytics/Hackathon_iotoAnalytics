@@ -597,7 +597,7 @@ def collect_legislator_details(biographyUrl):
     else:
         party = "Other/ Independent"
     party_id = scraper_utils.get_party_id(party)
-    fullname = unidecode.unidecode(fullname)
+    fullname = unidecode(fullname)
     hn = HumanName(fullname)
     name_first = hn.first
 
