@@ -1,11 +1,16 @@
 import sys
 import os
+from multiprocessing import Pool
 from pathlib import Path
 from nameparser import HumanName
 from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislatorScraperUtils
 from tqdm import tqdm
 import re
+import pandas as pd
+from urllib.request import urlopen as uReq
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -13,7 +18,7 @@ sys.path.insert(0, str(p))
 base_url = 'https://www.nmlegis.gov'
 wiki_url = 'https://en.wikipedia.org/'
 
-scraper_utils = USStateLegislatorScraperUtils('NM', 'nm_sc_legislators')
+scraper_utils = USStateLegislatorScraperUtils('NM', 'us_nm_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 senators_and_reps = ['/Members/Legislator_List?T=R', '/Members/Legislator_List?T=S']
@@ -221,16 +226,16 @@ def set_phone_numbers(row, soup):
     office_num = soup.find('span', {'id': 'MainContent_formViewLegislator_lblOfficePhone'}).text
     home_num = soup.find('span', {'id': 'MainContent_formViewLegislator_lblHomePhone'}).text
 
-    capitol_dict = {'number': capitol_num, 'office': 'capitol office'}
-    office_dict = {'number': office_num, 'office': 'personal office'}
-    home_dict = {'number': home_num, 'office': 'home'}
+    capitol_dict = {'office': 'capitol office', 'number': capitol_num.replace("(","").replace(")","").replace(" ","-")}
+    office_dict = {'office': 'personal office', 'number': office_num.replace("(","").replace(")","").replace(" ","-")}
+    home_dict = {'office': 'home', 'number': home_num.replace("(","").replace(")","").replace(" ","-")}
 
     temp = [capitol_dict, office_dict, home_dict]
 
     for item in temp:
-        if item['number']:
+        if len(item['number'])==12:
             numbers_lst.append(item)
-
+    print(numbers_lst)
     row.phone_numbers = numbers_lst
 
 
@@ -277,18 +282,22 @@ def set_committees(row, soup):
     standing_committee = soup.find('table', {'id': 'MainContent_formViewLegislator_gridViewStandingCommittees'})
     interim_committee = soup.find('table', {'id': 'MainContent_formViewLegislator_gridViewInterimCommittees'})
 
-    standing_rows = standing_committee.find_all('tr')
-    for r in standing_rows:
-        committees = [word for word in r.text.split('\n') if word]
-        role_and_com = {'role': committees[0], 'committee': committees[1].lower().title()}
-        all_committees.append(role_and_com)
-
-    interim_rows = interim_committee.find_all('tr')
-    for r in interim_rows:
-        committees = [word for word in r.text.split('\n') if word]
-        role_and_com = {'role': committees[0], 'committee': committees[1].lower().title()}
-        all_committees.append(role_and_com)
-
+    try:
+        standing_rows = standing_committee.find_all('tr')
+        for r in standing_rows:
+            committees = [word for word in r.text.split('\n') if word]
+            role_and_com = {'role': committees[0], 'committee': committees[1].lower().title()}
+            all_committees.append(role_and_com)
+    except:
+        pass
+    try:
+        interim_rows = interim_committee.find_all('tr')
+        for r in interim_rows:
+            committees = [word for word in r.text.split('\n') if word]
+            role_and_com = {'role': committees[0], 'committee': committees[1].lower().title()}
+            all_committees.append(role_and_com)
+    except:
+        pass
     row.committees = all_committees
 
 
@@ -315,6 +324,116 @@ def create_rows(length):
     """
 
     return [scraper_utils.initialize_row() for _ in range(length)]
+
+
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/New_Mexico_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/New_Mexico_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+                party = party.replace('\n', '')
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                        pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+        except Exception as e:
+            print(e)
+            pass
+
+
+def set_gender(row):
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
 
 
 def scrape_gov_site(all_gov_urls, rows):
@@ -344,12 +463,16 @@ def scrape_gov_site(all_gov_urls, rows):
         set_addresses(rows[item], soup)
         set_committees(rows[item], soup)
         set_areas_served(rows[item], soup)
+        get_wiki_url(rows[item])
+        set_gender(rows[item])
+
         print(rows[item])
 
     return sorted(rows, key=lambda row: (row.role, int(row.district)))
 
 
 def scrape_wiki_site(all_wiki_urls, sorted_rows):
+
     """
     Take rows that are partially filled and grabs any other missing information from wikipedia (birthday, years served,
     etc).
@@ -369,6 +492,27 @@ def scrape_wiki_site(all_wiki_urls, sorted_rows):
         sorted_rows[item].years_active = wiki_info['years_active']
         sorted_rows[item].most_recent_term_id = wiki_info['most_recent_term_id']
 
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
 
 def organize_data():
     """
@@ -386,7 +530,36 @@ def organize_data():
 
     unfinished_rows = scrape_gov_site(all_gov_urls, rows)
     scrape_wiki_site(all_wiki_urls, unfinished_rows)
-    scraper_utils.write_data(rows, 'us_nm_legislators')
+    leg_df = pd.DataFrame(rows)
+
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/New_Mexico_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/New_Mexico_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+
+    print('Scraping complete')
+
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')
+
 
 
 def main():

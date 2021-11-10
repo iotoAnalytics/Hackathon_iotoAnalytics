@@ -11,6 +11,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
+from urllib.request import urlopen as uReq
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
@@ -22,6 +23,9 @@ import re
 import boto3
 import time
 import datetime
+import pandas as pd
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 state_abbreviation = 'NV'
@@ -44,6 +48,131 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
    # name = re.sub("\n.*",'',name.text)
     #print(name)
    # return name
+
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
+def get_wiki_url(row):
+    wikipage_reps = "https://ballotpedia.org/Nevada_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Nevada_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+                party = party.replace('\n', '')
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                        pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+        except Exception as e:
+            print(e)
+            pass
 
 
 #gets the district
@@ -101,7 +230,7 @@ def get_urls(url) :
     if ('Senate' in url) :
         sentate = 1
 
-    term_id = None
+    term_id = ''
     page = scraper_utils.request(url)
     page = BeautifulSoup(page.content, 'lxml')
     url_table = page.find('tbody')
@@ -143,26 +272,26 @@ def get_urls(url) :
             email = content[1].text
             office_no = {
                 'office' : 'Leg Bldg Phone:',
-                'number' : content[3].text.replace('(','').replace(')','')
+                'number' : content[3].text.replace('(','').replace(')','').replace(' ','-')
             }
             phoneNumbers.append(office_no)
             try:
                 work_no = {
                 'office' : 'Work Phone:',
-                'number' : content[4].text.replace('(','').replace(')','')
+                'number' : content[4].text.replace('(','').replace(')','').replace(' ','-')
                 }
                 phoneNumbers.append(work_no)
 
             # !! 2.
             except Exception:
                 print("no phone number")
-
-            print(address)
-            print(email)
+            print(phoneNumbers)
+            #print(address)
+            #print(email)
 
             
             legislator = {
-                'term_id': term_id,
+                'term_id': str(term_id),
                 'link':(original_url + link),
                 'district':district,
                 'party':party,
@@ -365,7 +494,11 @@ def scrape(legislator):
     row.party_id = scraper_utils.get_party_id(legislator['party'])
     row.occupation = personal['occupation']
     row.education = personal['education']
-
+    get_wiki_url(row)
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     
 
     # Delay so we don't overburden web servers
@@ -386,7 +519,28 @@ if __name__ == '__main__':
     with Pool() as pool:
         data = pool.map(scrape, urls)
 
-    # Once we collect the data, we'll write it to the database:
-    scraper_utils.write_data(data)
+        leg_df = pd.DataFrame(data)
 
-    print('Complete!')
+        # getting urls from ballotpedia
+        wikipage_reps = "https://ballotpedia.org/Nevada_House_of_Representatives"
+        wikipage_senate = "https://ballotpedia.org/Nevada_State_Senate"
+
+        all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+        with Pool() as pool:
+            wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+        wiki_df = pd.DataFrame(wiki_data)[
+            [ 'name_last', 'wiki_url']]
+
+        big_df = pd.merge(leg_df, wiki_df, how='left',
+                          on=["name_last", 'wiki_url'])
+
+        big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+        big_list_of_dicts = big_df.to_dict('records')
+
+        print('Writing data to database...')
+
+        scraper_utils.write_data(big_list_of_dicts)
+
+        print(f'Scraper ran successfully!')
