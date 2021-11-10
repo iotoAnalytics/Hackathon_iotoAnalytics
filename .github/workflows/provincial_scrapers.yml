@@ -2,7 +2,7 @@ name: provincial scrapers
 
 on:
   schedule:
-    - cron: '*/10 * * * *' 
+    - cron: '*/1 * * * *' 
 jobs:
   build:
     runs-on: windows-latest
@@ -21,5 +21,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           
+      - name: echo
+        run: ECHO "test"
       - name: execute py script 
         run: 'for py_file in $(find scrapers/ca/ca-provinces -name "*_legislator_scraper.py") do python $py_file done'
