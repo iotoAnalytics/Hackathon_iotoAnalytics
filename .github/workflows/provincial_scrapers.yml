@@ -2,7 +2,7 @@ name: provincial scrapers
 
 on:
   schedule:
-    - cron: '19 * * * *' 
+    - cron: '20 * * * *' 
 jobs:
   build:
     runs-on: windows-latest
@@ -23,5 +23,10 @@ jobs:
           
       - name: echo
         run: ECHO "test"
+        
       - name: execute py script 
-        run: 'for py_file in $(find scrapers/ca/ca-provinces -name "*_legislator_scraper.py") do python $py_file done'
+        run: |
+          for py_file in $(find scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
+          do 
+          python $py_file 
+          done
