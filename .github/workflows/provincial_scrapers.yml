@@ -1,4 +1,4 @@
-name: provincial scrapers
+name: ca_provincial scrapers
 
 on:
   schedule:
