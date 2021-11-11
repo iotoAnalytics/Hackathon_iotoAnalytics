@@ -33,7 +33,7 @@ sklearn==0.0
 soupsieve==2.1
 threadpoolctl==2.1.0
 tokenizers==0.10.2
-torch==1.8.1
+torch
 tqdm==4.59.0
 transformers==4.5.1
 Unidecode==1.2.0
