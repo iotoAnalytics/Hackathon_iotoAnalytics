@@ -1,6 +1,4 @@
-import psycopg2
 from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
 # import datetime
 from datetime import date, datetime
 import json
@@ -12,35 +10,12 @@ from transformers import BertTokenizer
 from torch.utils.data import TensorDataset
 from transformers import BertForSequenceClassification
 from torch.utils.data import DataLoader, SequentialSampler
-import functools
 import torch.nn.functional as F
 
-import sys
 import pandas as pd
-from database import Database, CursorFromConnectionFromPool, Persistence
-from dataclasses import dataclass, field
-from typing import List
+from database import CursorFromConnectionFromPool
 from rows import *
-import copy
 # import atexit
-import utils
-from urllib.request import urlopen as uReq
-import re
-import requests
-import unidecode
-from bs4 import BeautifulSoup as soup
-from nameparser import HumanName
-from urllib.parse import urlparse
-from urllib.robotparser import RobotFileParser
-from bs4 import BeautifulSoup
-import time
-import random
-from collections import namedtuple
-import exceptions
-from pandas.core.computation.ops import UndefinedVariableError
-import numpy
-import pdfplumber
-import io
 
 # Get path to the root directory so we can import necessary modules
 

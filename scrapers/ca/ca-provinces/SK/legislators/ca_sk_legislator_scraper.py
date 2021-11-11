@@ -6,22 +6,11 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import pandas as pd
-import bs4
-from urllib.request import urlopen as uReq
-from urllib.request import Request
 from bs4 import BeautifulSoup
-import psycopg2
 from nameparser import HumanName
 from request_url import UrlRequest
-import requests
-import datefinder
-import unidecode
+
 from multiprocessing import Pool
-import datetime
-import re
-import numpy as np
-from datetime import datetime
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 
 header = {

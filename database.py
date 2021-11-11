@@ -3,20 +3,14 @@ Used for connecting scrapers to relational database using psycopg2.
 Author: Justin Tendeck
 """
 
-from typing import AnyStr
 from psycopg2.extras import RealDictCursor
 # from psycopg2 import pool
 import psycopg2
-import configparser
 import boto3
-import sys
-import os
 from psycopg2 import sql
-from datetime import date, datetime
+from datetime import datetime
 import json
 import utils
-import sys
-import numpy as np
 import pandas as pd
 
 
