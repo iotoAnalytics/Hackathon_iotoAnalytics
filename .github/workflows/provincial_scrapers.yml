@@ -22,7 +22,7 @@ jobs:
           
       - name: install pyTorch
         run: |
-          pip3 install torch==1.8.2+cpu -f https://download.pytorch.org/whl/lts/1.8/torch_lts.html
+          pip install https://download.pytorch.org/whl/cu102/torch-1.8.0-cp38-cp38-win_amd64.whl
         
       - name: install python packages
         run: |
