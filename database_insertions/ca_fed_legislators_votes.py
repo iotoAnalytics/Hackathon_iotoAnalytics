@@ -1,4 +1,7 @@
-# import database as db
+'''
+Takes info from ca_fed_legislation and ca_fed_legislation_topic_prob tables, stores 
+vote data into separate table for custom webapp endpoint to use.
+'''
 import sys
 import os
 from pathlib import Path
@@ -24,6 +27,7 @@ with db.CursorFromConnectionFromPool() as cur:
             SELECT ca_fed_legislation.goverlytics_id, 
                    ca_fed_legislation.bill_name, 
                    ca_fed_legislation.current_status, 
+                   ca_fed_legislation.session,
                    ca_fed_legislation.votes, ca_fed_legislation_topic_probs.topic 
             FROM {table} WHERE ca_fed_legislation.votes != '[]'
             """).format(
@@ -40,6 +44,7 @@ with db.CursorFromConnectionFromPool() as cur:
                         'vote_text': vote['vote_text'],
                         'legislator_goverlytics_id': vote['goverlytics_id'],
                         'vote_session_date': temp_vote_obj['date'],
+                        'session': item['session'],
                         'vote_description': temp_vote_obj['description'],
                         'legislation_goverlytics_id': item['goverlytics_id'],   
                         'bill_name': item['bill_name'],
@@ -54,7 +59,7 @@ with db.CursorFromConnectionFromPool() as cur:
         print(f'ERROR: \n {e} \n')
         cur.connection.rollback()
 
-    make_table_name = 'ca_fed_legislators_votes_webapp'
+    make_table_name = 'ca_fed_legislators_votes_webapp '
     create_table_query = sql.SQL("""
         CREATE TABLE IF NOT EXISTS {table} (
             legislator_goverlytics_id bigint,
@@ -62,6 +67,7 @@ with db.CursorFromConnectionFromPool() as cur:
             vote_text text,
             vote_session_date text,
             vote_description text,
+            session text,
             legislation_goverlytics_id text,
             bill_name text,
             current_status text,
@@ -74,11 +80,12 @@ with db.CursorFromConnectionFromPool() as cur:
     cur.connection.commit()
     insert_data_query = sql.SQL("""
         INSERT INTO {table}
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (legislator_goverlytics_id, legislation_goverlytics_id, vote_session_date, vote_description) DO UPDATE SET 
             name = excluded.name,
             vote_text = excluded.vote_text,
             bill_name = excluded.bill_name,
+            session = excluded.session,
             current_status = excluded.current_status,
             topic = excluded.topic
     """).format(table=sql.Identifier(make_table_name))
@@ -88,7 +95,7 @@ with db.CursorFromConnectionFromPool() as cur:
             row = utils.DotDict(row)
         if row.legislator_goverlytics_id:
             tup = (row.legislator_goverlytics_id, row.name, row.vote_text, row.vote_session_date,
-                    row.vote_description, row.legislation_goverlytics_id, row.bill_name, row.current_status,
+                    row.vote_description, row.session, row.legislation_goverlytics_id, row.bill_name, row.current_status,
                     row.topic)
             try:
                 cur.execute(insert_data_query, tup)
