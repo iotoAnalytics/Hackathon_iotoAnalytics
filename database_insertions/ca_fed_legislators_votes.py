@@ -59,7 +59,7 @@ with db.CursorFromConnectionFromPool() as cur:
         print(f'ERROR: \n {e} \n')
         cur.connection.rollback()
 
-    make_table_name = 'ca_fed_legislators_votes_webapp '
+    make_table_name = 'ca_fed_legislators_votes_webapp'
     create_table_query = sql.SQL("""
         CREATE TABLE IF NOT EXISTS {table} (
             legislator_goverlytics_id bigint,
