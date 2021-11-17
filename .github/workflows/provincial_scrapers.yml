@@ -22,7 +22,7 @@ jobs:
           
       - name: install pyTorch
         run: |
-          pip install pytorch
+          pip install torch
         
       - name: install python packages
         run: |
