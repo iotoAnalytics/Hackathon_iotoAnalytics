@@ -7,7 +7,7 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 import numpy as np
-import unidecode
+from unidecode import unidecode
 import pandas as pd
 from nameparser import HumanName
 
@@ -16,7 +16,7 @@ import requests
 from bs4 import BeautifulSoup as soup
 from urllib.request import urlopen as uReq
 
-scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators_test')
+scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.assembly.ab.ca')
 
 
@@ -43,27 +43,36 @@ def scrape_members_link(link):
 
 def collect_mla_data(link):
     # scrape a member's bio page to get available information
-    row = scraper_utils.initialize_row()
-    uClient = uReq(link)
-    page_html = uClient.read()
-    uClient.close()
+    page_html = None
+    try_count = 5
+    while try_count > 0:
+        try:
+            row = scraper_utils.initialize_row()
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            break
+        except:
+            try_count -= 1
     # # html parsing
     page_soup = soup(page_html, "html.parser")
     row.source_url = link
     member_id = link.split("mid=")[1]
     member_id = member_id.split("&")[0]
     row.source_id = member_id
-
     name_class = page_soup.find("h2", {"class": "nott ls1"})
-
     name = name_class.text
 
     name = name.replace("Honourable", "").strip()
-    if "." in name:
-        name = name.split(".")[1]
+    if "Mr." in name:
+        name = name.split("Mr. ")[1]
+    elif "Mrs." in name:
+        name = name.split("Mrs. ")[1]
+    elif "Ms." in name:
+        name = name.split("Ms. ")[1]
     # print(type(name))
     hn = HumanName(name)
-    row.name_full = name
+    row.name_full = hn.full_name
     row.name_last = hn.last
     row.name_first = hn.first
     row.name_middle = hn.middle
@@ -74,17 +83,21 @@ def collect_mla_data(link):
     party_info = party_info.find("div", {"class": "col3"})
     party_info = party_info.find("span", {"class": "data"})
     party = party_info.text
-    row.party = party
+    if party == "Independent":
+        row.party = "Independence"
+    elif party == "Alberta New Democratic Party":
+        row.party = "New Democratic"
+    else:
+        row.party = party
     try:
-        row.party_id = scraper_utils.get_party_id(party)
-
+        row.party_id = scraper_utils.get_party_id(row.party)
     except:
         row.party_id = 0
 
     const = page_soup.find("div", {"class": "col-lg-6 my-3 px-3 px-lg-0"})
     const = const.findAll("p")
     riding = const[1].text
-    riding = riding.split("for")[1].strip()
+    riding = riding.split(" for ")[1].strip()
     row.riding = riding
 
     # years active
@@ -182,9 +195,8 @@ def collect_mla_data(link):
                     pass
 
         i += 1
-
     row.phone_numbers = phone_numbers
-    row.most_recent_term_id = years_active[len(years_active) - 1]
+    row.most_recent_term_id = str(years_active[len(years_active) - 1])
 
     committees = []
     committee_table = page_soup.findAll("div", {"class": "mla_lcm mla_table"})
@@ -198,8 +210,30 @@ def collect_mla_data(link):
 
     row.committees = committees
     scraper_utils.crawl_delay(crawl_delay)
-    return row
 
+    mla_bio = page_soup.find('div', {'id': 'mla_bio'}).text
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, mla_bio)
+
+    uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta')
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = soup(page_html, "html.parser")
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    table = table.findAll("tr")[1:]
+
+    for tr in table:
+        tds = tr.findAll("td")
+        if len(tds) != 5:
+            continue
+        district = tds[3].text
+        name_td = tds[1]
+        name = name_td.text
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+            break
+
+    return row
 
 def scrape_wiki(link):
     # get the links for all the legislator's wikipedia pages
@@ -214,7 +248,11 @@ def scrape_wiki(link):
     rows = table.findAll("tr")[1:]
 
     for row in rows:
-        url_tail = row.span.span.span.a["href"]
+        name_td = row.findAll("td")[1]
+        try:
+            url_tail = name_td.find('a')["href"]
+        except:
+            continue
         wiki_link = 'https://en.wikipedia.org' + url_tail
 
         wiki_bios.append(wiki_link)
@@ -240,18 +278,15 @@ if __name__ == '__main__':
         wiki_data = pool.map(
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation']]
+        ['birthday', 'education', 'wiki_url', 'occupation']]
     # print(wikidf)
     big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url"])
 
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
     big_df['education'] = big_df['education'].replace({np.nan: None})
-    print(big_df)
 
-    print(big_df)
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)
 

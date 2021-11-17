@@ -9,20 +9,11 @@ sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import pandas as pd
-import bs4
-from urllib.request import Request
 from bs4 import BeautifulSoup
-import psycopg2
 from nameparser import HumanName
 from request_url import UrlRequest
-import requests
-import datefinder
-import unidecode
 from multiprocessing import Pool
-import datetime
 import re
-import numpy as np
-from datetime import datetime
 
 url = 'https://www.ola.org/en/legislative-business/bills/current'
 base_url = 'https://www.ola.org'

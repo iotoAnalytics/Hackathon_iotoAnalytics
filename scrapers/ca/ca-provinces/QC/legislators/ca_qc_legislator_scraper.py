@@ -23,6 +23,7 @@ import datetime
 import re
 import numpy as np
 from datetime import datetime
+from unidecode import unidecode
 
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
@@ -49,29 +50,43 @@ def getAssemblyLinks(myurl):
 
 
 def collect_leg_data(myurl):
-    req = Request(myurl,
-                  headers={'User-Agent': 'Mozilla/5.0'})
-    webpage = uReq(req).read()
+    row = scraper_utils.initialize_row()
 
-    uReq(req).close()
+    uClient = uReq(myurl)
+    page_html = uClient.read()
+    uClient.close()
+    scraper_utils.crawl_delay(crawl_delay)
 
-    page_soup = soup(webpage, "html.parser")
+
+    page_soup = soup(page_html, "html.parser")
     img = page_soup.findAll("img")
     name = (img[12]["alt"])
     hn = HumanName(name)
-
+    row.name_full = hn.full_name
+    # Names are not correct on the candidate images... hardcode fix here but should make more robust later
+    if row.name_full == 'Carlos J Leitao':
+        row.name_last = 'Leitão'
+    elif row.name_full == 'Simon Jolin-Barette':
+        row.name_last = "Barrette"
+    else:
+        row.name_last = hn.last
+    row.name_first = hn.first
+    row.name_middle = hn.middle
+    row.name_suffix = hn.suffix
+    
     # member id is now source_id
     member_id = myurl.split("/index")[0]
     member_id = member_id.split("-")
-    member_id = member_id[len(member_id) - 1]
+    row.source_id = member_id[len(member_id) - 1]
+    row.source_url = myurl
 
     personal_info = page_soup.find("div", {"class": "enteteFicheDepute"})
     personal_info = personal_info.findAll("li")
     riding = personal_info[0].text
-    riding = riding.split("for ")[1]
-    party = personal_info[1].text.strip()
+    row.riding = riding.split("for ")[1].replace('’', '\'')
+    row.party = personal_info[1].text.strip()
 
-    committees = []
+    row.committees = []
     uls = page_soup.findAll("ul")
     committee_offices = []
     for ul in uls:
@@ -93,7 +108,7 @@ def collect_leg_data(myurl):
             com_info = {'role': role, 'committee': committee,
                         'house': 'National Assembly'}
 
-            committees.append(com_info)
+            row.committees.append(com_info)
         elif " to the " in co:
             co = co.split(" to the ")
             role = co[0]
@@ -107,7 +122,7 @@ def collect_leg_data(myurl):
             com_info = {'role': role, 'committee': committee,
                         'house': 'National Assembly'}
 
-            committees.append(com_info)
+            row.committees.append(com_info)
         elif " for " in co:
             co = co.split(" for ")
             role = co[0]
@@ -117,7 +132,7 @@ def collect_leg_data(myurl):
             committee = committee.split("from")[0].strip()
             com_info = {'role': role, 'committee': committee,
                         'house': 'National Assembly'}
-            committees.append(com_info)
+            row.committees.append(com_info)
 
         elif " of " in co:
             co = co.split(" of ")
@@ -129,7 +144,7 @@ def collect_leg_data(myurl):
             com_info = {'role': role, 'committee': committee,
                         'house': 'National Assembly'}
 
-            committees.append(com_info)
+            row.committees.append(com_info)
         elif " on the " in co:
             co = co.split(" on the ")
             role = co[0]
@@ -140,21 +155,21 @@ def collect_leg_data(myurl):
             com_info = {'role': role, 'committee': committee,
                         'house': 'National Assembly'}
 
-            committees.append(com_info)
+            row.committees.append(com_info)
 
     contact_link = myurl.replace("index", "coordonnees")
 
-    req = Request(contact_link,
-                  headers={'User-Agent': 'Mozilla/5.0'})
-    webpage = uReq(req).read()
+    uClient = uReq(contact_link)
+    page_html = uClient.read()
+    uClient.close()
+    scraper_utils.crawl_delay(crawl_delay)
 
-    uReq(req).close()
 
-    contact_soup = soup(webpage, "html.parser")
+    contact_soup = soup(page_html, "html.parser")
     address_info = contact_soup.findAll("div", {"class": "blockAdresseDepute"})
-    phone_numbers = []
+    row.phone_numbers = []
     numbers = []
-    addresses = []
+    row.addresses = []
 
     for adin in address_info:
         try:
@@ -172,7 +187,7 @@ def collect_leg_data(myurl):
                     if number not in numbers:
                         numbers.append(number)
                         num_info = {'office': office, 'number': number}
-                        phone_numbers.append(num_info)
+                        row.phone_numbers.append(num_info)
                 elif "Fax" in a:
                     tele = 1
                 elif "Toll" in a:
@@ -186,7 +201,7 @@ def collect_leg_data(myurl):
 
             address = ', '.join(addr_list)
             addr_info = {'location': office, 'address': address}
-            addresses.append(addr_info)
+            row.addresses.append(addr_info)
 
         except:
             pass
@@ -204,21 +219,62 @@ def collect_leg_data(myurl):
                          ).replace("mailto:", "")
             except:
                 pass
-    capitalized_party = party.title()
+    row.email = email
+    
+    row.party = row.party.title()
+    if row.party == "Quebec Liberal Party":
+        row.party = "Liberal"
+    elif row.party == "Parti Conservateur Du Québec":
+        row.party = "Conservative"
 
     try:
-        party_id = scraper_utils.get_party_id(capitalized_party)
+        row.party_id = scraper_utils.get_party_id(row.party)
     except:
-        party_id = 0
+        row.party_id = 0
 
-    info = {'province_url': myurl, 'member_id': member_id, 'role': 'Member of National Assembly', 'name_full': name,
-            'name_first': hn.first, 'name_last': hn.last, 'name_suffix': hn.suffix, 'name_middle': hn.middle,
-            'riding': riding, 'party': party, 'party_id': party_id, 'email': email, 'committees': committees,
-            'phone_numbers': phone_numbers, 'addresses': addresses, 'military_experience': ""}
+    uClient = uReq('https://en.wikipedia.org/wiki/National_Assembly_of_Quebec')
+    scraper_utils.crawl_delay(crawl_delay)
+
+    page_html = uClient.read()
+    uClient.close()
+    wiki_page_soup = soup(page_html, "html.parser")
+
+    row.most_recent_term_id = get_most_recent_term_id_from_wiki(wiki_page_soup)
+
+    table = wiki_page_soup.find("table", {"class": "wikitable sortable"})
+    table = table.findAll("tr")[1:]
+    for tr in table:
+        tds = tr.findAll("td")
+        if len(tds) != 4:
+            continue
+        district = tds[3].text
+        name_td = tds[1]
+        name = name_td.text
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+            bio = get_biography_from_wiki(row.wiki_url)
+            try:
+                row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
+            except:
+                print(row.name_full)
+            break
 
     scraper_utils.crawl_delay(crawl_delay)
-    return info
+    return row
 
+def get_most_recent_term_id_from_wiki(page_soup):
+    info_box = page_soup.find('table', {'class':'infobox vcard'})
+    current_legislature = info_box.findAll('tr')[1].text
+    current_legislature = current_legislature.split(' ')[0]
+    return current_legislature
+    
+def get_biography_from_wiki(link):
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = soup(page_html, "html.parser")
+    main_content = page_soup.find("div", {"id" : "content"}).text
+    return main_content
 
 def get_wiki_people(repLink):
     # get links to legislators' personal wikipedia pages
@@ -235,7 +291,7 @@ def get_wiki_people(repLink):
         try:
             info = person.findAll("td")
 
-            biolink = "https://en.wikipedia.org/" + \
+            biolink = "https://en.wikipedia.org" + \
                 (info[1].span.span.span.a["href"])
 
             bio_lnks.append(biolink)
@@ -260,6 +316,8 @@ if __name__ == '__main__':
     pd.set_option('display.max_columns', None)
     leg_df = pd.DataFrame(leg_data)
 
+    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active'])
+
     # get my missing info from wikipedia
     wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
     wiki_people = get_wiki_people(wiki_link)
@@ -269,41 +327,17 @@ if __name__ == '__main__':
             func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
     wiki_df = pd.DataFrame(wiki_data)
 
-    # merge the wiki info with the rest of the data on first and last names
-    mergedRepsData = pd.merge(leg_df, wiki_df, how='left', on=[
-                              "name_first", "name_last"])
+    wikidf = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
+    # print(wikidf)
+    big_df = pd.merge(leg_df, wikidf, how='left',
+                      on=["wiki_url"])
 
-    # replace any NaN fields with None for database insertion (NaN conflicts with required data types
-    mergedRepsData['most_recent_term_id'] = mergedRepsData['most_recent_term_id'].replace({
-                                                                                          np.nan: None})
-    mergedRepsData['years_active'] = mergedRepsData['years_active'].replace({
-                                                                            np.nan: None})
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({
-                                                                        np.nan: None})
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({
-                                                                    np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({
-                                                                      np.nan: None})
-    big_df = mergedRepsData
-    big_df['seniority'] = 0
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
 
-    sample_row = scraper_utils.initialize_row()
-
-    #
-
-    big_df['province_territory'] = sample_row.province_territory
-    big_df['province_territory_id'] = sample_row.province_territory_id
-    #
-    #
-    big_df['country'] = sample_row.country
-    # # #
-    big_df['country_id'] = sample_row.country_id
-    big_df['source_url'] = big_df['province_url']
-
-    big_df['source_id'] = big_df['member_id']
-
-    print(big_df)
-    # convert to list of dicts for database insertion
     big_list_of_dicts = big_df.to_dict('records')
     # print(big_list_of_dicts)
 

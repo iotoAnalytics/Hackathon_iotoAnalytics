@@ -1,3 +1,11 @@
+import sys
+import os
+from pathlib import Path
+
+# Get path to the root directory so we can import necessary modules
+p = Path(os.path.abspath(__file__)).parents[5]
+sys.path.insert(0, str(p))
+
 import re
 import numpy as np
 from nameparser import HumanName
@@ -7,15 +15,10 @@ from bs4 import BeautifulSoup
 import time
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
+from unidecode import unidecode
 from datetime import datetime
-import sys
-import os
-from pathlib import Path
-
-# Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
-
-sys.path.insert(0, str(p))
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 prov_abbreviation = 'PE'
 database_table_name = 'ca_pe_legislators'
@@ -50,10 +53,12 @@ def get_urls():
 
 
 def find_mla_wiki(mlalink):
+
     bio_links = []
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
+
     # # html parsing
     page_soup = BeautifulSoup(page_html, "lxml")
     tables = page_soup.findAll("tbody")
@@ -88,6 +93,7 @@ def get_name(bio_container, row):
     name_full = bio_container.find('span', {'class': 'field--name-title'}).text
     if "," in name_full:
         name_full = name_full.split(',')[0]
+    name_full = name_full.replace('Hon. ', '')
 
     hn = HumanName(name_full)
     row.name_full = name_full
@@ -99,7 +105,7 @@ def get_name(bio_container, row):
 
 def get_riding(bio_container, row):
     riding = bio_container.find('div', {'class': 'views-field-field-member-constituency'}).text.strip()
-    row.riding = riding
+    row.riding = riding.replace(' - ', '-')
 
 
 def get_phone_number(bio_container, row):
@@ -174,7 +180,7 @@ def get_email(bio_container, row):
 
 def get_most_recent_term_id(years_active, row):
     year = years_active[-1]
-    row.most_recent_term_id = year
+    row.most_recent_term_id = str(year)
 
 
 def get_years_active(bio_container, row):
@@ -217,6 +223,27 @@ def get_committees(bio_container, row):
         pass
     row.committees = committees
 
+def get_wiki_url(row):
+    uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island')
+    page_html = uClient.read()
+    uClient.close()
+
+    wiki_base_url = "https://en.wikipedia.org"
+
+    page_soup = BeautifulSoup(page_html, "html.parser")
+    table = page_soup.findAll("table", {'class': 'wikitable sortable'})[0]
+    table = table.findAll("tr")[1:]
+
+
+    for table_row in table:
+        tds = table_row.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        district = tds[-1].text
+        
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = wiki_base_url + name_td.a['href']
+            return
 
 def scrape(url):
     row = scraper_utils.initialize_row()
@@ -240,10 +267,12 @@ def scrape(url):
     get_email(bio_container, row)
     get_years_active(bio_container, row)
     get_committees(bio_container, row)
+    get_wiki_url(row)
 
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio_container.text)
 
     return row
 
@@ -260,8 +289,10 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
+    #
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
@@ -274,20 +305,27 @@ if __name__ == '__main__':
     with Pool() as pool:
         wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'name_first', 'name_last']]
+        ['occupation', 'birthday', 'education', 'wiki_url']
+    ]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
+                      on=["wiki_url"])
 
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+#     isna = big_df['education'].isna()
+    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
     big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
 
     print('Scraping complete')
+    # vacant_index = big_df.index[big_df['wiki_url'] == None].tolist()
+    # for index in vacant_index:
+    #     big_df = big_df.drop(big_df.index[index])
 
     big_list_of_dicts = big_df.to_dict('records')
+
+    print(big_list_of_dicts)
     print('Writing data to database...')
 
     scraper_utils.write_data(big_list_of_dicts)

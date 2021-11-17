@@ -1,7 +1,6 @@
 import sys
 import os
 from pathlib import Path
-from scraper_utils import CAProvTerrLegislatorScraperUtils
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -13,16 +12,12 @@ import numpy as np
 import re
 import datetime
 from multiprocessing import Pool
-import unidecode
-import datefinder
-import requests
+from unidecode import unidecode
 from request_url import UrlRequest
 from nameparser import HumanName
-import psycopg2
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from urllib.request import Request
 from urllib.request import urlopen as uReq
-import bs4
 import pandas as pd
 
 
@@ -33,7 +28,7 @@ crawl_delay = scraper_utils.get_crawl_delay(url)
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Ontario'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-current_year = 2021
+current_year = datetime.datetime.now().year
 
 
 def get_links(url):
@@ -43,7 +38,9 @@ def get_links(url):
     rows = url_soup.find_all('tr')
     for item in rows:
         link = item.find('a').get("href")
-        if 'members' in link:
+        if "vacant" in link:
+            pass
+        elif 'members' in link:
             links.append(base_url + link)
     #print("number of members: " + str(len(links)))
     scraper_utils.crawl_delay(crawl_delay)
@@ -75,7 +72,7 @@ def get_info(soup):
     phone_lst = []
     date_lst = []
     text = soup.find('div', {
-        'class': 'views-element-container block block-views block-views-blockmember-member-role-history'}).find(
+        'class': 'view-display-id-member_role_history'}).find(
         'h3').text
     if 'present' in text:
         current_term = text.split('(')[0].strip()
@@ -89,8 +86,7 @@ def get_info(soup):
         address_lst.append(
             {'location': content[_].find('h3').text, 'address': content[_].find('p').text.replace('\n', ' ')})
         try:
-            phone = content[_].text.split('Tel.')[1].split('Fax')[
-                0].replace('\n', '').strip()
+            phone = content[_].text.split('Tel.')[1].split('Fax')[0].replace('\n', '').strip().replace(' ', '-')
             phone_lst.append(
                 {'office': content[_].find('h3').text, 'number': phone})
         except:
@@ -111,7 +107,7 @@ def get_info(soup):
             elif item.find('h2').text == 'Current party':
                 temp = item.find(
                     'div', {'class': 'field-content'}).text.split('of')[0].strip()
-                party = temp.replace('party', '').replace('Party', '').strip()
+                party = temp.replace('party', '').replace('Party', '').replace('Ontario', '').strip()
 
     date_lst = sorted(list(dict.fromkeys(date_lst)))
     return [com_lst, party, address_lst, phone_lst, date_lst, current_term]
@@ -147,7 +143,10 @@ def scrape(diction):
     except:
         row.party_id = 0
     row.addresses = info[2]
-    row.phone_numbers = info[3]
+    try:
+        row.phone_numbers = info[3]
+    except:
+        print(row.name_full, row.source_url, row.phone_numbers)
     row.years_active = info[4]
     row.most_recent_term_id = info[5]
 
@@ -165,26 +164,67 @@ def scrape(diction):
         'class': 'field field--name-field-email-address field--type-email field--label-hidden field__items'}).text.replace(
         '\n', '')
     row.email = email
-    for item in diction['wiki_list']:
-        if name_first in item and name_last in item:
-            wiki_info = scraper_utils.scrape_wiki_bio(item)
-            row.education = wiki_info['education']
-            row.birthday = wiki_info['birthday']
-            row.occupation = wiki_info['occupation']
+
+    uClient = uReq('https://en.wikipedia.org/wiki/Legislative_Assembly_of_Ontario')
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = BeautifulSoup(page_html, "html.parser")
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    table = table.findAll("tr")[1:]
+    for tr in table:
+        name_td = tr.findAll("td")[1]
+        name = name_td.text
+        district = tr.findAll("td")[3].text
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = 'https://en.wikipedia.org' + name_td.a['href']
+            bio = get_biography_from_wiki(row.wiki_url)
+            row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
+            break
 
     print('Done row for ' + name_full)
     scraper_utils.crawl_delay(crawl_delay)
     return row
 
+def get_biography_from_wiki(link):
+    uClient = uReq(link)
+    page_html = uClient.read()
+    uClient.close()
+    page_soup = BeautifulSoup(page_html, "html.parser")
+    main_content = page_soup.find("div", {"id" : "content"}).text
+    return main_content
+
 
 if __name__ == '__main__':
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
+
     legislator_links = get_links(url)
     wiki_links = get_wiki_links(wiki_url)
     dict_lst = make_diction(legislator_links, wiki_links)
 
     print('done making dict lists')
     with Pool() as pool:
-        data = pool.map(scrape, dict_lst)
+        mla_data = pool.map(scrape, dict_lst)
+
+    leg_df = pd.DataFrame(mla_data)
+    # drop columns that we'll get from wikipedia instead
+    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
+
+    with Pool() as pool:
+        wiki_data = pool.map(
+            func=scraper_utils.scrape_wiki_bio, iterable=wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['birthday', 'education', 'wiki_url', 'occupation']
+    ]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["wiki_url"])
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
+
+    big_list_of_dicts = big_df.to_dict('records')
     print('done collecting data')
-    scraper_utils.write_data(data)
+    scraper_utils.write_data(big_list_of_dicts)
     print('complete!')

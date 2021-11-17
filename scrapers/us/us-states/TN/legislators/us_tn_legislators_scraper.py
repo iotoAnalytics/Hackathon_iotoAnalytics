@@ -4,7 +4,7 @@
 import os
 import re
 import sys
-
+from urllib.request import urlopen as uReq
 import multiprocessing
 import numpy as np
 import pandas as pd
@@ -15,6 +15,8 @@ from nameparser import HumanName
 from pathlib import Path
 from pprint import pprint
 from tqdm import tqdm
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -72,6 +74,30 @@ def get_urls():
 
     return urls
 
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
 def scrape(url):
     soup = _create_soup(url, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
@@ -90,6 +116,11 @@ def scrape(url):
         _set_birthday(row, soup)
         _set_areas_served(row, soup)
         _set_district(row, soup)
+        get_wiki_url(row)
+        gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+        if not gender:
+            gender = 'O'
+        row.gender = gender
     except:
         print(f'Error with: {url}')
 
@@ -380,6 +411,110 @@ def _fix_occupation_format(legislator_data):
 
     legislator_data['occupation'] = formatted_occupation
 
+
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Tennessee_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Tennessee_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+                party = party.replace('\n', '')
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                        pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+        except Exception as e:
+            print(e)
+            pass
+
+
 def main():
     print('TENNESSEE!')
     print('O Tennessee: Fair Tennessee: ♫ ♫ ♫')
@@ -415,10 +550,30 @@ def main():
     print(DEBUG_MODE and 'Fixing formats in oddities...\n' or '', end='')
     fix_odditites(merged_data)
 
+    leg_df = pd.DataFrame(merged_data)
+
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Tennessee_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Tennessee_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+    big_list_of_dicts = big_df.to_dict('records')
+
     # Write to database
     print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if not DEBUG_MODE:
-        scraper_utils.write_data(merged_data)
+
+        scraper_utils.write_data(big_list_of_dicts)
 
     print('\nCOMPLETE!\n')
 

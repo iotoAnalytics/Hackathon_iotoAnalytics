@@ -1,7 +1,6 @@
 import sys
 import os
 from pathlib import Path
-import requests
 import time
 from selenium import webdriver
 import scraper_utils
@@ -10,10 +9,6 @@ from database import CursorFromConnectionFromPool
 from bs4 import BeautifulSoup
 import pandas as pd
 import dateutil.parser as dparser
-import pdfplumber
-import requests
-import io
-import re
 
 NODES_TO_ROOT = 4
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
@@ -22,7 +17,7 @@ sys.path.insert(0, str(path_to_root))
 PATH = "../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
 browser = webdriver.Chrome(PATH)
 
-
+#https://www.elections.ca/content.aspx?section=ele&dir=pas&document=index&lang=e
 COUNTRY = 'ca'
 TABLE = 'ca_electors'
 MAIN_URL = 'https://www.elections.ca/'
@@ -59,6 +54,7 @@ def find_electors_links(link):
         if "Voting" in link.text:
             voter_link = link.get('href')
             voter_link = MAIN_URL + voter_link
+            scraper_utils.crawl_delay(crawl_delay)
             return voter_link
 
 
@@ -78,13 +74,11 @@ def get_urls():
         link = find_electors_links(link)
         if link is not None:
             urls.append(link)
-
+    scraper_utils.crawl_delay(crawl_delay)
     return urls
 
 
 def get_table_data(url):
-    row = scraper_utils.initialize_row()
-    print(url)
     data = None
     browser.get(url)
     if browser.find_elements_by_tag_name('frame'):
@@ -125,11 +119,8 @@ def get_table_data(url):
     except Exception as e:
         print(e)
 
-    try:
-        print(data)
-    except Exception as e:
-        print(e)
     if data is not None:
+        row_list = []
         for i in data:
             province = i['province']
             if province == 'Newfoundland':
@@ -146,18 +137,19 @@ def get_table_data(url):
                 election_id = get_election_id(i)
             except:
                 election_id = int(0)
-            print(province_id)
-            print(election_id)
-            row.province_territory_id = int(province_id)
-            row.population = int(election_id)
-            row.electors = int(i['electors'])
-            row.election_id = int(i['population'])
-        print(data)
 
-    return row
+            if election_id != 0:
+                if province_id != 0:
+                    row_info = {'province_territory_id': province_id, 'election_id': election_id, 'electors': i['electors'], 'population': i['population']}
+
+                    row_list.append(row_info)
+        if row_list is None:
+            row_list = []
+        return row_list
 
 
 def get_election_id(data):
+
     election = data['election']
     province = data['province']
     province = province.replace('–', '-')
@@ -166,41 +158,40 @@ def get_election_id(data):
         try:
             date = dparser.parse(election, fuzzy=True)
             date_name = date.strftime("%Y_%m_%d")
-            election_name = date_name + '_by_election_' + province
-            print(election_name)
+            election_name = 'by_election_' + date_name
         except Exception as e:
             print(e)
         if pd.notna(province):
             df = elections
-            value = df.loc[(df['election_name'] == election_name)]['id'].values[0]
+            value = df.loc[df['election_name'].str.contains(election_name)]['id'].values[0]
             try:
                 return int(value)
             except Exception as e:
                 return value
     if 'general' in election.lower():
         general_elections = {
-            'fiftieth': '50th',
-            'forty-ninth': '49th',
-            'forty-eighth': '48th',
-            'forty-seventh': '47th',
-            'forty-sixth': '46th',
-            'forty-fifth': '45th',
-            'forty-fourth': '44th',
-            'forty-third': '43rd',
-            'forty-second': '42nd',
-            'forty-first': '41st',
-            'fortieth': '40th',
-            'thirty-ninth': '39th',
-            'thirty-eighth': '38th',
-            'thirty-seventh': '37th',
-            'thirty-sixth': '36th'
+            'fiftieth': '50',
+            'forty-ninth': '49',
+            'forty-eighth': '48',
+            'forty-seventh': '47',
+            'forty-sixth': '46',
+            'forty-fifth': '45',
+            'forty-fourth': '44',
+            'forty-third': '43',
+            'forty-second': '42',
+            'forty-first': '41',
+            'fortieth': '40',
+            'thirty-ninth': '39',
+            'thirty-eighth': '38',
+            'thirty-seventh': '37',
+            'thirty-sixth': '36'
         }
         election = election.split(' ')[0].lower()
         e_number = general_elections.get(election)
         election_name = e_number + '_general_election'
         if pd.notna(province):
             df = elections
-            value = df.loc[(df['election_name'] == election_name)]['id'].values[0]
+            value = df.loc[df['election_name'].str.contains(election_name)]['id'].values[0]
             try:
                 return int(value)
             except Exception as e:
@@ -208,7 +199,6 @@ def get_election_id(data):
 
 
 def get_prov_terr_id_from_district(province):
-    #province = province.replace('-', '--')
     province = province.replace('–', '--')
     if pd.notna(province):
         df = districts
@@ -220,6 +210,8 @@ def get_prov_terr_id_from_district(province):
 
 
 def get_prov_terr_id(province):
+    if not province:
+        return 0
     if pd.notna(province):
         df = scraper_utils.divisions
         value = df.loc[df["division"] == province]['id'].values[0]
@@ -230,7 +222,6 @@ def get_prov_terr_id(province):
 
 
 def get_election_with_frame(input_value, url):
-    print('1')
     browser.get(url + f'{input_value}/table1.html')
     election_name =''
     try:
@@ -244,7 +235,6 @@ def get_election_with_frame(input_value, url):
 
 
 def get_election():
-    print('2')
     try:
         election_name = browser.find_element_by_id('EventName')
         if election_name is None:
@@ -264,14 +254,12 @@ def get_election():
 
 
 def get_district_table():
-    print('3')
     title = browser.find_element_by_tag_name('h1').text
     title = title.split(' – ')[0]
     return get_district_data(title)
 
 
 def get_province_data_from_alt_table(election_name):
-    print('4')
     provincial_data_list = []
     table = browser.find_elements_by_tag_name("tbody")[1]
     rows = table.find_elements_by_tag_name('tr')
@@ -290,7 +278,6 @@ def get_province_data_from_alt_table(election_name):
 
 
 def get_province_data_from_frame_table(election_name):
-    print('5')
     provincial_data_list = []
     table = browser.find_element_by_tag_name("tbody")
     rows = table.find_elements_by_tag_name('tr')
@@ -315,7 +302,6 @@ def get_province_data_from_frame_table(election_name):
 
 
 def get_district_data(election):
-    print('6')
     provincial_data_list = []
     tables = browser.find_elements_by_tag_name("table")
     for t in tables:
@@ -392,7 +378,6 @@ def get_paragraph_table(election):
 
 
 def get_province_data(election):
-    print('7')
     provincial_data_list = []
     table = browser.find_element_by_tag_name("tbody")
     rows = table.find_elements_by_tag_name('tr')
@@ -412,21 +397,34 @@ def get_province_data(election):
     return provincial_data_list
 
 
+def get_row_data(data):
+    row = scraper_utils.initialize_row()
+    row.province_territory_id = int(data['province_territory_id'])
+    row.election_id = int(data['election_id'])
+    row.electors = int(data['electors'])
+    row.population = int(data['population'])
+    return row
+
+
 if __name__ == '__main__':
-    print('NOTE: This demo will provide warnings since some legislators are missing from the database.\n\
-If this occurs in your scraper, be sure to investigate. Check the database and make sure things\n\
-like names match exactly, including case and diacritics.\n~~~~~~~~~~~~~~~~~~~')
+
     urls = get_urls()
+    data = []
+    data_list = []
+    data.extend(get_table_data(url) for url in urls)
 
-    data = [get_table_data(url) for url in urls]
-    #get_table_data('https://www.elections.ca/content.aspx?section=res&dir=rep/off/dec3097&document=res_table01&lang=e')
+    lambda_obj = lambda x: (x is not None)
 
+    list_out = list(filter(lambda_obj, data))
+
+    flat_ls = [item for sublist in list_out for item in sublist]
     #print(data)
     # with Pool(processes=4) as pool:
     #     data = pool.map(scrape, urls)
-
-
-
-    scraper_utils.write_data(data)
+    #print(data_list)
+    row_data = [get_row_data(d) for d in flat_ls]
+    scraper_utils.write_data(row_data)
 
     print('Complete!')
+
+

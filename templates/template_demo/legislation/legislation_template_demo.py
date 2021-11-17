@@ -16,30 +16,25 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-import boto3
 import datetime
 from pprint import pprint
 from urllib.parse import parse_qs
 import urllib.parse as urlparse
-import re
 from nameparser import HumanName
-import configparser
-from database import Database
 from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislationScraperUtils
 
-
-
 state_abbreviation = 'IL'
+table_name = 'demo_template_legislation'
+legislator_table_name = 'us_il_legislators'
+
 scraper_utils = USStateLegislationScraperUtils(
-    state_abbreviation, 'demo_template_legislation', 'us_il_legislators')
+    state_abbreviation, table_name, legislator_table_name)
 
 base_url = 'https://www.ilga.gov'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
-
 
 def get_urls():
     '''

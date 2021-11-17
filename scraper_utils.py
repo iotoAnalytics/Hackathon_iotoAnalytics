@@ -1,45 +1,34 @@
-import psycopg2
-from psycopg2 import sql
-from psycopg2.extras import RealDictCursor
-# import datetime
-from datetime import date, datetime
-import json
-import numpy as np
-import torch
-import boto3
-import tempfile
-from transformers import BertTokenizer
-from torch.utils.data import TensorDataset
-from transformers import BertForSequenceClassification
-from torch.utils.data import DataLoader, SequentialSampler
-import functools
-
-import sys
-import pandas as pd
-from database import Database, CursorFromConnectionFromPool, Persistence
-from dataclasses import dataclass, field
-from typing import List
-from rows import *
-import copy
 # import atexit
-import utils
-from urllib.request import urlopen as uReq
+import boto3
+import copy
+import dateutil.parser as dparser
+import exceptions
+import functools
+import io
+import numpy as np
+import pandas as pd
+import pdfplumber
+import random
 import re
 import requests
-import unidecode
+import sys
+import tempfile
+import time
+import torch
+
 from bs4 import BeautifulSoup as soup
+from database import Database, CursorFromConnectionFromPool, Persistence
+from dataclasses import dataclass, field
+from datetime import date, datetime
+from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
 from nameparser import HumanName
+from pandas.core.computation.ops import UndefinedVariableError
+from rows import *
+from transformers import BertTokenizer, BertForSequenceClassification
+from torch.utils.data import TensorDataset, DataLoader, SequentialSampler
+from urllib.request import urlopen as uReq
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
-from bs4 import BeautifulSoup
-import time
-import random
-from collections import namedtuple
-import exceptions
-from pandas.core.computation.ops import UndefinedVariableError
-import numpy
-import pdfplumber
-import io
 
 """
 Contains utilities and data structures meant to help resolve common issues
@@ -267,6 +256,7 @@ class LegislatorScraperUtils(ScraperUtils):
         Takes in a link to the personal wikipedia page of the legislator
         """
         # get available birthday
+        wiki_url = wiki_link
         try:
             uClient = uReq(wiki_link)
             page_html = uClient.read()
@@ -325,7 +315,7 @@ class LegislatorScraperUtils(ScraperUtils):
             table = page_soup.find("table", {"class": "infobox vcard"})
 
             tds = table.findAll("td", {"colspan": "2"})
-            td = tds[0]
+            # td = tds[0]
 
             for td in tds:
                 asof = (td.find("span", {"class": "nowrap"}))
@@ -334,7 +324,7 @@ class LegislatorScraperUtils(ScraperUtils):
 
                         asofbr = td.find("br")
 
-                        year_started = (asofbr.nextSibling)
+                        year_started = str(asofbr.nextSibling)
 
                         year_started = year_started.split('[')[0]
                         if "," in year_started:
@@ -355,7 +345,8 @@ class LegislatorScraperUtils(ScraperUtils):
             # create a list of years from that year to current year
             # use current year + 1 since it doesn't include endpoint
             # will need to be updated each year
-            years_active = list(range(int(year_started), 2022))
+            year_today = datetime.now().year
+            years_active = list(range(int(year_started), year_today + 1))
 
         else:
             years_active = []
@@ -420,10 +411,11 @@ class LegislatorScraperUtils(ScraperUtils):
             head = page_soup.find("h1", {"id": "firstHeading"})
             name = head.text
             name = name.split("(")[0].strip()
+            name = name.replace('é', 'é')
 
         except:
             name = ""
-        name = unidecode.unidecode(name)
+        # name = unidecode.unidecode(name)
 
         hN = HumanName(name)
 
@@ -462,7 +454,7 @@ class LegislatorScraperUtils(ScraperUtils):
 
         info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
                 'education': education, 'occupation': occupation, 'years_active': years_active,
-                'most_recent_term_id': str(most_recent_term_id)}
+                'most_recent_term_id': str(most_recent_term_id), 'wiki_url': wiki_url}
 
         """
             returns dictionary with the following fields if available
@@ -477,6 +469,68 @@ class LegislatorScraperUtils(ScraperUtils):
         """
         return info
 
+    def get_legislator_gender(self, name_first: str, name_last: str, biography=None) -> str or None:
+        """
+        Used for getting the gender of legislator. 
+        This should be used when gender is not specified on the legislator website. 
+        
+        PARAMS
+        -----------
+        name_first the first name of legislator
+        name_last the last name of the legislator
+        biography a block of text that contains legislator information
+
+        RETURNS
+        ----------
+        'M' if the gender is guessed to be male\n
+        'F' if the gender is guessed to be female\n
+        None if the gender cannot be guessed
+        """
+
+        if biography:
+            try:
+                return self._guess_gender_from_text(biography)
+            except:
+                pass
+        return self._guess_gender_using_genderComputer(name_first, name_last)
+
+
+    def _guess_gender_from_text(self, biography):
+        count_masculine = 0
+        count_femanine = 0
+
+        count_masculine += len(re.findall('Mr. ', biography))
+        count_femanine += len(re.findall('Mrs. ', biography)) + len(re.findall('Ms. ', biography))
+        
+        count_masculine += len(re.findall(r'\she\W', biography)) or len(re.findall(r'\sHe\W', biography))
+        count_femanine += len(re.findall(r'\sshe\W', biography)) or len(re.findall(r'\sShe\W', biography))
+
+        if count_masculine > count_femanine:
+            return 'M'
+        if count_femanine > count_masculine:
+            return 'F'
+        raise ValueError('Cannot determine gender from biography')
+
+    def _guess_gender_using_genderComputer(self, name_first, name_last):
+        gc = GenderComputer()
+        name = name_first + ' ' + name_last
+
+        gender_mapping = {
+            'female': 'F',
+            'mostly female': 'F',
+            'mostly male': 'M',
+            'male': 'M',
+        }
+
+        legislator_gender = gc.resolveGender(name, self.country)
+        return gender_mapping.get(legislator_gender)
+
+    def write_data(self, data, database_table=None):
+        """
+        Inserts legislator sponsor by topic data into database table. Data must be either a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_sponsor_topic_legislators(data, table)
 
 class LegislationScraperUtils(ScraperUtils):
     """
@@ -698,7 +752,7 @@ class LegislationScraperUtils(ScraperUtils):
                     'Can only search columns of type str/text when using legislators_search_startswith!')
             except Exception as e:
                 print('An exception occurred: {e}')
-        if isinstance(val, numpy.int64):
+        if isinstance(val, np.int64):
             val = int(val)
         return val
 
@@ -871,6 +925,197 @@ class USFedLegislatorScraperUtils(LegislatorScraperUtils):
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_us_fed_legislators(data, table)
+
+    def scrape_ballotpedia_bio(self, link):
+        """
+        Used for getting missing legislator fields from their ballotpedia bios.
+        Useful for getting things like a legislator's birthday or education.
+        Takes in a link to the personal wikipedia page of the legislator
+        """
+        # get available birthday
+        ballotpedia_url = link
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            paragraphs = page_soup.find_all('p')
+            for p in paragraphs:
+                if "born on" in p.text:
+                    birthday_para = p.text
+                    birthday_sentence = birthday_para.split['.'][0]
+                    repBirth = dparser.parse(birthday_sentence, fuzzy=True)
+            # convert to proper data format
+                    b = datetime.strptime(repBirth, "%Y-%m-%d").date()
+
+            birthday = b
+
+        except:
+            # couldn't find birthday in side box
+            birthday = None
+
+        # get years_active,based off years in position
+        years_active = []
+        year_started = ""
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            infobox = page_soup.find("div", {"class": "infobox person"})
+
+            divs = infobox.findAll("div")
+            count = 0
+            for div in divs:
+                if 'Years in position' in div.text:
+                    break
+                count += 1
+            tenure = divs[count+1].text
+            tenure = tenure.replace('\n', '').replace('\t', '')
+            this_year = date.today()
+            this_year = this_year.year
+
+            # creating a list of the years worked based on tenure and current year
+            for i in range(int(tenure)+1):
+                year = this_year - i
+                years_active.append(year)
+            years_active.sort()
+        except Exception as ex:
+
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+
+
+        # get education
+        education = []
+        # possible education levels that might show up, feel free to add more
+        lvls = ["MA", "BA", "JD", "BSc", "MIA", "PhD",
+                "DDS", "MS", "BS", "MBA", "MS", "MD"]
+
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            infobox = page_soup.find("div", {"class": "infobox person"})
+            divs = infobox.findAll("div", {"class": "widget-row"})
+            paragraphs = page_soup.find_all('p')
+            paragraph = "".join([item.text for item in paragraphs])
+            count = 0
+            for div in divs:
+                if "Education" in div.text:
+                    edu = count + 1
+                if "Personal" in div.text:
+                    personal = count
+                count += 1
+            for i in range(edu, personal):
+                lvl = divs[i].findAll("div")[0].text
+                lvl = lvl.replace("\n", "").replace("\t", "")
+                if "Highschool" in lvl:
+                    continue
+                if "Law" in lvl:
+                    level = "JD"
+                if "Bachelor" in lvl:
+                    if "B.A." in paragraph:
+                        level = "BA"
+                    if "B.S." in paragraph:
+                        level = "BS"
+                school = divs[i].findAll("div")[1].text
+                school = school.replace("\n", "").replace("\t", "")
+                try:
+                    edinfo = {'level': level,
+                            'field': "", 'school': school}
+                    if edinfo not in education:
+                        education.append(edinfo)
+                except:
+                    pass
+
+        except Exception as ex:
+            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+            message = template.format(type(ex).__name__, ex.args)
+
+        # get full name
+        # this is necessary as it will be use to merge the resulting dataframe with the rest of your data
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            page_soup = soup(page_html, "html.parser")
+
+            # # #grabs each product
+            head = page_soup.find("h1", {"id": "firstHeading"})
+            name = head.text
+            name = name.split("(")[0].strip()
+            name = name.replace('é', 'é')
+
+        except:
+            name = ""
+        # name = unidecode.unidecode(name)
+
+        hN = HumanName(name)
+
+        # get occupation
+        occupation = []
+
+        try:
+            uClient = uReq(link)
+            page_html = uClient.read()
+            uClient.close()
+            # # html parsing
+            infobox = page_soup.find("div", {"class": "infobox person"})
+            divs = infobox.findAll("div", {"class": "widget-row"})
+
+            count = 0
+            for div in divs:
+                if "Personal" in div.text:
+                    break
+                count += 1
+
+            for i in range(count, len(divs)):
+                try:
+                    key = divs[i].findAll("div")[0].text
+                    if "Profession" in key:
+                        job = divs[i].findAll("div")[1].text
+                        occupation.append(job)
+                except Exception as e:
+                    print(e)
+
+
+        except Exception as e:
+            # no occupation available
+            pass
+
+        most_recent_term_id = ""
+
+        try:
+            most_recent_term_id = (years_active[len(years_active) - 1])
+
+        except:
+            pass
+
+        info = {'name_first': hN.first, 'name_last': hN.last, 'birthday': birthday,
+                'education': education, 'occupation': occupation, 'years_active': years_active,
+                'most_recent_term_id': str(most_recent_term_id), 'wiki_url': ballotpedia_url}
+
+        """
+            returns dictionary with the following fields if available
+            choose the ones that you weren't able to find from the gov website 
+
+            merge the resulting data with the data you scraped from the gov website, on name_first and name_last
+
+            Note: not all legislators will have a wikipedia page.  
+            This may cause some fields to be 'NaN' after the merge.
+            Replace all NaN fields with "None" or something similar or you may get a type error when uploading to db
+
+        """
+        return info
 
 
 class USStateLegislatorScraperUtils(USFedLegislatorScraperUtils):
@@ -1174,10 +1419,7 @@ class PDF_Table_Reader(PDF_Reader):
             tables.append(table_only_in_page.extract_table())
         return tables
 
-# <<<<<<< HEAD
 # region Election Scraper Utils
-# =======
-# region Election Data
 
 ##########################################
 # PREVIOUS ELECTION SCRAPER UTILS
@@ -1205,8 +1447,6 @@ class ElectoralDistrictScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_electoral_districts_data(data, table)
 
-# >>>>>>> bc03d4b2f85ea4309e5415c7081cb9b7fd1c3b77
-
 class ElectorsScraperUtils(ScraperUtils):
     def __init__(self, country: str, table_name: str):
         super().__init__(country, table_name, row_type=ElectorsRow())
@@ -1218,4 +1458,161 @@ class ElectorsScraperUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_electors(data, table)
 
+class ElectionVotesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=ElectionVotesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_election_votes(data, table)
+
+class CandidatesScraperUtils(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidates'
+        super().__init__(country, table_name, row_type=CandidatesRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_legislators'
+                cur.execute(query)
+                legislators = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.legislators = pd.DataFrame(legislators)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_data(data, table)
+
+class CandidatesElectionDetails(ScraperUtils):
+    def __init__(self, country: str):
+        table_name = f'{country.lower()}_candidate_election_details'
+        super().__init__(country, table_name, row_type=CandidateElectionDetailsRow())
+
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                query = 'SELECT * FROM ca_electoral_districts'
+                cur.execute(query)
+                electoral_districts = cur.fetchall()
+
+                query = f'SELECT * FROM ca_candidates'
+                cur.execute(query)
+                candidates = cur.fetchall()
+
+                query = f'SELECT * FROM ca_elections'
+                cur.execute(query)
+                elections = cur.fetchall()
+
+            except Exception as e:
+                sys.exit(
+                    f'An exception occurred retrieving tables from database:\n{e}')
+
+        self.electoral_districts = pd.DataFrame(electoral_districts)
+        self.candidates = pd.DataFrame(candidates)
+        self.elections = pd.DataFrame(elections)
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting previous_election data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_details_data(data, table)
+
+
+class FinancialContributionsScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=FinancialContributionsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_financial_contributions(data, table)
+
+
+class CandidateElectionFinancesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=CandidateElectionFinancesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting election votes data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_finances(data, table)
+
+
+class InflowScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=InflowsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_inflows(data, table)
+
+
+class CandidateElectionVotesScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=CandidateElectionVotesRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_candidate_election_votes(data, table)
+
+
+class OutflowScraperUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=OutflowsRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_outflows(data, table)
+
+
+class BankReconciliationUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=BankReconciliationRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_bank_reconciliation(data, table)
+
+
+class BankAccountUtils(ScraperUtils):
+    def __init__(self, country: str, table_name: str):
+        super().__init__(country, table_name, row_type=BankAccountRow())
+
+    def write_data(self, data, database_table=None) -> None:
+        """
+        Takes care of inserting data into database. Must be a list of Row objects or dictionaries.
+        """
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_bank_account(data, table)
 # end region

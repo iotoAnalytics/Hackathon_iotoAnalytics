@@ -42,7 +42,7 @@ scraper_utils = CAFedLegislatorScraperUtils()
 
 
 scrape_mps = True
-scrape_senators = False
+scrape_senators = True
 write_results_to_database = True
 
 mp_base_url = 'https://www.ourcommons.ca'
@@ -87,7 +87,8 @@ def get_mp_basic_details():
     mp_tiles = soup.find('div', {'id': 'mip-tile-view'})
 
     mp_data = []
-    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'})[:3]:
+    for tile in mp_tiles.findAll('div', {'class': 'ce-mip-mp-tile-container'}):
+        
         row = scraper_utils.initialize_row()
 
         mp_url = tile.find('a', {'class': 'ce-mip-mp-tile'}).get('href')
@@ -104,7 +105,52 @@ def get_mp_basic_details():
         row.name_first = hn.first
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix if hn.suffix else name_suffix
-
+        gender = scraper_utils.get_legislator_gender(hn.first, hn.last)
+        if type(gender) != str:
+            if hn.first == "Shafqat":
+                gender = "M"
+            if hn.first == "Taylor":
+                gender = "O"
+            if hn.first == "Jenica":
+                gender = "F"
+            if hn.first == "Parm":
+                gender = "M"
+            if hn.first == "Yves-François":
+                gender = "M"
+            if hn.first == "Bardish":
+                gender = "F"
+            if hn.first == "Sukh":
+                gender = "M"
+            if hn.first == "Kerry-Lynne":
+                gender = "F"
+            if hn.first == "Rhéal":
+                gender = "M"
+            if hn.first == "Chrystia":
+                gender = "F"
+            if hn.first == "Iqwinder":
+                gender = "M"
+            if hn.first == "Gudie":
+                gender = "F"
+            if hn.first == "Taleeb":
+                gender = "M"
+            if hn.first == "Churence":
+                gender = "M"
+            if hn.first == "Harjit":
+                gender = "M"
+            if hn.first == "Ya'ara":
+                gender = "F"
+            if hn.first == "Rechie":
+                gender = "F"
+            if hn.first == "Tako":
+                gender = "M"
+            if hn.first == "Dominique":
+                gender = "F"
+            if hn.first == "Cathay":
+                gender = "F"
+        else:
+            gender = gender
+        row.gender = gender
+            
         party = tile.find('div', {'class': 'ce-mip-mp-party'}).text
         row.party = mp_party_switcher[party] if party in mp_party_switcher else party
         row.party_id = scraper_utils.get_party_id(row.party, 'Fed - MP')
@@ -122,7 +168,47 @@ def get_mp_basic_details():
 
         mp_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)
-    mp_df = pd.DataFrame(mp_data)
+    mp_build_df = pd.DataFrame(mp_data)
+
+    wiki_base_url = "https://en.wikipedia.org"
+    page = scraper_utils.request("https://en.wikipedia.org/wiki/List_of_House_members_of_the_44th_Parliament_of_Canada")
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    wiki_page = soup.find('div', {'class': 'vector-body'})
+    prov_tables = wiki_page.find_all('tbody')
+    anchor_lst = []
+    for i in range(2, 13):
+        anchors = prov_tables[i].find_all('a')
+        for j in range(0,len(anchors)):
+            if "Party" in anchors[j]['href']:
+                continue
+            elif "cite_note" in anchors[j]['href']:
+                continue
+            elif "Independent_politician" in anchors[j]['href']:
+                continue
+            elif "Bloc_Qu" in anchors[j]['href']:
+                continue
+            else:
+                anchor_lst.append(anchors[j])
+    mp_href_lst = anchor_lst[::2] # removes district links
+    riding_href_lst = anchor_lst[1::2]
+    wiki_url_lst = []
+    riding_lst = []
+    for i in range(0,len(mp_href_lst)):
+        wiki_url = wiki_base_url + mp_href_lst[i]['href']
+        wiki_url_lst.append(wiki_url)
+        riding = riding_href_lst[i].text
+        if "South Shore—St. Margaret's" in riding:
+            riding = "South Shore—St. Margarets"
+        elif "Ville-Marie—Le Sud-Ouest—Île-des-Sœurs" in riding:
+            riding = "Ville-Marie—Le Sud-Ouest—Île-des-Soeurs"
+        else:
+            riding = riding
+        riding_lst.append(riding)
+    wiki_df = pd.DataFrame({"wiki_url": wiki_url_lst, "riding": riding_lst})
+
+    mp_df = mp_build_df.merge(wiki_df, on='riding', how='outer', suffixes=('_y',''))
+    mp_df.drop(mp_df.filter(regex='_y$').columns.tolist(),axis=1, inplace=True)
 
 
 def get_mp_contact_details(contact_url):
@@ -245,15 +331,14 @@ def get_mp_fine_details():
         mp_df.at[i, 'committees'] = roles['committees']
         mp_df.at[i, 'parl_assoc_interparl_groups'] = roles['parl_assoc_interparl_groups']
 
-        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_url = mp_df['wiki_url'].iloc[i]
         wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
         mp_df.at[i, 'birthday'] = wiki_data['birthday']
         mp_df.at[i, 'education'] = wiki_data['education']
         mp_df.at[i, 'occupation'] = wiki_data['occupation']
         mp_df.at[i, 'years_active'] = wiki_data['years_active']
         mp_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
-
-
+        mp_df.at[i, 'wiki_url'] = wiki_url
 def mp_scrape():
     """
     Entry point for scraper. Begins by collecting details directly from House of Commons
@@ -297,7 +382,18 @@ def get_sen_basic_details():
         row.name_first = hn.first
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix
-
+        gender = scraper_utils.get_legislator_gender(hn.first, hn.last)
+        if type(gender) != str:
+            if hn.first == 'Mobina':
+                gender = 'F'
+            if hn.first == 'Yuen':
+                gender = 'M'
+            if hn.first == 'Mohamed-Iqbal':
+                gender = 'M'
+        else:
+            gender = gender
+        row.gender = gender
+        
         # Source url
         source_url = f"{sen_base_url}{tds[0].a.get('href')}"
         row.source_url = source_url
@@ -316,12 +412,24 @@ def get_sen_basic_details():
         row.region = scraper_utils.get_region(prov_terr)
 
         row.role = 'Senator'
-        row.offices_roles_as_mp = None
-        row.parl_assoc_interparl_groups = None
+        row.offices_roles_as_mp = []
+        row.parl_assoc_interparl_groups = []
 
         sen_data.append(row)
     scraper_utils.crawl_delay(crawl_delay)
     sen_df = pd.DataFrame(sen_data)
+
+    wiki_base_url = "https://en.wikipedia.org"
+    page = scraper_utils.request("https://en.wikipedia.org/wiki/List_of_current_senators_of_Canada")
+    soup = BeautifulSoup(page.content, 'html.parser')
+    wiki_page = soup.find('div', {'class': 'vector-body'})
+    wiki_table = wiki_page.find_all('tbody')
+    tds = wiki_table[0].select("td:nth-of-type(2)")
+    wiki_url_lst = []
+    for td in tds:
+        anchor = td.find('a')
+        wiki_url_lst.append(wiki_base_url + anchor['href'])
+    sen_df['wiki_url'] = wiki_url_lst
 
 
 def get_individual_sen_page_details(sen_page_url):
@@ -383,13 +491,14 @@ def get_sen_fine_details():
         sen_df.at[i, 'email'] = sen_details['email']
         sen_df.at[i, 'committees'] = sen_details['committees']
 
-        wiki_url = f"https://en.wikipedia.org/wiki/{row['name_first']}_{row['name_last']}"
+        wiki_url = sen_df['wiki_url'].iloc[i]
         wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
         sen_df.at[i, 'birthday'] = wiki_data['birthday']
         sen_df.at[i, 'education'] = wiki_data['education']
         sen_df.at[i, 'occupation'] = wiki_data['occupation']
         sen_df.at[i, 'years_active'] = wiki_data['years_active']
         sen_df.at[i, 'most_recent_term_id'] = wiki_data['most_recent_term_id']
+        sen_df.at[i, 'wiki_url'] = wiki_url
 
 
 def senator_scrape():
@@ -417,10 +526,10 @@ if __name__ == '__main__':
 
     # Coalesce dataframes
     result = pd.concat([mp_df, sen_df])
-
+    
     if write_results_to_database and not result.empty:
         print('Writing data to database...')
-        scraper_utils.write_data(result.to_dict('records'))
+        scraper_utils.write_data(result.to_dict('records'), 'ca_fed_legislators')
     else:
         print('Either write to database switch set to false or no data collected. No data written to database.')
 

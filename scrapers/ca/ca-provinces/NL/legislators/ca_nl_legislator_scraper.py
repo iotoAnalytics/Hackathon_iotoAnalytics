@@ -14,8 +14,10 @@ from pathlib import Path
 from pprint import pprint
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 from time import sleep
 from tqdm import tqdm
+from unidecode import unidecode
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -46,7 +48,7 @@ def scrape(url):
     options = Options()
     options.headless = False
 
-    driver = webdriver.Chrome(WEBDRIVER_PATH, options=options)
+    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL + MEMBER_PATH + '/members.aspx')
     driver.maximize_window()
@@ -73,6 +75,8 @@ def scrape(url):
         _set_party(row, fields[2].text)
         _set_phone_numbers(row, fields[3].text)
         _set_email(row, fields[4].text)
+        _set_gender(row, fields[0])
+        _set_wiki_url(row)
 
         data.append(row)
 
@@ -151,7 +155,12 @@ def get_wiki_urls():
     wiki_url_path = '/wiki/Newfoundland_and_Labrador_House_of_Assembly'
     wiki_url = WIKI_URL + wiki_url_path
 
-    soup = _create_soup(wiki_url, SOUP_PARSER_TYPE)
+    soup = _create_soup(wiki_url, 'html.parser')
+
+    infobox = soup.find('table', {'class':'infobox vcard'})
+    current_assembly_url = WIKI_URL + infobox.find_all('tr')[1].td.a['href']
+
+    soup = _create_soup(current_assembly_url, 'html.parser')
     scraper_utils.crawl_delay(crawl_delay)
 
     urls = []
@@ -165,7 +174,6 @@ def get_wiki_urls():
         if '/wiki' in path:
             url = WIKI_URL + path
             urls.append(url)
-
     return urls
 
 def scrape_wiki(url):
@@ -201,10 +209,12 @@ def _set_source_url(row, text):
     row.source_url = text
 
 def _set_name(row, text):
-    human_name = HumanName(text)
+    human_name = HumanName(text.replace('’', '\''))
 
     row.name_first = human_name.first
     row.name_last = human_name.last
+    if row.name_last == 'Conway Ottenheimer':
+        row.name_last = 'Conway-Ottenheimer'
     row.name_middle = human_name.middle
     row.name_suffix = human_name.suffix
     row.name_full = human_name.full_name
@@ -239,7 +249,7 @@ def _set_email(row, text):
     row.email = text
     
 def _set_riding(row, text):
-    row.riding = text
+    row.riding = text.replace(' - ', '-')
 
 def _format_roles(text):
     # Format given text into role and name
@@ -262,7 +272,7 @@ def _get_committee_list(soup, committee_name):
         # Currently, there are no special roles listed for committees
         committee_member = {
             'name': member_data[0].strip(),
-            'riding': member_data[1].strip(),
+            'riding': member_data[1].strip().replace(' - ', '-'),
             'role': 'member',
             'committee': committee_name,
         }
@@ -284,32 +294,62 @@ def _get_committees(committees_data_list, full_name, riding):
 
     return committees
 
-def _get_legislator_row(legislator_data, name_full):
+def _set_gender(row, td_element):
+    try:
+        url = td_element.a["href"]
+        url = BASE_URL + url
+        page_soup = _create_soup(url, 'html.parser')
+        bio = page_soup.text
+    except:
+        bio = None
+    row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
+
+def _set_wiki_url(row):
+    wiki_url_path = '/wiki/Newfoundland_and_Labrador_House_of_Assembly'
+    wiki_url = WIKI_URL + wiki_url_path
+
+    soup = _create_soup(wiki_url, 'html.parser')
+
+    infobox = soup.find('table', {'class':'infobox vcard'})
+    current_assembly_url = WIKI_URL + infobox.find_all('tr')[1].td.a['href']
+    page_soup = _create_soup(current_assembly_url, 'html.parser')
+
+    table = page_soup.find("table", {"class": "wikitable sortable"})
+    trs = table.findAll("tr")[1:]
+    for tr in trs:
+        name_td = tr.findAll("td")[1]
+        name = name_td.text
+        district = tr.findAll("td")[3].text
+        
+        if "Vacant" in name:
+            continue
+
+        if unidecode(row.riding.lower()) == unidecode(district.strip().lower()) and unidecode(row.name_last.lower()) in unidecode(name.strip().lower()):
+            row.wiki_url = WIKI_URL + name_td.a["href"]    
+
+def _get_legislator_row(legislator_data, wiki_url):
     for row in legislator_data:
-        if name_full == row.name_full:
+        if wiki_url == row.wiki_url:
             return row
 
     return None
 
-def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
-    full_name = wiki_data['name_first'] + ' ' + wiki_data['name_last']
-
-    legislator_row = _get_legislator_row(legislator_data, full_name)
+def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
+    legislator_row = _get_legislator_row(legislator_data, wiki_data['wiki_url'])
 
     if not legislator_row:
         return
 
-    for bio_info in wiki_data:
-        if birthday:
-            legislator_row.birthday = wiki_data['birthday']
-        if education:
-            legislator_row.education = wiki_data['education']
-        if occupation:
-            legislator_row.occupation = wiki_data['occupation']
-        if years_active:
-            legislator_row.years_active = wiki_data['years_active']
-        if most_recent_term_id:
-            legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
+    if birthday:
+        legislator_row.birthday = wiki_data['birthday']
+    if education:
+        legislator_row.education = wiki_data['education']
+    if occupation:
+        legislator_row.occupation = wiki_data['occupation']
+    if years_active:
+        legislator_row.years_active = wiki_data['years_active']
+    if most_recent_term_id:
+        legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
 
 def main():
     print('NEWFOUNDLAND AND LABRADOR!')

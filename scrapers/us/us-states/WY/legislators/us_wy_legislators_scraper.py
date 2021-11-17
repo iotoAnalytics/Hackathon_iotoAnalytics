@@ -16,16 +16,21 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
 import time
 from datetime import datetime
-from selenium import webdriver
+
 from selenium.webdriver.support.ui import WebDriverWait
+import ssl
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+browser = webdriver.Chrome(ChromeDriverManager().install())
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
-PATH = "../../../../../web_drivers/chrome_win_91.0.4472.19/chromedriver.exe"
-browser = webdriver.Chrome(PATH)
+# PATH = "../../../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
+# browser = webdriver.Chrome(PATH)
 
 state_abbreviation = 'WY'
 database_table_name = 'us_wy_legislators'
@@ -54,9 +59,12 @@ def get_urls():
     items = browser.find_elements_by_tag_name('tr')
 
     for tr in items[2:]:
-        td = tr.find_elements_by_tag_name('td')[1]
-        link = td.find_element_by_tag_name('a').get_attribute('href')
-        urls.append(link)
+        try:
+            td = tr.find_elements_by_tag_name('td')[1]
+            link = td.find_element_by_tag_name('a').get_attribute('href')
+            urls.append(link)
+        except:
+            pass
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -68,9 +76,12 @@ def get_urls():
     items = browser.find_elements_by_tag_name('tr')
 
     for tr in items[2:]:
-        td = tr.find_elements_by_tag_name('td')[1]
-        link = td.find_element_by_tag_name('a').get_attribute('href')
-        urls.append(link)
+        try:
+            td = tr.find_elements_by_tag_name('td')[1]
+            link = td.find_element_by_tag_name('a').get_attribute('href')
+            urls.append(link)
+        except:
+            pass
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -84,12 +95,14 @@ def find_individual_wiki(wiki_page_link):
     uClient.close()
 
     page_soup = BeautifulSoup(page_html, "lxml")
-    tables = page_soup.findAll("tbody")
-    people = tables[4].findAll("tr")
-    for person in people[1:]:
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
         info = person.findAll("td")
         try:
-            biolink = "https://en.wikipedia.org" + (info[1].a["href"])
+            biolink = info[1].a["href"]
+            print(biolink)
             bio_lnks.append(biolink)
 
         except Exception:
@@ -112,7 +125,7 @@ def get_district_name_and_role(browser, row):
         name = district.split(':')[1]
         district = district.split(':')[0]
         row.district = district
-        print(district)
+
         if "Senator" in name:
             role = "Senator"
             name = name.replace("Senator", '')
@@ -127,9 +140,9 @@ def get_district_name_and_role(browser, row):
         row.name_first = hn.first
         row.name_middle = hn.middle
         row.name_suffix = hn.suffix
-        print(name)
+
         row.role = role
-        print(role)
+
     except:
         pass
 
@@ -164,13 +177,13 @@ def get_contact_info(browser, row):
             number = phone[1]
             number = number.replace('(', '')
             number = number.replace(')', '')
-            number = number.replace('', '-')
+            number = number.replace(' ', '-')
             location = phone[0].split(':')[1].strip()
             phone_detail = {"office": location, "number": number}
             phone_numbers.append(phone_detail)
         if 'Address' in item:
             address = item.split(':')[1].strip()
-            address = {'office': 'Mailing',
+            address = {'location': 'Mailing',
                        'address': address}
             addresses.append(address)
         if 'E-Mail' in item:
@@ -244,7 +257,6 @@ def get_years_of_service(detail, row):
             pass
 
     years_served.sort()
-    print(years_served)
     row.years_active = years_served
 
 
@@ -252,6 +264,10 @@ def get_bio(browser, row):
     time.sleep(5)
     bio_detail = browser.find_element_by_xpath('/html/body/div/div/div[2]/section/div/div[2]/div[3]/div/div/div[1]')
     detail = bio_detail.text
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, detail)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     get_occupation(detail, row)
     get_years_of_service(detail, row)
 
@@ -282,6 +298,109 @@ def get_committees(browser, row):
     row.committees = committees_list
 
 
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Wyoming_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Wyoming_State_Senate"
+
+    if row.role == "Representative":
+        try:
+            uClient = uReq(wikipage_reps)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+                party = party.replace('\n', '')
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+                if not row.wiki_url:
+                    for person in rows[1:]:
+                        tds = person.findAll("td")
+                        name_td = tds[1]
+                        name = name_td.text
+                        name = name.replace('\n', '')
+                        party = tds[2].text
+                        party = party.strip()
+
+                        if party == "Democratic":
+                            party = "Democrat"
+
+                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                            row.wiki_url = name_td.a['href']
+                            break
+                        elif row.party == party and row.name_last in name.strip().split()[-1]:
+                            row.wiki_url = name_td.a['href']
+                            break
+        except Exception as e:
+            print(e)
+    if row.role == "Senator":
+
+        try:
+            uClient = uReq(wikipage_senate)
+            page_html = uClient.read()
+            uClient.close()
+
+            page_soup = BeautifulSoup(page_html, "lxml")
+            tables = page_soup.findAll("table")
+            rows = tables[3].findAll("tr")
+
+            for person in rows[1:]:
+                tds = person.findAll("td")
+                name_td = tds[1]
+                name = name_td.text
+                name = name.replace('\n', '')
+                party = tds[2].text
+                party = party.strip()
+
+                if party == "Democratic":
+                    party = "Democrat"
+
+                try:
+                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
+                        row.wiki_url = name_td.a['href']
+                        break
+                except:
+                    pass
+            if not row.wiki_url:
+                for person in rows[1:]:
+                    tds = person.findAll("td")
+                    name_td = tds[1]
+                    name = name_td.text
+                    name = name.replace('\n', '')
+                    party = tds[2].text
+                    party = party.strip()
+
+                    if party == "Democratic":
+                        party = "Democrat"
+
+                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+                    elif row.party == party and row.name_last in name.strip():
+                        row.wiki_url = name_td.a['href']
+                        break
+        except Exception as e:
+            print(e)
+            pass
+
+
 def scrape(url):
     print(url)
     row = scraper_utils.initialize_row()
@@ -295,6 +414,7 @@ def scrape(url):
     get_bio(browser, row)
     get_contact_info(browser, row)
     get_committees(browser, row)
+    get_wiki_url(row)
 
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
@@ -312,33 +432,41 @@ if __name__ == '__main__':
 
     print('Scraping data...')
 
-    # data = [scrape(url) for url in urls]
+    data = [scrape(url) for url in urls]
+    #data = scrape("https://www.wyoleg.gov/Legislators/2021/S/1985")
 
-    with Pool(processes=6) as pool:
-        data = pool.map(scrape, urls)
+    # with Pool(processes=6) as pool:
+    #     data = pool.map(scrape, urls)
 
     leg_df = pd.DataFrame(data)
     leg_df = leg_df.drop(columns="birthday")
     leg_df = leg_df.drop(columns="education")
 
-    # getting urls from wikipedia
-    wikipage_reps = "https://en.wikipedia.org/wiki/Wyoming_House_of_Representatives"
-    wikipage_senate = "https://en.wikipedia.org/wiki/Wyoming_Senate"
+
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Wyoming_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Wyoming_State_Senate"
 
     all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    print(all_wiki_links)
 
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, all_wiki_links)
+    with Pool(processes=4) as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last']]
+        ['birthday', 'education', 'name_first', 'name_last', 'wiki_url']]
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_first", "name_last"])
+                      on=["name_last", "wiki_url"])
 
     isna = big_df['education'].isna()
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     print('Scraping complete')
+
+    vacant_index = big_df.index[big_df['wiki_url'] == ''].tolist()
+    for index in vacant_index:
+        print(index)
+        big_df = big_df.drop(big_df.index[index])
 
     big_list_of_dicts = big_df.to_dict('records')
 

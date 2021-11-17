@@ -33,11 +33,14 @@ import pandas as pd
 from urllib.request import urlopen as uReq
 import psycopg2
 import datefinder
-import unidecode
+from unidecode import unidecode
+from bs4 import BeautifulSoup
 from functools import partial
 from psycopg2 import sql
 from datetime import datetime
 import json
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 # # Initialize config parser and get variables from config file
@@ -50,6 +53,27 @@ import json
 
 scraper_utils = USStateLegislatorScraperUtils('NC', 'us_nc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.ncleg.gov')
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
 
 
 # def get_urls(myurl):
@@ -427,6 +451,40 @@ def scrape_wiki_bio_Links(wikiUrl, role):
     # return wikiInfosDict
 
 
+def get_wiki_url(member_district, role, name_first, name_last):
+
+    wikipage_reps = "https://ballotpedia.org/North_Carolina_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/North_Carolina_State_Senate"
+
+    if role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id" : 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+        
+        if unidecode(name.last) == unidecode(name_last) and district_num == member_district:
+            link = name_td.a['href']
+            return link
+        
+
+
 def collect_legislator_details(biographyUrl):
     myurl = biographyUrl
     uClient = uReq(myurl)
@@ -539,7 +597,7 @@ def collect_legislator_details(biographyUrl):
     else:
         party = "Other/ Independent"
     party_id = scraper_utils.get_party_id(party)
-    fullname = unidecode.unidecode(fullname)
+    fullname = unidecode(fullname)
     hn = HumanName(fullname)
     name_first = hn.first
 
@@ -577,13 +635,19 @@ def collect_legislator_details(biographyUrl):
 
     committees = collect_legislator_committees(biographyUrl)
 
+    gender = scraper_utils.get_legislator_gender(name_first, hn.last)
+    if not gender:
+        gender = 'O'
+    wiki_url = get_wiki_url(district, role, name_first, hn.last)
+
     legDict = {'source_url': biographyUrl, 'name_full': fullname, 'name_first': name_first, 'name_last': hn.last,
                'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party, 'party_id': party_id,
                'district': district,
                'role': role, 'areas_served': areas_served, 'phone_numbers': phones,
                'occupation': occupation, 'email': email, 'military_experience': military_experience,
-               'addresses': addresses, 'committees': committees, 'most_recent_term_id': session}
-
+               'addresses': addresses, 'committees': committees, 'most_recent_term_id': session, 'gender': gender, "wiki_url":wiki_url}
+    # if legDict.get("wiki_url") is None:
+    #     print(legDict)
     return legDict
 
 
@@ -674,7 +738,7 @@ if __name__ == '__main__':
     big_df['state_id'] = sample_row.state_id
     #
     #
-    big_df['source_url'] = big_df['state_url']
+    big_df['source_url'] = big_df['source_url']
     big_df['country'] = sample_row.country
     # # #
     big_df['country_id'] = sample_row.country_id
@@ -688,8 +752,24 @@ if __name__ == '__main__':
     big_df['seniority'] = 0
     big_df['source_id'] = big_df['state_member_id']
 
-    print(big_df)
-    big_list_of_dicts = big_df.to_dict('records')
+
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/North_Carolina_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/North_Carolina_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    new_df = pd.merge(big_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    new_df.drop(big_df.index[new_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = new_df.to_dict('records')
     # print(big_list_of_dicts)
 
     print('Writing data to database...')
