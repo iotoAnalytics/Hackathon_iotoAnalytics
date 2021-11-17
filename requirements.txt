@@ -35,7 +35,7 @@ selenium
 # tokenizers==0.10.2
 torch 
 tqdm==4.59.0 
-# transformers==4.5.1
+transformers==4.5.1
 unidecode==1.2.0 
 urllib3==1.26.4
 utils==1.0.1 
