@@ -36,7 +36,6 @@ WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
 GENERAL_ASSEMBLY_YEAR = {
     '50': '2021'
 }
@@ -46,7 +45,7 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
     options = Options()
-    options.headless = False
+    options.headless = True
 
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
