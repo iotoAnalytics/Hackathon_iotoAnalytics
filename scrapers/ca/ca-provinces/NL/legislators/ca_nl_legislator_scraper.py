@@ -45,15 +45,13 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
     options = Options()
-    options.add_argument("--no-sandbox");
-    options.add_argument("--disable-dev-shm-usage");
     options.add_argument("--headless");
     
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL + MEMBER_PATH + '/members.aspx')
     driver.maximize_window()
-    sleep(2)
+    sleep(25)
 
     html = driver.page_source
     print(html)
