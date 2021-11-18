@@ -45,8 +45,9 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
     options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--User-Agent=IOTO International Inc./enquiries@ioto.ca')
+    options.addArguments("--no-sandbox");
+    options.addArguments("--disable-dev-shm-usage");
+    options.addArguments("--headless");
     
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
