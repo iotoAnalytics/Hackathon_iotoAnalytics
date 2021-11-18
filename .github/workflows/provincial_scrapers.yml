@@ -28,6 +28,13 @@ jobs:
       - name: echo
         run: echo "test"
         
+      - name: configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-west-2
+          role-to-assume: ${{ secrets.AWS_RDS_ROLE }}
+          role-session-name: MySessionName
+        
       - name: execute py script 
         run: |
           for py_file in $(find ./scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
