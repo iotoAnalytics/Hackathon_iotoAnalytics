@@ -49,6 +49,7 @@ jobs:
         run: |
           for py_file in $(find ./scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
           do 
+          echo $py_file
           python $py_file 
           done
           
