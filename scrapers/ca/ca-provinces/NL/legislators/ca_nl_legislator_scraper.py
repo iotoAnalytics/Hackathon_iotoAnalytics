@@ -45,9 +45,9 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
     options = Options()
-    options.addArguments("--no-sandbox");
-    options.addArguments("--disable-dev-shm-usage");
-    options.addArguments("--headless");
+    options.add_argument("--no-sandbox");
+    options.add_argument("--disable-dev-shm-usage");
+    options.add_argument("--headless");
     
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
