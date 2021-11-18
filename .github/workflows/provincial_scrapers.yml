@@ -30,7 +30,7 @@ jobs:
         
       - name: Allow Security group rule to connect Github Actions to PostgresSQL
         run: |
-          aws ec2 authorize-security-group-ingress --group-name openparlPermittedIPAddresses --protocol tcp --port 5438 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          aws ec2 authorize-security-group-ingress --group-name openparlPermittedIPAddresses --protocol tcp --port 5432 --cidr ${{ steps.ip.outputs.ipv4 }}/32
 
       - name: setup python
         uses: actions/setup-python@v2
@@ -54,5 +54,5 @@ jobs:
           
       - name: Deny Security group rule to connect Github Actions to Mongo-port
         run: |
-          aws ec2 revoke-security-group-ingress --group-name openparlPermittedIPAddresses --protocol tcp --port 5438 --cidr ${{ steps.ip.outputs.ipv4 }}/32
+          aws ec2 revoke-security-group-ingress --group-name openparlPermittedIPAddresses --protocol tcp --port 5432 --cidr ${{ steps.ip.outputs.ipv4 }}/32
         if: always()
