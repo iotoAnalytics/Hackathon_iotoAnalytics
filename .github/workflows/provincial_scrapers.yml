@@ -21,6 +21,13 @@ jobs:
         id: ip
         uses: haythem/public-ip@v1.2
         
+      - name: configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          aws-region: us-west-2
+          aws-access-key-id: ${{ secrets.AWS_RDS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_RDS_SECRET_ACCESS_KEY }}
+        
       - name: Allow Security group rule to connect Github Actions to PostgresSQL
         run: |
           aws ec2 authorize-security-group-ingress --group-name openparlPermittedIPAddresses --protocol tcp --port 5438 --cidr $/32
@@ -29,13 +36,6 @@ jobs:
         run: |
           aws ec2 revoke-security-group-ingress --group-name sg-mongo-from-github --protocol tcp --port 27017 --cidr $/32
         if: always()
-
-      - name: configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@master
-        with:
-          aws-region: us-west-2
-          aws-access-key-id: ${{ secrets.AWS_RDS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_RDS_SECRET_ACCESS_KEY }}
 
       - name: setup python
         uses: actions/setup-python@v2
