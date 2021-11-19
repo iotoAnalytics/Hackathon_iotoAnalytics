@@ -53,7 +53,7 @@ def scrape(url):
     options.add_argument("--disable-extensions")
     options.add_argument('--User-Agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca')
     
-    driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+    driver = webdriver.Chrome(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install(), options=options)
     driver.switch_to.default_content()
     driver.get(BASE_URL + MEMBER_PATH + '/members.aspx')
     driver.maximize_window()
