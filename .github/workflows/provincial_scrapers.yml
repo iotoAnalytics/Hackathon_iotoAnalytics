@@ -14,8 +14,13 @@ jobs:
       id-token: write
       contents: read
     steps:       
+      - name: setup chrome
       - uses: browser-actions/setup-chrome@latest
-      - run: chrome --version
+    
+      - name: run chrome once to initialize
+        run: |
+          Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
+          Stop-Process -Name chrome
 
       - name: checkout repo content
         uses: actions/checkout@v2 # checkout the repository content to github runner
