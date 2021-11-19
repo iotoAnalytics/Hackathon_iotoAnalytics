@@ -43,9 +43,6 @@ jobs:
         with:
           python-version: '3.8' # install the python version needed
         
-      - name: setup selenium
-        uses: nanasess/setup-chromedriver@master
-        
       - name: install python packages
         run: |
           python -m pip install --upgrade pip
@@ -53,12 +50,8 @@ jobs:
           
       - name: execute py script 
         run: |
-          $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
-          foreach ($file in $files) {
-          echo "Running File: " $file.FullName
+          $file = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *bc_legislator_scraper.py
           python $file
-          echo "Complete running " $file.FullName
-          }
           
       - name: Deny Security group rule to connect Github Actions to PostgresSQL
         run: |
