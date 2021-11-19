@@ -49,7 +49,7 @@ jobs:
         run: echo "test"
         
       - name: execute py script 
-        run: |=
+        run: |
           for py_file in $(find ./scrapers/ca/ca-provinces -name "*_bc_legislator_scraper.py") 
           do 
           echo $py_file
