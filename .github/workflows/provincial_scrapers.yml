@@ -49,8 +49,8 @@ jobs:
         run: echo "test"
         
       - name: execute py script 
-        run: |
-          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
+        run: |=
+          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_bc_legislator_scraper.py") 
           do 
           echo $py_file
           python $py_file 
