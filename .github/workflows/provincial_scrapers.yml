@@ -18,7 +18,7 @@ jobs:
         uses: browser-actions/setup-chrome@latest
         
       - name: download chrome
-      - run: chrome --version
+        run: chrome --version
         with: 
           chrome-version: latest
           
