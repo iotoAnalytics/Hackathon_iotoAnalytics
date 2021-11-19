@@ -13,11 +13,7 @@ jobs:
     permissions:
       id-token: write
       contents: read
-    steps:
-      - name: execute py script 
-        run: |
-          Get-Childitem -Path *_legislator_scraper.py | Resolve-Path -Relative | % {python $_.FullName}
-          
+    steps:       
       - name: checkout repo content
         uses: actions/checkout@v2 # checkout the repository content to github runner
         
@@ -49,16 +45,12 @@ jobs:
           python -m pip install --upgrade pip
           pip3 install -r requirements.txt
           
-      - name: echo
-        run: echo "test"
-        
       - name: execute py script 
         run: |
-          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_bc_legislator_scraper.py") 
-          do 
-          echo $py_file
-          python $py_file 
-          done
+          $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
+          foreach ($file in $files) {
+          python $file
+          }
           
       - name: Deny Security group rule to connect Github Actions to PostgresSQL
         run: |
