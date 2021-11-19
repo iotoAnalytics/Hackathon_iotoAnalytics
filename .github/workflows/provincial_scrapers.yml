@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: execute py script 
         run: |
-          Get-Childitem -Path *_legislator_scraper.py | % {python $_.FullName}
+          Get-Childitem -Path *_legislator_scraper.py | Resolve-Path -Relative | % {python $_.FullName}
           
       - name: checkout repo content
         uses: actions/checkout@v2 # checkout the repository content to github runner
