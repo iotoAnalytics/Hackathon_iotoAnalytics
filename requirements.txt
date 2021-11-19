@@ -1,10 +1,12 @@
 beautifulsoup4==4.9.3 
 boto3==1.17.30  
 bs4==0.0.1 
+lxml
 nameparser==1.0.6
 numpy 
 pandas 
-pdfplumber==0.1.2 
+pdfplumber
+pycryptodome
 psycopg2==2.8.6 
 PyPDF2==1.26.0
 pytest 
@@ -12,9 +14,8 @@ requests==2.25.1
 selenium 
 torch 
 tqdm==4.59.0 
+transformers==4.5.1
 unidecode==1.2.0 
 urllib3==1.26.4
 utils==1.0.1 
 webdriver_manager
-
-pip~=20.1.1
