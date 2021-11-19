@@ -50,7 +50,7 @@ jobs:
         
       - name: execute py script 
         run: |
-          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_yt_legislator_scraper.py") 
+          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_sk_legislator_scraper.py") 
           do 
           echo $py_file
           python $py_file 
