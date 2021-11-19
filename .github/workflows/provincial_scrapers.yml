@@ -16,11 +16,7 @@ jobs:
     steps:
       - name: execute py script 
         run: |
-          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_bc_legislator_scraper.py") 
-          do 
-          echo $py_file
-          python $py_file 
-          done
+          ls ./scrapers/ca/ca-provinces/*_legislator_scraper.py | %{ python $_.Fullname}
           
       - name: checkout repo content
         uses: actions/checkout@v2 # checkout the repository content to github runner
