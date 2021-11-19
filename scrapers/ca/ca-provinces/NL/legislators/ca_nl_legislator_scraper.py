@@ -15,6 +15,7 @@ from pprint import pprint
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.utils import ChromeType
 from time import sleep
 from tqdm import tqdm
 from unidecode import unidecode
