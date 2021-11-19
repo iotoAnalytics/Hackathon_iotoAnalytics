@@ -292,45 +292,48 @@ def get_wiki_people(link):
     scraper_utils.crawl_delay(crawl_delay)
     return people_links
 
+try:
+    if __name__ == '__main__':
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        members_link = 'https://www.leg.bc.ca/learn-about-us/members'
+        # First we'll get the URLs we wish to scrape:
+        urls = get_urls(members_link)
 
-if __name__ == '__main__':
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    members_link = 'https://www.leg.bc.ca/learn-about-us/members'
-    # First we'll get the URLs we wish to scrape:
-    urls = get_urls(members_link)
-
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
-    big_df = pd.DataFrame(data)
-    big_df = big_df.drop(columns = ["birthday", "occupation", "education"])
+        with Pool() as pool:
+            data = pool.map(scrape, urls)
+        big_df = pd.DataFrame(data)
+        big_df = big_df.drop(columns = ["birthday", "occupation", "education"])
 
 
-    # get missing data from wikipedia
+        # get missing data from wikipedia
 
-    wiki_bc_parliaments_link = 'https://en.wikipedia.org/wiki/Parliament_of_British_Columbia'
-    wiki_people = get_wiki_people(wiki_bc_parliaments_link)
+        wiki_bc_parliaments_link = 'https://en.wikipedia.org/wiki/Parliament_of_British_Columbia'
+        wiki_people = get_wiki_people(wiki_bc_parliaments_link)
 
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
+        with Pool() as pool:
+            wiki_data = pool.map(scraper_utils.scrape_wiki_bio, wiki_people)
 
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'education', 'birthday', 'wiki_url']]
-    # print(wiki_df)
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['occupation', 'education', 'birthday', 'wiki_url']]
+        # print(wiki_df)
 
-    mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
-                              "wiki_url"])
+        mergedRepsData = pd.merge(big_df, wiki_df, how='left', on=[
+                                "wiki_url"])
 
-    mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
-    mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
-    mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
+        mergedRepsData['birthday'] = mergedRepsData['birthday'].replace({np.nan: None})
+        mergedRepsData['occupation'] = mergedRepsData['occupation'].replace({np.nan: None})
+        mergedRepsData['education'] = mergedRepsData['education'].replace({np.nan: None})
 
-    big_df = mergedRepsData
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+        big_df = mergedRepsData
+        big_list_of_dicts = big_df.to_dict('records')
+        # print(big_list_of_dicts)
 
-    print('Writing data to database...')
+        print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+        scraper_utils.write_data(big_list_of_dicts)
 
-    print('Complete!')
+        print('Complete!')
+except Exception as e:
+    print(e)
+    sys.exit(2)
