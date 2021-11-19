@@ -16,6 +16,8 @@ jobs:
     steps:       
       - name: setup chrome
         uses: browser-actions/setup-chrome@latest
+        
+      - name: download chrome
         run: chrome --version
       
       - name: checkout repo content
