@@ -19,5 +19,3 @@ unidecode==1.2.0
 urllib3==1.26.4
 utils==1.0.1 
 webdriver_manager
-
-pip~=20.1.1
