@@ -49,6 +49,7 @@ with db.CursorFromConnectionFromPool() as cur:
                         'legislation_goverlytics_id': item['goverlytics_id'],   
                         'bill_name': item['bill_name'],
                         'current_status': item['current_status'],
+                        'passed': temp_vote_obj['passed'],
                         'topic': item['topic']
                     }]
 
@@ -71,6 +72,7 @@ with db.CursorFromConnectionFromPool() as cur:
             legislation_goverlytics_id text,
             bill_name text,
             current_status text,
+            passed int,
             topic text,
         UNIQUE (legislator_goverlytics_id, legislation_goverlytics_id, vote_session_date, vote_description)
         );
@@ -80,13 +82,14 @@ with db.CursorFromConnectionFromPool() as cur:
     cur.connection.commit()
     insert_data_query = sql.SQL("""
         INSERT INTO {table}
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (legislator_goverlytics_id, legislation_goverlytics_id, vote_session_date, vote_description) DO UPDATE SET 
             name = excluded.name,
             vote_text = excluded.vote_text,
             bill_name = excluded.bill_name,
             session = excluded.session,
             current_status = excluded.current_status,
+            passed = excluded.passed,
             topic = excluded.topic
     """).format(table=sql.Identifier(make_table_name))
     
@@ -96,7 +99,7 @@ with db.CursorFromConnectionFromPool() as cur:
         if row.legislator_goverlytics_id:
             tup = (row.legislator_goverlytics_id, row.name, row.vote_text, row.vote_session_date,
                     row.vote_description, row.session, row.legislation_goverlytics_id, row.bill_name, row.current_status,
-                    row.topic)
+                    row.passed, row.topic)
             try:
                 cur.execute(insert_data_query, tup)
             except Exception as e:
