@@ -20,7 +20,7 @@ from bs4 import BeautifulSoup as soup
 from database import Database, CursorFromConnectionFromPool, Persistence
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from genderComputer.genderComputer import GenderComputer # Must download repo on iotoAnalytics/genderComputer
+from genderComputer.genderComputer import GenderComputer
 from nameparser import HumanName
 from pandas.core.computation.ops import UndefinedVariableError
 from rows import *
