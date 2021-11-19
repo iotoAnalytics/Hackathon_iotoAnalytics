@@ -49,7 +49,9 @@ jobs:
         run: |
           $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
           foreach ($file in $files) {
+          echo "Running File: " $file.FullName
           python $file
+          echo "Complete running " $file.FullName
           }
           
       - name: Deny Security group rule to connect Github Actions to PostgresSQL
