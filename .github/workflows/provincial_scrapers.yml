@@ -18,8 +18,10 @@ jobs:
         uses: browser-actions/setup-chrome@latest
         
       - name: download chrome
-        run: chrome --version
-      
+      - run: chrome --version
+        with: 
+          chrome-version: latest
+          
       - name: checkout repo content
         uses: actions/checkout@v2 # checkout the repository content to github runner
         
