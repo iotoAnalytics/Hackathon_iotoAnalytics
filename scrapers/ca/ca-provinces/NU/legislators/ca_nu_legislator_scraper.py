@@ -1,22 +1,25 @@
-import sys
-import os
-from pathlib import Path
-import re
 import datetime
+import os
+import re
+import sys
+import traceback
+
+from pathlib import Path
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen
+import pandas as pd
+import numpy as np
+
 from bs4 import BeautifulSoup as soup
 from bs4 import NavigableString
 from multiprocessing import Pool
 from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from urllib.request import urlopen
 from unidecode import unidecode
-import pandas as pd
-import numpy as np
 
 BASE_URL = 'https://www.assembly.nu.ca'
 MLA_URL = BASE_URL + '/members/mla'
@@ -553,5 +556,5 @@ try:
     if __name__ == '__main__':
         program_driver()
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

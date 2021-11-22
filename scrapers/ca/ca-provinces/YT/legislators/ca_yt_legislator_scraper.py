@@ -1,25 +1,28 @@
-import sys
-import os
-from pathlib import Path
-import re
 import datetime
+import os
+import re
+import sys
+import traceback
+
+from pathlib import Path
 from time import sleep
 
 NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen
+import pandas as pd
+import numpy as np
+
 from bs4 import BeautifulSoup as soup
 from multiprocessing import Pool
 from nameparser import HumanName
-import pandas as pd
-import numpy as np
+from scraper_utils import CAProvTerrLegislatorScraperUtils
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from unidecode import unidecode
+from urllib.request import urlopen
+from webdriver_manager.chrome import ChromeDriverManager
 
 BASE_URL = 'https://yukonassembly.ca'
 MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
@@ -476,5 +479,5 @@ try:
     if __name__ == '__main__':
         program_driver()
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

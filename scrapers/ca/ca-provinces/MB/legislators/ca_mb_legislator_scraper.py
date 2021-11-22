@@ -1,21 +1,21 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
-from bs4 import BeautifulSoup as soup
-import requests
-from multiprocessing import Pool
-
-from nameparser import HumanName
-import pandas as pd
-from unidecode import unidecode
 import numpy as np
+import pandas as pd
+
+from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
+from urllib.request import urlopen as uReq
 
 base_url = 'https://www.gov.mb.ca'
 
@@ -275,5 +275,5 @@ try:
 
         print('Complete!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

@@ -1,16 +1,16 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
 from bs4 import BeautifulSoup
+from multiprocessing import Pool
 from nameparser import HumanName
 from request_url import UrlRequest
-
-from multiprocessing import Pool
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 
 header = {
@@ -138,5 +138,5 @@ try:
         scraper_utils.write_data(data)
         print('Complete!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

@@ -1,9 +1,16 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
+
+import numpy as np
+import pandas as pd
+import re
+import time
 
 from bs4 import BeautifulSoup as soup
 from multiprocessing import Pool
@@ -11,11 +18,6 @@ from nameparser import HumanName as hn
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen
 from unidecode import unidecode
-
-import pandas as pd
-import re
-import time
-import numpy as np
 
 BASE_GOV_WEBSITE = 'https://www.gnb.ca'
 GOV_SITE_WITH_LINK_TO_MLAS = BASE_GOV_WEBSITE + '/legis/index-e.asp'
@@ -347,5 +349,5 @@ try:
         time_elapsed = time_after_running - time_before_running
         print(f'Scraper ran in {time_elapsed} seconds')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

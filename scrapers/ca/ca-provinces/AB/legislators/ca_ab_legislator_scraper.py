@@ -1,19 +1,23 @@
-import sys
+'''
+TODO: source_url that we thought was unique isn't always unique.
+'''
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
 import numpy as np
-from unidecode import unidecode
 import pandas as pd
-from nameparser import HumanName
 
-from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
 from urllib.request import urlopen as uReq
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
@@ -297,5 +301,5 @@ try:
 
         print('Complete!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)
