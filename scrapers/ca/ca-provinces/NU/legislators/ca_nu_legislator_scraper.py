@@ -36,6 +36,8 @@ NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY = {
                                     2 : 2004,
                                     3 : 2008,
                                     4 : 2013,
+                                    5 : 2017,
+                                    6 : 2021,
                                     }
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NU', 'ca_nu_legislators')
@@ -273,6 +275,7 @@ class MLASiteScraper:
     def __get_electoral_district(self, container):
         container_text = container.text
         riding = container_text.replace('Constituency:', '')
+        riding = riding.replace(' - ', '-')
         return riding.strip()
 
     def __set_role_data(self):
@@ -290,7 +293,7 @@ class MLASiteScraper:
         constituency_office_container = self.__get_constituency_office_container()
 
         self.row.addresses = self.__get_addresses(constituency_office_container)
-        self.row.email = self.__get_email(legislative_office_container)
+        self.row.email = self.__get_email(legislative_office_container, constituency_office_container)
         self.row.phone_numbers = self.__get_phone_numebers(legislative_office_container, constituency_office_container)
 
     def __get_legislative_office_container(self):
@@ -320,13 +323,24 @@ class MLASiteScraper:
                                    'address' : address})
         return constituencies
 
-    def __get_email(self, container):
+    def __get_email(self, container1, container2):
         '''
         Website is loaded by Javascript and changes the text
         Could use Selenium but this method will be faster.
         '''
-        address_container = container.find('span', {'class' : 'spamspan'})
-        email = address_container.text
+        address_container = container1.find('span', {'class' : 'spamspan'})
+        try:
+            email = address_container.text
+        except:
+            print(f"No legislative email currently for member {self.row.name_full}")
+        
+        try:
+            address_container = container2.find('span', {'class' : 'spamspan'})
+            email = address_container.text
+        except:
+            print(f"No legislative email currently for member {self.row.name_full}")
+            email = ''
+            
         return self.__format_email_address(email)
     
     def __format_email_address(self, email):
@@ -339,16 +353,26 @@ class MLASiteScraper:
         constituency_numbers = self.__get__numbers_from_container(constituency_container)
         index_of_phone_number = 0
         index_of_fax_number = 1
-
-        legislative_phone = self.__get_number('legislative office phone', 
-                                               legislative_numbers[index_of_phone_number])
-        legislative_fax = self.__get_number('legislative office fax',
-                                           legislative_numbers[index_of_fax_number])
-        constituency_phone = self.__get_number('constituency office phone', 
-                                               constituency_numbers[index_of_phone_number])
-        constituency_fax = self.__get_number('constituency office fax', 
-                                               constituency_numbers[index_of_fax_number])
-        return [legislative_phone, legislative_fax, constituency_phone, constituency_fax]
+        return_list = []
+        try:
+            legislative_phone = self.__get_number('legislative office phone', 
+                                                legislative_numbers[index_of_phone_number])
+            legislative_fax = self.__get_number('legislative office fax',
+                                            legislative_numbers[index_of_fax_number])
+            return_list.extend([legislative_phone, legislative_fax])
+        except:
+            print(f"No legislative numbers currently for member {self.row.name_full}")
+            
+        try:
+            constituency_phone = self.__get_number('constituency office phone', 
+                                                constituency_numbers[index_of_phone_number])
+            constituency_fax = self.__get_number('constituency office fax', 
+                                                constituency_numbers[index_of_fax_number])
+            return_list.extend([constituency_phone, constituency_fax])
+        except:
+            print(f"No constituency numbers currently for member {self.row.name_full}")
+            
+        return return_list
 
     def __get__numbers_from_container(self, container):
         text = container.text
