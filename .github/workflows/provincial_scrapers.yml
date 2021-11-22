@@ -42,9 +42,6 @@ jobs:
           python -m pip install --upgrade pip
           pip3 install -r requirements.txt
           
-      - name: echo
-        run: echo "test"
-        
       - name: temporary testing script
         run: |
           Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
