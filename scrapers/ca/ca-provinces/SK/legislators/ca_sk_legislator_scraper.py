@@ -126,14 +126,17 @@ def scrape(info_dict):
     scraper_utils.crawl_delay(crawl_delay)
     return row
 
-
-if __name__ == '__main__':
-    links = get_legislator_links(url)
-    wiki_links = get_wiki_links(wiki_url)
-    info_dict = make_diction(links, wiki_links)
-    print('Made dictionaries')
-    with Pool() as pool:
-        data = pool.map(scrape, info_dict)
-    print('Done Scraping!')
-    scraper_utils.write_data(data)
-    print('Complete!')
+try:
+    if __name__ == '__main__':
+        links = get_legislator_links(url)
+        wiki_links = get_wiki_links(wiki_url)
+        info_dict = make_diction(links, wiki_links)
+        print('Made dictionaries')
+        with Pool() as pool:
+            data = pool.map(scrape, info_dict)
+        print('Done Scraping!')
+        scraper_utils.write_data(data)
+        print('Complete!')
+except Exception as e:
+    print(e)
+    sys.exit(1)

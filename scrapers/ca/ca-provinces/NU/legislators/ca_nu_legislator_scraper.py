@@ -549,5 +549,9 @@ PreProgramFunctions().update_term_and_legislature_dict(elections_page_soup)
 # print(CURRENT_LEGISLATURE_TERM)
 # print(NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY)
 
-if __name__ == '__main__':
-    program_driver()
+try:
+    if __name__ == '__main__':
+        program_driver()
+except Exception as e:
+    print(e)
+    sys.exit(1)

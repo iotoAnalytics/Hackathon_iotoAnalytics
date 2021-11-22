@@ -457,5 +457,9 @@ class MLA_Site_Scraper:
 main_page_soup = Main_Functions().get_page_as_soup(MLA_URL)
 Main_Functions().update_term_and_legislature_dict(main_page_soup)
 
-if __name__ == '__main__':
-    program_driver()
+try:
+    if __name__ == '__main__':
+        program_driver()
+except Exception as e:
+    print(e)
+    sys.exit(1)

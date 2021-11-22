@@ -308,41 +308,44 @@ assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
 # get list of assembly members' bio pages
 assembly_members = getAssemblyLinks(assembly_link)
 
+try:
+    if __name__ == '__main__':
+        with Pool() as pool:
+            leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        leg_df = pd.DataFrame(leg_data)
 
-if __name__ == '__main__':
-    with Pool() as pool:
-        leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    leg_df = pd.DataFrame(leg_data)
+        leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active'])
 
-    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active'])
+        # get my missing info from wikipedia
+        wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
+        wiki_people = get_wiki_people(wiki_link)
 
-    # get my missing info from wikipedia
-    wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
-    wiki_people = get_wiki_people(wiki_link)
+        with Pool() as pool:
+            wiki_data = pool.map(
+                func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+        wiki_df = pd.DataFrame(wiki_data)
 
-    with Pool() as pool:
-        wiki_data = pool.map(
-            func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
-    wiki_df = pd.DataFrame(wiki_data)
+        wikidf = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
+        # print(wikidf)
+        big_df = pd.merge(leg_df, wikidf, how='left',
+                        on=["wiki_url"])
 
-    wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
-    # print(wikidf)
-    big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["wiki_url"])
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
 
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+        big_list_of_dicts = big_df.to_dict('records')
+        # print(big_list_of_dicts)
 
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+        print('Writing data to database...')
 
-    print('Writing data to database...')
+        scraper_utils.write_data(big_list_of_dicts)
 
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print('Complete!')
+        print('Complete!')
+except Exception as e:
+    print(e)
+    sys.exit(1)

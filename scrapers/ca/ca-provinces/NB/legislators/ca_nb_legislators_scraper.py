@@ -338,10 +338,14 @@ committees_urls_and_names = Utils().get_committees_urls_and_names()
 for url_and_name in committees_urls_and_names:
     COMMITTEES.append(Committee(url_and_name.get('url'), url_and_name.get('committee_name')))
 
-if __name__ == '__main__':
-    time_before_running = time.time()
-    print("Beginning scraper...")
-    program_driver()
-    time_after_running = time.time()
-    time_elapsed = time_after_running - time_before_running
-    print(f'Scraper ran in {time_elapsed} seconds')
+try:
+    if __name__ == '__main__':
+        time_before_running = time.time()
+        print("Beginning scraper...")
+        program_driver()
+        time_after_running = time.time()
+        time_elapsed = time_after_running - time_before_running
+        print(f'Scraper ran in {time_elapsed} seconds')
+except Exception as e:
+    print(e)
+    sys.exit(1)

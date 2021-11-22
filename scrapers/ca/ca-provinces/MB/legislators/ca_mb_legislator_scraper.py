@@ -232,45 +232,48 @@ def scrape_main_wiki(link):
     scraper_utils.crawl_delay(crawl_delay)
     return wiki_urls
 
+try:
+    if __name__ == '__main__':
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
 
-if __name__ == '__main__':
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
+        members_link = 'https://www.gov.mb.ca/legislature/members/mla_list_constituency.html'
 
-    members_link = 'https://www.gov.mb.ca/legislature/members/mla_list_constituency.html'
+        member_bios = scrape_main_page(members_link)
 
-    member_bios = scrape_main_page(members_link)
+        with Pool() as pool:
 
-    with Pool() as pool:
+            data = pool.map(func=collect_mla_data, iterable=member_bios)
+        leg_df = pd.DataFrame(data)
+        # drop columns that we'll get from wikipedia instead
+        leg_df = leg_df.drop(columns=[
+                            'birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
 
-        data = pool.map(func=collect_mla_data, iterable=member_bios)
-    leg_df = pd.DataFrame(data)
-    # drop columns that we'll get from wikipedia instead
-    leg_df = leg_df.drop(columns=[
-                         'birthday', 'education', 'occupation', 'years_active', 'most_recent_term_id'])
+        wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba'
+        wiki_bios = scrape_main_wiki(wiki_link)
+        with Pool() as pool:
+            wiki_data = pool.map(
+                func=scraper_utils.scrape_wiki_bio, iterable=wiki_bios)
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['occupation', 'education', 'birthday', 'wiki_url', 'years_active', 'most_recent_term_id']
+        ]
 
-    wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Manitoba'
-    wiki_bios = scrape_main_wiki(wiki_link)
-    with Pool() as pool:
-        wiki_data = pool.map(
-            func=scraper_utils.scrape_wiki_bio, iterable=wiki_bios)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'education', 'birthday', 'wiki_url', 'years_active', 'most_recent_term_id']
-    ]
+        big_df = pd.merge(leg_df, wiki_df, how='left',
+                        on=["wiki_url"])
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
+        big_df['most_recent_term_id'] = big_df['most_recent_term_id'].replace({np.nan: None})
 
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["wiki_url"])
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
-    big_df['most_recent_term_id'] = big_df['most_recent_term_id'].replace({np.nan: None})
+        big_list_of_dicts = big_df.to_dict('records')
+        # print(big_list_of_dicts)
 
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+        print('Writing data to database...')
 
-    print('Writing data to database...')
+        scraper_utils.write_data(big_list_of_dicts)
 
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print('Complete!')
+        print('Complete!')
+except Exception as e:
+    print(e)
+    sys.exit(1)
