@@ -45,13 +45,41 @@ jobs:
       - name: echo
         run: echo "test"
         
-      - name: execute py script 
+      - name: temporary testing script
         run: |
-          for py_file in $(find ./scrapers/ca/ca-provinces -name "*_legislator_scraper.py") 
-          do 
-          echo $py_file
-          python $py_file 
-          done
+          Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
+          Start-Sleep -s 10
+          $file1 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *nu_legislator_scraper.py
+          $file2 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *on_legislator_scraper.py
+          $file3 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *pe_legislator_scraper.py
+          $file4 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *qc_legislator_scraper.py
+          $file5 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *sk_legislator_scraper.py
+          $file6 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *yt_legislator_scraper.py
+
+          $files = @($file1, $file2, $file3, $file4, $file5, $file6)
+
+          foreach ($file in $files) {
+          echo "Running File: " $file.FullName
+          python $file
+          if ($LASTEXITCODE -ne 0) {
+            Exit 1
+          }
+          echo "Complete running " $file.FullName
+          }
+
+      # - name: execute py script 
+      #   run: |
+      #     Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
+      #     Start-Sleep -s 10
+      #     $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
+      #     foreach ($file in $files) {
+      #     echo "Running File: " $file.FullName
+      #     python $file
+      #     if ($LASTEXITCODE -ne 0) {
+      #       Exit 1
+      #     }
+      #     echo "Complete running " $file.FullName
+      #     }
           
       - name: Deny Security group rule to connect Github Actions to Mongo-port
         run: |
