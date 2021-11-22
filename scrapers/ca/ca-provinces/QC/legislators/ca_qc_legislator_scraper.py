@@ -1,34 +1,27 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
+import numpy as np
 import pandas as pd
-import bs4
+import unidecode
+
+from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
 from urllib.request import urlopen as uReq
 from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import psycopg2
-from nameparser import HumanName
-import requests
-import datefinder
-import unidecode
-from multiprocessing import Pool
-import datetime
-import re
-import numpy as np
-from datetime import datetime
-from unidecode import unidecode
-
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
-
 
 def getAssemblyLinks(myurl):
     infos = []
@@ -347,5 +340,5 @@ try:
 
         print('Complete!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

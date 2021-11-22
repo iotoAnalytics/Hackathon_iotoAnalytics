@@ -1,25 +1,26 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-from datetime import datetime
+import pandas as pd
 import numpy as np
 import re
 import datetime
-from multiprocessing import Pool
-from unidecode import unidecode
-from request_url import UrlRequest
-from nameparser import HumanName
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from bs4 import BeautifulSoup
-from urllib.request import urlopen as uReq
-import pandas as pd
 
+from bs4 import BeautifulSoup
+from datetime import datetime
+from multiprocessing import Pool
+from nameparser import HumanName
+from request_url import UrlRequest
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
+from urllib.request import urlopen as uReq
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('ON', 'ca_on_legislators')
 url = 'https://www.ola.org/en/members/current'
@@ -229,5 +230,5 @@ try:
         scraper_utils.write_data(big_list_of_dicts)
         print('complete!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

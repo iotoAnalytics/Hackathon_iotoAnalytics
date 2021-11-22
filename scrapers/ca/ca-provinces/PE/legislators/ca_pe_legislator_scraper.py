@@ -1,23 +1,27 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-import re
 import numpy as np
-from nameparser import HumanName
-from multiprocessing import Pool
 import pandas as pd
-from bs4 import BeautifulSoup
-import time
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
-from unidecode import unidecode
-from datetime import datetime
+import re
 import ssl
+import time
+
+from bs4 import BeautifulSoup
+from datetime import datetime
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
+from urllib.request import urlopen as uReq
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 prov_abbreviation = 'PE'
@@ -332,5 +336,5 @@ try:
 
         print(f'Scraper ran successfully!')
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)

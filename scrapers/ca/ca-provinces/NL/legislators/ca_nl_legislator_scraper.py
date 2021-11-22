@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import re
 import sys
+import traceback
 from multiprocessing import Pool
 
 from bs4 import BeautifulSoup
@@ -361,10 +362,10 @@ def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, e
 
 def main():
     print('NEWFOUNDLAND AND LABRADOR!')
-    print('She\'s a rocky isle in the ocean ♫ ♫ ♫')
-    print('And she\'s pounded by wind from the sea ♫ ♫ ♫')
-    print('You might think that she\'s rugged and cold ♫ ♫ ♫')
-    print('But she\'s home sweet home to me. ♫ ♫ ♫')
+    print('She\'s a rocky isle in the ocean')
+    print('And she\'s pounded by wind from the sea')
+    print('You might think that she\'s rugged and cold')
+    print('But she\'s home sweet home to me.')
 
     print('\nSCRAPING NEWFOUNDLAND AND LABRADOR LEGISLATORS\n')
 
@@ -408,5 +409,5 @@ try:
     if __name__ == '__main__':
         main()
 except Exception as e:
-    print(e)
+    traceback.print_exc()
     sys.exit(1)
