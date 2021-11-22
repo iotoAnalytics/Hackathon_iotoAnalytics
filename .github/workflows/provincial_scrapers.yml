@@ -46,14 +46,11 @@ jobs:
         run: |
           Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
           Start-Sleep -s 10
-          $file1 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *nu_legislator_scraper.py
-          $file2 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *on_legislator_scraper.py
-          $file3 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *pe_legislator_scraper.py
-          $file4 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *qc_legislator_scraper.py
-          $file5 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *sk_legislator_scraper.py
-          $file6 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *yt_legislator_scraper.py
+          $file1 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *qc_legislator_scraper.py
+          $file2 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *sk_legislator_scraper.py
+          $file3 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *yt_legislator_scraper.py
 
-          $files = @($file1, $file2, $file3, $file4, $file5, $file6)
+          $files = @($file1, $file2, $file3)
 
           foreach ($file in $files) {
           echo "Running File: " $file.FullName
