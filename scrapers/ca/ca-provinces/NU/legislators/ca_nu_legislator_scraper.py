@@ -36,6 +36,8 @@ NTH_TO_YEAR_LEGISLATIVE_ASSEMBLY = {
                                     2 : 2004,
                                     3 : 2008,
                                     4 : 2013,
+                                    5 : 2017,
+                                    6 : 2021,
                                     }
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NU', 'ca_nu_legislators')
