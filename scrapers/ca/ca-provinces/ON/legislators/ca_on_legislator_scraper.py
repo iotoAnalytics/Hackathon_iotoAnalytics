@@ -29,8 +29,7 @@ crawl_delay = scraper_utils.get_crawl_delay(url)
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Ontario'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-current_year = datetime.datetime.now().year
-
+current_year = datetime.now().year
 
 def get_links(url):
     links = []
