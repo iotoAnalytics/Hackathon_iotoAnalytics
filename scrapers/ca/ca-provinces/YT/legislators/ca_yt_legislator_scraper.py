@@ -472,5 +472,9 @@ class ScraperForCommittee:
         names = names_container.find_elements_by_tag_name('span')
         return [{name.text : 'member'} for name in names]
 
-if __name__ == '__main__':
-    program_driver()
+try:
+    if __name__ == '__main__':
+        program_driver()
+except Exception as e:
+    print(e)
+    sys.exit(1)

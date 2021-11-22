@@ -194,37 +194,40 @@ def get_biography_from_wiki(link):
     main_content = page_soup.find("div", {"id" : "content"}).text
     return main_content
 
+try:
+    if __name__ == '__main__':
+        # pd.set_option('display.max_rows', None)
+        # pd.set_option('display.max_columns', None)
 
-if __name__ == '__main__':
-    # pd.set_option('display.max_rows', None)
-    # pd.set_option('display.max_columns', None)
+        legislator_links = get_links(url)
+        wiki_links = get_wiki_links(wiki_url)
+        dict_lst = make_diction(legislator_links, wiki_links)
 
-    legislator_links = get_links(url)
-    wiki_links = get_wiki_links(wiki_url)
-    dict_lst = make_diction(legislator_links, wiki_links)
+        print('done making dict lists')
+        with Pool() as pool:
+            mla_data = pool.map(scrape, dict_lst)
 
-    print('done making dict lists')
-    with Pool() as pool:
-        mla_data = pool.map(scrape, dict_lst)
+        leg_df = pd.DataFrame(mla_data)
+        # drop columns that we'll get from wikipedia instead
+        leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
 
-    leg_df = pd.DataFrame(mla_data)
-    # drop columns that we'll get from wikipedia instead
-    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
+        with Pool() as pool:
+            wiki_data = pool.map(
+                func=scraper_utils.scrape_wiki_bio, iterable=wiki_links)
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'wiki_url', 'occupation']
+        ]
 
-    with Pool() as pool:
-        wiki_data = pool.map(
-            func=scraper_utils.scrape_wiki_bio, iterable=wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'wiki_url', 'occupation']
-    ]
+        big_df = pd.merge(leg_df, wiki_df, how='left',
+                        on=["wiki_url"])
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
 
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["wiki_url"])
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
-
-    big_list_of_dicts = big_df.to_dict('records')
-    print('done collecting data')
-    scraper_utils.write_data(big_list_of_dicts)
-    print('complete!')
+        big_list_of_dicts = big_df.to_dict('records')
+        print('done collecting data')
+        scraper_utils.write_data(big_list_of_dicts)
+        print('complete!')
+except Exception as e:
+    print(e)
+    sys.exit(1)

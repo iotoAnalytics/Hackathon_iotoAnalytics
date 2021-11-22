@@ -336,4 +336,4 @@ try:
         print('Complete!')
 except Exception as e:
     print(e)
-    sys.exit(2)
+    sys.exit(1)

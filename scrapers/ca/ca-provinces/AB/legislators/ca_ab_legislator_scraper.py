@@ -261,7 +261,6 @@ def scrape_wiki(link):
 
 try:
     if __name__ == '__main__':
-        raise Exception()
         pd.set_option('display.max_rows', None)
         pd.set_option('display.max_columns', None)
         members_link = 'https://www.assembly.ab.ca/members/members-of-the-legislative-assembly/chamber-seating-plan'
