@@ -10,6 +10,7 @@ sys.path.insert(0, str(p))
 
 import numpy as np
 import pandas as pd
+import ssl
 import unidecode
 
 from bs4 import BeautifulSoup as soup
@@ -18,6 +19,8 @@ from nameparser import HumanName
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from unidecode import unidecode
 from urllib.request import urlopen
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 # crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
@@ -297,7 +300,6 @@ def get_wiki_people(repLink):
 
 
 assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
-# get list of assembly members' bio pages
 
 try:
     if __name__ == '__main__':
