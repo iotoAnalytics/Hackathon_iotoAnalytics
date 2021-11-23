@@ -10,6 +10,7 @@ sys.path.insert(0, str(p))
 
 import numpy as np
 import pandas as pd
+import ssl
 import unidecode
 
 from bs4 import BeautifulSoup as soup
@@ -20,8 +21,11 @@ from unidecode import unidecode
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 
+ssl._create_default_https_context = ssl._create_unverified_context
+
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+# crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+crawl_delay = 5 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
@@ -298,11 +302,13 @@ def get_wiki_people(repLink):
 
 
 assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
-# get list of assembly members' bio pages
-assembly_members = getAssemblyLinks(assembly_link)
 
 try:
     if __name__ == '__main__':
+        print("Getting list of assembly members' bio pages")
+        assembly_members = getAssemblyLinks(assembly_link)
+        
+        print("Collecting data...")
         with Pool() as pool:
             leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
         pd.set_option('display.max_rows', None)
@@ -315,6 +321,7 @@ try:
         wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
         wiki_people = get_wiki_people(wiki_link)
 
+        print("Collecting wiki data...")
         with Pool() as pool:
             wiki_data = pool.map(
                 func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
