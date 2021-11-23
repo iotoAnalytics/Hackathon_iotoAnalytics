@@ -1,21 +1,5 @@
-import pandas as pd
-import bs4
-from urllib.request import Request
-from bs4 import BeautifulSoup
-import psycopg2
-from nameparser import HumanName
-from request_url import UrlRequest
 import requests
-import datefinder
-import unidecode
-from multiprocessing import Pool
-import datetime
 import re
-import numpy as np
-from datetime import datetime
-import sys
-import os
-from pathlib import Path
 from io import BytesIO
 import pdfx
 import pdfplumber

@@ -1,10 +1,5 @@
 import pandas as pd
-from database import Database
 from database import CursorFromConnectionFromPool
-from psycopg2 import sql
-from datetime import datetime, date
-import numpy as np
-import utils
 from scraper_utils import LegislatorSponsorTopicRow
 from scraper_utils import LegislatorScraperUtils
 

@@ -13,16 +13,11 @@ import re
 import datetime
 from multiprocessing import Pool
 from unidecode import unidecode
-import datefinder
-import requests
 from request_url import UrlRequest
 from nameparser import HumanName
-import psycopg2
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from bs4 import BeautifulSoup
-from urllib.request import Request
 from urllib.request import urlopen as uReq
-import bs4
 import pandas as pd
 
 
