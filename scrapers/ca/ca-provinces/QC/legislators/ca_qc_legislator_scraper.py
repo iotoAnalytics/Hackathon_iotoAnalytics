@@ -21,7 +21,8 @@ from urllib.request import urlopen as uReq
 from urllib.request import Request
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+# crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+crawl_delay = 5 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
