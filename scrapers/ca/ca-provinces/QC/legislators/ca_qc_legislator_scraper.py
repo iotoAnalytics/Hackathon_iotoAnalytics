@@ -17,8 +17,7 @@ from multiprocessing import Pool
 from nameparser import HumanName
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from unidecode import unidecode
-from urllib.request import urlopen as uReq
-from urllib.request import Request
+from urllib.request import urlopen
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 # crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
@@ -26,10 +25,9 @@ crawl_delay = 5 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
-    req = Request(myurl,
-                  headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'})
-    webpage = uReq(req).read()
-    uReq(req).close()
+    uClient = urlopen(myurl)
+    webpage =uClient.read()
+    uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
 
     page_soup = soup(webpage, "html.parser")
@@ -46,7 +44,7 @@ def getAssemblyLinks(myurl):
 def collect_leg_data(myurl):
     row = scraper_utils.initialize_row()
 
-    uClient = uReq(myurl)
+    uClient = urlopen(myurl)
     page_html = uClient.read()
     uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
@@ -153,7 +151,7 @@ def collect_leg_data(myurl):
 
     contact_link = myurl.replace("index", "coordonnees")
 
-    uClient = uReq(contact_link)
+    uClient = urlopen(contact_link)
     page_html = uClient.read()
     uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
@@ -226,7 +224,7 @@ def collect_leg_data(myurl):
     except:
         row.party_id = 0
 
-    uClient = uReq('https://en.wikipedia.org/wiki/National_Assembly_of_Quebec')
+    uClient = urlopen('https://en.wikipedia.org/wiki/National_Assembly_of_Quebec')
     scraper_utils.crawl_delay(crawl_delay)
 
     page_html = uClient.read()
@@ -263,7 +261,7 @@ def get_most_recent_term_id_from_wiki(page_soup):
     return current_legislature
     
 def get_biography_from_wiki(link):
-    uClient = uReq(link)
+    uClient = urlopen(link)
     page_html = uClient.read()
     uClient.close()
     page_soup = soup(page_html, "html.parser")
@@ -273,7 +271,7 @@ def get_biography_from_wiki(link):
 def get_wiki_people(repLink):
     # get links to legislators' personal wikipedia pages
     bio_lnks = []
-    uClient = uReq(repLink)
+    uClient = urlopen(repLink)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
