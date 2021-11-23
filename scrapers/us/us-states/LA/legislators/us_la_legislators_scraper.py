@@ -20,6 +20,11 @@ from nameparser import HumanName
 import re
 import boto3
 from tqdm import tqdm
+import pandas as pd
+from urllib.request import urlopen as uReq
+from unidecode import unidecode
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[4]
@@ -140,6 +145,38 @@ def scrape_rep(url):
     print(row)
     return row
 
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Louisiana_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Louisiana_State_Senate"
+
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = str(name_td.a['href'])
+            return link
+
 
 def get_info_from_scraped_gov_url(row, soup):
     """
@@ -157,7 +194,14 @@ def get_info_from_scraped_gov_url(row, soup):
     get_years_active(row, soup)
     get_occupation(row, soup)
     get_area_served(row, soup)
-
+    try:
+        row.wiki_url = get_wiki_url(row)
+    except:
+        row.wiki_url = ""
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
 
 def get_occupation(row, soup):
     """
@@ -460,6 +504,28 @@ def scrape_wiki_site(wiki_urls, rows):
 
     return rows
 
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
 
 if __name__ == '__main__':
 
@@ -480,6 +546,35 @@ if __name__ == '__main__':
     pprint(rep_data)
 
     data = rep_data + sen_data
+
+    leg_df = pd.DataFrame(data)
+
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Louisiana_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Louisiana_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    print('Scraping complete')
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')
+
     scraper_utils.write_data(data)
 
     print('Complete!')

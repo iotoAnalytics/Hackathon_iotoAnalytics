@@ -20,14 +20,18 @@ from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
 import request_url
+from urllib.request import urlopen as uReq
 from multiprocessing import Pool
 from database import Database
 import configparser
 from pprint import pprint
+from unidecode import unidecode
 from nameparser import HumanName
 import re
 import boto3
-
+import pandas as pd
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 # # Initialize config parser and get variables from config file
@@ -82,7 +86,7 @@ def get_phone(soup):
     box_text = soup.find('div', {
                          'class': 'roundedrect gradientgray shadow'}).text.replace('\r', '').split('\n')
     box_text = [x for x in box_text if x]
-    return {'office': box_text[3].strip(), 'number': phone}
+    return [{'office': box_text[3].strip(), 'number': phone}]
 
 
 def get_rep_wikilink(soup):
@@ -235,6 +239,61 @@ def get_dicts(url):
     return links
 
 
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Hawaii_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Hawaii_State_Senate"
+
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = str(name_td.a['href'])
+            print(link)
+            return link
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
 def scrape(lst_item):
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -283,8 +342,19 @@ def scrape(lst_item):
     row.email = get_email(soup)
     row.district = get_district(soup)
     row.phone_numbers = get_phone(soup)
-    row.committees = get_com(soup, name[0])
+    try:
+        row.committees = get_com(soup, name[0])
+    except:
+        pass
     print('done row for: ' + name[0])
+    try:
+        row.wiki_url = get_wiki_url(row)
+    except:
+        pass
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
     return row
 
 
@@ -295,9 +365,29 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         data = pool.map(scrape, urls)
-    print('done scraping!')
+    leg_df = pd.DataFrame(data)
+        # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Hawaii_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Hawaii_State_Senate"
 
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
-    print('Complete!')
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    print('Scraping complete')
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')
+

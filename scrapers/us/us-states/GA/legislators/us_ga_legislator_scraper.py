@@ -38,7 +38,9 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+driver = webdriver.Chrome(ChromeDriverManager().install())
 
 # Initialize config parser and get variables from config file
 configParser = configparser.RawConfigParser()
@@ -58,8 +60,8 @@ crawl_delay = scraper_utils.get_crawl_delay('https://www.legis.ga.gov')
 chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument('--headless')
 
-driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
-                          chrome_options=chrome_options)
+#driver = webdriver.Chrome('../../../../web_drivers/chrome_win_89.0.4389.23/chromedriver.exe',
+#                          chrome_options=chrome_options)
 
 
 def collect_rep_bio_info(myurl):
@@ -89,7 +91,7 @@ def collect_rep_bio_info(myurl):
         "a", {"class": "btn responseBtn btn-sm btn-outline-primary"})
     csv_link = (public_info[1]["href"])
 
-    test_df = pd.read_excel(csv_link)
+    test_df = pd.read_csv(csv_link, encoding="Latin_1")
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_rows', None)
     test_df = test_df.rename(columns={'last name': 'name_last', 'first name': 'name_first',
