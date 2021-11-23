@@ -21,11 +21,12 @@ from unidecode import unidecode
 from urllib.request import urlopen as uReq
 from urllib.request import Request
 
+print("Test to see if this part prints. If not, it might be running but just a problem with printing.")
 ssl._create_default_https_context = ssl._create_unverified_context
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
 # crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
-crawl_delay = 5 # above won't work with github workflow
+crawl_delay = 2 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
