@@ -25,11 +25,10 @@ crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
 
 def getAssemblyLinks(myurl):
     infos = []
-    req = Request(myurl,
-                  headers={'User-Agent': 'Mozilla/5.0'})
-    webpage = uReq(req).read()
-
-    uReq(req).close()
+    uClient = uReq(myurl)
+    webpage =uClient.read()
+    uClient.close()
+    scraper_utils.crawl_delay(crawl_delay)
 
     page_soup = soup(webpage, "html.parser")
 
