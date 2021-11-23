@@ -299,11 +299,12 @@ def get_wiki_people(repLink):
 
 assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
 # get list of assembly members' bio pages
-print("Getting list of assembly members' bio pages")
-assembly_members = getAssemblyLinks(assembly_link)
 
 try:
     if __name__ == '__main__':
+        print("Getting list of assembly members' bio pages")
+        assembly_members = getAssemblyLinks(assembly_link)
+        
         print("Collecting data...")
         with Pool() as pool:
             leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
