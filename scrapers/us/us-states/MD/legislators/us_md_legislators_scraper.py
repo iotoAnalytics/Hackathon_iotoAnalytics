@@ -160,7 +160,7 @@ def get_wiki_url(row):
 
         if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
             link = name_td.a['href']
-            print(link)
+
             return link
 
 
