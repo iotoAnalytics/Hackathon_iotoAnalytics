@@ -7,7 +7,7 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 sys.setrecursionlimit(5000)
-
+from unidecode import unidecode
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 import requests
@@ -78,10 +78,13 @@ def match_wiki_link(wiki_url, dict_item_list):
                                                  'aria-labelledby': 'Members_of_the_South_Carolina_House_of_Representatives'})
         for legislator_name in legislator_names.find('td', {'class': 'navbox-list navbox-odd'}).find_all('li'):
             legislator_html = legislator_name.find('a')
-            if hn.first in legislator_html.get('title') and hn.last in legislator_html.get('title'):
-                if 'redlink' not in legislator_html.get('href'):
-                    dict_item['wiki_link'] = base_wiki + legislator_html.get('href')
-                    print(f'done finding wiki link for {hn.first}')
+            try:
+                if hn.first in legislator_html.get('title') and hn.last in legislator_html.get('title'):
+                    if 'redlink' not in legislator_html.get('href'):
+                        dict_item['wiki_link'] = base_wiki + legislator_html.get('href')
+                        print(f'done finding wiki link for {hn.first}')
+            except:
+                pass
     scraper_utils.crawl_delay(crawl_delay)
     return dict_item_list
 
@@ -141,106 +144,35 @@ def get_legislator_links(url):
 
 def get_wiki_url(row):
 
-    wikipage_reps = "https://ballotpedia.org/South_Carolina_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/South_Carolina_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/Kansas_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Kansas_State_Senate"
 
     if row.role == "Representative":
-        try:
-            uClient = uReq(wikipage_reps)
-            page_html = uClient.read()
-            uClient.close()
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
 
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
+    page_html = uClient.read()
+    uClient.close()
 
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-                party = party.replace('\n', '').replace('.', '')
-                if party == "Democratic":
-                    party = "Democrat"
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
 
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
 
-                try:
-                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                        pass
-                if not row.wiki_url:
-                    for person in rows[1:]:
-                        tds = person.findAll("td")
-                        name_td = tds[1]
-                        name = name_td.text
-                        name = name.replace('\n', '')
-                        party = tds[2].text
-                        party = party.strip()
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
 
-                        if party == "Democratic":
-                            party = "Democrat"
-
-                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                            row.wiki_url = name_td.a['href']
-                            break
-                        elif row.party == party and row.name_last in name.strip().split()[-1]:
-                            row.wiki_url = name_td.a['href']
-                            break
-        except Exception as e:
-            print(e)
-    if row.role == "Senator":
-
-        try:
-            uClient = uReq(wikipage_senate)
-            page_html = uClient.read()
-            uClient.close()
-
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
-
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-
-                if party == "Democratic":
-                    party = "Democrat"
-
-                try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                    pass
-            if not row.wiki_url:
-                for person in rows[1:]:
-                    tds = person.findAll("td")
-                    name_td = tds[1]
-                    name = name_td.text
-                    name = name.replace('\n', '')
-                    party = tds[2].text
-                    party = party.strip()
-
-                    if party == "Democratic":
-                        party = "Democrat"
-
-                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-        except Exception as e:
-            print(e)
-            pass
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
 
 
 def scrape_info(dict_item):
@@ -387,7 +319,6 @@ if __name__ == '__main__':
     big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
 
     big_list_of_dicts = big_df.to_dict('records')
-
 
     scraper_utils.write_data(big_list_of_dicts)
     print('Complete!')

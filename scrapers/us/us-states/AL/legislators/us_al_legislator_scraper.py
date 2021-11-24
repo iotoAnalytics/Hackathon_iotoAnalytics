@@ -28,6 +28,24 @@ import html
 import re
 from scraper_utils import USStateLegislatorScraperUtils
 from pprint import pprint
+import sys
+import os
+from pathlib import Path
+from scraper_utils import USStateLegislatorScraperUtils
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
+import time
+from io import StringIO
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 
 # from database import Database
@@ -61,6 +79,59 @@ def strip_name(pic_url, is_senate):
 '''
 replace nan values with ''
 '''
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Alabama_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Alabama_State_Senate"
+
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
 
 
 def nan(string):
@@ -102,13 +173,14 @@ def get_legislator_links(base_url, is_senate, pic_url):
 
 
 def scrape_legislator(links):
+
     CONSTANTS.titles.remove(*CONSTANTS.titles)
     party = {'(D)': 'Democrat', '(R)': 'Republican'}
 
     legislators = {}
 
     for link, value in links.items():
-
+        print(link)
         # base_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALRepresentative.aspx?NAME=Alexander&OID_SPONSOR=100537&OID_PERSON=7710&SESSNAME=Regular%20Session%202021'
         base_url = link
         member_request = request_url.UrlRequest.make_request(base_url, header)
@@ -171,12 +243,18 @@ def scrape_legislator(links):
         fields.areas_served = district_table[1][2].split(',')
 
         temp = []
+        district = nan(district_table[1][3]).replace('(', '').replace(')',' ').replace(' ', '-')
+        district = district.replace('--', '-')
+        capitol = legislature_table[1][3].replace('(', '').replace(')',' ').replace(' ', '-')
+        capitol = capitol.replace('--', '-')
+        print(district)
+        print(capitol)
         if nan(district_table[1][3]) != '':
             temp.append(
-                {'number': nan(district_table[1][3]), 'office': 'District Office'})
+                {'office': 'District Office', 'number': district})
         if legislature_table[1][3] != '':
             temp.append(
-                {'number': legislature_table[1][3], 'office': 'Capitol Office'})
+                {'office': 'Capitol Office', 'number': capitol})
 
         fields.phone_numbers = temp
 
@@ -191,11 +269,23 @@ def scrape_legislator(links):
         fields.addresses = temp
 
         email = legislature_table[1][10]
-        # email == email checks if email = nan or not
-        fields.email = nan(email if email == email else district_table[1][10])
-
+        print(email)
+        if email == email:
+            email = email.replace('.alhouse', '@alhouse')
+            fields.email = email
+        else:
+            email = district_table[1][10]
+            if email == email:
+                email = email.replace('.alhouse', '@alhouse')
+                fields.email = email
         legislators[fields.district] = fields
         scraper_utils.crawl_delay(crawl_delay)
+        gender = scraper_utils.get_legislator_gender(fields.name_first, fields.name_last)
+        if not gender:
+            gender = 'O'
+        fields.gender = gender
+        fields.wiki_url = str(get_wiki_url(fields))
+
     return legislators
 
 
@@ -380,7 +470,7 @@ house_links = get_legislator_links(
 house_dict = scrape_legislator(house_links)
 house = merge_wiki(house_wiki, house_dict)
 house = dict_to_list(house)
-
+print("house")
 # senate scraper
 senate_wiki_links = get_wiki_links(wikipedia_senate_url)
 senate_wiki = scrape_wiki(senate_wiki_links)
@@ -388,10 +478,33 @@ senate_links = get_legislator_links(senators_url, True, senator_pic_url)
 senate_dict = scrape_legislator(senate_links)
 senate = merge_wiki(senate_wiki, senate_dict)
 senate = dict_to_list(senate)
-
+print("senate")
 senate_house_data_lst = house + senate
 
-# scraper_utils.write_data(senate_house_data_lst)
+leg_df = pd.DataFrame(senate_house_data_lst)
+# getting urls from ballotpedia
+wikipage_reps = "https://ballotpedia.org/Alabama_House_of_Representatives"
+wikipage_senate = "https://ballotpedia.org/Alabama_State_Senate"
 
-for d in senate_house_data_lst[:10]:
-    print(d)
+all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+with Pool() as pool:
+    wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+wiki_df = pd.DataFrame(wiki_data)[['name_last', 'wiki_url']]
+
+big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+print('Scraping complete')
+
+big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+big_list_of_dicts = big_df.to_dict('records')
+
+print('Writing data to database...')
+
+scraper_utils.write_data(big_list_of_dicts)
+
+
+print('Complete')
+
