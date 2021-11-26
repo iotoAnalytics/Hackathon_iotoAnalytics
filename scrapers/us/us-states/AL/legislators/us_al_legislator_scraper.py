@@ -6,6 +6,7 @@ Issues:
     - names with only Initials (J.B.) has J as first name and B as middle name
     - birthdays on wikipedia that don't have class='bday' only get the years scraped
 """
+import itertools
 import sys
 import os
 from pathlib import Path
@@ -173,7 +174,7 @@ def get_legislator_links(base_url, is_senate, pic_url):
 
 
 def scrape_legislator(links):
-
+    print(links)
     CONSTANTS.titles.remove(*CONSTANTS.titles)
     party = {'(D)': 'Democrat', '(R)': 'Republican'}
 
@@ -463,21 +464,23 @@ scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(
     'http://www.legislature.state.al.us')
 # house scraper
-house_wiki_links = get_wiki_links(wikipedia_house_url)
-house_wiki = scrape_wiki(house_wiki_links)
+#house_wiki_links = get_wiki_links(wikipedia_house_url)
+#house_wiki = scrape_wiki(house_wiki_links)
 house_links = get_legislator_links(
     house_of_rep_url, False, house_of_rep_pic_url)
-house_dict = scrape_legislator(house_links)
-house = merge_wiki(house_wiki, house_dict)
-house = dict_to_list(house)
+
+house_dict = scrape_legislator(dict(itertools.islice(house_links.items(), 5)))
+#house = merge_wiki(house_wiki, house_dict)
+house = dict_to_list(house_dict)
 print("house")
 # senate scraper
-senate_wiki_links = get_wiki_links(wikipedia_senate_url)
-senate_wiki = scrape_wiki(senate_wiki_links)
+# senate_wiki_links = get_wiki_links(wikipedia_senate_url)
+# senate_wiki = scrape_wiki(senate_wiki_links)
 senate_links = get_legislator_links(senators_url, True, senator_pic_url)
-senate_dict = scrape_legislator(senate_links)
-senate = merge_wiki(senate_wiki, senate_dict)
-senate = dict_to_list(senate)
+
+senate_dict = scrape_legislator(dict(itertools.islice(senate_links.items(), 5)))
+#senate = merge_wiki(senate_wiki, senate_dict)
+senate = dict_to_list(senate_dict)
 print("senate")
 senate_house_data_lst = house + senate
 

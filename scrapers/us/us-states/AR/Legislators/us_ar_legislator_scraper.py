@@ -443,7 +443,7 @@ def scrape(urls):
         import traceback
         traceback.print_exc()
         print(urls)
-
+    print(row)
     return row
 
 
@@ -469,7 +469,7 @@ if __name__ == '__main__':
             urls.append([path, wiki_url[key[0:2]]])
         except KeyError:
             urls.append([path])
-
+    print(urls)
     # session_id = set_session_id()
     print('Initialized Scraping')
 
