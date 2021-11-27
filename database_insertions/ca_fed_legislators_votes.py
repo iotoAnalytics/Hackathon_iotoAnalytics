@@ -37,21 +37,24 @@ with db.CursorFromConnectionFromPool() as cur:
         data = cur.fetchall()
 
         for item in data:
-            temp_vote_obj = item['votes'][0]
-            for vote in temp_vote_obj['votes']:
-                vote_data += [{
-                        'name': vote['legislator'],
-                        'vote_text': vote['vote_text'],
-                        'legislator_goverlytics_id': vote['goverlytics_id'],
-                        'vote_session_date': temp_vote_obj['date'],
-                        'session': item['session'],
-                        'vote_description': temp_vote_obj['description'],
-                        'legislation_goverlytics_id': item['goverlytics_id'],   
-                        'bill_name': item['bill_name'],
-                        'current_status': item['current_status'],
-                        'passed': temp_vote_obj['passed'],
-                        'topic': item['topic']
-                    }]
+            '''Loop through each vote element; vote element is NOT the list of legislator votes, it includes fields like total, nay, yay, etc.'''
+            for i in range(len(item['votes'])):
+                temp_vote_obj = item['votes'][i]
+                '''loop through all the votes within the vote element'''
+                for vote in temp_vote_obj['votes']:
+                    vote_data += [{
+                            'name': vote['legislator'],
+                            'vote_text': vote['vote_text'],
+                            'legislator_goverlytics_id': vote['goverlytics_id'],
+                            'vote_session_date': temp_vote_obj['date'],
+                            'session': item['session'],
+                            'vote_description': temp_vote_obj['description'],
+                            'legislation_goverlytics_id': item['goverlytics_id'],   
+                            'bill_name': item['bill_name'],
+                            'current_status': item['current_status'],
+                            'passed': temp_vote_obj['passed'],
+                            'topic': item['topic']
+                        }]
 
         print('\ndone mutating data\n')
 
