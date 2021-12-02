@@ -3,18 +3,22 @@ import os
 from datetime import datetime
 from pathlib import Path
 import time
-from selenium import webdriver
+
 from scraper_utils import BankReconciliationUtils
 from database import CursorFromConnectionFromPool
 import pandas as pd
 import dateutil.parser as dparser
+
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+browser = webdriver.Chrome(ChromeDriverManager().install())
 
 NODES_TO_ROOT = 4
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
 PATH = "../../../web_drivers/chrome_win_93.0.4577.15/chromedriver.exe"
-browser = webdriver.Chrome(PATH)
+#browser = webdriver.Chrome(PATH)
 
 # https://www.elections.ca/WPAPPS/WPF/EN/Home/Index
 COUNTRY = 'ca'

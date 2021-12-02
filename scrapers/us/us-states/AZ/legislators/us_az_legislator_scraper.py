@@ -20,16 +20,92 @@ from urllib.request import Request
 from bs4 import BeautifulSoup as soup
 import psycopg2
 from nameparser import HumanName
+
+import sys
+import os
+from pathlib import Path
+from scraper_utils import USStateLegislatorScraperUtils
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
+import time
+from io import StringIO
 import requests
 import datefinder
 import unidecode
 from multiprocessing import Pool
 import datetime
 import re
+from unidecode import unidecode
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 scraper_utils = USStateLegislatorScraperUtils('AZ', 'us_az_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://www.azleg.gov')
+
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
+def get_wiki_url(name_last, district, role):
+
+
+    wikipage_reps = "https://ballotpedia.org/Arizona_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Arizona_State_Senate"
+
+    if role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district_text = district_td.text
+        district_num = re.search(r'\d+', district_text).group().strip()
+
+        if unidecode(name.last) == unidecode(name_last) and district_num == district:
+            link = name_td.a['href']
+            return link
 
 
 def get_leg_bios(myurl):
@@ -48,6 +124,7 @@ def get_leg_bios(myurl):
     senate_roster = page_soup.find("table", {"id": "SenateRoster"})
     senate_people = senate_roster.findAll("tr")
     for hp in house_people[1:]:
+        role = "Representative"
         person_info = hp.findAll("td")
         person_link = person_info[0].a["href"]
         state_member_id = person_link.split("legislator=")[1]
@@ -84,13 +161,20 @@ def get_leg_bios(myurl):
 
         party_id = scraper_utils.get_party_id(party)
 
+        wiki_url = get_wiki_url(hn.last, district, role)
+
+        gender = scraper_utils.get_legislator_gender(hn.last, hn.first)
+        if not gender:
+            gender = 'O'
+
         leg_info = {'state_url': person_link, 'state_member_id': state_member_id, 'name_full': name_full,
                     'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle, 'name_suffix': hn.suffix,
                     'district': district, 'party': party, 'party_id': party_id, 'email': email,
-                    'phone_numbers': phns, 'role': 'Representative'}
+                    'phone_numbers': phns, 'role': 'Representative', "gender": gender, "wiki_url": wiki_url}
         leg_bio.append(leg_info)
 
     for hp in senate_people[1:]:
+        role = "Senator"
         person_info = hp.findAll("td")
         person_link = person_info[0].a["href"]
         state_member_id = person_link.split("legislator=")[1]
@@ -125,10 +209,15 @@ def get_leg_bios(myurl):
         if phone != "":
             phns.append(phone_numbers)
 
+        wiki_url = get_wiki_url(hn.last, district, role)
+
+        gender = scraper_utils.get_legislator_gender(hn.last, hn.first)
+        if not gender:
+            gender = 'O'
         leg_info = {'state_url': person_link, 'state_member_id': state_member_id, 'name_full': name_full,
                     'name_last': hn.last, 'name_first': hn.first, 'name_middle': hn.middle, 'name_suffix': hn.suffix,
                     'district': district, 'party': party, 'party_id': party_id, 'email': email,
-                    'phone_numbers': phns, 'role': 'Senator'}
+                    'phone_numbers': phns, 'role': 'Senator', "gender": gender, "wiki_url": wiki_url}
         leg_bio.append(leg_info)
     scraper_utils.crawl_delay(crawl_delay)
     return leg_bio
@@ -192,6 +281,8 @@ def collect_leg_data(myurl):
                 except:
                     years_active = []
 
+
+
     leg_info = {'state_url': myurl, 'committees': committees, 'seniority': None, 'areas_served': [],
                 'occupation': occupation,
                 'years_active': years_active, 'most_recent_term_id': most_recent_term_id, 'addresses': [],
@@ -212,7 +303,10 @@ def find_reps_wiki(repLink):
     people = tables[4].findAll("tr")
     for person in people[1:]:
         info = person.findAll("td")
-        biolink = "https://en.wikipedia.org/" + (info[1].a["href"])
+        try:
+            biolink = "https://en.wikipedia.org/" + (info[1].a["href"])
+        except:
+            pass
 
         bio_lnks.append(biolink)
 
@@ -354,6 +448,7 @@ if __name__ == '__main__':
     leg_df = pd.DataFrame(leg_data)
 
     leg_df = pd.merge(leg_df, leg_roster_df, how='left', on=['state_url'])
+    print(leg_df)
 
     wiki_rep_link = 'https://en.wikipedia.org/wiki/Arizona_House_of_Representatives'
     wiki_sen_link = 'https://en.wikipedia.org/wiki/Arizona_Senate'
@@ -397,13 +492,29 @@ if __name__ == '__main__':
     # # #
     big_df['country_id'] = sample_row.country_id
 
-    print(big_df)
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Arizona_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Arizona_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    new_df = pd.merge(big_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+
+    print('Scraping complete')
+
+    new_df.drop(big_df.index[new_df['wiki_url'] == ''], inplace=True)
 
     big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
 
     print('Writing data to database...')
 
     scraper_utils.write_data(big_list_of_dicts)
 
-    print('Complete!')
+    print(f'Scraper ran successfully!')

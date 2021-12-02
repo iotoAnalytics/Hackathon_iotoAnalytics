@@ -1,42 +1,40 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
+import numpy as np
 import pandas as pd
-import bs4
+import ssl
+import unidecode
+
+from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
 from urllib.request import urlopen as uReq
 from urllib.request import Request
-from bs4 import BeautifulSoup as soup
-import psycopg2
-from nameparser import HumanName
-import requests
-import datefinder
-import unidecode
-from multiprocessing import Pool
-import datetime
-import re
-import numpy as np
-from datetime import datetime
-from unidecode import unidecode
 
+print("Test to see if this part prints. If not, it might be running but just a problem with printing.")
+ssl._create_default_https_context = ssl._create_unverified_context
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
-crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
-
+# crawl_delay = scraper_utils.get_crawl_delay('http://www.assnat.qc.ca')
+crawl_delay = 2 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
     req = Request(myurl,
-                  headers={'User-Agent': 'Mozilla/5.0'})
+                  headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'})
     webpage = uReq(req).read()
-
     uReq(req).close()
+    scraper_utils.crawl_delay(crawl_delay)
 
     page_soup = soup(webpage, "html.parser")
 
@@ -305,44 +303,50 @@ def get_wiki_people(repLink):
 
 
 assembly_link = "http://www.assnat.qc.ca/en/deputes/index.html"
-# get list of assembly members' bio pages
-assembly_members = getAssemblyLinks(assembly_link)
 
+try:
+    if __name__ == '__main__':
+        print("Getting list of assembly members' bio pages")
+        assembly_members = getAssemblyLinks(assembly_link)
+        
+        print("Collecting data...")
+        with Pool() as pool:
+            leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        leg_df = pd.DataFrame(leg_data)
 
-if __name__ == '__main__':
-    with Pool() as pool:
-        leg_data = pool.map(func=collect_leg_data, iterable=assembly_members)
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    leg_df = pd.DataFrame(leg_data)
+        leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active'])
 
-    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation', 'years_active'])
+        # get my missing info from wikipedia
+        wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
+        wiki_people = get_wiki_people(wiki_link)
 
-    # get my missing info from wikipedia
-    wiki_link = 'https://en.wikipedia.org/wiki/National_Assembly_of_Quebec'
-    wiki_people = get_wiki_people(wiki_link)
+        print("Collecting wiki data...")
+        with Pool() as pool:
+            wiki_data = pool.map(
+                func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+        wiki_df = pd.DataFrame(wiki_data)
 
-    with Pool() as pool:
-        wiki_data = pool.map(
-            func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
-    wiki_df = pd.DataFrame(wiki_data)
+        wikidf = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
+        # print(wikidf)
+        big_df = pd.merge(leg_df, wikidf, how='left',
+                        on=["wiki_url"])
 
-    wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'wiki_url', 'occupation', 'years_active']]
-    # print(wikidf)
-    big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["wiki_url"])
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
 
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+        big_list_of_dicts = big_df.to_dict('records')
+        # print(big_list_of_dicts)
 
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+        print('Writing data to database...')
 
-    print('Writing data to database...')
+        scraper_utils.write_data(big_list_of_dicts)
 
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print('Complete!')
+        print('Complete!')
+except Exception as e:
+    traceback.print_exc()
+    sys.exit(1)

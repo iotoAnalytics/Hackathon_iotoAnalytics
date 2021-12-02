@@ -16,6 +16,11 @@ from multiprocessing import Pool
 import pandas as pd
 from nameparser import HumanName
 import re
+from unidecode import unidecode
+from urllib.request import urlopen as uReq
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 state_abbreviation = 'IA'
 database_table_name = 'us_ia_legislators'
@@ -34,6 +39,7 @@ crawl_delay = scraper_utils.get_crawl_delay(base_url)
 
 
 def get_info_table_info(soup):
+    list = []
     dictionary = {}
     table = soup.find('div', {'class': 'legisIndent divideVert'})
     info_table = pd.read_html(str(table))[0]
@@ -41,12 +47,71 @@ def get_info_table_info(soup):
     for item in info_table.to_dict('records'):
         if item[0] == 'Occupation:':
             dictionary['occupation'] = item[1].split(',')
+            return dictionary
         elif item[0] == 'Capitol Phone:':
             dictionary['phone_number'] = {
                 'office': '',
                 'number': item[1].replace('.', '-')
             }
-    return dictionary
+            list.append(dictionary)
+            return list
+
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
+def get_wiki_url(row):
+    wikipage_reps = "https://ballotpedia.org/Iowa_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Iowa_State_Senate"
+
+    link = ''
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            break
+    return link
 
 
 def get_committees(soup):
@@ -130,7 +195,7 @@ def scrape(dict_item):
     row.name_middle = name_middle.title()
     row.name_last = name_last.title()
 
-    row.district = dict_item['District']
+    row.district = str(dict_item['District'])
     row.party = dict_item['Party']
     row.party_id = scraper_utils.get_party_id(dict_item['Party'])
     row.email = dict_item['Email']
@@ -149,10 +214,14 @@ def scrape(dict_item):
     page = scraper_utils.request(link)
     soup = BeautifulSoup(page.content, 'lxml')
     info_table_dict = get_info_table_info(soup)
-    if 'occupation' in info_table_dict:
+    try:
         row.occupation = info_table_dict['occupation']
-    if 'phone_number' in info_table_dict:
+    except:
+        row.occupation = []
+    try:
         row.phone_numbers = info_table_dict['phone_number']
+    except:
+        pass
 
     row.committees = get_committees(soup)
     row.years_active = get_years(soup)
@@ -163,8 +232,16 @@ def scrape(dict_item):
     except Exception:
         pass
 
+    row.wiki_url = get_wiki_url(row)
+
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    print(gender)
+    row.gender = gender
     scraper_utils.crawl_delay(crawl_delay)
     print(f'Done row for {name_first}')
+    print(row)
     return row
 
 
@@ -173,8 +250,31 @@ if __name__ == '__main__':
 
     with Pool() as pool:
         data = pool.map(scrape, urls)
+    leg_df = pd.DataFrame(data)
 
-    # Once we collect the data, we'll write it to the database:
-    scraper_utils.write_data(data)
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Iowa_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Iowa_State_Senate"
 
-    print('Complete!')
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    print('Scraping complete')
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')
+

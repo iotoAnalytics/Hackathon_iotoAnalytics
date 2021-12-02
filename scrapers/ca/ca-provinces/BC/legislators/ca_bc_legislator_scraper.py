@@ -1,28 +1,26 @@
-from platform import win32_is_iot
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
-from bs4 import BeautifulSoup as soup
-import requests
-from multiprocessing import Pool
+import numpy as np
+import pandas as pd
 
+from bs4 import BeautifulSoup as soup
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from multiprocessing import Pool
+from nameparser import HumanName
 from selenium import webdriver
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from nameparser import HumanName
-import pandas as pd
 from unidecode import unidecode 
-import numpy as np
-from selenium.webdriver.chrome.options import Options
+from urllib.request import urlopen as uReq
 from webdriver_manager.chrome import ChromeDriverManager
 
 
@@ -305,7 +303,6 @@ try:
         big_df = pd.DataFrame(data)
         big_df = big_df.drop(columns = ["birthday", "occupation", "education"])
 
-
         # get missing data from wikipedia
 
         wiki_bc_parliaments_link = 'https://en.wikipedia.org/wiki/Parliament_of_British_Columbia'
@@ -335,5 +332,5 @@ try:
 
         print('Complete!')
 except Exception as e:
-    print(e)
-    sys.exit(2)
+    traceback.print_exc()
+    sys.exit(1)

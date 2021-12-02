@@ -1,23 +1,27 @@
-import sys
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-import re
 import numpy as np
-from nameparser import HumanName
-from multiprocessing import Pool
 import pandas as pd
-from bs4 import BeautifulSoup
-import time
-from scraper_utils import CAProvTerrLegislatorScraperUtils
-from urllib.request import urlopen as uReq
-from unidecode import unidecode
-from datetime import datetime
+import re
 import ssl
+import time
+
+from bs4 import BeautifulSoup
+from datetime import datetime
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
+from urllib.request import urlopen as uReq
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 prov_abbreviation = 'PE'
@@ -276,58 +280,61 @@ def scrape(url):
 
     return row
 
+try:
+    if __name__ == '__main__':
+        start = time.time()
+        print(
+            f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) '
+            f'since the crawl delay is very large (ie: {crawl_delay} seconds). '
+            f'If you need to abort, press ctrl + c.')
+        print('Collecting URLS...')
+        urls = get_urls()
+        print('URLs Collected.')
 
-if __name__ == '__main__':
-    start = time.time()
-    print(
-        f'WARNING: This website may take awhile to scrape (about 5-10 minutes using multiprocessing) '
-        f'since the crawl delay is very large (ie: {crawl_delay} seconds). '
-        f'If you need to abort, press ctrl + c.')
-    print('Collecting URLS...')
-    urls = get_urls()
-    print('URLs Collected.')
+        print('Scraping data...')
 
-    print('Scraping data...')
+        data = [scrape(url) for url in urls]
+        #
+        # with Pool() as pool:
+        #     data = pool.map(scrape, urls)
+        leg_df = pd.DataFrame(data)
+        leg_df = leg_df.drop(columns="birthday")
+        leg_df = leg_df.drop(columns="education")
+        leg_df = leg_df.drop(columns="occupation")
 
-    data = [scrape(url) for url in urls]
-    #
-    # with Pool() as pool:
-    #     data = pool.map(scrape, urls)
-    leg_df = pd.DataFrame(data)
-    leg_df = leg_df.drop(columns="birthday")
-    leg_df = leg_df.drop(columns="education")
-    leg_df = leg_df.drop(columns="occupation")
+        # getting urls from wikipedia
+        wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
+        mla_wikis = find_mla_wiki(wiki_general_assembly_link)
 
-    # getting urls from wikipedia
-    wiki_general_assembly_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Prince_Edward_Island'
-    mla_wikis = find_mla_wiki(wiki_general_assembly_link)
+        with Pool() as pool:
+            wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
+        wiki_df = pd.DataFrame(wiki_data)[
+            ['occupation', 'birthday', 'education', 'wiki_url']
+        ]
 
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_wiki_bio, mla_wikis)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['occupation', 'birthday', 'education', 'wiki_url']
-    ]
+        big_df = pd.merge(leg_df, wiki_df, how='left',
+                        on=["wiki_url"])
 
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["wiki_url"])
+    #     isna = big_df['education'].isna()
+        # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
 
-#     isna = big_df['education'].isna()
-    # big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    # big_df.loc[isna, 'occupation'] = pd.Series([[]] * isna.sum()).values
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+        print('Scraping complete')
+        # vacant_index = big_df.index[big_df['wiki_url'] == None].tolist()
+        # for index in vacant_index:
+        #     big_df = big_df.drop(big_df.index[index])
 
-    print('Scraping complete')
-    # vacant_index = big_df.index[big_df['wiki_url'] == None].tolist()
-    # for index in vacant_index:
-    #     big_df = big_df.drop(big_df.index[index])
+        big_list_of_dicts = big_df.to_dict('records')
 
-    big_list_of_dicts = big_df.to_dict('records')
+        print(big_list_of_dicts)
+        print('Writing data to database...')
 
-    print(big_list_of_dicts)
-    print('Writing data to database...')
+        scraper_utils.write_data(big_list_of_dicts)
 
-    scraper_utils.write_data(big_list_of_dicts)
-
-    print(f'Scraper ran successfully!')
+        print(f'Scraper ran successfully!')
+except Exception as e:
+    traceback.print_exc()
+    sys.exit(1)
