@@ -56,6 +56,7 @@ POLITICAL_PARTIES = ['Republican', 'Democrat',
 
 
 def request_find(base_url, t, att, filter_all=False):
+    print(base_url)
     url_request = scraper_utils.request(base_url)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     scraper_utils.crawl_delay(crawl_delay)

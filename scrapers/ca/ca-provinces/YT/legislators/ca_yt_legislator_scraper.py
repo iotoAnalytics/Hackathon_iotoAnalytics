@@ -27,7 +27,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 BASE_URL = 'https://yukonassembly.ca'
 MLA_URL = BASE_URL + '/mlas?field_party_affiliation_target_id=All&field_assembly_target_id=All&sort_by=field_last_name_value'
 COMMITTEE_URL = BASE_URL + '/committees'
-WIKI_URL = 'https://en.wikipedia.org/wiki/Yukon_Legislative_Assembly#Current_members'
+WIKI_URL = 'https://en.wikipedia.org/wiki/Yukon_Legislative_Assembly'
 NTH_LEGISLATIVE_ASSEMBLY_TO_YEAR = {24 : 1978,
                                     25 : 1982,
                                     26 : 1985,
@@ -60,6 +60,7 @@ def program_driver():
     print("Getting data from mla pages...")
     all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
     mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
+    print(mla_data)
 
     print("Getting data from wiki pages...")
     all_wiki_links = scrape_main_wiki_link(WIKI_URL)
@@ -212,7 +213,7 @@ class ScraperForMLAs:
         return self.row
 
     def __set_row_data(self):
-        self.row.source_url = self.url
+        self.row.source_url = self.url.strip()
         self.__set_name_data()
         self.__set_role_data()
         self.__set_party_data()
@@ -264,7 +265,8 @@ class ScraperForMLAs:
             self.row.party_id = 0
 
     def __set_riding_data(self):
-        riding = self.main_container.find('div', {'class' : 'field--name-field-constituency'}).text
+        riding = self.main_container.find('div', {'class' : 'field--name-field-constituency'}).find("div", {"class":"field--item"}).text
+        riding = riding.replace('\n', '').strip()
         self.row.riding = riding
 
     def __set_address(self):

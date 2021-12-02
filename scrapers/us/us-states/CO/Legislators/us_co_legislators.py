@@ -22,6 +22,8 @@ import pandas as pd
 from multiprocessing.dummy import Pool
 import traceback
 from tqdm import tqdm
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 state_abbreviation = 'CO'

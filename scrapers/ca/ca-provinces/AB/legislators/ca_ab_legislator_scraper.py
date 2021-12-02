@@ -1,6 +1,3 @@
-'''
-TODO: source_url that we thought was unique isn't always unique.
-'''
 import os
 import sys
 import traceback
@@ -68,6 +65,7 @@ def collect_mla_data(link):
     name = name_class.text
 
     name = name.replace("Honourable", "").strip()
+    name = name.replace("Premier", "").strip()
     if "Mr." in name:
         name = name.split("Mr. ")[1]
     elif "Mrs." in name:
@@ -75,6 +73,7 @@ def collect_mla_data(link):
     elif "Ms." in name:
         name = name.split("Ms. ")[1]
     # print(type(name))
+    name = name.split(",")[0]
     hn = HumanName(name)
     row.name_full = hn.full_name
     row.name_last = hn.last

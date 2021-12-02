@@ -33,6 +33,26 @@ from nameparser import HumanName
 from datetime import datetime
 import re
 import pandas as pd
+import sys
+sys.setrecursionlimit(4000)
+
+import sys
+import os
+from pathlib import Path
+from scraper_utils import USStateLegislatorScraperUtils
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
+import time
+from io import StringIO
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 # Initialize config parser and get variables from config file
@@ -107,6 +127,29 @@ def get_urls(historical=False):
     return urls
 
 
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
+
+
 def get_wiki_links(link, chamber):
     wikipedia_link = 'https://en.wikipedia.org'
 
@@ -126,6 +169,39 @@ def get_wiki_links(link, chamber):
         links[(chamber, district)] = (wikipedia_link + member_url)
     scraper_utils.crawl_delay(crawl_delay)
     return links
+
+
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Arkansas_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Arkansas_State_Senate"
+
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
 
 
 def scrape_wiki(url, row):
@@ -227,6 +303,8 @@ def scrape_wiki(url, row):
                         row.education = edinfo
     except Exception as e:
         pass
+
+
     scraper_utils.crawl_delay(crawl_delay)
     return row
 
@@ -349,11 +427,23 @@ def scrape(urls):
             scrape_wiki(urls[1], row)
         except:
             pass
+        try:
+            row.wiki_url = get_wiki_url(row)
+        except:
+            pass
+
+        gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+        if not gender:
+            gender = 'O'
+        row.gender = gender
+
+
         scraper_utils.crawl_delay(crawl_delay)
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(urls)
+
     return row
 
 
@@ -386,14 +476,34 @@ if __name__ == '__main__':
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    # data = [scrape(url) for url in urls]
-    with Pool() as pool:
-        data = pool.map(scrape, urls)
+    data = [scrape(url) for url in urls]
+    print(data)
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    leg_df = pd.DataFrame(data)
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Arkansas_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Arkansas_State_Senate"
 
-    # Once we collect the data, we'll write it to the database.
-    scraper_utils.write_data(data)
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
-    print('Complete!')
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_data = [scraper_utils.scrape_ballotpedia_bio(link) for link in all_wiki_links]
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
 
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
 
-# scrape_wiki('https://en.wikipedia.org/w/index.php?title=Jim_Wooten_(politician)&action=edit&redlink=1', scraper_utils.initialize_row())
+    print('Scraping complete')
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')

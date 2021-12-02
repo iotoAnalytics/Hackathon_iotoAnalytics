@@ -14,6 +14,7 @@ import gzip
 import argparse
 import time
 import pandas as pd
+from unidecode import unidecode
 import bs4
 from urllib.request import urlopen as uReq
 from urllib.request import Request
@@ -28,6 +29,8 @@ import datetime
 import re
 from geotext import GeoText
 from requests import get
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 # import html.parser
@@ -117,69 +120,72 @@ def get_sen_bio(myurl):
 
 
 def get_rep_bio(myurl):
-    rep_bios = []
-    uClient = uReq(myurl)
-    scraper_utils.crawl_delay(crawl_delay)
-    page_html = uClient.read()
-    uClient.close()
-    # # html parsing
-    page_soup = soup(page_html, "html.parser")
-    tbl = page_soup.find("table", {"id": "grvRepInfo"})
-    links = tbl.findAll("td")
-    i = 1
-    for link in links:
-        if i % 7 == 1:
-            # website
-            state_url = link.a["href"]
-            # if "housedems" not in state_url:
-            #     state_url =state_url + "about"
-            # else:
-            #     state_url = state_url + "about/"
-            # print(state_url)
+    try:
+        print(myurl)
+        rep_bios = []
+        uClient = uReq(myurl)
+        scraper_utils.crawl_delay(crawl_delay)
+        page_html = uClient.read()
+        uClient.close()
+        # # html parsing
+        page_soup = soup(page_html, "html.parser")
+        tbl = page_soup.find("table", {"id": "grvRepInfo"})
+        links = tbl.findAll("td")
+        i = 1
+        for link in links:
+            if i % 7 == 1:
+                # website
+                state_url = link.a["href"]
+                # if "housedems" not in state_url:
+                #     state_url =state_url + "about"
+                # else:
+                #     state_url = state_url + "about/"
+                # print(state_url)
 
-        if i % 7 == 2:
-            # district
-            district = link.text
+            if i % 7 == 2:
+                # district
+                district = link.text
 
-        if i % 7 == 3:
-            # name
-            name_full = link.text
+            if i % 7 == 3:
+                # name
+                name_full = link.text
 
-            hn = HumanName(name_full)
-        if i % 7 == 4:
-            # party
-            party = ""
-            p = link.text
-            if p == "R":
-                party = "Republican"
-                party_id = 3
-            if p == "D":
-                party = "Democrat"
-                party_id = 2
+                hn = HumanName(name_full)
+            if i % 7 == 4:
+                # party
+                party = ""
+                p = link.text
+                if p == "R":
+                    party = "Republican"
+                    party_id = 3
+                if p == "D":
+                    party = "Democrat"
+                    party_id = 2
 
-        if i % 7 == 6:
-            # phone
-            phone = link.text
-            phone = phone.replace("517373", "517-373-")
+            if i % 7 == 6:
+                # phone
+                phone = link.text
+                phone = phone.replace("517373", "517-373-")
 
-            phone_numbers = {"office": '', 'number': phone}
-            # print(phone_number)
+                phone_numbers = {"office": '', 'number': phone}
+                # print(phone_number)
 
-        if i % 7 == 0:
-            # email
-            email = link.a["href"]
-            bio_info = {'source_url': state_url, 'district': district, 'name_full': name_full, 'name_first': hn.first,
-                        'name_last': hn.last, 'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party,
-                        'party_id': party_id, 'phone_numbers': phone_numbers, 'email': email.replace("mailto:", ""),
-                        'role': 'Representative',
-                        'state': 'MI', 'state_id': 26, 'country': 'United States of America', 'country_id': 1}
-            print(bio_info)
-            if name_full != "Vacant":
-                rep_bios.append(bio_info)
+            if i % 7 == 0:
+                # email
+                email = link.a["href"]
+                bio_info = {'source_url': state_url, 'district': district, 'name_full': name_full, 'name_first': hn.first,
+                            'name_last': hn.last, 'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party,
+                            'party_id': party_id, 'phone_numbers': phone_numbers, 'email': email.replace("mailto:", ""),
+                            'role': 'Representative',
+                            'state': 'MI', 'state_id': 26, 'country': 'United States of America', 'country_id': 1}
+                print(bio_info)
+                if name_full != "Vacant":
+                    rep_bios.append(bio_info)
 
-        i = i + 1
-    return rep_bios
-
+            i = i + 1
+        return rep_bios
+    except:
+        pass
 
 def collect_sen_data(myurl):
     years_active = 0

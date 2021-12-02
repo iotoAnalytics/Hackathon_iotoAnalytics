@@ -657,12 +657,16 @@ if __name__ == '__main__':
     big_df['source_id'] = big_df['state_member_id']
     big_df['seniority'] = 0
     get_wiki_url(sample_row)
-    print(sample_row.name_first)
-    print(sample_row.name_last)
-    gender = scraper_utils.get_legislator_gender(sample_row.name_first, sample_row.name_last)
-    if not gender:
-        gender = 'O'
-    sample_row.gender = gender
+
+    try:
+        gender = scraper_utils.get_legislator_gender(big_df['name_first'], big_df['name_last'])
+        if not gender:
+            gender = 'O'
+        sample_row.gender = gender
+    except:
+        pass
+
+
 
     # getting urls from ballotpedia
     wikipage_reps = "https://ballotpedia.org/Wisconsin_State_Assembly"
