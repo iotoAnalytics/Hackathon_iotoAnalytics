@@ -26,12 +26,6 @@ import datetime
 from nameparser import HumanName
 from nameparser.config import CONSTANTS
 import html
-import re
-from scraper_utils import USStateLegislatorScraperUtils
-from pprint import pprint
-import sys
-import os
-from pathlib import Path
 from scraper_utils import USStateLegislatorScraperUtils
 import re
 from unidecode import unidecode
@@ -46,14 +40,6 @@ import time
 from io import StringIO
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
-
-
-
-# from database import Database
-# from database import CursorFromConnectionFromPool
-
-'''temp imports'''
-
 
 header = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
@@ -80,6 +66,8 @@ def strip_name(pic_url, is_senate):
 '''
 replace nan values with ''
 '''
+
+
 def find_individual_wiki(wiki_page_link):
     bio_lnks = []
     uClient = uReq(wiki_page_link)

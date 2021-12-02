@@ -118,7 +118,7 @@ def get_urls(historical=False):
             district = districts[index].text.split('\n')[2].strip()
             name = path.text.split(' ')
             name = [name[0], name[-1]]
-            if year == str(datetime.now().year): #non historical 
+            if year == str(datetime.now().year): #non historical
                 if (chamber, district, path.text) not in urls.keys():
                     urls[(chamber, district, path.text)] = (base_url + path['href'], year)
             else: #historical
@@ -310,6 +310,7 @@ def scrape_wiki(url, row):
 
 
 def scrape(urls):
+    print(urls)
     '''
     Insert logic here to scrape all URLs acquired in the get_urls() function.
 
@@ -326,6 +327,7 @@ def scrape(urls):
     '''
     try:
         url = urls[0][0]
+        print(url)
 
         row = scraper_utils.initialize_row()
 
@@ -442,8 +444,7 @@ def scrape(urls):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(urls)
-    print(row)
+        
     return row
 
 
@@ -469,7 +470,7 @@ if __name__ == '__main__':
             urls.append([path, wiki_url[key[0:2]]])
         except KeyError:
             urls.append([path])
-    print(urls)
+
     # session_id = set_session_id()
     print('Initialized Scraping')
 
@@ -477,7 +478,7 @@ if __name__ == '__main__':
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     data = [scrape(url) for url in urls]
-    print(data)
+
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
     leg_df = pd.DataFrame(data)
