@@ -57,27 +57,33 @@ POLITICAL_PARTIES = ['Republican', 'Democrat',
 
 def request_find(base_url, t, att, filter_all=False):
     print(base_url)
-    url_request = scraper_utils.request(base_url)
-    url_soup = BeautifulSoup(url_request.content, 'lxml')
-    scraper_utils.crawl_delay(crawl_delay)
-    if filter_all:
+    if base_url is not None:
+        url_request = scraper_utils.request(base_url)
+        url_soup = BeautifulSoup(url_request.content, 'lxml')
+        scraper_utils.crawl_delay(crawl_delay)
+        if filter_all:
+            stuff = url_soup.find_all(t, att)
+            stuff = stuff.find('a').get('href')
+            print(stuff)
+            return url_soup.find_all(t, att)
         stuff = url_soup.find_all(t, att)
         stuff = stuff.find('a').get('href')
         print(stuff)
-        return url_soup.find_all(t, att)
-    stuff = url_soup.find_all(t, att)
-    stuff = stuff.find('a').get('href')
-    print(stuff)
-    return url_soup.find(t, att)
+        return url_soup.find(t, att)
 
 # Either filters first then returns first "a" tag with href or returns first a tag href found
 # Assumes a tag has href
 
 
 def retrieve_href(base_url, t, att, filter=False, filter_t=None, reg=None):
+    print(t)
+    print(att)
     try:
         content = request_find(base_url, t, att)
+        print('hello')
+        print(content)
         content = content.find("a").get("href")
+        print(content)
         if filter:
             filtered_content = content.find(filter_t, re.compile(reg))
             content = filtered_content.find('a').get('href')
@@ -330,9 +336,11 @@ def get_urls():
     print(assembly_members_url)
     content = request_find(assembly_members_url, 'div',
                            {'class': 'name'}, True)
-    for member in content:
-        urls.append(member.a['href'])
-
+    try:
+        for member in content:
+            urls.append(member.a['href'])
+    except:
+        pass
     return urls
     # return ['https://www.legis.nd.gov/assembly/67-2021/members/house/representative-mike-brandenburg']
 
@@ -362,8 +370,8 @@ def find_individual_wiki(wiki_page_link):
 
 def get_wiki_url(row):
 
-    wikipage_reps = "https://ballotpedia.org/Kansas_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Kansas_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/North_Dakota_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/North_Dakota_State_Senate"
 
     if row.role == "Representative":
         try:
@@ -525,39 +533,43 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
-
+    print(urls)
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     try:
-        # data = [scrape(url) for url in urls]
-        with Pool() as pool:
-            data = pool.map(scrape, urls)
+        data = [scrape(url) for url in urls]
+        # with Pool() as pool:
+        #     data = pool.map(scrape, urls)
+
     except Exception as e:
         sys.exit(f'error: {e}\n')
-
+    print(data)
     leg_df = pd.DataFrame(data)
 
-    # getting urls from ballotpedia
-    wikipage_reps = "https://ballotpedia.org/Kansas_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Kansas_State_Senate"
-
-    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['name_last', 'wiki_url']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_last", 'wiki_url'])
-    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
-
-    big_list_of_dicts = big_df.to_dict('records')
-
-    print('Writing data to database...')
-
-    scraper_utils.write_data(big_list_of_dicts)
-
-
-    print('Complete!')
+    #
+    # # getting urls from ballotpedia
+    # wikipage_reps = "https://ballotpedia.org/North_Dakota_House_of_Representatives"
+    # wikipage_senate = "https://ballotpedia.org/North_Dakota_State_Senate"
+    #
+    # all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    #
+    # with Pool() as pool:
+    #     wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    # wiki_df = pd.DataFrame(wiki_data)[
+    #     ['name_last', 'wiki_url']]
+    # print(leg_df)
+    # print(wiki_df)
+    #
+    # big_df = pd.merge(leg_df, wiki_df, how='left',
+    #                   on=["name_last", 'wiki_url'])
+    # big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+    #
+    # big_list_of_dicts = big_df.to_dict('records')
+    #
+    # print('Writing data to database...')
+    #
+    # scraper_utils.write_data(big_list_of_dicts)
+    #
+    #
+    # print('Complete!')

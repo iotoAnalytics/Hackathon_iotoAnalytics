@@ -744,27 +744,38 @@ if __name__ == '__main__':
     senate_wiki_link = 'https://en.wikipedia.org/wiki/Senate_of_Virginia#:~:text=The%20Senate%20of%20Virginia%20is,the%20lieutenant%20governor%20of%20Virginia.'
     sen_bios_wiki = get_senate_wiki_bios(senate_wiki_link)
 
-    with Pool() as pool:
-        sen_wiki_data = pool.map(
-            func=find_wiki_sen_data, iterable=sen_bios_wiki)
-    sen_wiki_df = pd.DataFrame(sen_wiki_data)
+    # with Pool() as pool:
+    #     sen_wiki_data = pool.map(
+    #         func=find_wiki_sen_data, iterable=sen_bios_wiki)
+    # print(sen_wiki_data)
+    # sen_wiki_df = pd.DataFrame(sen_wiki_data)
+
+    try:
+        sen_df['most_recent_term_id'] = sen_df['most_recent_term_id'].replace({np.nan: None})
+        sen_df['years_active'] = sen_df['years_active'].replace({np.nan: None})
+        sen_df['occupation'] = sen_df['occupation'].replace({np.nan: None})
+        sen_df['birthday'] = sen_df['birthday'].replace({np.nan: None})
+        sen_df['education'] = sen_df['education'].replace({np.nan: None})
+    except:
+        pass
+
     mergedSensData = pd.merge(sen_df, sen_wiki_df, how='left', on=[
-                              "name_first", "name_last"])
-    mergedSensData['most_recent_term_id'] = mergedSensData['most_recent_term_id'].replace({
-                                                                                          np.nan: None})
-    mergedSensData['years_active'] = mergedSensData['years_active'].replace({
-                                                                            np.nan: None})
-    mergedSensData['occupation'] = mergedSensData['occupation'].replace({
-                                                                        np.nan: None})
-    mergedSensData['birthday'] = mergedSensData['birthday'].replace({
-                                                                    np.nan: None})
-    mergedSensData['education'] = mergedSensData['education'].replace({
-                                                                      np.nan: None})
+                               "name_first", "name_last"])
+    # mergedSensData['most_recent_term_id'] = mergedSensData['most_recent_term_id'].replace({
+    #                                                                                       np.nan: None})
+    # mergedSensData['years_active'] = mergedSensData['years_active'].replace({
+    #                                                                         np.nan: None})
+    # mergedSensData['occupation'] = mergedSensData['occupation'].replace({
+    #                                                                     np.nan: None})
+    # mergedSensData['birthday'] = mergedSensData['birthday'].replace({
+    #                                                                 np.nan: None})
+    # mergedSensData['education'] = mergedSensData['education'].replace({
+    #                                                                   np.nan: None})
     sample_row = scraper_utils.initialize_row()
     # print(sample_row)
+    # #
     #
-
-    big_df = (mergedSensData.append(mergedRepsData, sort=True))
+    big_df = (sen_df.append(mergedRepsData, sort=True))
     big_df['state'] = sample_row.state
     big_df['state_id'] = sample_row.state_id
     #

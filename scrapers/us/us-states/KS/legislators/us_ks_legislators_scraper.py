@@ -372,9 +372,6 @@ def scrape(url):
     get_committees(main_div, row)
     row.wiki_url = get_wiki_url(row)
 
-    print(row.wiki_url)
-    print(row.source_url + "\n")
-
     gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
     if not gender:
         gender = 'O'
