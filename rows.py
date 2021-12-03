@@ -846,7 +846,7 @@ class LegislatorRow:
         if type(value) != str:
             raise TypeError("email must be a str")
         email_regex = r'[A-Za-z0-9._%\'!+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}'
-        if not re.match(email_regex, value):
+        if (not re.match(email_regex, value)) and value != '':
             raise ValueError("Improper email formatting in email. Required format: ExampleEmail@domain.com" +
                 f"\nEmail passed in was {value}" +
                 "\nThere may be a problem with the email validator so please check rows.py for more details.")

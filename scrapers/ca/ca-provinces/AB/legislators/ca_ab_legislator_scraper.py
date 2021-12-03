@@ -1,19 +1,23 @@
-import sys
+'''
+TODO: source_url that we thought was unique isn't always unique.
+'''
 import os
+import sys
+import traceback
+
 from pathlib import Path
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
-from scraper_utils import CAProvTerrLegislatorScraperUtils
 import numpy as np
-from unidecode import unidecode
 import pandas as pd
-from nameparser import HumanName
 
-from multiprocessing import Pool
-import requests
 from bs4 import BeautifulSoup as soup
+from multiprocessing import Pool
+from nameparser import HumanName
+from scraper_utils import CAProvTerrLegislatorScraperUtils
+from unidecode import unidecode
 from urllib.request import urlopen as uReq
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('AB', 'ca_ab_legislators')
@@ -64,6 +68,7 @@ def collect_mla_data(link):
     name = name_class.text
 
     name = name.replace("Honourable", "").strip()
+    name = name.replace("Premier", "").strip()
     if "Mr." in name:
         name = name.split("Mr. ")[1]
     elif "Mrs." in name:
@@ -71,6 +76,7 @@ def collect_mla_data(link):
     elif "Ms." in name:
         name = name.split("Ms. ")[1]
     # print(type(name))
+    name = name.split(",")[0]
     hn = HumanName(name)
     row.name_full = hn.full_name
     row.name_last = hn.last
@@ -260,38 +266,42 @@ def scrape_wiki(link):
     return wiki_bios
 
 
-if __name__ == '__main__':
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    members_link = 'https://www.assembly.ab.ca/members/members-of-the-legislative-assembly/chamber-seating-plan'
-    mla_links = scrape_members_link(members_link)
+try:
+    if __name__ == '__main__':
+        pd.set_option('display.max_rows', None)
+        pd.set_option('display.max_columns', None)
+        members_link = 'https://www.assembly.ab.ca/members/members-of-the-legislative-assembly/chamber-seating-plan'
+        mla_links = scrape_members_link(members_link)
 
-    with Pool() as pool:
-        data = pool.map(func=collect_mla_data, iterable=mla_links)
-    leg_df = pd.DataFrame(data)
-    # get these from wikipedia instead
-    leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
+        with Pool() as pool:
+            data = pool.map(func=collect_mla_data, iterable=mla_links)
+        leg_df = pd.DataFrame(data)
+        # get these from wikipedia instead
+        leg_df = leg_df.drop(columns=['birthday', 'education', 'occupation'])
 
-    wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
-    wiki_people = scrape_wiki(wiki_link)
-    with Pool() as pool:
-        wiki_data = pool.map(
-            func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
-    wikidf = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'wiki_url', 'occupation']]
-    # print(wikidf)
-    big_df = pd.merge(leg_df, wikidf, how='left',
-                      on=["wiki_url"])
+        wiki_link = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Alberta'
+        wiki_people = scrape_wiki(wiki_link)
+        with Pool() as pool:
+            wiki_data = pool.map(
+                func=scraper_utils.scrape_wiki_bio, iterable=wiki_people)
+        wikidf = pd.DataFrame(wiki_data)[
+            ['birthday', 'education', 'wiki_url', 'occupation']]
+        # print(wikidf)
+        big_df = pd.merge(leg_df, wikidf, how='left',
+                        on=["wiki_url"])
 
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
-    big_df['education'] = big_df['education'].replace({np.nan: None})
+        big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+        big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+        big_df['education'] = big_df['education'].replace({np.nan: None})
 
-    big_list_of_dicts = big_df.to_dict('records')
-    # print(big_list_of_dicts)
+        big_list_of_dicts = big_df.to_dict('records')
+        # print(big_list_of_dicts)
 
-    print('Writing data to database...')
+        print('Writing data to database...')
 
-    scraper_utils.write_data(big_list_of_dicts)
+        scraper_utils.write_data(big_list_of_dicts)
 
-    print('Complete!')
+        print('Complete!')
+except Exception as e:
+    traceback.print_exc()
+    sys.exit(1)

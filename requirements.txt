@@ -10,7 +10,7 @@ bs4==0.0.1
 # idna==2.10
 # joblib==1.0.0
 # langdetect==1.0.9
-# lxml
+lxml
 nameparser==1.0.6
 # nltk==3.6.2
 numpy 
@@ -35,7 +35,7 @@ selenium
 # tokenizers==0.10.2
 torch 
 tqdm==4.59.0 
-# transformers==4.5.1
+transformers==4.5.1
 unidecode==1.2.0 
 urllib3==1.26.4
 utils==1.0.1 

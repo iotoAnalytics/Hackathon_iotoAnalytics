@@ -6,6 +6,7 @@ import multiprocessing
 import os
 import re
 import sys
+import traceback
 from multiprocessing import Pool
 
 from bs4 import BeautifulSoup
@@ -36,7 +37,6 @@ WIKI_URL = 'https://en.wikipedia.org'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WEBDRIVER_PATH = os.path.join('..', '..', '..', '..', '..', 'web_drivers', 'chrome_win_90.0.4430.24', 'chromedriver.exe')
 GENERAL_ASSEMBLY_YEAR = {
     '50': '2021'
 }
@@ -46,7 +46,8 @@ crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
 def scrape(url):
     options = Options()
-    options.headless = False
+    options.headless = True
+    options.add_argument('--User-Agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca')
 
     driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
     driver.switch_to.default_content()
@@ -55,6 +56,7 @@ def scrape(url):
     sleep(2)
 
     html = driver.page_source
+    print(html)
     soup = BeautifulSoup(html, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -353,10 +355,10 @@ def _merge_wiki_data(legislator_data, wiki_data, wiki_url=True, birthday=True, e
 
 def main():
     print('NEWFOUNDLAND AND LABRADOR!')
-    print('She\'s a rocky isle in the ocean ♫ ♫ ♫')
-    print('And she\'s pounded by wind from the sea ♫ ♫ ♫')
-    print('You might think that she\'s rugged and cold ♫ ♫ ♫')
-    print('But she\'s home sweet home to me. ♫ ♫ ♫')
+    print('She\'s a rocky isle in the ocean')
+    print('And she\'s pounded by wind from the sea')
+    print('You might think that she\'s rugged and cold')
+    print('But she\'s home sweet home to me.')
 
     print('\nSCRAPING NEWFOUNDLAND AND LABRADOR LEGISLATORS\n')
 
@@ -396,5 +398,9 @@ def main():
 
     print('\nCOMPLETE!\n')
 
-if __name__ == '__main__':
-    main()
+try:
+    if __name__ == '__main__':
+        main()
+except Exception as e:
+    traceback.print_exc()
+    sys.exit(1)
