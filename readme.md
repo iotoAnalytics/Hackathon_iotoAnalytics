@@ -1,4 +1,4 @@
-[![provincial scrapers](https://github.com/iotoAnalytics/goverlytics-scrapers/actions/workflows/provincial_scrapers.yml/badge.svg)](https://github.com/iotoAnalytics/goverlytics-scrapers/actions/workflows/provincial_scrapers.yml)
+![provincial scrapers](https://github.com/iotoAnalytics/goverlytics-scrapers/actions/workflows/provincial_scrapers.yml/badge.svg)
 
 
 ## Goverlytics Scrapers
