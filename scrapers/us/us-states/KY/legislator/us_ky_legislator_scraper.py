@@ -1,4 +1,3 @@
-
 import sys
 import os
 from pathlib import Path
@@ -15,6 +14,7 @@ from urllib.request import urlopen as uReq
 import time
 from io import StringIO
 import ssl
+
 ssl._create_default_https_context = ssl._create_unverified_context
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -29,11 +29,9 @@ from scraper_utils import USStateLegislatorScraperUtils
 from pathlib import Path
 import boto3
 
-
 scraper_utils = USStateLegislatorScraperUtils(
     'KY', 'us_ky_legislators')
 crawl_delay = scraper_utils.get_crawl_delay('https://legislature.ky.gov')
-
 
 
 def request_find(base_url, t, att, filter_all=False):
@@ -43,6 +41,7 @@ def request_find(base_url, t, att, filter_all=False):
     if filter_all:
         return url_soup.find_all(t, att)
     return url_soup.find(t, att)
+
 
 def find_individual_wiki(wiki_page_link):
     bio_lnks = []
@@ -66,6 +65,7 @@ def find_individual_wiki(wiki_page_link):
     scraper_utils.crawl_delay(crawl_delay)
     return bio_lnks
 
+
 def get_urls():
     '''
     Insert logic here to get all URLs you will need to scrape from the page.
@@ -87,7 +87,7 @@ def get_urls():
         for link in links:
             link = "https://legislature.ky.gov" + link['href']
             urls.append(link)
-           # print(link)
+        # print(link)
     except:
         pass
     page2 = scraper_utils.request(house_members_url)
@@ -99,14 +99,14 @@ def get_urls():
         for link in links2:
             link = "https://legislature.ky.gov" + link['href']
             urls.append(link)
-           # print(link)
+        # print(link)
     except:
         pass
     # return [['Legislators/Pages/Legislator-Profile.aspx?DistrictNumber=68', "House"]]
     return urls
 
-def get_wiki_url(row):
 
+def get_wiki_url(row):
     wikipage_reps = "https://ballotpedia.org/Kentucky_House_of_Representatives"
     wikipage_senate = "https://ballotpedia.org/Kentucky_State_Senate"
 
@@ -137,7 +137,9 @@ def get_wiki_url(row):
             link = name_td.a['href']
             return link
 
+
 def scrape(url):
+    print(url)
     try:
         '''
         Insert logic here to scrape all URLs acquired in the get_urls() function.
@@ -153,15 +155,14 @@ def scrape(url):
         when inserting data into database. Refer to the data dictionary to see data types for
         each column.
         '''
-        base_url = 'https://legislature.ky.gov/'
-        url_request = requests.get(base_url + url, verify=False)
+        url_request = requests.get(url, verify=False)
         url_soup = BeautifulSoup(url_request.content, 'lxml')
         row = scraper_utils.initialize_row()
 
-        row.source_url = base_url + url
-        #print(url_soup)
+        row.source_url = url
+        # print(url_soup)
         try:
-            committee_list = url_soup.find('div', {'id':'legcommittees'}).find_all('li')
+            committee_list = url_soup.find('div', {'id': 'legcommittees'}).find_all('li')
             committees = []
             for commitee in committee_list:
                 # pprint(commitee.get_text(strip=True).split('\t', 1))
@@ -175,8 +176,6 @@ def scrape(url):
         except:
             pass
         # pprint(f'committess: {committees}')
-
-
 
         """
         https://stackoverflow.com/questions/57392407/how-to-split-html-text-with-br-tags
@@ -192,23 +191,21 @@ def scrape(url):
                 row.email = ""
                 break
             if target == "Home City":
-                areas_served = [p_list[index+1].text]
+                areas_served = [p_list[index + 1].text]
                 row.areas_served = areas_served
             elif target == "Phone Number(s)":
-                phone_number_list = p_list[index+1].get_text(separator='|', strip=True).split('|')
+                phone_number_list = p_list[index + 1].get_text(separator='|', strip=True).split('|')
                 for number in phone_number_list:
                     phone_numbers.append({'number': number.split(": ")[1],
                                           'type': number.split(": ")[0]})
                 row.phone_number = phone_numbers
             elif target == "Email":
-                email = p_list[index+1].text
+                email = p_list[index + 1].text
                 row.email = email
 
         # pprint(f'areas_served: {areas_served}')
         # pprint(f'email: {email}')
         # pprint(f'phone_numbers: {phone_numbers}')
-
-
 
         # pprint(areas_served)
         try:
@@ -225,10 +222,10 @@ def scrape(url):
         role = full_name_unfiltered.split(" ")[0]
         full_name_unfiltered = full_name_unfiltered.split(" ")[1:-1]
         name_dict = {'name_full': '',
-                         'name_first': '',
-                         'name_middle': '',
-                         'name_last': '',
-                         'role': ''}
+                     'name_first': '',
+                     'name_middle': '',
+                     'name_last': '',
+                     'role': ''}
 
         temp = []
         for name in full_name_unfiltered:
@@ -238,11 +235,11 @@ def scrape(url):
         full_name = ""
         for index, name in enumerate(temp):
             if len(temp) == 3 and index == 1:
-                name_dict[NAME_KEYS[index+1]] = name
+                name_dict[NAME_KEYS[index + 1]] = name
                 full_name = full_name + name + " "
             else:
                 if len(temp) == 3 and index == 2:
-                    name_dict[NAME_KEYS[index -1]] = name
+                    name_dict[NAME_KEYS[index - 1]] = name
                 else:
                     name_dict[NAME_KEYS[index]] = name
                 full_name = full_name + name + " "
@@ -261,13 +258,14 @@ def scrape(url):
         addresses = url_soup.find_all('address')
         address_list = []
         try:
-            address_titles = url_soup.find('div', {'class': 'relativeContent col-sm-4 col-xs-12'}).find_all('p', {'class': 'title'})[0:]
+            address_titles = url_soup.find('div', {'class': 'relativeContent col-sm-4 col-xs-12'}).find_all('p', {
+                'class': 'title'})[0:]
             index = 0
             for title in address_titles:
                 if title.text in titles:
                     address_list.append({'address': addresses[index].text,
-                                         'location':title.text})
-                    index+=1
+                                         'location': title.text})
+                    index += 1
         except:
             pass
         # pprint(f'address: {address_list}')
@@ -293,43 +291,40 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
+    print(urls)
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
-    try:
-        # data = [scrape(url) for url in urls]
-        with Pool() as pool:
-            data = pool.map(scrape, urls)
-        # pprint(data)
-        # Once we collect the data, we'll write it to the database.
-        leg_df = pd.DataFrame(data)
-        leg_df.drop(leg_df.index[leg_df['name_full'] == ''], inplace=True)
+    #try:
+    data = [scrape(url) for url in urls]
+    # with Pool() as pool:
+    #     data = pool.map(scrape, urls)
+    #     # pprint(data)
+    #     # Once we collect the data, we'll write it to the database.
+    leg_df = pd.DataFrame(data)
+    leg_df.drop(leg_df.index[leg_df['name_full'] == ''], inplace=True)
         # getting urls from ballotpedia
-        wikipage_reps = "https://ballotpedia.org/Kentucky_House_of_Representatives"
-        wikipage_senate = "https://ballotpedia.org/Kentucky_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/Kentucky_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Kentucky_State_Senate"
 
-        all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
-        with Pool() as pool:
-            wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
-        wiki_df = pd.DataFrame(wiki_data)[
-            ['name_last', 'wiki_url']]
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
 
-        big_df = pd.merge(leg_df, wiki_df, how='left',
+    big_df = pd.merge(leg_df, wiki_df, how='left',
                           on=["name_last", 'wiki_url'])
 
-        print('Scraping complete')
+    print('Scraping complete')
 
-        big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
 
-        big_list_of_dicts = big_df.to_dict('records')
+    big_list_of_dicts = big_df.to_dict('records')
 
-        print('Writing data to database...')
+    print('Writing data to database...')
 
-        scraper_utils.write_data(big_list_of_dicts)
+    scraper_utils.write_data(big_list_of_dicts)
 
-
-
-    except Exception as e:
-        sys.exit(f'error: {e}\n')
     print('Complete!')
