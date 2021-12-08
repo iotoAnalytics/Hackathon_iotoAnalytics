@@ -376,7 +376,7 @@ def scrape_gov(data_dict):
 
 
 if __name__ == '__main__':
-    dict_lst = get_gov_dicts()[0:5]
+    dict_lst = get_gov_dicts()
 
     with Pool() as pool:
         data = pool.map(scrape_gov, dict_lst)
