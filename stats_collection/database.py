@@ -3,7 +3,6 @@ Used for connecting scrapers to relational database using psycopg2.
 Author: Justin Tendeck
 """
 
-from typing import AnyStr
 from psycopg2.extras import RealDictCursor
 # from psycopg2 import pool
 import psycopg2
@@ -18,7 +17,6 @@ import utils
 import sys
 import numpy as np
 import pandas as pd
-
 
 db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
 db_port = 5432
@@ -137,207 +135,108 @@ class Persistence:
     # table that indexes columns in canadian datasets that have null values
 
     # writes pm_video data to database
-    # @staticmethod
-    # def write_pm_vid_data(data, table):
-    #     with CursorFromConnectionFromPool() as cur:
-    #         try:
-    #             create_table_query = sql.SQL("""
-
-    #                 CREATE TABLE IF NOT EXISTS {table} (
-    #                     title text UNIQUE,
-    #                     video_text text
-    #                 );
-
-    #                 ALTER TABLE {table} OWNER TO rds_ad;
-    #             """).format(table=sql.Identifier(table))
-
-    #             cur.execute(create_table_query)
-    #             cur.connection.commit()
-    #         except Exception as e:
-    #             print(f'An exception occured executting a query:\n{e}')
-    #             cur.connection.rollback()
-
-    #         insert_legislator_query = sql.SQL("""
-    #                 INSERT INTO {table}
-    #                 VALUES (%s, %s)
-    #                 ON CONFLICT (title) DO UPDATE SET
-    #                     title = excluded.title,
-    #                     video_text = excluded.video_text;
-    #                 """).format(table=sql.Identifier(table))
-
-    #         # This is used to convert dictionaries to rows. Need to test it out!
-    #         for item in data:
-    #             if isinstance(item, dict):
-    #                 item = utils.DotDict(item)
-    #             try:
-    #                 tup = (
-    #                     item.title,
-    #                     item.video_text
-    #                 )
-
-    #                 cur.execute(insert_legislator_query, tup)
-    #             except Exception as e:
-    #                 print(f'Exception occured inserting the following data:\n{tup}')
-    #                 print(e)
-    #                 cur.connection.rollback()
-
-    # @staticmethod
-    # def write_stats_data_test(data, table):
-    #     with CursorFromConnectionFromPool() as cur:
-    #         try:
-    #             create_table_query = sql.SQL("""
-
-    #                 CREATE TABLE IF NOT EXISTS {table} (
-    #                     state_name text UNIQUE,
-    #                     legislator_count int, 
-    #                     ave_bills_sponsored decimal(5,2),
-    #                     ave_bills_sponsored_percent decimal(5,2),
-    #                     ave_age decimal(5,2),
-    #                     ave_years_active decimal(5,2),
-    #                     topics_count json
-    #                 );
-
-    #                 ALTER TABLE {table} OWNER TO rds_ad;
-    #             """).format(table=sql.Identifier(table))
-
-    #             cur.execute(create_table_query)
-    #             cur.connection.commit()
-    #         except Exception as e:
-    #             print(f'An exception occured executting a query:\n{e}')
-    #             cur.connection.rollback()
-
-    #         insert_legislator_query = sql.SQL("""
-    #                 INSERT INTO {table}
-    #                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-    #                 ON CONFLICT (state_name) DO UPDATE SET
-    #                     legislator_count = excluded.legislator_count,
-    #                     ave_bills_sponsored = excluded.ave_bills_sponsored,
-    #                     ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent,
-    #                     ave_age = excluded.ave_age,
-    #                     ave_years_active = excluded.ave_years_active,
-    #                     topics_count = excluded.topics_count;
-    #                 """).format(table=sql.Identifier(table))
-
-    #         # This is used to convert dictionaries to rows. Need to test it out!
-    #         for item in data:
-    #             if isinstance(item, dict):
-    #                 item = utils.DotDict(item)
-    #             try:
-    #                 tup = (
-    #                     item.state_name,
-    #                     item.legislator_count,
-    #                     item.ave_bills_sponsored, 
-    #                     item.ave_bills_sponsored_percent,
-    #                     item.ave_age,
-    #                     item.ave_years_active,
-    #                     # item.topics_count
-    #                     json.dumps(item.topics_count, default=utils.json_serial)
-    #                 )
-
-    #                 cur.execute(insert_legislator_query, tup)
-    #             except Exception as e:
-    #                 print(f'Exception occured inserting the following data:\n{tup}')
-    #                 print(e)
-    #                 cur.connection.rollback()
-
-
     @staticmethod
-    def write_ca_fed_vote_data(data, table):
-        if not isinstance(data, list):
-            raise TypeError(
-                'Data being written to database must be a list of Rows or dictionaries!')
-
+    def write_pm_vid_data(data, table):
         with CursorFromConnectionFromPool() as cur:
             try:
                 create_table_query = sql.SQL("""
-                    
+
                     CREATE TABLE IF NOT EXISTS {table} (
-                        goverlytics_id text PRIMARY KEY,
-                        Name text,
-                        Session text,
-                        Vote Number text,
-                        Vote Respect text,
-                        Vote Number text
+                        title text UNIQUE,
+                        video_text text
                     );
 
                     ALTER TABLE {table} OWNER TO rds_ad;
-                    """).format(table=sql.Identifier(table))
+                """).format(table=sql.Identifier(table))
 
                 cur.execute(create_table_query)
                 cur.connection.commit()
-
             except Exception as e:
-                print(
-                    f'An exception occurred creating {table}:\n{e}')
+                print(f'An exception occured executting a query:\n{e}')
                 cur.connection.rollback()
 
             insert_legislator_query = sql.SQL("""
-                INSERT INTO {table}
-                VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (source_url) DO UPDATE SET
-                    date_collected = excluded.date_collected,
-                    bill_title = excluded.bill_title,
-                    bill_name = excluded.bill_name,
-                    bill_type = excluded.bill_type,
-                    sponsors = excluded.sponsors,
-                    sponsors_id = excluded.sponsors_id,
-                    principal_sponsor_id = excluded.principal_sponsor_id,
-                    principal_sponsor = excluded.principal_sponsor,
-                    current_status = excluded.current_status,
-                    actions = excluded.actions,
-                    date_introduced = excluded.date_introduced,
-                    chamber_origin = excluded.chamber_origin,
-                    session = excluded.session,
-                    state = excluded.state,
-                    state_id = excluded.state_id,
-                    source_topic = excluded.source_topic,
-                    votes = excluded.votes,
-                    goverlytics_id = excluded.goverlytics_id,
-                    source_id = excluded.source_id,
-                    committees = excluded.committees,
-                    cosponsors = excluded.cosponsors,
-                    cosponsors_id = excluded.cosponsors_id,
-                    topic = excluded.topic,
-                    bill_text = excluded.bill_text,
-                    bill_description = excluded.bill_description,
-                    bill_summary = excluded.bill_summary,
-                    country_id = excluded.country_id,
-                    country = excluded.country;
+                    INSERT INTO {table}
+                    VALUES (%s, %s)
+                    ON CONFLICT (title) DO UPDATE SET
+                        title = excluded.title,
+                        video_text = excluded.video_text;
+                    """).format(table=sql.Identifier(table))
+
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
+                try:
+                    tup = (
+                        item.title,
+                        item.video_text
+                    )
+
+                    cur.execute(insert_legislator_query, tup)
+                except Exception as e:
+                    print(f'Exception occured inserting the following data:\n{tup}')
+                    print(e)
+                    cur.connection.rollback()
+
+    @staticmethod
+    def write_stats_data_test(data, table):
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        state_name text UNIQUE,
+                        legislator_count int, 
+                        ave_bills_sponsored decimal(5,2),
+                        ave_bills_sponsored_percent decimal(5,2),
+                        ave_age decimal(5,2),
+                        ave_years_active decimal(5,2),
+                        topics_count json
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
                 """).format(table=sql.Identifier(table))
 
-            date_collected = datetime.now()
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            except Exception as e:
+                print(f'An exception occured executting a query:\n{e}')
+                cur.connection.rollback()
 
-            for row in data:
+            insert_legislator_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (state_name) DO UPDATE SET
+                        legislator_count = excluded.legislator_count,
+                        ave_bills_sponsored = excluded.ave_bills_sponsored,
+                        ave_bills_sponsored_percent = excluded.ave_bills_sponsored_percent,
+                        ave_age = excluded.ave_age,
+                        ave_years_active = excluded.ave_years_active,
+                        topics_count = excluded.topics_count;
+                    """).format(table=sql.Identifier(table))
 
-                if isinstance(row, dict):
-                    row = utils.DotDict(row)
-
-                if pd.notna(row.principal_sponsor_id):
-                    row.principal_sponsor_id = int(row.principal_sponsor_id)
-                else:
-                    row.principal_sponsor_id = None
-
-                tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
-                       row.session, row.date_introduced, row.source_url, row.chamber_origin,
-                       json.dumps(row.committees, default=utils.json_serial),
-                       row.state_id, row.state, row.bill_type, row.bill_title, row.current_status,
-                       row.principal_sponsor_id, row.principal_sponsor, row.sponsors, row.sponsors_id,
-                       row.cosponsors, row.cosponsors_id, row.bill_text, row.bill_description, row.bill_summary,
-                       json.dumps(row.actions, default=utils.json_serial),
-                       json.dumps(row.votes, default=utils.json_serial),
-                       row.source_topic, row.topic, row.country_id, row.country)
-
+            # This is used to convert dictionaries to rows. Need to test it out!
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
                 try:
+                    tup = (
+                        item.state_name,
+                        item.legislator_count,
+                        item.ave_bills_sponsored, 
+                        item.ave_bills_sponsored_percent,
+                        item.ave_age,
+                        item.ave_years_active,
+                        # item.topics_count
+                        json.dumps(item.topics_count, default=utils.json_serial)
+                    )
+
                     cur.execute(insert_legislator_query, tup)
-
                 except Exception as e:
-                    print(
-                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                    print(f'Exception occured inserting the following data:\n{tup}')
+                    print(e)
                     cur.connection.rollback()
-    
-
 
 
     @staticmethod
@@ -966,11 +865,6 @@ class Persistence:
                 else:
                     row.principal_sponsor_id = None
 
-                if pd.notna(row.province_territory_id):
-                    row.province_territory_id = int(row.province_territory_id)
-                else:
-                    row.province_territory_id = None 
-
                 tup = (row.goverlytics_id, row.source_id, date_collected, row.bill_name,
                        row.session, row.date_introduced, row.source_url, row.chamber_origin,
                        json.dumps(row.committees, default=utils.json_serial),
@@ -986,13 +880,13 @@ class Persistence:
                        row.publications,
                        json.dumps(row.last_major_event, default=utils.json_serial))
 
-                try:
-                    cur.execute(insert_legislator_query, tup)
+            try:
+                cur.execute(insert_legislator_query, tup)
 
-                except Exception as e:
-                    print(
-                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-                    cur.connection.rollback()
+            except Exception as e:
+                print(
+                    f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
+                cur.connection.rollback()
 
     @staticmethod
     def write_ca_prov_terr_legislation(data, table):
@@ -1104,58 +998,6 @@ class Persistence:
                        json.dumps(row.actions, default=utils.json_serial),
                        json.dumps(row.votes, default=utils.json_serial),
                        row.source_topic, row.topic, row.country_id, row.country)
-
-                try:
-                    cur.execute(insert_legislator_query, tup)
-
-                except Exception as e:
-                    print(
-                        f'An exception occurred inserting {row.goverlytics_id}:\n{e}')
-                    cur.connection.rollback()
-
-    @staticmethod
-    def write_ca_vote_data(data, table):
-        if not isinstance(data, list):
-            raise TypeError(
-                'Data being written to database must be a list of Rows or dictionaries!')
-
-        with CursorFromConnectionFromPool() as cur:
-            try:
-                create_table_query = sql.SQL("""
-                  
-                    CREATE TABLE IF NOT EXISTS {table} (
-                        name text,
-                        goverlytics_id bigint UNIQUE,
-                        source_id text,
-                        voting_data jsonb
-                    );
-
-                    ALTER TABLE {table} OWNER TO rds_ad;
-                """).format(table=sql.Identifier(table))
-
-                cur.execute(create_table_query)
-                cur.connection.commit()
-
-            except Exception as e:
-                print(
-                    f'An exception occurred creating {table}:\n{e}')
-                cur.connection.rollback()
-
-            insert_legislator_query = sql.SQL("""
-                INSERT INTO {table}
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (goverlytics_id) DO UPDATE SET
-                    name = excluded.name,
-                    goverlytics_id = excluded.goverlytics_id,
-                    source_id = excluded.source_id,
-                    voting_data = excluded.voting_data
-                """).format(table=sql.Identifier(table))
-
-            for row in data:
-                if isinstance(row, dict):
-                    row = utils.DotDict(row)
-
-                tup = (row.name, row.goverlytics_id, row.source_id, json.dumps(row.voting_data, default=utils.json_serial))
 
                 try:
                     cur.execute(insert_legislator_query, tup)
