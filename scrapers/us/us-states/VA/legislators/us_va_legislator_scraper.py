@@ -744,11 +744,11 @@ if __name__ == '__main__':
     senate_wiki_link = 'https://en.wikipedia.org/wiki/Senate_of_Virginia#:~:text=The%20Senate%20of%20Virginia%20is,the%20lieutenant%20governor%20of%20Virginia.'
     sen_bios_wiki = get_senate_wiki_bios(senate_wiki_link)
 
-    # with Pool() as pool:
-    #     sen_wiki_data = pool.map(
-    #         func=find_wiki_sen_data, iterable=sen_bios_wiki)
-    # print(sen_wiki_data)
-    # sen_wiki_df = pd.DataFrame(sen_wiki_data)
+    with Pool() as pool:
+        sen_wiki_data = pool.map(
+            func=find_wiki_sen_data, iterable=sen_bios_wiki)
+    print(sen_wiki_data)
+    sen_wiki_df = pd.DataFrame(sen_wiki_data)
 
     try:
         sen_df['most_recent_term_id'] = sen_df['most_recent_term_id'].replace({np.nan: None})

@@ -3,22 +3,23 @@ import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-p = Path(os.path.abspath(__file__)).parents[5]
+# p = Path(os.path.abspath(__file__)).parents[5]
 
-sys.path.insert(0, str(p))
+# sys.path.insert(0, str(p))
 
 from scraper_utils import CAProvinceTerrLegislationScraperUtils
 import pandas as pd
 from bs4 import BeautifulSoup
 from nameparser import HumanName
-from request_url import UrlRequest
+import requests
+# from request_url import UrlRequest
 from multiprocessing import Pool
 import re
 
 url = 'https://www.ola.org/en/legislative-business/bills/current'
 base_url = 'https://www.ola.org'
 header = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'}
 
 prov_terr_abbreviation = 'ON'
 database_table_name = 'ca_on_legislation'
@@ -84,7 +85,7 @@ def edit_table(lst):
 
 def get_bill_links(url):
     link_dict = []
-    url_request = UrlRequest.make_request(url, header)
+    url_request = scraper_utils.request(url)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_content = url_soup.find('div', {'class': 'view-content'})
     for item in url_content.find_all('div', {'class': 'views-row'}):
@@ -111,13 +112,15 @@ def scrape(dict_item):
     url = dict_item['url']
     session = re.search('parliament-[1-9]{2}', url).group().title()
     sponsors = dict_item['sponsors']
-    url_request = UrlRequest.make_request(url, header)
+    url_request = scraper_utils.request(url)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
 
     row = scraper_utils.initialize_row()
     row.source_url = url
     row.actions = dict_item['actions']
-    row.committees = dict_item['committees']
+    committees = []
+    committees.append(dict_item['committees'])
+    row.committees = committees
     row.session = session
 
     if len(sponsors) == 1:
@@ -153,6 +156,7 @@ def scrape(dict_item):
     row.current_status = current_status
     row.bill_summary = bill_summary
     row.bill_text = bill_text
+    row.date_introduced = None
     scraper_utils.crawl_delay(crawl_delay)
     print('Done row for: '+bill_name)
     return row
