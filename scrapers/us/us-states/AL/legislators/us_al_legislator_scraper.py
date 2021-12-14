@@ -5,53 +5,55 @@ Function: Scrape legislator data for the state of Alabama
 Issues:
     - names with only Initials (J.B.) has J as first name and B as middle name
     - birthdays on wikipedia that don't have class='bday' only get the years scraped
+    
+Edited Dec 14, 2021
+Author: Kevin Nha
+Updated scraper.
 """
-import itertools
-import sys
 import os
+import sys
+
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
-
 sys.path.insert(0, str(p))
 
-import requests
-from bs4 import BeautifulSoup
-import request_url
-import pandas as pd
-from psycopg2 import sql
-import json
 import datetime
+import html
+import multiprocessing
+import numpy as np
+import pandas as pd
+import re
+import request_url
+import ssl
+
+from bs4 import BeautifulSoup
+from multiprocessing import Pool
 from nameparser import HumanName
 from nameparser.config import CONSTANTS
-import html
 from scraper_utils import USStateLegislatorScraperUtils
-import re
-from unidecode import unidecode
-import numpy as np
-from nameparser import HumanName
-from multiprocessing import Pool
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
 from urllib.request import urlopen as uReq
-import time
-from io import StringIO
-import ssl
+from unidecode import unidecode
+
 ssl._create_default_https_context = ssl._create_unverified_context
+
+scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
+crawl_delay = scraper_utils.get_crawl_delay(
+    'http://www.legislature.state.al.us')
+    
 
 header = {
     'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-senators_url = 'http://www.legislature.state.al.us/aliswww/ISD/Senate/ALSenators.aspx'
-# first half for personal page url
-senator_pic_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALSenator.aspx'
-house_of_rep_url = 'http://www.legislature.state.al.us/aliswww/ISD/House/ALRepresentatives.aspx'
-# first half for personal page url
-house_of_rep_pic_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALRepresentative.aspx'
 
-wikipedia_house_url = 'https://en.wikipedia.org/wiki/Alabama_House_of_Representatives'
-wikipedia_senate_url = 'https://en.wikipedia.org/wiki/Alabama_Senate'
+senators_url = 'http://www.legislature.state.al.us/aliswww/ISD/Senate/ALSenators.aspx'
+senator_base_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALSenator.aspx'
+
+house_of_rep_url = 'http://www.legislature.state.al.us/aliswww/ISD/House/ALRepresentatives.aspx'
+house_base_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALRepresentative.aspx'
+
+wikipedia_house_url = 'https://ballotpedia.org/Alabama_House_of_Representatives'
+wikipedia_senate_url = 'https://ballotpedia.org/Alabama_State_Senate'
 
 
 def strip_name(pic_url, is_senate):
@@ -129,10 +131,10 @@ def nan(string):
     return string
 
 
-def get_legislator_links(base_url, is_senate, pic_url):
+def get_legislator_links(url, is_senate, base_url):
 
-    member_request = request_url.UrlRequest.make_request(base_url, header)
-    member_soup = BeautifulSoup(member_request.content, 'lxml')
+    member_request = request_url.UrlRequest.make_request(url, header)
+    member_soup = BeautifulSoup(member_request.content, 'html.parser')
     members = member_soup.find('table').find_all('input')
 
     links = {}
@@ -147,8 +149,10 @@ def get_legislator_links(base_url, is_senate, pic_url):
     """
 
     for member in members:
-        member_url = pic_url
+        member_url = base_url
         name = 'NAME=' + strip_name(member['src'], is_senate)
+        if 'VACANT' in name:
+            continue
         oid_sponsor = 'OID_SPONSOR=' + member['longdesc']
         oid_person = 'OID_PERSON=' + member['alt']
         session = 'SESSNAME=Regular%20Session%20' + \
@@ -157,147 +161,139 @@ def get_legislator_links(base_url, is_senate, pic_url):
         member_url = member_url + '?' + name + '&' + \
             oid_sponsor + '&' + oid_person + '&' + session
         links[member_url] = {'session': session, 'oid_sponsor': oid_sponsor}
+        
     scraper_utils.crawl_delay(crawl_delay)
     return links
 
 
-def scrape_legislator(links):
-    print(links)
+def scrape_legislator(link: tuple):
     CONSTANTS.titles.remove(*CONSTANTS.titles)
     party = {'(D)': 'Democrat', '(R)': 'Republican'}
+    
+    link, value = link[0], link[1]
+    base_url = link
+    member_request = request_url.UrlRequest.make_request(base_url, header)
+    member_soup = BeautifulSoup(member_request.content, 'html.parser')
+    members = member_soup.find_all('table')
 
-    legislators = {}
+    complete_name = member_soup.find(
+        'span', id='ContentPlaceHolder1_lblMember').string
 
-    for link, value in links.items():
-        print(link)
-        # base_url = 'http://www.legislature.state.al.us/aliswww/ISD/ALRepresentative.aspx?NAME=Alexander&OID_SPONSOR=100537&OID_PERSON=7710&SESSNAME=Regular%20Session%202021'
-        base_url = link
-        member_request = request_url.UrlRequest.make_request(base_url, header)
-        member_soup = BeautifulSoup(member_request.content, 'lxml')
-        members = member_soup.find_all('table')
+    # unescape turns &QUOT; into ""
+    name = html.unescape(complete_name.string)
+    name = html.unescape(complete_name.string)
+    name = name.replace('SENATOR', '')
+    name = name.replace('REPRESENTATIVE', '')
+    name = HumanName(name)
 
-        complete_name = member_soup.find(
-            'span', id='ContentPlaceHolder1_lblMember').string
+    name.capitalize()
 
-        # unescape turns &QUOT; into ""
-        name = html.unescape(complete_name.string)
-        name = html.unescape(complete_name.string)
-        name = name.replace('SENATOR', '')
-        name = name.replace('REPRESENTATIVE', '')
-        name = HumanName(name)
-        if name.last == '':
-            continue
+    legislature_table = pd.read_html(str(members[0]))[0]
+    district_table = pd.read_html(str(members[1]))[0]
+    committees_table = pd.read_html(str(members[-1]))[0]
 
-        name.capitalize()
+    fields = scraper_utils.initialize_row()
 
-        legislature_table = pd.read_html(str(members[0]))[0]
-        district_table = pd.read_html(str(members[1]))[0]
-        committees_table = pd.read_html(str(members[-1]))[0]
+    fields.source_id = value['oid_sponsor'].replace('OID_SPONSOR=', '')
+    fields.most_recent_term_id = value['session'].replace(
+        '%20', '').replace(' ', '').replace('SESSNAME=', '')
+    fields.date_collected = datetime.datetime.today().strftime('%d-%m-%Y')
+    fields.source_url = base_url
+    fields.name_full = name.full_name
+    fields.name_last = name.last
+    fields.name_first = name.first
+    fields.name_middle = name.middle
+    fields.name_suffix = name.suffix
+    fields.party = party[district_table[1][0]]
+    fields.party_id = scraper_utils.get_party_id(fields.party)
+    fields.role = complete_name.split()[0].title()
+    fields.district = district_table[1][1].split()[2]
 
-        fields = scraper_utils.initialize_row()
-
-        fields.source_id = value['oid_sponsor'].replace('OID_SPONSOR=', '')
-        fields.most_recent_term_id = value['session'].replace(
-            '%20', '').replace(' ', '').replace('SESSNAME=', '')
-        fields.date_collected = datetime.datetime.today().strftime('%d-%m-%Y')
-        fields.source_url = base_url
-        fields.name_full = name.full_name
-        fields.name_last = name.last
-        fields.name_first = name.first
-        fields.name_middle = name.middle
-        fields.name_suffix = name.suffix
-        fields.party = party[district_table[1][0]]
-        fields.party_id = scraper_utils.get_party_id(fields.party)
-        fields.role = complete_name.split()[0].title()
-        fields.district = district_table[1][1].split()[2]
-
-        try:
-            committees_table.index = committees_table['Committees'].tolist()
-            temp = []
-            for index, row in committees_table.iterrows():
-                temp.append(
-                    {
-                        'committee': row['Committees'],
-                        'role': row['Position']
-                    })
-
-            fields.committees = temp
-
-            # fields.committees'] = temp
-
-        except KeyError:
-            print('key error')
-            pass
-
-        fields.areas_served = district_table[1][2].split(',')
-
+    try:
+        committees_table.index = committees_table['Committees'].tolist()
         temp = []
-        district = nan(district_table[1][3]).replace('(', '').replace(')',' ').replace(' ', '-')
-        district = district.replace('--', '-')
-        capitol = legislature_table[1][3].replace('(', '').replace(')',' ').replace(' ', '-')
-        capitol = capitol.replace('--', '-')
-        print(district)
-        print(capitol)
-        if nan(district_table[1][3]) != '':
+        for index, row in committees_table.iterrows():
             temp.append(
-                {'office': 'District Office', 'number': district})
-        if legislature_table[1][3] != '':
-            temp.append(
-                {'office': 'Capitol Office', 'number': capitol})
+                {
+                    'committee': row['Committees'],
+                    'role': row['Position']
+                })
 
-        fields.phone_numbers = temp
+        fields.committees = temp
 
-        temp = []
-        # This just puts all the address components together, nan turns nan values to ''
-        temp.append({'location': 'Capitol Office', 'address': nan(str(legislature_table[1][6]).replace('Suite', '')) + ' ' + legislature_table[1][5] + ', ' +
-                     legislature_table[1][7] + ', AL ' + legislature_table[1][9]})
+        # fields.committees'] = temp
 
-        temp.append({'location': 'District Office', 'address': nan(str(district_table[1][5]) + ', ') + nan(str(district_table[1][6]) + ', ') + nan(district_table[1][7]) +
-                     ', AL, ' + nan(district_table[1][9])})
+    except KeyError:
+        print('key error')
+        pass
 
-        fields.addresses = temp
+    fields.areas_served = district_table[1][2].split(',')
 
-        email = legislature_table[1][10]
-        print(email)
+    temp = []
+    district = nan(district_table[1][3]).replace('(', '').replace(')',' ').replace(' ', '-')
+    district = district.replace('--', '-')
+    capitol = legislature_table[1][3].replace('(', '').replace(')',' ').replace(' ', '-')
+    capitol = capitol.replace('--', '-')
+    if nan(district_table[1][3]) != '':
+        temp.append(
+            {'office': 'District Office', 'number': district})
+    if legislature_table[1][3] != '':
+        temp.append(
+            {'office': 'Capitol Office', 'number': capitol})
+
+    fields.phone_numbers = temp
+
+    temp = []
+    # This just puts all the address components together, nan turns nan values to ''
+    temp.append({'location': 'Capitol Office', 'address': nan(str(legislature_table[1][6]).replace('Suite', '')) + ' ' + legislature_table[1][5] + ', ' +
+                    legislature_table[1][7] + ', AL ' + legislature_table[1][9]})
+
+    temp.append({'location': 'District Office', 'address': nan(str(district_table[1][5]) + ', ') + nan(str(district_table[1][6]) + ', ') + nan(district_table[1][7]) +
+                    ', AL, ' + nan(district_table[1][9])})
+
+    fields.addresses = temp
+
+    email = legislature_table[1][10]
+    if email == email:
+        email = email.replace('.alhouse', '@alhouse')
+        fields.email = email
+    else:
+        email = district_table[1][10]
         if email == email:
             email = email.replace('.alhouse', '@alhouse')
             fields.email = email
-        else:
-            email = district_table[1][10]
-            if email == email:
-                email = email.replace('.alhouse', '@alhouse')
-                fields.email = email
-        legislators[fields.district] = fields
-        scraper_utils.crawl_delay(crawl_delay)
-        gender = scraper_utils.get_legislator_gender(fields.name_first, fields.name_last)
-        if not gender:
-            gender = 'O'
-        fields.gender = gender
-        fields.wiki_url = str(get_wiki_url(fields))
 
-    return legislators
+    scraper_utils.crawl_delay(crawl_delay)
+    gender = scraper_utils.get_legislator_gender(fields.name_first, fields.name_last)
+    if not gender:
+        gender = 'O'
+    fields.gender = gender
+    fields.wiki_url = str(get_wiki_url(fields))
+    
+    #temporary because ballotpedia isn't updated
+    if fields.name_full == "Patrice McClammy":
+        fields.wiki_url = 'https://ballotpedia.org/Patrice_McClammy'
+
+    return fields
 
 
 def get_wiki_links(link):
-    wikipedia_link = 'https://en.wikipedia.org'
-
     member_request = request_url.UrlRequest.make_request(link, header)
-    member_soup = BeautifulSoup(member_request.content, 'lxml')
-    members = member_soup.find('table', class_='wikitable sortable')
+    member_soup = BeautifulSoup(member_request.content, 'html.parser')
+    members = member_soup.find('table', {"id":"officeholder-table"})
     members = members.find_all('tr')[1:]
 
-    links = {}
+    links = []
 
     for member in members:
-        district = member.find_all('td')[0].find('a').text
-        page_url_end = member.find_all('td')[1].find('a', class_=False)
-        if page_url_end is None:
-            continue
-
-        links[district] = (wikipedia_link + page_url_end['href'])
+        try:
+            name_position = 1
+            links.append(member.findAll('td')[name_position].a["href"])
+        except:
+            pass
+                     
     scraper_utils.crawl_delay(crawl_delay)
     return links
-
 
 def scrape_wiki(links):
     missing_fields = {}
@@ -428,16 +424,6 @@ def merge_wiki(wiki, legislators):
     legislators = dict(sorted(legislators.items()))
     return legislators
 
-
-# def init_database():
-#     db_user = 'postgres'
-#     db_pass = 'dionysos'
-#     db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
-#     db_port = '5432'
-#     db_name = 'openparl'
-
-#     Database.initialise(database=db_name, host=db_host, user=db_user, password=db_pass)
-
 def dict_to_list(dictionary):
     my_list = []
 
@@ -446,56 +432,54 @@ def dict_to_list(dictionary):
 
     return my_list
 
+if __name__ == "__main__":
+    print("Collecting house data...")
+    house_links = get_legislator_links(
+        house_of_rep_url, False, house_base_url)
 
-# init_database()
-scraper_utils = USStateLegislatorScraperUtils('AL', 'us_al_legislators')
-crawl_delay = scraper_utils.get_crawl_delay(
-    'http://www.legislature.state.al.us')
-# house scraper
-#house_wiki_links = get_wiki_links(wikipedia_house_url)
-#house_wiki = scrape_wiki(house_wiki_links)
-house_links = get_legislator_links(
-    house_of_rep_url, False, house_of_rep_pic_url)
+    threads = int(multiprocessing.cpu_count() * 0.5)
+        
+    with Pool(threads) as pool:
+        house_data = pool.map(scrape_legislator, house_links.items())
+    
+    house_wiki_links = get_wiki_links(wikipedia_house_url)
+    with Pool(threads) as pool:
+        house_wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, house_wiki_links)
+    
+    print("Collecting senate data...")    
+    senate_links = get_legislator_links(
+        senators_url, True, senator_base_url)
 
-house_dict = scrape_legislator(dict(itertools.islice(house_links.items(), 5)))
-#house = merge_wiki(house_wiki, house_dict)
-house = dict_to_list(house_dict)
-print("house")
-# senate scraper
-# senate_wiki_links = get_wiki_links(wikipedia_senate_url)
-# senate_wiki = scrape_wiki(senate_wiki_links)
-senate_links = get_legislator_links(senators_url, True, senator_pic_url)
+    with Pool(threads) as pool:
+        senate_data = pool.map(scrape_legislator, senate_links.items())
+        
+    senate_wiki_links = get_wiki_links(wikipedia_senate_url)
+    with Pool(threads) as pool:
+        senate_wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, senate_wiki_links)
 
-senate_dict = scrape_legislator(dict(itertools.islice(senate_links.items(), 5)))
-#senate = merge_wiki(senate_wiki, senate_dict)
-senate = dict_to_list(senate_dict)
-print("senate")
-senate_house_data_lst = house + senate
+    print("Configuring data...")
+    senate_house_data_lst = house_data + senate_data
+    senate_house_wiki_data = house_wiki_data + senate_wiki_data
 
-leg_df = pd.DataFrame(senate_house_data_lst)
-# getting urls from ballotpedia
-wikipage_reps = "https://ballotpedia.org/Alabama_House_of_Representatives"
-wikipage_senate = "https://ballotpedia.org/Alabama_State_Senate"
+    leg_df = pd.DataFrame(senate_house_data_lst)
+    leg_df = leg_df.drop(columns =  ['years_active', 'birthday', 'education', 'occupation'])
+    
+    wiki_df = pd.DataFrame(senate_house_wiki_data)[
+        ['years_active', 'birthday', 'education', 'occupation', 'wiki_url']
+    ]
 
-all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                        on=['wiki_url'])
+    
+    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
+    big_df['occupation'] = big_df['occupation'].replace({np.nan: None})
+    big_df['education'] = big_df['education'].replace({np.nan: None})
+    big_df['years_active'] = big_df['years_active'].replace({np.nan: None})
 
-with Pool() as pool:
-    wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
-wiki_df = pd.DataFrame(wiki_data)[['name_last', 'wiki_url']]
+    big_list_of_dicts = big_df.to_dict('records')
 
-big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_last", 'wiki_url'])
+    print('Writing data to database...')
+    scraper_utils.write_data(big_list_of_dicts)
 
-print('Scraping complete')
-
-big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
-
-big_list_of_dicts = big_df.to_dict('records')
-
-print('Writing data to database...')
-
-scraper_utils.write_data(big_list_of_dicts)
-
-
-print('Complete')
+    print('Complete')
 
