@@ -303,7 +303,6 @@ try:
         big_df = pd.DataFrame(data)
         big_df = big_df.drop(columns = ["birthday", "occupation", "education"])
 
-
         # get missing data from wikipedia
 
         wiki_bc_parliaments_link = 'https://en.wikipedia.org/wiki/Parliament_of_British_Columbia'

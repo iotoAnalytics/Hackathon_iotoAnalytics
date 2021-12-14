@@ -71,7 +71,7 @@ def configure_data(mla_data, wiki_data):
     mla_df = mla_df.drop(columns = columns_not_on_main_site)
   
     wiki_df = pd.DataFrame(wiki_data)[
-        ['birthday', 'education', 'name_first', 'name_last', 'occupation', 'wiki_url']
+        ['birthday', 'education', 'occupation', 'wiki_url']
     ]
 
     big_df = pd.merge(mla_df, wiki_df, 
