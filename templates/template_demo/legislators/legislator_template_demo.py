@@ -1,6 +1,4 @@
 '''
-Before beginning, be sure to update values in the config file.
-
 This template is meant to serve as a general outline, and will not necessarily work for
 all pages. Feel free to modify the scripts as necessary.
 
