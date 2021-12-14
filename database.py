@@ -3,6 +3,7 @@ Used for connecting scrapers to relational database using psycopg2.
 Author: Justin Tendeck
 """
 
+from typing import AnyStr
 from psycopg2.extras import RealDictCursor
 # from psycopg2 import pool
 import psycopg2
@@ -1795,7 +1796,6 @@ class Persistence:
                         source_id text,
                         voting_data jsonb
                     );
-
                     ALTER TABLE {table} OWNER TO rds_ad;
                 """).format(table=sql.Identifier(table))
 
@@ -1911,7 +1911,7 @@ class Persistence:
 
                 tup = (row.candidate_election_finances_id,
                        row.total_credits,
-                       row.total_debits,
+                       row.total_debits,   
                        row.total_balance,
                        row.outstanding_cheques,
                        row.deposits_in_transit,

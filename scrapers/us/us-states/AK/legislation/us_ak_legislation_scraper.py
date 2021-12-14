@@ -31,13 +31,7 @@ import time
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
 
-# # Initialize config parser and get variables from config file
-# configParser = configparser.RawConfigParser()
-# configParser.read('config.cfg')
-
 state_abbreviation = 'AK'
-# database_table_name = str(configParser.get('scraperConfig', 'database_table_name'))
-# legislator_table_name = str(configParser.get('scraperConfig', 'legislator_table_name'))
 
 scraper_utils = USStateLegislationScraperUtils(
     state_abbreviation, 'us_ak_legislation', 'us_ak_legislators')
@@ -98,7 +92,7 @@ def get_links(url_table):
 
 
 def go_into_links(link):
-    idict = {"cosponsors": 'NONE', "bill summary": 'NONE'}
+    idict = {"cosponsors": 'NONE',"bill summary": 'NONE'}
     url_request = request_url.UrlRequest.make_request(link, header)
     url_soup = BeautifulSoup(url_request.content, 'lxml')
     url_summary = url_soup.find_all(
@@ -177,10 +171,6 @@ def split_cosponsors(page_info):
 
 
 def get_dictionaries():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
-
     gov_url = past_terms_url(base_url)
     url_table = get_html(gov_url)
     df = pd.read_html(str(url_table))[0]
@@ -197,16 +187,17 @@ def get_dictionaries():
 
 
 def scrape(data_dict):
+<<<<<<< HEAD:scrapers/us-states/AK/legislation/alaska_legislation_scraper.py
+=======
 
+>>>>>>> dev:scrapers/us/us-states/AK/legislation/us_ak_legislation_scraper.py
     row = scraper_utils.initialize_row()
     url = data_dict['urls']
-    #print('doing url: ' + url)
     temp_dict = go_into_links(url)
     cosponsors = split_cosponsors(temp_dict['cosponsors'])
     session = get_session(url)
 
-    bill_name = data_dict['Bill']
-    # p_sponsor = data_dict['Principal Sponsors'].replace('REPRESENTATIVE', '').replace('SENATOR', '').title().strip()
+    bill_name = data_dict['Bill'].replace(' ','')
     goverlytics_id = f'{state_abbreviation}_{session}_{bill_name}'
 
     row.goverlytics_id = goverlytics_id

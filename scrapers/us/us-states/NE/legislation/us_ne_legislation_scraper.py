@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 # Get path to the root directory so we can import necessary modules
-
 p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
