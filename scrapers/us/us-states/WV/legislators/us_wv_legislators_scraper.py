@@ -1,22 +1,23 @@
 # Unavailable data - source_id, seniority, military_experience
 # Wiki data - education
 
-import os
-import re
-import sys
-from urllib.request import urlopen as uReq
 import multiprocessing
+from datetime import datetime
+from tqdm import tqdm
+import ssl
+import sys
+import os
+from pathlib import Path
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
-from multiprocessing import Pool
-from nameparser import HumanName
-from pathlib import Path
-from pprint import pprint
-from tqdm import tqdm
-import numpy as np
-import pandas as pd
-import ssl
+from urllib.request import urlopen as uReq
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
 p = Path(os.path.abspath(__file__)).parents[5]
@@ -49,6 +50,7 @@ LEGISLATURE_START_YEAR = {
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+
 def get_urls():
     urls = []
 
@@ -61,7 +63,7 @@ def get_urls():
 
     table_rows = soup.find('table', 'tabborder').find_all('tr', {'valign': 'top'})
     house_urls = [BASE_URL + HOUSE_PATH + '/' + path.find('td').find('a').get('href')
-        for path in table_rows]
+                  for path in table_rows]
 
     # Get senate members
     scrape_url = BASE_URL + SENATE_PATH + roster_path
@@ -70,11 +72,12 @@ def get_urls():
 
     table_rows = soup.find('table', 'tabborder').find_all('tr', {'valign': 'top'})
     senate_urls = [BASE_URL + SENATE_PATH + '/' + path.find('td').find('a').get('href')
-        for path in table_rows]
+                   for path in table_rows]
 
     urls = house_urls + senate_urls
 
     return urls
+
 
 def scrape(url):
     print(url)
@@ -94,16 +97,20 @@ def scrape(url):
     _set_areas_served(row, soup)
     _set_district(row, soup)
     _set_biography_fields(row, soup)
-    _set_wiki_url(row)
-
+    try:
+        row.wiki_url = _set_wiki_url(row)
+    except:
+        pass
+    print(row)
     return row
+
 
 def get_wiki_urls():
     wiki_urls = []
-    
+
     wiki_member_list_url = [WIKI_URL + WIKI_HOUSE_PATH, WIKI_URL + WIKI_SENATE_PATH]
 
-    for url in wiki_member_list_url: 
+    for url in wiki_member_list_url:
         page = scraper_utils.request(url)
         soup = BeautifulSoup(page.content, SOUP_PARSER_TYPE)
         scraper_utils.crawl_delay(crawl_delay)
@@ -118,13 +125,19 @@ def get_wiki_urls():
                 pass
 
     return wiki_urls
-    
-def merge_all_wiki_data(legislator_data, wiki_urls):
-    with Pool(NUM_POOL_PROCESSES) as pool:
-        wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
 
-    for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, most_recent_term_id=False, years_active=False, birthday=False, occupation=False)
+
+def merge_all_wiki_data(legislator_data, wiki_urls):
+    try:
+        with Pool(NUM_POOL_PROCESSES) as pool:
+            wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
+
+        for data in wiki_data:
+            _merge_wiki_data(legislator_data, data, most_recent_term_id=False, years_active=False, birthday=False,
+                             occupation=False)
+    except:
+        pass
+
 
 def _scrape_wiki(url):
     wiki_data = scraper_utils.scrape_wiki_bio(url)
@@ -132,47 +145,60 @@ def _scrape_wiki(url):
     scraper_utils.crawl_delay(wiki_crawl_delay)
     return wiki_data
 
+
 def _create_soup(url, soup_parser_type):
-    headers = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'}
     page = requests.get(url, headers=headers, verify=PEM_PATH)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
+
 
 def _set_most_recent_term_id(row):
     most_recent_term_id = LEGISLATURE_START_YEAR.get(CURRENT_LEGISLATURE)
     row.most_recent_term_id = most_recent_term_id
 
+
 def _set_source_url(row, url):
     row.source_url = url
 
-def _set_name(row, soup):
-    name_str = soup.find('div', {'id': 'wrapleftcolr'}).find('h2').text
-    formatted_name = re.sub('\([A-Za-z0-9\,\s\-]+\)', '', name_str).strip()
-    human_name = HumanName(formatted_name)
 
-    row.name_first = human_name.first
-    row.name_last = human_name.last
-    row.name_middle = human_name.middle
-    row.name_suffix = human_name.suffix
-    row.name_full = human_name.full_name
+def _set_name(row, soup):
+    try:
+        name_str = soup.find('div', {'id': 'wrapleftcolr'}).find('h2').text
+        formatted_name = re.sub('\([A-Za-z0-9\,\s\-]+\)', '', name_str).strip()
+        human_name = HumanName(formatted_name)
+
+        row.name_first = human_name.first
+        row.name_last = human_name.last
+        row.name_middle = human_name.middle
+        row.name_suffix = human_name.suffix
+        row.name_full = human_name.full_name
+    except:
+        pass
+
 
 def _set_party(row, soup):
     party_str = soup.find('div', {'id': 'wrapleftcolr'}).find('h2').text
-    formatted_party = re.search('\((R|D) - ([A-Za-z]+), ([0-9]+)\)', party_str).group(1)
+    try:
+        formatted_party = re.search('\((R|D) - ([A-Za-z]+), ([0-9]+)\)', party_str).group(1)
 
-    party = ''
-    if formatted_party == 'R':
-        party = 'Republican'
-    elif formatted_party == 'D':
-        party = 'Democrat'
+        party = ''
+        if formatted_party == 'R':
+            party = 'Republican'
+        elif formatted_party == 'D':
+            party = 'Democrat'
 
-    row.party = party
-    row.party_id = scraper_utils.get_party_id(party)
+        row.party = party
+        row.party_id = scraper_utils.get_party_id(party)
+    except:
+        pass
 
 def _set_role(row, url):
     role = re.search('\?member=([A-Za-z]+)', url).group(1)
     row.role = role
-    
+
+
 def _set_committees(row, soup):
     committees = []
 
@@ -187,7 +213,7 @@ def _set_committees(row, soup):
         role_str = 'Member'
         if not committee_anchor.previousSibling.isspace():
             role_str = committee_anchor.previousSibling.strip().title()[:-1]
-            
+
         committee_str = committee_anchor.text.strip()
 
         committee = {
@@ -198,6 +224,7 @@ def _set_committees(row, soup):
 
     row.committees = committees
 
+
 def _set_phone_numbers(row, soup):
     phone_numbers = []
     try:
@@ -206,7 +233,6 @@ def _set_phone_numbers(row, soup):
         for element in location_elements:
             location_str = _format_phone_location(element.text)
             number_str = _format_phone_number(element.nextSibling)
-
 
             phone_number = {
                 'office': location_str,
@@ -219,16 +245,19 @@ def _set_phone_numbers(row, soup):
         print(e)
     print(row.phone_numbers)
 
+
 def _format_phone_location(phone_location_str):
     phone_location = phone_location_str.replace('Phone:', '')
     phone_location = phone_location.strip()
     return phone_location
+
 
 def _format_phone_number(phone_number_str):
     phone_number = phone_number_str.strip()
     phone_number = re.sub('[\(\)]', '', phone_number)
     phone_number = phone_number.replace(' ', '-')
     return phone_number
+
 
 def _set_addresses(row, soup):
     addresses = []
@@ -249,6 +278,7 @@ def _set_addresses(row, soup):
 
     row.addresses = addresses
 
+
 def _format_address_location(address_location_str):
     # May be in the following formats:
     #   Capital Office:
@@ -256,6 +286,7 @@ def _format_address_location(address_location_str):
     address_location = address_location_str.replace(' Office', '')
     address_location = address_location[:-1]
     return address_location
+
 
 def _format_address(address_element):
     address = ''
@@ -275,26 +306,32 @@ def _format_address(address_element):
         address = address.strip()
         address = address.replace('\n', ', ')
         address = address.replace(', WV', ', WV,')
-    
+
     return address
+
 
 def _set_email(row, soup):
     email_str = soup.find('div', {'id': 'wrapleftcolr'}).find('a').text
     email = email_str.strip()
     row.email = email
-    
+
+
 def _set_areas_served(row, soup):
     areas_served_str = soup.find('div', {'id': 'wraprightcolr'}).find('strong').nextSibling
     areas_served_str = str(areas_served_str).strip()
     areas_served_str = areas_served_str.replace(' (part)', '')
     areas_served = areas_served_str.split(', ')
     row.areas_served = areas_served
-    
+
+
 def _set_district(row, soup):
     district_str = soup.find('div', {'id': 'wrapleftcolr'}).find('h2').text
-    formatted_district = re.search('\((R|D) - ([A-Za-z]+), ([0-9]+)\)', district_str).group(3)
-    district = formatted_district.lstrip('0')
-    row.district = district
+    try:
+        formatted_district = re.search('\((R|D) - ([A-Za-z]+), ([0-9]+)\)', district_str).group(3)
+        district = formatted_district.lstrip('0')
+        row.district = district
+    except:
+        pass
 
 def _set_biography_fields(row, soup):
     # Sets the following fields: years_active, birthday
@@ -332,25 +369,26 @@ def _set_gender(row, biography_content):
 def _set_occupation(row, element):
     occupation_str = str(element.previousSibling).strip()
     is_fixed = _fix_occupation(row, occupation_str)
-    
+
     # No need to run rest of code if already fixed or occupation doesn't exist
     if is_fixed or occupation_str == 'None':
         return
 
     occupation_str = re.sub('\((.*?)\)', '', occupation_str)
     occupation_list = re.split('/|; |, |and ', occupation_str)
-    
+
     occupation = []
     for job in occupation_list:
         if ' - ' in job or ' – ' in job or ' — ' in job:
             job = re.split(' - | – | — ', job, 1)[0]
         if 'for' in job or 'of' in job or 'with' in job:
             job = re.split(' for | of | with ', job, 1)[0]
-        
+
         if job:
             occupation.append(job.strip())
 
     row.occupation = occupation
+
 
 def _fix_occupation(row, text):
     # NOTE: This method fixes special cases. Currently, this is the simplest effective way to set
@@ -359,7 +397,7 @@ def _fix_occupation(row, text):
     # Evan Hansen - House - 51
     if 'President, Downstream Strategies' in text:
         row.occupation = ['President of Downstream Strategies']
-    
+
     # John Mandt Jr. - House - 16
     elif 'Fourth Generation Business Owner' in text:
         row.occupation = ['Business Owner']
@@ -374,7 +412,7 @@ def _fix_occupation(row, text):
 
     # Ric Griffith - House - 19
     elif 'Pharmacist/Owner of Griffith and Feil Drug' in text:
-        row.occupation = ['Pharmacist','Owner of Griffith and Feil Drug']
+        row.occupation = ['Pharmacist', 'Owner of Griffith and Feil Drug']
 
     # Gary G. Howell - House - 56
     elif 'Small Business Owner/Mail Order Auto Parts' in text:
@@ -383,34 +421,37 @@ def _fix_occupation(row, text):
     # Shannon Kimes - House - 9
     elif 'Owner, Kimes Steel and Rail, Inc' in text:
         row.occupation = ['Owner of Kimes Steel and Rail Inc']
-    
+
     # Michael T. Azinger - Senate - 3 
     elif 'Manager, Azinger Group' in text:
         row.occupation = ['Manager of Azinger Group']
-    
+
     else:
         return False
-    
+
     return True
+
 
 def _set_years_active(row, element):
     years_active_str = str(element.nextSibling).strip()
     years_active_list = re.findall('[0-9]+-[0-9]+', years_active_str)
-    years_active = _unpack_years_range(years_active_list)    
+    years_active = _unpack_years_range(years_active_list)
     row.years_active = years_active
+
 
 def _unpack_years_range(years_range):
     # Unpacks a list of year ranges
     # e.g. ['2010-2012', '2016-2018'] -> ['2010, 2011, 2012, 2016, 2017, 2018] 
     formatted_years_active = []
     formatted_years_range = [years_boundary.split('-') for years_boundary in years_range]
-            
+
     for years_boundary in formatted_years_range:
         for year in range(int(years_boundary[0]), int(years_boundary[1]) + 1):
             if year not in formatted_years_active:
                 formatted_years_active.append(year)
 
     return formatted_years_active
+
 
 def _set_birthday(row, element):
     try:
@@ -421,8 +462,9 @@ def _set_birthday(row, element):
     except Exception:
         pass
 
+
 def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True,
-                    years_active=True, most_recent_term_id=True):
+                     years_active=True, most_recent_term_id=True):
     full_name = wiki_data['name_first'] + ' ' + wiki_data['name_last']
 
     legislator_row = _get_legislator_row(legislator_data, full_name)
@@ -448,101 +490,32 @@ def _set_wiki_url(row):
     wikipage_senate = "https://ballotpedia.org/West_Virginia_State_Senate"
 
     if row.role == "Delegate":
-        try:
-            uClient = uReq(wikipage_reps)
-            page_html = uClient.read()
-            uClient.close()
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
 
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
+    page_html = uClient.read()
+    uClient.close()
 
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-                party = party.replace('\n', '')
-                if party == "Democratic":
-                    party = "Democrat"
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
 
-                try:
-                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                        pass
-                if not row.wiki_url:
-                    for person in rows[1:]:
-                        tds = person.findAll("td")
-                        name_td = tds[1]
-                        name = name_td.text
-                        name = name.replace('\n', '')
-                        party = tds[2].text
-                        party = party.strip()
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
 
-                        if party == "Democratic":
-                            party = "Democrat"
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
 
-                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                            row.wiki_url = name_td.a['href']
-                            break
-                        elif row.party == party and row.name_last in name.strip().split()[-1]:
-                            row.wiki_url = name_td.a['href']
-                            break
-        except Exception as e:
-            print(e)
-    if row.role == "Senator":
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
 
-        try:
-            uClient = uReq(wikipage_senate)
-            page_html = uClient.read()
-            uClient.close()
-
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
-
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-
-                if party == "Democratic":
-                    party = "Democrat"
-
-                try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                    pass
-            if not row.wiki_url:
-                for person in rows[1:]:
-                    tds = person.findAll("td")
-                    name_td = tds[1]
-                    name = name_td.text
-                    name = name.replace('\n', '')
-                    party = tds[2].text
-                    party = party.strip()
-
-                    if party == "Democratic":
-                        party = "Democrat"
-
-                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-        except Exception as e:
-            print(e)
-            pass
+            return link
 
 
 def _get_legislator_row(legislator_data, name_full):
@@ -575,6 +548,7 @@ def find_individual_wiki(wiki_page_link):
     scraper_utils.crawl_delay(crawl_delay)
     return bio_lnks
 
+
 def main():
     print('WEST VIRGINIA!')
     print('Country roads, take me home ♫ ♫ ♫')
@@ -590,8 +564,9 @@ def main():
 
     # Scrape data from collected URLs
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
-    with Pool(NUM_POOL_PROCESSES) as pool:
-        data = list(tqdm(pool.imap(scrape, urls)))
+    # with Pool(NUM_POOL_PROCESSES) as pool:
+    #     data = list(tqdm(pool.imap(scrape, urls)))
+    data = [scrape(url) for url in urls]
 
     # Collect wiki urls
     print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
@@ -602,6 +577,7 @@ def main():
     merge_all_wiki_data(data, wiki_urls)
 
     leg_df = pd.DataFrame(data)
+    print(leg_df)
     # getting urls from ballotpedia
     wikipage_reps = "https://ballotpedia.org/West_Virginia_House_of_Delegates"
     wikipage_senate = "https://ballotpedia.org/West_Virginia_State_Senate"
@@ -620,18 +596,15 @@ def main():
     big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
     big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
     big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
-
-    vacant_index = big_df.index[big_df['wiki_url'] == ''].tolist()
-    for index in vacant_index:
-        big_df = big_df.drop(big_df.index[index])
+    big_df.drop(big_df.index[big_df['name_full'] == 'Vacant'], inplace=True)
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
 
     print('Scraping complete')
     # Write to database
-    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
-    if not DEBUG_MODE:
-        scraper_utils.write_data(data)
+    scraper_utils.write_data(data)
 
     print('\nCOMPLETE!\n')
-    
+
+
 if __name__ == '__main__':
     main()
