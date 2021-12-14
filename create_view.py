@@ -3,7 +3,7 @@ from psycopg2 import sql
 
 VIEW_NAME = "us_legislators"
 SELECTED_COLUMNS = ["goverlytics_id", "name_full", "name_last", "name_first", "name_middle", "name_suffix", "district", "party_id", "state", "wiki_url", "is_active"]
-COMPLETED_STATES = ["AK", "AZ", "DE", "HI", "IA", "ID", "KS", "KY", "LA", "MA", "NC", "ND", "NE", "NM", "NV", "OH", "RI", "SC", "UT", "VT", "WA", "WY"]
+COMPLETED_STATES = ["AK", "AL", "AZ", "DE", "HI", "IA", "ID", "KS", "KY", "LA", "MA", "NC", "ND", "NE", "NM", "NV", "OH", "RI", "SC", "UT", "VT", "WA", "WY"]
 
 def get_select_query():
     query = ""
