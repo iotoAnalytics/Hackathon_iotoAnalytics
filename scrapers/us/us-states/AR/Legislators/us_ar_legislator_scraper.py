@@ -161,10 +161,12 @@ def get_wiki_links(link, chamber):
     links = {}
 
     for member in members:
-
-        elements = member.find_all('td')
-        district = elements[0].text.strip()
-        member_url = elements[1].find('a')['href']
+        try:
+            elements = member.find_all('td')
+            district = elements[0].text.strip()
+            member_url = elements[1].find('a')['href']
+        except:
+            pass
 
         links[(chamber, district)] = (wikipedia_link + member_url)
     scraper_utils.crawl_delay(crawl_delay)
@@ -481,7 +483,7 @@ if __name__ == '__main__':
 
     # with Pool() as pool:
     #     data = pool.map(scrape, urls)
-    leg_df = pd.DataFrame(data)
+    leg_df = pd.DataFrame(data[:50])
     # getting urls from ballotpedia
     wikipage_reps = "https://ballotpedia.org/Arkansas_House_of_Representatives"
     wikipage_senate = "https://ballotpedia.org/Arkansas_State_Senate"
