@@ -5,8 +5,11 @@
 name: ca_provincial_legislator scrapers
 
 on:
-  schedule:
-    - cron: "0 0 1 * *" # Runs every month
+  # schedule:
+    # - cron: "0 0 1 * *" # Runs every month
+  push:
+    branches:
+      - dev
     
 jobs:
   build:
