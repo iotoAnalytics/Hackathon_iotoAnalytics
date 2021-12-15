@@ -1,5 +1,4 @@
-[![provincial scrapers](https://github.com/iotoAnalytics/goverlytics-scrapers/actions/workflows/provincial_scrapers.yml/badge.svg)](https://github.com/iotoAnalytics/goverlytics-scrapers/actions/workflows/provincial_scrapers.yml)
-
+[![Canada Provincial Legislator Scraper Actions Status](https://github.com/iotoAnalytics/goverlytics-scrapers/workflows/provincial_legislator_scrapers.yml/badge.svg)](https://github.com/iotoAnalytics/goverlytics-scrapers/actions)
 
 ## Goverlytics Scrapers
 
