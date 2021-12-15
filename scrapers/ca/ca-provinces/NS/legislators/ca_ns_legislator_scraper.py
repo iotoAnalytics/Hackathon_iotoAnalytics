@@ -274,10 +274,9 @@ def scrape(url):
 
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
-
-    page = requests.get(url, proxies={"http":"http://myproxy:3129"})
+    print("Test print..?")
+    page = requests.get(url, proxies={"http":"http://61.233.25.166:80"})
     soup = BeautifulSoup(page.content, 'html.parser')
-    print(soup)
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 
     get_most_recent_term_id(row)
