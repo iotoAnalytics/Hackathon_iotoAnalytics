@@ -272,18 +272,14 @@ def get_wiki_url(row):
 
 
 def scrape(url):
-    print(url)
     row = scraper_utils.initialize_row()
     row.source_url = url
 
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
 
-    uClient = uReq(url)
-    page_html = uClient.read()
-    uClient.close()
-    
-    soup = BeautifulSoup(page_html, 'html.parser')
+    page = scraper_utils.request(url)
+    soup = BeautifulSoup(page.content, 'html.parser')
 
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 

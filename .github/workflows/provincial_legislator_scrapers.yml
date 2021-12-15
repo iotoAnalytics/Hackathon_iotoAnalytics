@@ -51,11 +51,35 @@ jobs:
 
       # This is basically a powershell script. If the environment changes to ubuntu or mac, this will need to be changed.
       # The script starts by opening chrome once, because this needs to be done for the webdriver to install the correct chrome driver.
-      - name: execute py script 
+      # - name: execute py script 
+      #   run: |
+      #     Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
+      #     Start-Sleep -s 10
+      #     $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
+      #     foreach ($file in $files) {
+      #     echo "Running File: " $file.FullName
+      #     python $file
+      #     if ($LASTEXITCODE -ne 0) {
+      #       Exit 1
+      #     }
+      #     echo "Complete running " $file.FullName
+      #     }
+
+      - name: temporary testing script
         run: |
           Start-Process -FilePath 'C:\Program Files\Google\Chrome\Application\chrome.exe'\
           Start-Sleep -s 10
-          $files = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *_legislator_scraper.py
+          $file1 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *ns_legislator_scraper.py
+          $file2 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *nt_legislator_scraper.py
+          $file3 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *nu_legislator_scraper.py
+          $file4 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *on_legislator_scraper.py
+          $file5 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *pe_legislator_scraper.py
+          $file6 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *qc_legislator_scraper.py
+          $file7 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *sk_legislator_scraper.py
+          $file8 = Get-ChildItem -Path scrapers\ca\ca-provinces -Recurse *yt_legislator_scraper.py
+          
+          $files = @($file1, $file2, $file3, $file4, $file5, $file6, $file7, $file8)
+          
           foreach ($file in $files) {
           echo "Running File: " $file.FullName
           python $file
