@@ -39,8 +39,21 @@ def get_urls():
 
     path = '/members/profiles'
     scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(scrape_url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+    soup = BeautifulSoup(page_html, 'html.parser')
 
     members_view = soup.find('div', {'class': 'view-content'})
 
@@ -95,8 +108,22 @@ def find_mla_wiki(mlalink):
 def get_most_recent_term_id(row):
     path = '/members/profiles'
     scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(scrape_url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+        
+    soup = BeautifulSoup(page_html, 'html.parser')
     assembly = soup.find('h2', {'class': 'paragraph-header'}).text
 
     scraper_utils.crawl_delay(crawl_delay)
@@ -219,8 +246,23 @@ def get_years_active(bio_container, row):
 
 def get_committee_role(name, link):
     role = "member"
-    page = scraper_utils.request(base_url + link)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    url = base_url + link
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+        
+    soup = BeautifulSoup(page_html, 'html.parser')
+    
     members = soup.findAll('div', {'class': 'views-row'})
     for member in members:
         if name in member.text:
