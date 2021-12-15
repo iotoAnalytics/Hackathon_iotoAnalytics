@@ -11,7 +11,6 @@ sys.path.insert(0, str(p))
 import pandas as pd
 import numpy as np
 import re
-import ssl
 import time
 
 from bs4 import BeautifulSoup
@@ -20,8 +19,6 @@ from nameparser import HumanName
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
 from unidecode import unidecode
-
-ssl._create_default_https_context = ssl._create_unverified_context
 
 prov_abbreviation = 'NS'
 database_table_name = 'ca_ns_legislators'
@@ -32,10 +29,6 @@ scraper_utils = CAProvTerrLegislatorScraperUtils(
 base_url = 'https://nslegislature.ca'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
-
-header = {
-    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
-
 
 def get_urls():
     urls = []
@@ -281,9 +274,11 @@ def scrape(url):
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
 
-    page = scraper_utils.request(url, headers=header)
-    soup = BeautifulSoup(page.content, 'html.parser')
-
+    uClient = uReq(url)
+    page_html = uClient.read()
+    uClient.close()
+    soup = BeautifulSoup(page_html, 'html.parser')
+    
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 
     get_most_recent_term_id(row)
