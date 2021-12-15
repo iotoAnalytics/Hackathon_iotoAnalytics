@@ -317,7 +317,7 @@ try:
         with Pool(processes=int(multiprocessing.cpu_count() / 2)) as pool:
             data = pool.map(scrape, urls)
 
-        print(data)
+        print(len(data))
         # with Pool() as pool:
         #     data = pool.map(scrape, urls)
         leg_df = pd.DataFrame(data)
