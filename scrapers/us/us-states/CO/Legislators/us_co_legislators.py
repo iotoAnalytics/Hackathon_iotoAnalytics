@@ -15,6 +15,24 @@ p = Path(os.path.abspath(__file__)).parents[5]
 
 sys.path.insert(0, str(p))
 
+import sys
+import os
+from pathlib import Path
+from scraper_utils import USStateLegislatorScraperUtils
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
+import time
+from io import StringIO
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+
 from scraper_utils import USStateLegislatorScraperUtils
 from bs4 import BeautifulSoup
 from nameparser import HumanName
@@ -22,6 +40,8 @@ import pandas as pd
 from multiprocessing.dummy import Pool
 import traceback
 from tqdm import tqdm
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 state_abbreviation = 'CO'
@@ -33,6 +53,29 @@ scraper_utils = USStateLegislatorScraperUtils(
 base_url = 'https://leg.colorado.gov'
 # Get the crawl delay specified in the website's robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
+
+
+def find_individual_wiki(wiki_page_link):
+    bio_lnks = []
+    uClient = uReq(wiki_page_link)
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    tables = page_soup.findAll("table")
+    rows = tables[3].findAll("tr")
+
+    for person in rows[1:]:
+        info = person.findAll("td")
+        try:
+            biolink = info[1].a["href"]
+
+            bio_lnks.append(biolink)
+
+        except Exception:
+            pass
+    scraper_utils.crawl_delay(crawl_delay)
+    return bio_lnks
 
 
 def get_wiki_links(link, chamber):
@@ -101,10 +144,43 @@ def get_urls(historical = True):
             info.append([path, wiki_url[key]])
     return info
 
+def get_wiki_url(row):
+
+    wikipage_reps = "https://ballotpedia.org/Colorado_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Colorado_State_Senate"
+
+    if row.role == "Representative":
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
+
+    page_html = uClient.read()
+    uClient.close()
+
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
+
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
+
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
+
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
+
+
 
 def scrape(info):
     try:
-        print(info)
+
         wiki = info[1]
         url = info[0]
 
@@ -125,7 +201,7 @@ def scrape(info):
         # data from legislator list page
         row.party = url['records']['Party']
         row.party_id = scraper_utils.get_party_id(row.party)
-        row.district = url['records']['District']
+        row.district = str(url['records']['District'])
         if url['has_contacts']:
             row.phone_number = [{'office': 'Capitol', 'number': url['records']['Capitol Phone #']}]
             row.email = url['records']['Email']
@@ -162,14 +238,20 @@ def scrape(info):
         row.most_recent_term_id = wiki['most_recent_term_id']
         row.birthday = wiki['birthday']
 
+        row.wiki_url = str(get_wiki_url(row))
+
+        gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+        if not gender:
+            gender = 'O'
+        row.gender = gender
         # Delay so we don't overburden web servers
         scraper_utils.crawl_delay(crawl_delay)
+
+
         return row
     except:
         traceback.print_exc()
         print(url)
-    
-
 
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
@@ -178,8 +260,33 @@ if __name__ == '__main__':
     # Speed things up using pool.
     with Pool() as pool:
         data = pool.map(scrape, urls)
+    leg_df = pd.DataFrame(data)
 
-    # Once we collect the data, we'll write it to the database:
-    scraper_utils.write_data(data)
 
-    print('Complete!')
+    # getting urls from ballotpedia
+    wikipage_reps = "https://ballotpedia.org/Colorado_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/Colorado_State_Senate"
+
+    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+
+    with Pool() as pool:
+        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
+    wiki_df = pd.DataFrame(wiki_data)[
+        ['name_last', 'wiki_url']]
+
+    big_df = pd.merge(leg_df, wiki_df, how='left',
+                      on=["name_last", 'wiki_url'])
+
+    print('Scraping complete')
+
+    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
+    big_df.drop(big_df.index[big_df['wiki_url'] == 'None'], inplace=True)
+
+    big_list_of_dicts = big_df.to_dict('records')
+
+    print('Writing data to database...')
+
+    scraper_utils.write_data(big_list_of_dicts)
+
+    print(f'Scraper ran successfully!')
+

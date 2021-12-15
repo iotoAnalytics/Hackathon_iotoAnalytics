@@ -63,7 +63,6 @@ def scrape(url):
     sleep(25)
 
     html = driver.page_source
-    print(html)
     soup = BeautifulSoup(html, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
 

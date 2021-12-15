@@ -32,6 +32,21 @@ from bs4 import BeautifulSoup
 from scraper_utils import USStateLegislatorScraperUtils
 import boto3
 import pandas as pd
+import sys
+import os
+from pathlib import Path
+from scraper_utils import USStateLegislatorScraperUtils
+import re
+from unidecode import unidecode
+import numpy as np
+from nameparser import HumanName
+from multiprocessing import Pool
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
+import time
+from io import StringIO
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -53,30 +68,38 @@ crawl_delay = scraper_utils.get_crawl_delay('https://www.legis.nd.gov')
 
 POLITICAL_PARTIES = ['Republican', 'Democrat',
                      "Libertarian", 'Green', 'Consitituion']
-
+base_url = 'https://www.legis.nd.gov/assembly'
 
 def request_find(base_url, t, att, filter_all=False):
-    url_request = scraper_utils.request(base_url)
-    url_soup = BeautifulSoup(url_request.content, 'lxml')
-    scraper_utils.crawl_delay(crawl_delay)
-    if filter_all:
+    print(base_url)
+    if base_url is not None:
+        url_request = scraper_utils.request(base_url)
+        url_soup = BeautifulSoup(url_request.content, 'lxml')
+        scraper_utils.crawl_delay(crawl_delay)
+        if filter_all:
+            stuff = url_soup.find_all(t, att)
+            stuff = stuff.find('a').get('href')
+            print(stuff)
+            return url_soup.find_all(t, att)
         stuff = url_soup.find_all(t, att)
         stuff = stuff.find('a').get('href')
         print(stuff)
-        return url_soup.find_all(t, att)
-    stuff = url_soup.find_all(t, att)
-    stuff = stuff.find('a').get('href')
-    print(stuff)
-    return url_soup.find(t, att)
+        url = url_soup.find(t, att)
+        print(url)
 
 # Either filters first then returns first "a" tag with href or returns first a tag href found
 # Assumes a tag has href
 
 
 def retrieve_href(base_url, t, att, filter=False, filter_t=None, reg=None):
+    print(t)
+    print("hello")
+    print(att)
     try:
         content = request_find(base_url, t, att)
+        print(content)
         content = content.find("a").get("href")
+        print(content)
         if filter:
             filtered_content = content.find(filter_t, re.compile(reg))
             content = filtered_content.find('a').get('href')
@@ -277,8 +300,9 @@ def retrieve_phone_numbers(content):
         number_type = phone_number.find(
             'div', 'field-label').text.split(':')[0]
         number = phone_number.find('div', 'field-item even').text
+        contact_information['office'] = number_type
         contact_information['number'] = number
-        contact_information['type'] = number_type
+
         phone_number_list.append(contact_information)
 
     return phone_number_list
@@ -310,30 +334,59 @@ def retrieve_contact_info(content):
 
 
 def get_urls():
-    '''
-    Insert logic here to get all URLs you will need to scrape from the page.
-    '''
     urls = []
+    scrape_url = base_url
+    page = scraper_utils.request(scrape_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    list_of_terms = soup.find_all('li')
+    year = str(datetime.now().year)
+    for l in list_of_terms:
+        if year in l.text:
+            if "Assembly" in l.text:
+                assembly_url = l.find('a').get('href')
+    page = scraper_utils.request(assembly_url)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    next_link = soup.find("h3")
+    next_link = next_link.find('a').get('href')
+    page = scraper_utils.request(next_link)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    div = soup.find('div', {'class': 'inside'})
 
-    # Logic goes here! Some sample code:
-    base_url = 'https://www.legis.nd.gov/assembly'
-
-    # Get url of current year assymbly members
-    assembly_info_url = retrieve_href(
-        base_url, 'div', {'class': 'view-content'}, True, 'li', '^first*')
-    assembly_members_url = retrieve_href(assembly_info_url, 'div', {
-                                         'class': 'panel-pane pane-custom pane-1'})
-
-    # Retreive href that contain information on each member.
-    # Each href contains information on one memnber
-    print(assembly_members_url)
-    content = request_find(assembly_members_url, 'div',
-                           {'class': 'name'}, True)
-    for member in content:
-        urls.append(member.a['href'])
+    divs = div.find_all('div',{'class': 'name'})
+    for item in divs:
+        url = item.find('a').get('href')
+        urls.append(url)
 
     return urls
-    # return ['https://www.legis.nd.gov/assembly/67-2021/members/house/representative-mike-brandenburg']
+
+
+# def get_urls():
+#     '''
+#     Insert logic here to get all URLs you will need to scrape from the page.
+#     '''
+#     urls = []
+#
+#     # Logic goes here! Some sample code:
+#     base_url = 'https://www.legis.nd.gov/assembly'
+#
+#     # Get url of current year assymbly members
+#     assembly_info_url = retrieve_href(
+#         base_url, 'div', {'class': 'view-content'}, True, 'li', '^first*')
+#     assembly_members_url = retrieve_href(assembly_info_url, 'div', {
+#                                          'class': 'panel-pane pane-custom pane-1'})
+#
+#     # Retreive href that contain information on each member.
+#     # Each href contains information on one memnber
+#     print(assembly_members_url)
+#     content = request_find(assembly_members_url, 'div',
+#                            {'class': 'name'}, True)
+#     try:
+#         for member in content:
+#             urls.append(member.a['href'])
+#     except:
+#         pass
+#     return urls
+#     # return ['https://www.legis.nd.gov/assembly/67-2021/members/house/representative-mike-brandenburg']
 
 
 def find_individual_wiki(wiki_page_link):
@@ -361,105 +414,36 @@ def find_individual_wiki(wiki_page_link):
 
 def get_wiki_url(row):
 
-    wikipage_reps = "https://ballotpedia.org/Kansas_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Kansas_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/North_Dakota_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/North_Dakota_State_Senate"
 
     if row.role == "Representative":
-        try:
-            uClient = uReq(wikipage_reps)
-            page_html = uClient.read()
-            uClient.close()
+        uClient = uReq(wikipage_reps)
+    elif row.role == "Senator":
+        uClient = uReq(wikipage_senate)
 
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
+    page_html = uClient.read()
+    uClient.close()
 
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-                party = party.replace('\n', '')
-                if party == "Democratic":
-                    party = "Democrat"
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
 
-                try:
-                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                        pass
-                if not row.wiki_url:
-                    for person in rows[1:]:
-                        tds = person.findAll("td")
-                        name_td = tds[1]
-                        name = name_td.text
-                        name = name.replace('\n', '')
-                        party = tds[2].text
-                        party = party.strip()
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
 
-                        if party == "Democratic":
-                            party = "Democrat"
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
 
-                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                            row.wiki_url = name_td.a['href']
-                            break
-                        elif row.party == party and row.name_last in name.strip().split()[-1]:
-                            row.wiki_url = name_td.a['href']
-                            break
-        except Exception as e:
-            print(e)
-    if row.role == "Senator":
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
 
-        try:
-            uClient = uReq(wikipage_senate)
-            page_html = uClient.read()
-            uClient.close()
-
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
-
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-
-                if party == "Democratic":
-                    party = "Democrat"
-
-                try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                    pass
-            if not row.wiki_url:
-                for person in rows[1:]:
-                    tds = person.findAll("td")
-                    name_td = tds[1]
-                    name = name_td.text
-                    name = name.replace('\n', '')
-                    party = tds[2].text
-                    party = party.strip()
-
-                    if party == "Democratic":
-                        party = "Democrat"
-
-                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-        except Exception as e:
-            print(e)
-            pass
 
 
 def scrape(url):
@@ -514,9 +498,16 @@ def scrape(url):
     if contact_info_dict['areaserved'] != None:
         row.areas_served = contact_info_dict['areaserved']
     if contact_info_dict['phonenumbers'] != None:
+        print(contact_info_dict['phonenumbers'])
         row.phone_numbers = contact_info_dict['phonenumbers']
     if contact_info_dict['email'] != None:
         row.email = contact_info_dict['email']
+
+    row.wiki_url = str(get_wiki_url(row))
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last)
+    if not gender:
+        gender = 'O'
+    row.gender = gender
 
     return row
 
@@ -524,22 +515,24 @@ def scrape(url):
 if __name__ == '__main__':
     # First we'll get the URLs we wish to scrape:
     urls = get_urls()
-
+    print(urls)
     # Next, we'll scrape the data we want to collect from those URLs.
     # Here we can use Pool from the multiprocessing library to speed things up.
     # We can also iterate through the URLs individually, which is slower:
     try:
-        # data = [scrape(url) for url in urls]
-        with Pool() as pool:
-            data = pool.map(scrape, urls)
+        data = [scrape(url) for url in urls]
+        # with Pool() as pool:
+        #     data = pool.map(scrape, urls)
+
     except Exception as e:
         sys.exit(f'error: {e}\n')
-
+    print(data)
     leg_df = pd.DataFrame(data)
 
+
     # getting urls from ballotpedia
-    wikipage_reps = "https://ballotpedia.org/Kansas_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Kansas_State_Senate"
+    wikipage_reps = "https://ballotpedia.org/North_Dakota_House_of_Representatives"
+    wikipage_senate = "https://ballotpedia.org/North_Dakota_State_Senate"
 
     all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
 
@@ -547,11 +540,13 @@ if __name__ == '__main__':
         wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
     wiki_df = pd.DataFrame(wiki_data)[
         ['name_last', 'wiki_url']]
+    print(leg_df)
+    print(wiki_df)
 
     big_df = pd.merge(leg_df, wiki_df, how='left',
                       on=["name_last", 'wiki_url'])
     big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
-
+    big_df.drop(big_df.index[big_df['wiki_url'] == 'None'], inplace=True)
     big_list_of_dicts = big_df.to_dict('records')
 
     print('Writing data to database...')

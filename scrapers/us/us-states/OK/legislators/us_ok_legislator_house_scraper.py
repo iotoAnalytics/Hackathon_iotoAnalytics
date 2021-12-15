@@ -3,19 +3,20 @@
 
 import datetime
 import multiprocessing
-import os
-import re
-import sys
-from multiprocessing import Pool
-from urllib.request import urlopen as uReq
-from bs4 import BeautifulSoup
-from nameparser import HumanName
-from pathlib import Path
-from pprint import pprint
 from tqdm import tqdm
-import pandas as pd
+import sys
+import os
+from pathlib import Path
+import re
+from unidecode import unidecode
+from nameparser import HumanName
+from multiprocessing import Pool
+from bs4 import BeautifulSoup
+from urllib.request import urlopen as uReq
 import ssl
+
 ssl._create_default_https_context = ssl._create_unverified_context
+import pandas as pd
 
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -41,6 +42,7 @@ LEGISLATURE_YEAR = {
 scraper_utils = USStateLegislatorScraperUtils(STATE_ABBREVIATION, LEGISLATOR_TABLE_NAME)
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+
 def get_urls():
     urls = []
 
@@ -51,14 +53,13 @@ def get_urls():
     scraper_utils.crawl_delay(crawl_delay)
 
     table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_RadGrid1_ctl00'})
-    table_rows = table.find('tbody').find_all('tr')    
+    table_rows = table.find('tbody').find_all('tr')
     for row in table_rows:
         path = row.find_all('td')[0].find('a').get('href')
         url = BASE_URL + house_members_path + '/' + path
         urls.append(url)
 
     return urls
-
 
 
 def find_individual_wiki(wiki_page_link):
@@ -103,6 +104,7 @@ def scrape(url):
 
     return row
 
+
 def get_committee_urls():
     urls = []
 
@@ -116,15 +118,17 @@ def get_committee_urls():
 
     house_committees_table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_dgrdCommittee_ctl00'}).find('tbody')
     house_committees_urls = [BASE_URL + house_committees_path + '/' + path.get('href')
-        for path in house_committees_table.find_all('a')]
+                             for path in house_committees_table.find_all('a')]
 
-    conference_committees_table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_rgdConference_ctl00'}).find('tbody')
+    conference_committees_table = soup.find('table', {'id': 'ctl00_ContentPlaceHolder1_rgdConference_ctl00'}).find(
+        'tbody')
     conference_committees_urls = [BASE_URL + house_committees_path + '/' + path.get('href')
-        for path in conference_committees_table.find_all('a')]
+                                  for path in conference_committees_table.find_all('a')]
 
     urls = house_committees_urls + conference_committees_urls
 
     return urls
+
 
 def scrape_committee(url):
     soup = _create_soup(url, SOUP_PARSER_TYPE)
@@ -135,15 +139,17 @@ def scrape_committee(url):
 
     return members
 
+
 def update_house_committees(data, urls):
-    print(DEBUG_MODE and 'Scraping committee data...\n' or '',  end='')
+    print(DEBUG_MODE and 'Scraping committee data...\n' or '', end='')
     with Pool(NUM_POOL_PROCESSES) as pool:
         committees_data_list = list(tqdm(pool.imap(scrape_committee, urls)))
 
-    print(DEBUG_MODE and 'Updating committee data..\n' or '',  end='')
+    print(DEBUG_MODE and 'Updating committee data..\n' or '', end='')
     for row in data:
         committees = _get_committees(committees_data_list, row.name_full, row.district)
         row.committees = committees
+
 
 def get_wiki_urls_with_district():
     wiki_url_path = '/wiki/Oklahoma_House_of_Representatives'
@@ -169,6 +175,7 @@ def get_wiki_urls_with_district():
 
     return urls
 
+
 def scrape_wiki(url):
     wiki_data = scraper_utils.scrape_wiki_bio(url['url'])
     wiki_crawl_delay = scraper_utils.get_crawl_delay(url['url'])
@@ -179,6 +186,7 @@ def scrape_wiki(url):
         'district': url['district']
     }
 
+
 def merge_all_wiki_data(legislator_data, wiki_urls):
     print(DEBUG_MODE and 'Scraping wikipedia...\n' or '', end='')
     with Pool(NUM_POOL_PROCESSES) as pool:
@@ -186,13 +194,15 @@ def merge_all_wiki_data(legislator_data, wiki_urls):
 
     print(DEBUG_MODE and 'Merging wikipedia data...\n' or '', end='')
     for data in wiki_data:
-        _merge_wiki_data(legislator_data, data, years_active=False, most_recent_term_id=False)    
+        _merge_wiki_data(legislator_data, data, years_active=False, most_recent_term_id=False)
+
 
 def _create_soup(url, soup_parser_type):
     scrape_url = url
     page = scraper_utils.request(scrape_url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
+
 
 def _set_most_recent_term_id(row, soup):
     legislature_service_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblLegislativeService'}).text
@@ -204,8 +214,10 @@ def _set_most_recent_term_id(row, soup):
         if most_recent_term_id:
             row.most_recent_term_id = most_recent_term_id
 
+
 def _set_source_url(row, url):
     row.source_url = url
+
 
 def _set_name(row, soup):
     name_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblName'}).text
@@ -219,10 +231,12 @@ def _set_name(row, soup):
     row.name_suffix = human_name.suffix
     row.name_full = human_name.full_name
 
+
 def _set_party(row, soup):
     party_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblParty'}).text
     row.party = party_str
     row.party_id = scraper_utils.get_party_id(party_str)
+
 
 def _set_role(row, soup):
     role_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblName'}).text
@@ -234,11 +248,13 @@ def _set_role(row, soup):
 
     row.role = role
 
+
 def _set_years_active(row, soup):
     year_elected_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblYear'}).text
     year_elected = int(year_elected_str.replace('Year: ', ''))
     years_active = [year for year in range(year_elected, CURRENT_YEAR + 1)]
     row.years_active = years_active
+
 
 def _set_phone_numbers(row, soup):
     phone_number_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblPhone'}).text
@@ -256,6 +272,7 @@ def _set_phone_numbers(row, soup):
     print(phone_numbers)
     row.phone_numbers = phone_numbers
 
+
 def _set_addresses(row, soup):
     address_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblCapitolRoom'}).find_parent('div').text
 
@@ -269,6 +286,7 @@ def _set_addresses(row, soup):
     addresses.append(address)
     row.addresses = addresses
 
+
 def _set_email(row, soup):
     district_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblDistrict'}).text
     pattern = re.compile('[0-9]+')
@@ -277,13 +295,14 @@ def _set_email(row, soup):
     house_members_contact_path = '/Members/Contact.aspx'
     house_members_query = '?District='
     scrape_url = BASE_URL + house_members_contact_path + house_members_query + district
-    
+
     email_soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
     scraper_utils.crawl_delay(crawl_delay)
 
     email = email_soup.find('input', {'id': 'txtMemberEmail'}).get('value')
     row.email = email
-    
+
+
 def _set_areas_served(row, soup):
     areas_served_county_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblCounties'}).text
     county_areas_served_list = areas_served_county_str.split(', ')
@@ -294,11 +313,13 @@ def _set_areas_served(row, soup):
     areas_served = county_areas_served_list + municipality_areas_served_list
     row.areas_served = areas_served
 
+
 def _set_district(row, soup):
     district_str = soup.find('span', {'id': 'ctl00_ContentPlaceHolder1_lblDistrict'}).text
     pattern = re.compile('[0-9]+')
     district = pattern.search(district_str).group(0)
     row.district = district
+
 
 def _format_address_str(original_str):
     formatted_address = original_str.strip()
@@ -309,6 +330,7 @@ def _format_address_str(original_str):
     formatted_address = re.sub('\([0-9]{3}\) [0-9]{3}\-[0-9]{4}|\n', '', formatted_address)
 
     return formatted_address
+
 
 def _get_committee_name(soup):
     # Format string version of HTML first
@@ -321,9 +343,10 @@ def _get_committee_name(soup):
 
     return committee_name
 
+
 def _get_committee_list(soup, committee_name):
     members_list_soup = soup.find('div', {'id': 'ctl00_ContentPlaceHolder1_tblMembers'}).find_all('a')
-    
+
     members = []
     members_href = []
 
@@ -353,19 +376,21 @@ def _get_committee_list(soup, committee_name):
         member = {}
         member['district'] = member_district
         member['role'] = 'member' if is_regular_member else member_info[0].lower()
-        member['name'] = member_info[1] + ' ' + member_info[0] if is_regular_member else member_info[2] + ' ' + member_info[1]
+        member['name'] = member_info[1] + ' ' + member_info[0] if is_regular_member else member_info[2] + ' ' + \
+                                                                                         member_info[1]
         member['committee'] = committee_name
 
         members.append(member)
 
     return members
 
+
 def _get_committees(committees_data_list, full_name, district):
     committees = []
 
     for committee_members in committees_data_list:
         for member in committee_members:
-            if member['name'] == full_name and  member['district'] == district:
+            if member['name'] == full_name and member['district'] == district:
                 committee = {
                     'role': member['role'],
                     'committee': member['committee'],
@@ -374,107 +399,33 @@ def _get_committees(committees_data_list, full_name, district):
 
     return committees
 
+
 def get_wiki_url(row):
-
     wikipage_reps = "https://ballotpedia.org/Oklahoma_House_of_Representatives"
-    wikipage_senate = "https://ballotpedia.org/Oklahoma_State_Senate"
 
-    if row.role == "Representative":
-        try:
-            uClient = uReq(wikipage_reps)
-            page_html = uClient.read()
-            uClient.close()
+    uClient = uReq(wikipage_reps)
 
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
+    page_html = uClient.read()
+    uClient.close()
 
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-                party = party.replace('\n', '')
-                if party == "Democratic":
-                    party = "Democrat"
+    page_soup = BeautifulSoup(page_html, "lxml")
+    table = page_soup.find("table", {"id": 'officeholder-table'})
+    rows = table.findAll("tr")
 
-                try:
-                    if row.party == party and row.name_last in name.strip() and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                        pass
-                if not row.wiki_url:
-                    for person in rows[1:]:
-                        tds = person.findAll("td")
-                        name_td = tds[1]
-                        name = name_td.text
-                        name = name.replace('\n', '')
-                        party = tds[2].text
-                        party = party.strip()
+    for person in rows[1:]:
+        tds = person.findAll("td")
+        name_td = tds[1]
+        name = name_td.text
+        name = name.replace('\n', '')
+        name = HumanName(name)
 
-                        if party == "Democratic":
-                            party = "Democrat"
+        district_td = tds[0]
+        district = district_td.text
+        district_num = re.search(r'\d+', district).group().strip()
 
-                        if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                            row.wiki_url = name_td.a['href']
-                            break
-                        elif row.party == party and row.name_last in name.strip().split()[-1]:
-                            row.wiki_url = name_td.a['href']
-                            break
-        except Exception as e:
-            print(e)
-    if row.role == "Senator":
-
-        try:
-            uClient = uReq(wikipage_senate)
-            page_html = uClient.read()
-            uClient.close()
-
-            page_soup = BeautifulSoup(page_html, "lxml")
-            tables = page_soup.findAll("table")
-            rows = tables[3].findAll("tr")
-
-            for person in rows[1:]:
-                tds = person.findAll("td")
-                name_td = tds[1]
-                name = name_td.text
-                name = name.replace('\n', '')
-                party = tds[2].text
-                party = party.strip()
-
-                if party == "Democratic":
-                    party = "Democrat"
-
-                try:
-                    if row.party == party and row.name_last in name.strip().split()[-1] and name.strip().split(" ")[0] in row.name_first:
-                        row.wiki_url = name_td.a['href']
-                        break
-                except:
-                    pass
-            if not row.wiki_url:
-                for person in rows[1:]:
-                    tds = person.findAll("td")
-                    name_td = tds[1]
-                    name = name_td.text
-                    name = name.replace('\n', '')
-                    party = tds[2].text
-                    party = party.strip()
-
-                    if party == "Democratic":
-                        party = "Democrat"
-
-                    if row.party == party and row.name_last in name.strip() and row.name_first in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-                    elif row.party == party and row.name_last in name.strip():
-                        row.wiki_url = name_td.a['href']
-                        break
-        except Exception as e:
-            print(e)
-            pass
+        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
+            link = name_td.a['href']
+            return link
 
 
 def _get_legislator_row(data, name_full, district):
@@ -488,7 +439,9 @@ def _get_legislator_row(data, name_full, district):
             return row
     return None
 
-def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True, years_active=True, most_recent_term_id=True):
+
+def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True, years_active=True,
+                     most_recent_term_id=True):
     full_name = wiki_data['data']['name_first'] + ' ' + wiki_data['data']['name_last']
     district = wiki_data['district']
 
@@ -508,6 +461,7 @@ def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, 
     if most_recent_term_id:
         legislator_row.most_recent_term_id = wiki_data['data']['most_recent_term_id']
 
+
 def _fix_oddities(legislator_data):
     # Manually fix odd data
 
@@ -519,6 +473,7 @@ def _fix_oddities(legislator_data):
     # District 61 - Format occupation - Remove [2] from occupation
     legislator_row = _get_legislator_row(legislator_data, 'Kenton Patzkowsky', '61')
     legislator_row.occupation = [re.sub('\[[0-9]+\]', '', legislator_row.occupation[0])]
+
 
 def scrape_house_legislators():
     # Collect house legislators urls
@@ -557,9 +512,8 @@ def scrape_house_legislators():
 
         # getting urls from ballotpedia
         wikipage_reps = "https://ballotpedia.org/Oklahoma_House_of_Representatives"
-        wikipage_senate = "https://ballotpedia.org/Oklahoma_State_Senate"
 
-        all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
+        all_wiki_links = find_individual_wiki(wikipage_reps)
 
         with Pool() as pool:
             wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)

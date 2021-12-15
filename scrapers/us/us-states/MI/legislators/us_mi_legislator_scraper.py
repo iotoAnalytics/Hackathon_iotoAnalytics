@@ -14,6 +14,7 @@ import gzip
 import argparse
 import time
 import pandas as pd
+from unidecode import unidecode
 import bs4
 from urllib.request import urlopen as uReq
 from urllib.request import Request
@@ -28,6 +29,11 @@ import datetime
 import re
 from geotext import GeoText
 from requests import get
+import ssl
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 
 # import html.parser
@@ -117,69 +123,67 @@ def get_sen_bio(myurl):
 
 
 def get_rep_bio(myurl):
+    print(myurl)
+    driver = webdriver.Chrome(ChromeDriverManager().install())
+
     rep_bios = []
-    uClient = uReq(myurl)
-    scraper_utils.crawl_delay(crawl_delay)
-    page_html = uClient.read()
-    uClient.close()
-    # # html parsing
-    page_soup = soup(page_html, "html.parser")
-    tbl = page_soup.find("table", {"id": "grvRepInfo"})
-    links = tbl.findAll("td")
-    i = 1
-    for link in links:
-        if i % 7 == 1:
-            # website
-            state_url = link.a["href"]
-            # if "housedems" not in state_url:
-            #     state_url =state_url + "about"
-            # else:
-            #     state_url = state_url + "about/"
-            # print(state_url)
 
-        if i % 7 == 2:
-            # district
-            district = link.text
+    driver.get(myurl)
+    all_reps = driver.find_elements_by_class_name("fa-chevron-circle-down")
+    all_reps[2].click()
+    time.sleep(2)
 
-        if i % 7 == 3:
-            # name
-            name_full = link.text
+    html = driver.page_source
+    s = soup(html, 'lxml')
+    body = s.find("div", {'class': 'card-body'})
+    items = body.find_all('li')
+    state_url = ''
+    for item in items:
+        #print(item.text)
+        links = item.find_all('a')
+        for l in links:
+            if "tel" not in l.get('href') and 'mailto' not in l.get('href') and '.pdf' not in l.get('href'):
+                 state_url = l.get('href')
+        try:
+            rows = item.find_all('div')
 
-            hn = HumanName(name_full)
-        if i % 7 == 4:
-            # party
-            party = ""
-            p = link.text
-            if p == "R":
-                party = "Republican"
-                party_id = 3
-            if p == "D":
-                party = "Democrat"
-                party_id = 2
+            name = rows[0].text
+            name = name.split(' (')[0].replace('\n', '').replace('  ', '')
+            if name != "Vacant":
+                party = rows[0].text
+                party = party.split(')')[0].replace('\n', '').replace('  ', '')
+                party = party.split('(')[1]
+                party_id = scraper_utils.get_party_id(party)
+                district = rows[0].text
+                district = district.split('-')[1].replace('\n', '').replace('  ', '')
+                address = rows[3].text
+                addresses = {"location": "office", "address": address}
+                email = rows[5].text
+                inner_row = rows[2].find_all('div')
+                phone = inner_row[1].text
+                phone = phone.replace('\n', '').replace('  ', '')
+                phone = phone.replace('(', '').replace(')', '').replace('+1 ', '').replace(' ', '-')
 
-        if i % 7 == 6:
-            # phone
-            phone = link.text
-            phone = phone.replace("517373", "517-373-")
+                hn = HumanName(name)
 
-            phone_numbers = {"office": '', 'number': phone}
-            # print(phone_number)
 
-        if i % 7 == 0:
-            # email
-            email = link.a["href"]
-            bio_info = {'source_url': state_url, 'district': district, 'name_full': name_full, 'name_first': hn.first,
-                        'name_last': hn.last, 'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party,
-                        'party_id': party_id, 'phone_numbers': phone_numbers, 'email': email.replace("mailto:", ""),
-                        'role': 'Representative',
-                        'state': 'MI', 'state_id': 26, 'country': 'United States of America', 'country_id': 1}
-            print(bio_info)
-            if name_full != "Vacant":
+                bio_info = {'source_url': state_url, 'district': district, 'name_full': hn.full_name, 'name_first': hn.first,
+                            'name_last': hn.last, 'name_middle': hn.middle, 'name_suffix': hn.suffix, 'party': party,
+                            'party_id': party_id, 'phone_numbers': phone, 'email': email,
+                            'role': 'Representative', "addresses": addresses,
+                            'state': 'MI', 'state_id': 26, 'country': 'United States of America', 'country_id': 1}
                 rep_bios.append(bio_info)
+        except:
+            pass
 
-        i = i + 1
+
+        # if name != "Vacant":
+
+
+    driver.close()
     return rep_bios
-
+    # except:
+    #     pass
 
 def collect_sen_data(myurl):
     years_active = 0
@@ -946,7 +950,8 @@ def wiki_rep_areas(area_link_dict):
 
 if __name__ == '__main__':
     sen_page = 'https://senate.michigan.gov/senatorinfo_complete.html'
-    house_page = 'https://www.house.mi.gov/MHRPublic/frmRepListMilenia.aspx?all=true'
+    # house_page = 'https://www.house.mi.gov/MHRPublic/frmRepListMilenia.aspx?all=true'
+    house_page = 'https://www.house.mi.gov/AllRepresentatives'
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     # get links for each person's page
@@ -957,10 +962,9 @@ if __name__ == '__main__':
     # print(sen_links)
     # print(len(sen_links))
 
-    # print(sen_links)
-
-    with Pool() as pool:
-        sen_data = pool.map(func=collect_sen_data, iterable=sen_links)
+    # with Pool() as pool:
+    #     sen_data = pool.map(func=collect_sen_data, iterable=sen_links)
+    sen_data = [collect_sen_data(url) for url in sen_links]
     sendata = []
     print("pool 1")
     for sl in sen_links:
@@ -978,9 +982,10 @@ if __name__ == '__main__':
     committees = get_committee_urls(committee_url)
     # print(committees)
 
-    with Pool() as pool:
-
-        commData = pool.map(func=get_committee_info, iterable=committees)
+    # with Pool() as pool:
+    #
+    #     commData = pool.map(func=get_committee_info, iterable=committees)
+    commData = [get_committee_info(url) for url in committees]
     # print(commData)
     print("pool 2")
     comm_list = []
@@ -1052,15 +1057,17 @@ if __name__ == '__main__':
 
     rep_bio = get_rep_bio(house_page)
     rep_bio_df = pd.DataFrame(rep_bio)
-    # print(rep_bio)
-    rep_links = [(d['source_url']) for d in rep_bio]
-    rep_party = [(d['party']) for d in rep_bio]
 
-    with Pool() as pool:
-        rep_data = pool.map(func=collect_rep_data, iterable=rep_links)
-    rep_df = pd.DataFrame(rep_data)
+    #
+    # rep_links = [(d['source_url']) for d in rep_bio]
+    # rep_party = [(d['party']) for d in rep_bio]
+    #
+    # # with Pool() as pool:
+    # #     rep_data = pool.map(func=collect_rep_data, iterable=rep_links)
+    # rep_data = data = [collect_rep_data(url) for url in rep_links]
+    # rep_df = pd.DataFrame(rep_data)
     # print(rep_df)
-    rep_df = pd.merge(rep_df, rep_bio_df, how='left', on=['source_url'])
+    #rep_df = pd.merge(rep_df, rep_bio_df, how='left', on=['source_url'])
 
     comm_link = 'https://www.house.mi.gov/MHRPublic/standingcommittee.aspx'
     commData = get_house_committee_info(comm_link)
@@ -1094,7 +1101,7 @@ if __name__ == '__main__':
     comm_df = pd.DataFrame(comm_list)
     # print(comm_df)
     #
-    rep_df = pd.merge(rep_df, comm_df, how='left',
+    rep_df = pd.merge(rep_bio_df, comm_df, how='left',
                       on=["name_last", "name_first"])
 
     rep_wiki_link = 'https://en.wikipedia.org/wiki/Michigan_House_of_Representatives'

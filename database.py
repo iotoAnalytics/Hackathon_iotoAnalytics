@@ -3,6 +3,7 @@ Used for connecting scrapers to relational database using psycopg2.
 Author: Justin Tendeck
 """
 
+from typing import AnyStr
 from psycopg2.extras import RealDictCursor
 # from psycopg2 import pool
 import psycopg2
@@ -529,6 +530,128 @@ class Persistence:
                 print(f'An exception occurred executing a query:\n{e}')
                 cur.connection.rollback()
 
+            date_collected = datetime.now()
+
+            # TODO Use the commented out code below when all the scrapers with issues are finished...
+            # select_all_from_us_legislators = f'SELECT * FROM us_legislators'
+            
+            # cur.execute(select_all_from_us_legislators)
+            # us_legislators = cur.fetchall()
+            # us_legislators = pd.DataFrame(us_legislators)
+
+            # # This is used to convert dictionaries to rows. Need to test it out!
+            # wiki_url_for_legislators_being_updated = []
+            # for item in data:
+            #     try:
+            #         if isinstance(item, dict):
+            #             item = utils.DotDict(item)
+
+            #         tup = (
+            #             item.source_id,
+            #             item.most_recent_term_id,
+            #             date_collected,
+            #             item.source_url,
+            #             item.name_full,
+            #             item.name_last,
+            #             item.name_first,
+            #             item.name_middle,
+            #             item.name_suffix,
+            #             item.country_id,
+            #             item.country,
+            #             item.state_id,
+            #             item.state,
+            #             item.party_id,
+            #             item.party,
+            #             item.role,
+            #             item.district,
+            #             item.years_active,
+            #             json.dumps(item.committees, default=utils.json_serial),
+            #             item.areas_served,
+            #             json.dumps(item.phone_numbers, default=utils.json_serial),
+            #             json.dumps(item.addresses, default=utils.json_serial),
+            #             item.email,
+            #             item.birthday,
+            #             item.seniority,
+            #             item.occupation,
+            #             json.dumps(item.education, default=utils.json_serial),
+            #             item.military_experience,
+            #             item.gender,
+            #             item.wiki_url
+            #         )
+
+            #         wiki_url_exists = False
+            #         if item.wiki_url in us_legislators['wiki_url'].values:
+            #             wiki_url_exists = True
+
+            #         if wiki_url_exists:
+            #             gov_id = us_legislators.loc[us_legislators['wiki_url'] == item.wiki_url]['goverlytics_id'].values[0]
+            #             insert_query = sql.SQL('''
+            #                 INSERT INTO {table}
+            #                 VALUES (
+            #                     {gov_id}, 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+            #             ''').format(
+            #                 table=sql.Identifier(table),
+            #                 gov_id=sql.Literal(int(gov_id))
+            #             )
+            #         else:
+            #             insert_query = sql.SQL('''
+            #                 WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
+            #                 INSERT INTO {table}
+            #                 VALUES (
+            #                     (SELECT leg_id FROM leg_id), 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 
+            #                     %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true)
+            #             ''').format(
+            #                 table=sql.Identifier(table)
+            #             )
+
+            #         insert_legislator_query = sql.SQL("""
+            #                 {insert_query}
+            #                 ON CONFLICT (wiki_url) DO UPDATE SET
+            #                     date_collected = excluded.date_collected,
+            #                     name_full = excluded.name_full,
+            #                     name_last = excluded.name_last,
+            #                     name_first = excluded.name_first,
+            #                     name_middle = excluded.name_middle,
+            #                     name_suffix = excluded.name_suffix,
+            #                     district = excluded.district,
+            #                     role = excluded.role,
+            #                     committees = excluded.committees,
+            #                     areas_served = excluded.areas_served,
+            #                     phone_numbers = excluded.phone_numbers,
+            #                     addresses = excluded.addresses,
+            #                     state = excluded.state,
+            #                     state_id = excluded.state_id,
+            #                     party = excluded.party,
+            #                     party_id = excluded.party_id,
+            #                     email = excluded.email,
+            #                     birthday = excluded.birthday,
+            #                     military_experience = excluded.military_experience,
+            #                     occupation = excluded.occupation,
+            #                     education = excluded.education,
+            #                     source_id = excluded.source_id,
+            #                     most_recent_term_id = excluded.most_recent_term_id,
+            #                     years_active = excluded.years_active,
+            #                     seniority = excluded.seniority,
+            #                     gender = excluded.gender,
+            #                     wiki_url = excluded.wiki_url,
+            #                     is_active = excluded.is_active;
+            #                 """).format(insert_query=insert_query)
+
+            #         cur.execute(insert_legislator_query, tup)
+            #         wiki_url_for_legislators_being_updated.append(item.wiki_url)
+
+            #     except Exception as e:
+            #         print(f'Exception occurred inserting the following data:\n{tup} \n{e}')
+            #         cur.connection.rollback()
+
+            # Persistence.update_legislator_active_column(cur, wiki_url_for_legislators_being_updated, table)
+            
+            #TODO Delete this code after all the scrapers with issues are fixed
             insert_legislator_query = sql.SQL("""
             
                     WITH leg_id AS (SELECT NEXTVAL('legislator_id') leg_id)
@@ -618,6 +741,7 @@ class Persistence:
                     cur.connection.rollback()
 
             Persistence.update_legislator_active_column(cur, wiki_url_for_legislators_being_updated, table)
+        ### Delete up to here
 
     @staticmethod
     def write_ca_fed_legislators(data, table):
@@ -1765,7 +1889,6 @@ class Persistence:
                         source_id text,
                         voting_data jsonb
                     );
-
                     ALTER TABLE {table} OWNER TO rds_ad;
                 """).format(table=sql.Identifier(table))
 
@@ -1881,7 +2004,7 @@ class Persistence:
 
                 tup = (row.candidate_election_finances_id,
                        row.total_credits,
-                       row.total_debits,
+                       row.total_debits,   
                        row.total_balance,
                        row.outstanding_cheques,
                        row.deposits_in_transit,

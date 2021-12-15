@@ -23,6 +23,8 @@ import requests
 from scraper_utils import CAFedLegislationScraperUtils
 from bs4 import BeautifulSoup
 import re
+from database_insertions.classification_topic_prob import classify_fed_legislation
+from database_insertions.ca_fed_legislators_votes import update_fed_legislator_votes
 
 base_url = 'https://www.parl.ca'
 xml_url_csv = 'xml_urls.csv'
@@ -204,7 +206,7 @@ def get_senate_vote_details(senate_vote_url):
         try:
             vote_details['date'] = _get_date_in_senate_vote_details(soup)
         except Exception as e:
-            print(f'Cannot find date for {url}')
+            print(f'Cannot find date for {bill_url}')
 
         vote_details['description'] = soup.select('div.vote-title-box > div.vote-web-title')[0].text.strip()
         vote_details['chamber'] = 'S'
@@ -647,4 +649,10 @@ if __name__ == '__main__':
     if len(xml_data) > 0:
         scraper_utils.write_data(xml_data)
 
+    print('Classifying Legislation...\n')
+    classify_fed_legislation()
+
+    print('Updating ca_fed_legislators_votes_webapp table...\n')
+    update_fed_legislator_votes()
+    
     print('Complete!')
