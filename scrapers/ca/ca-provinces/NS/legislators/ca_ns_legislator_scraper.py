@@ -4,6 +4,8 @@ import traceback
 
 from pathlib import Path
 
+from requests import adapters
+
 # Get path to the root directory so we can import necessary modules
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
@@ -17,8 +19,10 @@ import time
 from bs4 import BeautifulSoup
 from multiprocessing import Pool
 from nameparser import HumanName
+from requests.adapters import HTTPAdapter
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from urllib.request import urlopen as uReq
+from urllib3.util.retry import Retry
 from unidecode import unidecode
 
 prov_abbreviation = 'NS'
@@ -267,7 +271,6 @@ def get_wiki_url(row):
             row.wiki_url = wiki_base_url + name_td.a['href']
             break
 
-
 def scrape(url):
     row = scraper_utils.initialize_row()
     row.source_url = url
@@ -275,7 +278,13 @@ def scrape(url):
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
     print("Test print..?")
-    page = requests.get(url, proxies={"http":"http://61.233.25.166:80"})
+    session = requests.Session()
+    retry = Retry(connect=3, backoff_factor=0.5)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    
+    page = session.get(url)
     soup = BeautifulSoup(page.content, 'html.parser')
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 
