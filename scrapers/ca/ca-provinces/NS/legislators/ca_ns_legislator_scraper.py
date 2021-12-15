@@ -8,10 +8,10 @@ from pathlib import Path
 p = Path(os.path.abspath(__file__)).parents[5]
 sys.path.insert(0, str(p))
 
+import multiprocessing
 import pandas as pd
 import numpy as np
 import re
-import requests
 import time
 
 from bs4 import BeautifulSoup
@@ -30,9 +30,6 @@ scraper_utils = CAProvTerrLegislatorScraperUtils(
 base_url = 'https://nslegislature.ca'
 # Get scraper delay from website robots.txt file
 crawl_delay = scraper_utils.get_crawl_delay(base_url)
-
-session = requests.Session()
-session.proxies = {"http": "http://61.233.25.166:80"}
 
 def get_urls():
     urls = []
@@ -278,8 +275,12 @@ def scrape(url):
     row.region = region
     print("Test print..?")
 
-    page = session.get(url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    uClient = uReq(url)
+    page_html = uClient.read()
+    uClient.close()
+    scraper_utils.crawl_delay(crawl_delay)
+    
+    soup = BeautifulSoup(page_html, 'html.parser')
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 
     get_most_recent_term_id(row)
@@ -312,8 +313,9 @@ try:
         print('URLs Collected.')
 
         print('Scraping data...')
-        data = [scrape(url) for url in urls]
-
+        # data = [scrape(url) for url in urls]
+        with Pool(processes=int(multiprocessing.cpu_count() / 2)) as pool:
+            data = pool.map(scrape, urls)
 
         print(data)
         # with Pool() as pool:
