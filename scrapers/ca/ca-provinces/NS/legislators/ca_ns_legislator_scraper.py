@@ -29,7 +29,7 @@ scraper_utils = CAProvTerrLegislatorScraperUtils(
 
 base_url = 'https://nslegislature.ca'
 # Get scraper delay from website robots.txt file
-crawl_delay = scraper_utils.get_crawl_delay(base_url)
+crawl_delay = 10 # Got it straight from the website because there was some error getting it using scraper_utils
 
 def get_urls():
     urls = []
