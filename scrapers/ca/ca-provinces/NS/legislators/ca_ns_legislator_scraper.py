@@ -11,6 +11,7 @@ sys.path.insert(0, str(p))
 import pandas as pd
 import numpy as np
 import re
+import requests
 import time
 
 from bs4 import BeautifulSoup
@@ -274,11 +275,9 @@ def scrape(url):
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
 
-    uClient = uReq(url)
-    page_html = uClient.read()
-    uClient.close()
-    soup = BeautifulSoup(page_html, 'html.parser')
-
+    page = requests.get(url, proxies={"http":"http://myproxy:3129"})
+    soup = BeautifulSoup(page.content, 'html.parser')
+    print(soup)
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
 
     get_most_recent_term_id(row)
