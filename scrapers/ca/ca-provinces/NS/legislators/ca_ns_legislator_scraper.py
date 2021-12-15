@@ -1,3 +1,11 @@
+'''
+Author: Kat S.
+Edited: Kevin Nha
+
+Notes:
+This scraper is extremely slow. Each crawl delay is 10 seconds. 
+'''
+
 import os
 import sys
 import traceback
@@ -84,7 +92,6 @@ def get_current_general_assembly_link(general_assembly_link):
 
 def find_mla_wiki(mlalink):
     bio_links = []
-    print(mlalink)
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
@@ -95,13 +102,11 @@ def find_mla_wiki(mlalink):
         info = person.findAll("td")
         try:
             biolink = "https://en.wikipedia.org" + (info[2].a["href"])
-            print(biolink)
             bio_links.append(biolink)
         except Exception:
             pass
 
     scraper_utils.crawl_delay(crawl_delay)
-    print(bio_links)
     return bio_links
 
 
@@ -318,7 +323,6 @@ def scrape(url):
 
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
-    print("Test print..?")
 
     max_retry_value = 15
     while max_retry_value > 0:
@@ -372,7 +376,6 @@ try:
         with Pool(processes=int(multiprocessing.cpu_count() / 2)) as pool:
             data = pool.map(scrape, urls)
 
-        print(len(data))
         # with Pool() as pool:
         #     data = pool.map(scrape, urls)
         leg_df = pd.DataFrame(data)
