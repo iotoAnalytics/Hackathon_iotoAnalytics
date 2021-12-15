@@ -285,6 +285,7 @@ def scrape(url):
             page_html = uClient.read()
             uClient.close()
             scraper_utils.crawl_delay(crawl_delay)
+            break
         except Exception:
             max_retry_value -= 1
     if max_retry_value == 0:
