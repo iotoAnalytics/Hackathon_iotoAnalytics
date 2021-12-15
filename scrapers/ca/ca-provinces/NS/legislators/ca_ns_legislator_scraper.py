@@ -12,6 +12,7 @@ import multiprocessing
 import pandas as pd
 import numpy as np
 import re
+import ssl
 import time
 
 from bs4 import BeautifulSoup
@@ -30,6 +31,8 @@ scraper_utils = CAProvTerrLegislatorScraperUtils(
 base_url = 'https://nslegislature.ca'
 # Get scraper delay from website robots.txt file
 crawl_delay = 10 # Got it straight from the website because there was some error getting it using scraper_utils
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_urls():
     urls = []
@@ -275,7 +278,7 @@ def scrape(url):
     row.region = region
     print("Test print..?")
 
-    uClient = uReq(url)
+    uClient = uReq(url, timeout=10)
     page_html = uClient.read()
     uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
