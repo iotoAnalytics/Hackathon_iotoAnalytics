@@ -278,10 +278,18 @@ def scrape(url):
     row.region = region
     print("Test print..?")
 
-    uClient = uReq(url, timeout=10)
-    page_html = uClient.read()
-    uClient.close()
-    scraper_utils.crawl_delay(crawl_delay)
+    max_retry_value = 5
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+        except Exception:
+            max_retry_value -= 1
+    if max_retry_value == 0:
+        sys.exit(1)
+        
     
     soup = BeautifulSoup(page_html, 'html.parser')
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
