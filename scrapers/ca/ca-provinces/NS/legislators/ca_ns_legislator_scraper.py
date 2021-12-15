@@ -278,7 +278,7 @@ def scrape(url):
     row.region = region
     print("Test print..?")
 
-    max_retry_value = 5
+    max_retry_value = 15
     while max_retry_value > 0:
         try:
             uClient = uReq(url, timeout=10)
@@ -288,6 +288,7 @@ def scrape(url):
             break
         except Exception:
             max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
     if max_retry_value == 0:
         sys.exit(1)
         
