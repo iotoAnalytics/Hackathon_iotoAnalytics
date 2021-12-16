@@ -1,3 +1,11 @@
+'''
+Author: Kat S.
+Edited: Kevin Nha
+
+Notes:
+This scraper is extremely slow. Each crawl delay is 10 seconds. 
+'''
+
 import os
 import sys
 import traceback
@@ -12,6 +20,7 @@ import multiprocessing
 import pandas as pd
 import numpy as np
 import re
+import ssl
 import time
 
 from bs4 import BeautifulSoup
@@ -29,15 +38,30 @@ scraper_utils = CAProvTerrLegislatorScraperUtils(
 
 base_url = 'https://nslegislature.ca'
 # Get scraper delay from website robots.txt file
-crawl_delay = scraper_utils.get_crawl_delay(base_url)
+crawl_delay = 10 # Got it straight from the website because there was some error getting it using scraper_utils
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_urls():
     urls = []
 
     path = '/members/profiles'
     scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(scrape_url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+    soup = BeautifulSoup(page_html, 'html.parser')
 
     members_view = soup.find('div', {'class': 'view-content'})
 
@@ -68,7 +92,6 @@ def get_current_general_assembly_link(general_assembly_link):
 
 def find_mla_wiki(mlalink):
     bio_links = []
-    print(mlalink)
     uClient = uReq(mlalink)
     page_html = uClient.read()
     uClient.close()
@@ -79,21 +102,33 @@ def find_mla_wiki(mlalink):
         info = person.findAll("td")
         try:
             biolink = "https://en.wikipedia.org" + (info[2].a["href"])
-            print(biolink)
             bio_links.append(biolink)
         except Exception:
             pass
 
     scraper_utils.crawl_delay(crawl_delay)
-    print(bio_links)
     return bio_links
 
 
 def get_most_recent_term_id(row):
     path = '/members/profiles'
     scrape_url = base_url + path
-    page = scraper_utils.request(scrape_url)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(scrape_url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+        
+    soup = BeautifulSoup(page_html, 'html.parser')
     assembly = soup.find('h2', {'class': 'paragraph-header'}).text
 
     scraper_utils.crawl_delay(crawl_delay)
@@ -216,8 +251,23 @@ def get_years_active(bio_container, row):
 
 def get_committee_role(name, link):
     role = "member"
-    page = scraper_utils.request(base_url + link)
-    soup = BeautifulSoup(page.content, 'html.parser')
+    url = base_url + link
+    max_retry_value = 10
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+        
+    soup = BeautifulSoup(page_html, 'html.parser')
+    
     members = soup.findAll('div', {'class': 'views-row'})
     for member in members:
         if name in member.text:
@@ -273,12 +323,21 @@ def scrape(url):
 
     region = scraper_utils.get_region(prov_abbreviation)
     row.region = region
-    print("Test print..?")
 
-    uClient = uReq(url)
-    page_html = uClient.read()
-    uClient.close()
-    scraper_utils.crawl_delay(crawl_delay)
+    max_retry_value = 15
+    while max_retry_value > 0:
+        try:
+            uClient = uReq(url, timeout=10)
+            page_html = uClient.read()
+            uClient.close()
+            scraper_utils.crawl_delay(crawl_delay)
+            break
+        except Exception:
+            max_retry_value -= 1
+            print(f"Retries remaining: {max_retry_value}")
+    if max_retry_value == 0:
+        sys.exit(1)
+        
     
     soup = BeautifulSoup(page_html, 'html.parser')
     bio_container = soup.find('div', {'class': 'panels-flexible-region-mla-profile-current-center'})
@@ -298,7 +357,6 @@ def scrape(url):
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
-    print(row)
     return row
 
 try:
@@ -317,7 +375,6 @@ try:
         with Pool(processes=int(multiprocessing.cpu_count() / 2)) as pool:
             data = pool.map(scrape, urls)
 
-        print(len(data))
         # with Pool() as pool:
         #     data = pool.map(scrape, urls)
         leg_df = pd.DataFrame(data)

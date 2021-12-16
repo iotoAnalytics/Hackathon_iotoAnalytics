@@ -328,8 +328,6 @@ try:
         #     big_df = big_df.drop(big_df.index[index])
 
         big_list_of_dicts = big_df.to_dict('records')
-
-        print(big_list_of_dicts)
         print('Writing data to database...')
 
         scraper_utils.write_data(big_list_of_dicts)

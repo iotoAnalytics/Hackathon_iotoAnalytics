@@ -60,7 +60,6 @@ def program_driver():
     print("Getting data from mla pages...")
     all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
     mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
-    print(mla_data)
 
     print("Getting data from wiki pages...")
     all_wiki_links = scrape_main_wiki_link(WIKI_URL)

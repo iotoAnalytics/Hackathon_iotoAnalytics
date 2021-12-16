@@ -10,6 +10,7 @@ NODES_TO_ROOT = 5
 path_to_root = Path(os.path.abspath(__file__)).parents[NODES_TO_ROOT]
 sys.path.insert(0, str(path_to_root))
 
+import multiprocessing
 import pandas as pd
 import numpy as np
 
@@ -23,7 +24,7 @@ from unidecode import unidecode
 BASE_URL = 'https://www.ntassembly.ca'
 MLA_URL = BASE_URL + '/members'
 WIKI_URL = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_the_Northwest_Territories'
-THREADS_FOR_POOL = 12
+THREADS_FOR_POOL = int(multiprocessing.cpu_count() / 2)
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('NT', 'ca_nt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
@@ -123,9 +124,9 @@ class Main_Functions:
         table = table.findAll("tr")[1:]
         for tr in table:
             td = tr.findAll("td")[0]
-            url = 'https://en.wikipedia.org' + (td.a["href"])
-
-            wiki_urls.append(url)
+            if 'vacant' not in td.text.lower():
+                url = 'https://en.wikipedia.org' + (td.a["href"])
+                wiki_urls.append(url)
         return wiki_urls
 
     def configure_data(self, mla_data, wiki_data):
@@ -262,7 +263,8 @@ class MLA_Site_Scraper:
         try:
             address = self.__format_member_address(container)
         except Exception as e:
-            print(self.row.name_full)
+            print(f"address not found for: {self.row.name_full}")
+            address = ''
         return {'location' : 'member\'s office',
                 'address' : address}
         
