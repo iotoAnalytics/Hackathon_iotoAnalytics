@@ -328,14 +328,14 @@ class MLASiteScraper:
         Website is loaded by Javascript and changes the text
         Could use Selenium but this method will be faster.
         '''
-        address_container = container1.find('span', {'class' : 'spamspan'})
+        address_container = container1.find('a', {'class' : 'spamspan'})
         try:
             email = address_container.text
         except:
             print(f"No legislative email currently for member {self.row.name_full}")
         
         try:
-            address_container = container2.find('span', {'class' : 'spamspan'})
+            address_container = container2.find('a', {'class' : 'spamspan'})
             email = address_container.text
         except:
             print(f"No legislative email currently for member {self.row.name_full}")

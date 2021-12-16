@@ -23,9 +23,9 @@ from unidecode import unidecode
 from urllib.request import urlopen as uReq
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('ON', 'ca_on_legislators')
-url = 'https://www.ola.org/en/members/current'
+members_url = 'https://www.ola.org/en/members/current'
 base_url = 'https://www.ola.org'
-crawl_delay = scraper_utils.get_crawl_delay(url)
+crawl_delay = scraper_utils.get_crawl_delay(base_url)
 wiki_url = 'https://en.wikipedia.org/wiki/Legislative_Assembly_of_Ontario'
 header = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36'}
@@ -33,8 +33,12 @@ current_year = datetime.now().year
 
 def get_links(url):
     links = []
-    url_request = UrlRequest.make_request(url, header)
-    url_soup = BeautifulSoup(url_request.content, 'lxml')
+
+    uClient = uReq(url)
+    page_html = uClient.read()
+    uClient.close()
+
+    url_soup = BeautifulSoup(page_html, 'html.parser')
     rows = url_soup.find_all('tr')
     for item in rows:
         link = item.find('a').get("href")
@@ -49,9 +53,13 @@ def get_links(url):
 
 def get_wiki_links(url):
     base_wiki = 'https://en.wikipedia.org'
+
     wiki_links = []
-    url_request = UrlRequest.make_request(url, header)
-    url_soup = BeautifulSoup(url_request.content, 'lxml')
+    uClient = uReq(url)
+    page_html = uClient.read()
+    uClient.close()
+
+    url_soup = BeautifulSoup(page_html, 'html.parser')
     url_table = url_soup.find('table', {'class': 'wikitable sortable'})
     for item in url_table.find_all('tr'):
         try:
@@ -124,8 +132,12 @@ def scrape(diction):
     row = scraper_utils.initialize_row()
     row.source_url = diction['url']
 
-    url_request = UrlRequest.make_request(diction['url'], header)
-    url_soup = BeautifulSoup(url_request.content, 'lxml')
+    uClient = uReq(diction['url'])
+    page_html = uClient.read()
+    uClient.close()
+
+    url_soup = BeautifulSoup(page_html, 'html.parser')
+
     first_content = url_soup.find(
         'h1', {'class': 'field-content'}).text.split('(')
     info = get_info(url_soup)
@@ -199,7 +211,7 @@ try:
         # pd.set_option('display.max_rows', None)
         # pd.set_option('display.max_columns', None)
 
-        legislator_links = get_links(url)
+        legislator_links = get_links(members_url)
         wiki_links = get_wiki_links(wiki_url)
         dict_lst = make_diction(legislator_links, wiki_links)
 
