@@ -1,22 +1,22 @@
 # Unavailable data - source_id, seniority, military_experience
 # Wiki data - education
 
+import os
 import multiprocessing
-from datetime import datetime
-from tqdm import tqdm
+import re
+import requests
 import ssl
 import sys
-import os
-from pathlib import Path
-import re
-from unidecode import unidecode
-import numpy as np
-from nameparser import HumanName
-from multiprocessing import Pool
-import pandas as pd
-import requests
 from bs4 import BeautifulSoup
+from datetime import datetime
+from tqdm import tqdm
+from multiprocessing import Pool
+from nameparser import HumanName
+from pathlib import Path
+from pprint import pprint
 from urllib.request import urlopen as uReq
+import numpy as np
+import pandas as pd
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -34,14 +34,17 @@ BASE_URL = 'https://www.wvlegislature.gov'
 HOUSE_PATH = '/House'
 SENATE_PATH = '/Senate1'
 WIKI_URL = 'https://en.wikipedia.org'
-WIKI_HOUSE_PATH = '/wiki/West_Virginia_House_of_Delegates'
-WIKI_SENATE_PATH = '/wiki/West_Virginia_Senate'
+LEGISLATURE_PATH = '/wiki/West_Virginia_Legislature'
+BALLOTPEDIA_URL = 'https://ballotpedia.org'
+BALLOTPEDIA_HOUSE_PATH = '/West_Virginia_House_of_Delegates'
+BALLOTPEDIA_SENATE_PATH = '/West_Virginia_State_Senate'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
 PEM_PATH = os.path.join('..', 'us_wv.pem')
+WIKI_DATA_TO_MERGE = ['education']
 
-# Update for new legislatures
+# TODO: Update for new legislatures
 CURRENT_LEGISLATURE = '85'
 LEGISLATURE_START_YEAR = {
     '85': '2021'
@@ -58,7 +61,7 @@ def get_urls():
 
     # Get house members
     scrape_url = BASE_URL + HOUSE_PATH + roster_path
-    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
+    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE, custom_pem=True)
     scraper_utils.crawl_delay(crawl_delay)
 
     table_rows = soup.find('table', 'tabborder').find_all('tr', {'valign': 'top'})
@@ -67,7 +70,7 @@ def get_urls():
 
     # Get senate members
     scrape_url = BASE_URL + SENATE_PATH + roster_path
-    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE)
+    soup = _create_soup(scrape_url, SOUP_PARSER_TYPE, custom_pem=True)
     scraper_utils.crawl_delay(crawl_delay)
 
     table_rows = soup.find('table', 'tabborder').find_all('tr', {'valign': 'top'})
@@ -76,12 +79,14 @@ def get_urls():
 
     urls = house_urls + senate_urls
 
+    # Remove all vacant urls
+    urls = list(filter(lambda url: 'Vacant' not in url, urls))
+
     return urls
 
 
 def scrape(url):
-    print(url)
-    soup = _create_soup(url, SOUP_PARSER_TYPE)
+    soup = _create_soup(url, SOUP_PARSER_TYPE, custom_pem=True)
     scraper_utils.crawl_delay(crawl_delay)
     row = scraper_utils.initialize_row()
 
@@ -97,59 +102,127 @@ def scrape(url):
     _set_areas_served(row, soup)
     _set_district(row, soup)
     _set_biography_fields(row, soup)
-    try:
-        row.wiki_url = _set_wiki_url(row)
-    except:
-        pass
-    print(row)
     return row
 
 
-def get_wiki_urls():
-    wiki_urls = []
+def get_legislators_wiki_urls(wiki_url):
+    wiki_urls_with_district = []
 
-    wiki_member_list_url = [WIKI_URL + WIKI_HOUSE_PATH, WIKI_URL + WIKI_SENATE_PATH]
+    soup = _create_soup(wiki_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
 
-    for url in wiki_member_list_url:
-        page = scraper_utils.request(url)
-        soup = BeautifulSoup(page.content, SOUP_PARSER_TYPE)
-        scraper_utils.crawl_delay(crawl_delay)
+    for section in soup.select('div[aria-labelledby*="Members_of_"]'):
+        container = section.find('div', {'class': 'div-col'})
+        legor_list = container.find(['ol', 'ul'])
 
-        table_rows = soup.find('table', {'class': 'sortable wikitable'}).find('tbody').find_all('tr')
+        # Find list containing legislators
+        if legor_list:
+            list_items = legor_list.find_all('li')
+        else:
+            list_items = container.findChildren('div', recursive=False)
 
-        for row in table_rows[1:]:
-            try:
-                path = row.find('span', {'class': 'fn'}).find('a').get('href')
-                wiki_urls.append(WIKI_URL + path)
-            except Exception:
-                pass
+        current_district = 1
+        for idx, li in enumerate(list_items, start=1):
+            # Get district of legislator depending on list type
+            if legor_list:
+                current_district = idx
+            else:
+                text = li.find('div').get_text()
+                text = re.sub('[^0-9]', '', text)
+                if text.isdigit():
+                    current_district = text
+            
+            anchors = li.find_all('a')
+            for a in anchors:
+                if '/wiki' in (url:= a.get('href')):
+                    wiki_item = (str(current_district), WIKI_URL + url)
+                    wiki_urls_with_district.append(wiki_item)
 
-    return wiki_urls
-
-
-def merge_all_wiki_data(legislator_data, wiki_urls):
-    try:
-        with Pool(NUM_POOL_PROCESSES) as pool:
-            wiki_data = list(tqdm(pool.imap(_scrape_wiki, wiki_urls)))
-
-        for data in wiki_data:
-            _merge_wiki_data(legislator_data, data, most_recent_term_id=False, years_active=False, birthday=False,
-                             occupation=False)
-    except:
-        pass
+    return wiki_urls_with_district
 
 
-def _scrape_wiki(url):
-    wiki_data = scraper_utils.scrape_wiki_bio(url)
+def scrape_wiki(wiki_item):
+    district, wiki_url = wiki_item
+
+    wiki_data = scraper_utils.scrape_wiki_bio(wiki_url)
     wiki_crawl_delay = scraper_utils.get_crawl_delay(WIKI_URL)
     scraper_utils.crawl_delay(wiki_crawl_delay)
+
+    wiki_data['district'] = district
+
     return wiki_data
 
 
-def _create_soup(url, soup_parser_type):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'}
-    page = requests.get(url, headers=headers, verify=PEM_PATH)
+def merge_all_wiki_data(legislator_data, wiki_data):
+    leg_df = pd.DataFrame(legislator_data)
+    leg_df = leg_df.drop(columns = WIKI_DATA_TO_MERGE)
+    leg_df['district'] = leg_df['district'].apply(lambda district: re.sub('[^0-9]', '', district))
+
+    wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
+    leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district'])
+
+    for key in WIKI_DATA_TO_MERGE:
+        leg_wiki_df[key] = leg_wiki_df[key].replace({np.nan: None})
+
+        if key not in set(['birthday', 'most_recent_term_id']):
+            isna = leg_wiki_df[key].isna()
+            leg_wiki_df.loc[isna, key] = pd.Series([[]] * isna.sum()).values
+
+    return leg_wiki_df.to_dict('records')
+
+
+def get_ballotpedia_data(ballotpedia_url):
+    all_ballotpedia_data = []
+
+    soup = _create_soup(ballotpedia_url, SOUP_PARSER_TYPE)
+    scraper_utils.crawl_delay(crawl_delay)
+
+    table = soup.find('table', id='officeholder-table')
+    table_rows = table.find('tbody').find_all('tr')
+
+    for tr in table_rows:
+        table_cols = tr.find_all('td')
+        district = re.search('District ([0-9]+)', table_cols[0].get_text()).group(1)
+        
+        # Skip if Vacant
+        if not (anchor := table_cols[1].find('a')):
+            continue
+        
+        url = anchor.get('href')
+        name = anchor.get_text()
+        human_name = HumanName(name)
+
+        ballotpedia_data = {
+            'name_first': human_name.first,
+            'name_last': human_name.last,
+            'district': district,
+            'wiki_url': url
+        }
+        all_ballotpedia_data.append(ballotpedia_data)
+    
+    return all_ballotpedia_data
+
+
+def merge_all_ballotpedia_data(legislator_data, ballotpedia_data):
+    leg_df = pd.DataFrame(legislator_data)
+    leg_df = leg_df.drop(columns = 'wiki_url')
+    ballotpedia_df = pd.DataFrame(ballotpedia_data)[['name_last', 'district', 'wiki_url']]
+    leg_ballotpedia_df = pd.merge(leg_df, ballotpedia_df, how='left', on=['name_last', 'district'])
+
+    # Fix all invalid values
+    leg_ballotpedia_df.replace({np.nan: None}, inplace = True)
+
+    return leg_ballotpedia_df.to_dict('records')
+
+
+def _create_soup(url, soup_parser_type, custom_pem=False):
+    if custom_pem:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'
+        }
+        page = requests.get(url, headers=headers, verify=PEM_PATH)
+    else:
+        page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
 
@@ -193,6 +266,7 @@ def _set_party(row, soup):
         row.party_id = scraper_utils.get_party_id(party)
     except:
         pass
+
 
 def _set_role(row, url):
     role = re.search('\?member=([A-Za-z]+)', url).group(1)
@@ -243,7 +317,6 @@ def _set_phone_numbers(row, soup):
         row.phone_numbers = phone_numbers
     except Exception as e:
         print(e)
-    print(row.phone_numbers)
 
 
 def _format_phone_location(phone_location_str):
@@ -256,6 +329,7 @@ def _format_phone_number(phone_number_str):
     phone_number = phone_number_str.strip()
     phone_number = re.sub('[\(\)]', '', phone_number)
     phone_number = phone_number.replace(' ', '-')
+    phone_number = phone_number.replace('--', '-')
     return phone_number
 
 
@@ -333,11 +407,12 @@ def _set_district(row, soup):
     except:
         pass
 
+
 def _set_biography_fields(row, soup):
     # Sets the following fields: years_active, birthday
     biography_content = soup.find('ul', {'class': 'popup'}).find('li').find('div')
     fields_elements = biography_content.find_all('strong')
-    _set_gender(row, biography_content)
+
     # Setup dictionary of fields
     biography_fields = {}
     for element in fields_elements:
@@ -347,6 +422,8 @@ def _set_biography_fields(row, soup):
     years_active_key = 'Legislative Service'
     birthday_key = 'Born'
     occupation_key = 'Born'
+
+    _set_gender(row, biography_content)
 
     if years_active_key in biography_fields:
         _set_years_active(row, biography_fields[years_active_key])
@@ -360,9 +437,7 @@ def _set_biography_fields(row, soup):
 
 
 def _set_gender(row, biography_content):
-    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, biography_content.text)
-    if not gender:
-        gender = 'O'
+    gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, biography_content.text) or 'O'
     row.gender = gender
 
 
@@ -459,63 +534,8 @@ def _set_birthday(row, element):
         birthday_str = re.search('[A-Za-z]+ [0-9]+, [0-9]+', birthday_str).group(0)
         birthday = datetime.strptime(birthday_str, '%B %d, %Y')
         row.birthday = birthday
-    except Exception:
+    except:
         pass
-
-
-def _merge_wiki_data(legislator_data, wiki_data, birthday=True, education=True, occupation=True,
-                     years_active=True, most_recent_term_id=True):
-    full_name = wiki_data['name_first'] + ' ' + wiki_data['name_last']
-
-    legislator_row = _get_legislator_row(legislator_data, full_name)
-
-    if not legislator_row:
-        return
-
-    for bio_info in wiki_data:
-        if birthday:
-            legislator_row.birthday = wiki_data['birthday']
-        if education:
-            legislator_row.education = wiki_data['education']
-        if occupation:
-            legislator_row.occupation = wiki_data['occupation']
-        if years_active:
-            legislator_row.years_active = wiki_data['years_active']
-        if most_recent_term_id:
-            legislator_row.most_recent_term_id = wiki_data['most_recent_term_id']
-
-
-def _set_wiki_url(row):
-    wikipage_reps = "https://ballotpedia.org/West_Virginia_House_of_Delegates"
-    wikipage_senate = "https://ballotpedia.org/West_Virginia_State_Senate"
-
-    if row.role == "Delegate":
-        uClient = uReq(wikipage_reps)
-    elif row.role == "Senator":
-        uClient = uReq(wikipage_senate)
-
-    page_html = uClient.read()
-    uClient.close()
-
-    page_soup = BeautifulSoup(page_html, "lxml")
-    table = page_soup.find("table", {"id": 'officeholder-table'})
-    rows = table.findAll("tr")
-
-    for person in rows[1:]:
-        tds = person.findAll("td")
-        name_td = tds[1]
-        name = name_td.text
-        name = name.replace('\n', '')
-        name = HumanName(name)
-
-        district_td = tds[0]
-        district = district_td.text
-        district_num = re.search(r'\d+', district).group().strip()
-
-        if unidecode(name.last) == unidecode(row.name_last) and district_num == row.district:
-            link = name_td.a['href']
-
-            return link
 
 
 def _get_legislator_row(legislator_data, name_full):
@@ -524,29 +544,6 @@ def _get_legislator_row(legislator_data, name_full):
             return row
 
     return None
-
-
-def find_individual_wiki(wiki_page_link):
-    bio_lnks = []
-    uClient = uReq(wiki_page_link)
-    page_html = uClient.read()
-    uClient.close()
-
-    page_soup = BeautifulSoup(page_html, "lxml")
-    tables = page_soup.findAll("table")
-    rows = tables[3].findAll("tr")
-
-    for person in rows[1:]:
-        info = person.findAll("td")
-        try:
-            biolink = info[1].a["href"]
-
-            bio_lnks.append(biolink)
-
-        except Exception:
-            pass
-    scraper_utils.crawl_delay(crawl_delay)
-    return bio_lnks
 
 
 def main():
@@ -564,44 +561,34 @@ def main():
 
     # Scrape data from collected URLs
     print(DEBUG_MODE and 'Scraping data from collected URLs...\n' or '', end='')
-    # with Pool(NUM_POOL_PROCESSES) as pool:
-    #     data = list(tqdm(pool.imap(scrape, urls)))
-    data = [scrape(url) for url in urls]
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        data = list(tqdm(pool.imap(scrape, urls)))
+    # data = [scrape(url) for url in urls]
 
     # Collect wiki urls
     print(DEBUG_MODE and 'Collecting wiki URLs...\n' or '', end='')
-    wiki_urls = get_wiki_urls()
+    wiki_urls = get_legislators_wiki_urls(WIKI_URL + LEGISLATURE_PATH)
+
+    # Scrape data from wiki URLs
+    print(DEBUG_MODE and 'Scraping data from wiki URLs...\n' or '', end='')
+    with Pool(NUM_POOL_PROCESSES) as pool:
+        wiki_data = list(tqdm(pool.imap(scrape_wiki, wiki_urls)))
 
     # Merge data from wikipedia
-    print(DEBUG_MODE and 'Merging wiki data with house legislators...\n' or '', end='')
-    merge_all_wiki_data(data, wiki_urls)
+    print(DEBUG_MODE and 'Merging wiki data with legislators...\n' or '', end='')
+    merged_data = merge_all_wiki_data(data, wiki_data)
+    
+    # Merge ballotpedia data for wiki_url
+    print(DEBUG_MODE and 'Merging ballotpedia data with legislators...\n' or '', end='')
+    ballotpedia_house_data = get_ballotpedia_data(BALLOTPEDIA_URL + BALLOTPEDIA_HOUSE_PATH)
+    ballotpedia_senate_data = get_ballotpedia_data(BALLOTPEDIA_URL + BALLOTPEDIA_SENATE_PATH)
+    all_ballotpedia_data = ballotpedia_house_data + ballotpedia_senate_data
+    merged_data = merge_all_ballotpedia_data(merged_data, all_ballotpedia_data)
 
-    leg_df = pd.DataFrame(data)
-    print(leg_df)
-    # getting urls from ballotpedia
-    wikipage_reps = "https://ballotpedia.org/West_Virginia_House_of_Delegates"
-    wikipage_senate = "https://ballotpedia.org/West_Virginia_State_Senate"
-
-    all_wiki_links = (find_individual_wiki(wikipage_reps) + find_individual_wiki(wikipage_senate))
-
-    with Pool() as pool:
-        wiki_data = pool.map(scraper_utils.scrape_ballotpedia_bio, all_wiki_links)
-    wiki_df = pd.DataFrame(wiki_data)[
-        ['name_last', 'wiki_url']]
-
-    big_df = pd.merge(leg_df, wiki_df, how='left',
-                      on=["name_last", 'wiki_url'])
-
-    isna = big_df['education'].isna()
-    big_df.loc[isna, 'education'] = pd.Series([[]] * isna.sum()).values
-    big_df['birthday'] = big_df['birthday'].replace({np.nan: None})
-    big_df['wiki_url'] = big_df['wiki_url'].replace({np.nan: None})
-    big_df.drop(big_df.index[big_df['name_full'] == 'Vacant'], inplace=True)
-    big_df.drop(big_df.index[big_df['wiki_url'] == ''], inplace=True)
-
-    print('Scraping complete')
     # Write to database
-    scraper_utils.write_data(data)
+    if not DEBUG_MODE:
+        print('Writing to database...\n', end='')
+        scraper_utils.write_data(merged_data)
 
     print('\nCOMPLETE!\n')
 
