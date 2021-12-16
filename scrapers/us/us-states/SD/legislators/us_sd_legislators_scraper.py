@@ -35,7 +35,7 @@ LEGISLATURE_PATH = '/wiki/South_Dakota_Legislature'
 SOUP_PARSER_TYPE = 'lxml'
 
 NUM_POOL_PROCESSES = int(multiprocessing.cpu_count() * 0.5)
-WIKI_DATA_TO_MERGE = ['years_active', 'birthday', 'education']
+WIKI_DATA_TO_MERGE = ['years_active', 'birthday', 'education', 'wiki_url']
 
 PARTY_FULL = {
     'R': 'Republican',
@@ -110,7 +110,8 @@ def get_legislators_wiki_urls(wiki_url):
         scraper_utils.crawl_delay(crawl_delay)
 
         for section in soup.select('div[aria-labelledby*="Members_of_"]'):
-            ordered_list = section.find('ol')
+            container = section.find('div', {'class': 'div-col'})
+            ordered_list = container.find(['ol', 'ul'])
             list_items = ordered_list.find_all('li')
 
             for idx, li in enumerate(list_items, start=1):
@@ -139,6 +140,7 @@ def scrape_wiki(wiki_item):
 def merge_all_wiki_data(legislator_data, wiki_data):
     leg_df = pd.DataFrame(legislator_data)
     leg_df = leg_df.drop(columns = WIKI_DATA_TO_MERGE)
+    leg_df['district'] = leg_df['district'].apply(lambda district: re.sub('[^0-9]', '', district))
 
     wiki_df = pd.DataFrame(wiki_data)[['name_first', 'name_last', 'district', *WIKI_DATA_TO_MERGE]]
     leg_wiki_df = pd.merge(leg_df, wiki_df, how='left', on=['name_first', 'name_last', 'district'])
@@ -153,7 +155,6 @@ def merge_all_wiki_data(legislator_data, wiki_data):
     return leg_wiki_df.to_dict('records')
 
 def _create_soup(url, soup_parser_type):
-    print(url)
     page = scraper_utils.request(url)
     soup = BeautifulSoup(page.content, soup_parser_type)
     return soup
@@ -174,6 +175,7 @@ def set_member_data(member_data):
     _set_occupation(row, member_data)
     _set_areas_served(row, member_data)
     _set_district(row, member_data)
+    _set_gender(row, member_data)
 
     return row
 
@@ -322,6 +324,14 @@ def _set_district(row, member_data):
     except:
         pass
 
+def _set_gender(row, member_data):
+    try:
+        human_name = HumanName(member_data['Name'])
+        gender = scraper_utils.get_legislator_gender(human_name.first, human_name.last)
+        row.gender = gender
+    except:
+        pass
+
 def main():
     print('SOUTH DAKOTA!')
     print('Wanna go back to you though your nothing but a town ♫ ♫ ♫')
@@ -332,7 +342,6 @@ def main():
     # Get session data and IDs
     print(DEBUG_MODE and 'Initializing...\n' or '', end='')
     session_data = get_current_session_data()
-    print(session_data)
     session_id = get_current_session_id(session_data)
     most_recent_term_id = get_most_recent_term_id(session_data)
 
@@ -340,7 +349,6 @@ def main():
     print(DEBUG_MODE and 'Scraping legislators data...\n' or '', end='')
     members_areas_served = get_members_areas_served(session_id)
     session_members_data = get_session_members_data(session_id)
-    print(session_members_data)
 
     # Initialize most_recent_term_id and areas_served into members data
     for member_data in session_members_data:
@@ -364,9 +372,20 @@ def main():
     print(DEBUG_MODE and 'Merging wiki data with legislators...\n' or '', end='')
     merged_data = merge_all_wiki_data(data, wiki_data)
 
+    # Special Case - Session 96, Maggie Sutton (4002) is Margaret Sutton in wikipedia. Remove if this is no longer the case
+    # Special Case - Session 96, R. Blake Curd (3926) is Blake Curd in wikipedia. Remove if this is no longer the case
+    # Special Case - Session 96, Sam Marty (3967) is J. Sam Marty in wikipedia. Remove if this is no longer the case
+    for legor in merged_data:
+        if legor['source_id'] == '4002' and legor['district'] == '10' and legor['name_last'] == 'Sutton' and legor['name_first'] == 'Maggie':
+            legor['wiki_url'] = 'https://en.wikipedia.org/wiki/Margaret_Sutton_(politician)'
+        elif legor['source_id'] == '3926' and legor['district'] == '12' and legor['name_last'] == 'Curd' and legor['name_first'] == 'R.':
+            legor['wiki_url'] = 'https://en.wikipedia.org/wiki/Blake_Curd'
+        elif legor['source_id'] == '3967' and legor['district'] == '28' and legor['name_last'] == 'Marty' and legor['name_first'] == 'Sam':
+            legor['wiki_url'] = 'https://en.wikipedia.org/wiki/J._Sam_Marty'
+
     # Write to database
-    print(DEBUG_MODE and 'Writing to database...\n' or '', end='')
     if not DEBUG_MODE:
+        print('Writing to database...\n')
         scraper_utils.write_data(merged_data)
 
     print('\nCOMPLETE!\n')
