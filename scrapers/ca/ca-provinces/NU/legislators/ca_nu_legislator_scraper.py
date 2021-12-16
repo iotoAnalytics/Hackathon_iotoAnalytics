@@ -328,14 +328,14 @@ class MLASiteScraper:
         Website is loaded by Javascript and changes the text
         Could use Selenium but this method will be faster.
         '''
-        address_container = container1.find('a', {'class' : 'spamspan'})
         try:
+            address_container = container1.find('span', {'class' : 'spamspan'})
             email = address_container.text
         except:
             print(f"No legislative email currently for member {self.row.name_full}")
         
         try:
-            address_container = container2.find('a', {'class' : 'spamspan'})
+            address_container = container2.find('span', {'class' : 'spamspan'})
             email = address_container.text
         except:
             print(f"No constituency email currently for member {self.row.name_full}")
@@ -357,18 +357,20 @@ class MLASiteScraper:
         try:
             legislative_phone = self.__get_number('legislative office phone', 
                                                 legislative_numbers[index_of_phone_number])
+            return_list.extend(legislative_phone)
             legislative_fax = self.__get_number('legislative office fax',
                                             legislative_numbers[index_of_fax_number])
-            return_list.extend([legislative_phone, legislative_fax])
+            return_list.extend(legislative_fax)
         except:
             print(f"No legislative numbers currently for member {self.row.name_full}")
             
         try:
             constituency_phone = self.__get_number('constituency office phone', 
                                                 constituency_numbers[index_of_phone_number])
+            return_list.extend(constituency_phone)
             constituency_fax = self.__get_number('constituency office fax', 
                                                 constituency_numbers[index_of_fax_number])
-            return_list.extend([constituency_phone, constituency_fax])
+            return_list.extend(constituency_fax)
         except:
             print(f"No constituency numbers currently for member {self.row.name_full}")
             
