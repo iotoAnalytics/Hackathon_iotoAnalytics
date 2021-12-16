@@ -263,7 +263,8 @@ class MLA_Site_Scraper:
         try:
             address = self.__format_member_address(container)
         except Exception as e:
-            print(self.row.name_full)
+            print(f"address not found for: {self.row.name_full}")
+            address = ''
         return {'location' : 'member\'s office',
                 'address' : address}
         

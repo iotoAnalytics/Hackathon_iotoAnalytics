@@ -338,7 +338,7 @@ class MLASiteScraper:
             address_container = container2.find('a', {'class' : 'spamspan'})
             email = address_container.text
         except:
-            print(f"No legislative email currently for member {self.row.name_full}")
+            print(f"No constituency email currently for member {self.row.name_full}")
             email = ''
             
         return self.__format_email_address(email)

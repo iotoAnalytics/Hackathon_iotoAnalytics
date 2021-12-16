@@ -357,7 +357,6 @@ def scrape(url):
     row.role = "Member of the Legislative Assembly"
     # Delay so we do not overburden servers
     scraper_utils.crawl_delay(crawl_delay)
-    print(row)
     return row
 
 try:

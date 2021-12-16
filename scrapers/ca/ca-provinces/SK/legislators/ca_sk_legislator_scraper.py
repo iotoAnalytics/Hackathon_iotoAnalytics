@@ -122,7 +122,6 @@ def scrape(info_dict):
     bio = url_soup.find('div', {'class' : 'biography-cell'}).text
     row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
 
-    print('Done row for: '+name_full)
     scraper_utils.crawl_delay(crawl_delay)
     return row
 

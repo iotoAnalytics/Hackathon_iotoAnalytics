@@ -194,7 +194,6 @@ def scrape(diction):
             row.gender = scraper_utils.get_legislator_gender(row.name_first, row.name_last, bio)
             break
 
-    print('Done row for ' + name_full)
     scraper_utils.crawl_delay(crawl_delay)
     return row
 
