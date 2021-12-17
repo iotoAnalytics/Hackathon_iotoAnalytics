@@ -112,7 +112,7 @@ def collect_mla_data(link_party):
             row.email = email
 
         except:
-            print(link)
+            print(f"email not found for: {link}")
 
     # get addresses, phone numbers
     phone_numbers = []

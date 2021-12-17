@@ -46,6 +46,7 @@ THREADS_FOR_POOL = 12
 scraper_utils = CAProvTerrLegislatorScraperUtils('YT', 'ca_yt_legislators')
 crawl_delay = scraper_utils.get_crawl_delay(BASE_URL)
 
+chrome_driver_manager = ChromeDriverManager().install()
 options = Options()
 options.headless = True
 
@@ -60,7 +61,6 @@ def program_driver():
     print("Getting data from mla pages...")
     all_mla_links = scraper_for_main.get_all_mla_links(main_page_soup)
     mla_data = get_data_from_all_links(get_mla_data, all_mla_links)
-    print(mla_data)
 
     print("Getting data from wiki pages...")
     all_wiki_links = scrape_main_wiki_link(WIKI_URL)
@@ -410,7 +410,7 @@ class ScraperForCommitteesMainSite:
 class ScraperForCommittee:
     def __init__(self, committee_url):
         self.url = committee_url
-        self.driver = webdriver.Chrome(ChromeDriverManager().install(), options=options)
+        self.driver = webdriver.Chrome(chrome_driver_manager, options=options)
         self.driver.switch_to.default_content()
         self.data = {}
         self.__collect_data()

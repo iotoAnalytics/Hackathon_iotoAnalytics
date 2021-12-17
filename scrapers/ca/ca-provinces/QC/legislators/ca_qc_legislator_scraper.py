@@ -18,9 +18,8 @@ from multiprocessing import Pool
 from nameparser import HumanName
 from scraper_utils import CAProvTerrLegislatorScraperUtils
 from unidecode import unidecode
-from urllib.request import urlopen
+from urllib.request import urlopen as uReq
 
-print("Test to see if this part prints. If not, it might be running but just a problem with printing.")
 ssl._create_default_https_context = ssl._create_unverified_context
 
 scraper_utils = CAProvTerrLegislatorScraperUtils('QC', 'ca_qc_legislators')
@@ -29,8 +28,8 @@ crawl_delay = 2 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
-    uClient = urlopen(myurl)
-    webpage =uClient.read()
+    uClient = uReq(myurl)
+    webpage = uClient.read()
     uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
 
@@ -48,11 +47,21 @@ def getAssemblyLinks(myurl):
 def collect_leg_data(myurl):
     row = scraper_utils.initialize_row()
 
-    uClient = urlopen(myurl)
-    page_html = uClient.read()
-    uClient.close()
+    try_count = 5
+    
+    while try_count > 0:
+        try:
+            uClient = uReq(myurl)
+            page_html = uClient.read()
+            uClient.close()
+            break
+        except:
+            try_count -= 1
+            print(f"Remaining try_count: {try_count}")
+            if try_count == 0:
+                sys.exit(1)
+        
     scraper_utils.crawl_delay(crawl_delay)
-
 
     page_soup = soup(page_html, "html.parser")
     img = page_soup.findAll("img")
@@ -155,7 +164,7 @@ def collect_leg_data(myurl):
 
     contact_link = myurl.replace("index", "coordonnees")
 
-    uClient = urlopen(contact_link)
+    uClient = uReq(contact_link)
     page_html = uClient.read()
     uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
@@ -228,7 +237,7 @@ def collect_leg_data(myurl):
     except:
         row.party_id = 0
 
-    uClient = urlopen('https://en.wikipedia.org/wiki/National_Assembly_of_Quebec')
+    uClient = uReq('https://en.wikipedia.org/wiki/National_Assembly_of_Quebec')
     scraper_utils.crawl_delay(crawl_delay)
 
     page_html = uClient.read()
@@ -265,7 +274,7 @@ def get_most_recent_term_id_from_wiki(page_soup):
     return current_legislature
     
 def get_biography_from_wiki(link):
-    uClient = urlopen(link)
+    uClient = uReq(link)
     page_html = uClient.read()
     uClient.close()
     page_soup = soup(page_html, "html.parser")
@@ -275,7 +284,7 @@ def get_biography_from_wiki(link):
 def get_wiki_people(repLink):
     # get links to legislators' personal wikipedia pages
     bio_lnks = []
-    uClient = urlopen(repLink)
+    uClient = uReq(repLink)
     page_html = uClient.read()
     uClient.close()
     # # html parsing
