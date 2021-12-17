@@ -29,10 +29,9 @@ crawl_delay = 2 # above won't work with github workflow
 
 def getAssemblyLinks(myurl):
     infos = []
-    req = Request(myurl,
-                  headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)Chrome/79.0.3945.88 Safari/537.36; IOTO International Inc./enquiries@ioto.ca'})
-    webpage = uReq(req).read()
-    uReq(req).close()
+    uClient = uReq(myurl)
+    webpage = uClient.read()
+    uClient.close()
     scraper_utils.crawl_delay(crawl_delay)
 
     page_soup = soup(webpage, "html.parser")
@@ -49,11 +48,21 @@ def getAssemblyLinks(myurl):
 def collect_leg_data(myurl):
     row = scraper_utils.initialize_row()
 
-    uClient = uReq(myurl)
-    page_html = uClient.read()
-    uClient.close()
+    try_count = 5
+    
+    while try_count > 0:
+        try:
+            uClient = uReq(myurl)
+            page_html = uClient.read()
+            uClient.close()
+            break
+        except:
+            try_count -= 1
+            print(f"Remaining try_count: {try_count}")
+            if try_count == 0:
+                sys.exit(1)
+        
     scraper_utils.crawl_delay(crawl_delay)
-
 
     page_soup = soup(page_html, "html.parser")
     img = page_soup.findAll("img")
