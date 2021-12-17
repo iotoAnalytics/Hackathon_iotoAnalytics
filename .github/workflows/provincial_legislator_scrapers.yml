@@ -9,7 +9,7 @@ on:
     # - cron: "0 0 1 * *" # Runs every month
   push:
     branches:
-      - dev
+      - main
     
 jobs:
   build:
