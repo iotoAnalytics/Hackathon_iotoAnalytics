@@ -208,6 +208,6 @@ if __name__ == '__main__':
 
     print('Writing data to database...')
     scraper_utils.write_data(bill_data)
-    print("print check")
+    print("ok i get it")
     print('Complete!')
     #done
