@@ -210,4 +210,5 @@ if __name__ == '__main__':
     scraper_utils.write_data(bill_data)
     print("ok i get it")
     print('Complete!')
+    print("what happens now?")
     #done
