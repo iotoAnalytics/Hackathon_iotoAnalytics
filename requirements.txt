@@ -7,7 +7,8 @@ numpy
 pandas 
 pdfplumber
 pycryptodome
-psycopg2==2.8.6 
+#psycopg2==2.8.6 
+psycopg2
 PyPDF2==1.26.0
 pytest 
 requests==2.25.1 

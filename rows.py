@@ -1,5 +1,5 @@
-from typing import List
-from dataclasses import dataclass
+from typing import Dict, List
+from dataclasses import dataclass, field
 from datetime import datetime
 import re
 
@@ -3101,4 +3101,99 @@ class BankAccountRow:
         if not isinstance(value, float):
             raise TypeError("account_balance must be an float")
         self._account_balance = value
+
+
+#########################################################
+#       MUNICIPAL ROWS                                  #
+#########################################################
+
+@dataclass
+class MunicipalRow:
+    """
+    Data structure for housing data about each municipality
+    """
+
+    def __iter__(self):
+        for attr, value in self.__dict__.items():
+            yield attr, value
+    
+    municipality_id: int
+    municipality: str
+    municipality_land_area: List[dict]
+    municipality_population: List[dict]
+    municipal_yearly_revenue: List[dict]
+    municipal_yearly_expenses: List[dict]
+    municipal_councilors: List[dict]
+
+    def __init__(self):
+        self._municipality_id = 0
+        self._municipality = ''
+        self._municipality_land_area = []
+        self._municipality_population = []
+        self._municipal_yearly_revenue = []
+        self._municipal_yearly_expenses = []
+        self._municipal_councilors = []
+
+    @property
+    def municipality_id(self) -> int:
+        return self._municipality_id
+    @municipality_id.setter
+    def municipality_id(self, id: int) -> None:
+        if type(id) != int:
+            raise TypeError('municipality_id must be int')
+        self._municipality_id = id
+
+    @property
+    def municipality(self) -> str:
+        return self._municipality
+    @municipality.setter
+    def municipality(self, id: str) -> None:
+        if type(id) != str:
+            raise TypeError('municipality must be str')
+        self._municipality = id
+
+    @property
+    def municipality_land_area(self) -> List[dict]:
+        return self._municipality_land_area
+    @municipality_land_area.setter
+    def municipality_land_area(self, id: List[dict]) -> None:
+        if type(id) != List[dict]:
+            raise TypeError('municipality_land_area must be List[dict]')
+        self._municipality_land_area = id
+
+    @property
+    def municipality_population(self) -> List[dict]:
+        return self._municipality_population
+    @municipality_population.setter
+    def municipality_population(self, id: List[dict]) -> None:
+        if type(id) != List[dict]:
+            raise TypeError('municipality_population must be List[dict]')
+        self._municipality_population = id
+
+    @property
+    def municipal_yearly_revenue(self) -> List[dict]:
+        return self._municipal_yearly_revenue
+    @municipal_yearly_revenue.setter
+    def municipal_yearly_revenue(self, id: List[dict]) -> None:
+        if type(id) != List[dict]:
+            raise TypeError('municipal_yearly_revenue must be List[dict]')
+        self._municipal_yearly_revenue = id
+
+    @property
+    def municipal_yearly_expenses(self) -> List[dict]:
+        return self._municipal_yearly_expenses
+    @municipal_yearly_expenses.setter
+    def municipal_yearly_expenses(self, id: List[dict]) -> None:
+        if type(id) != List[dict]:
+            raise TypeError('municipal_yearly_expenses must be List[dict]')
+        self._municipal_yearly_expenses = id
+
+    @property
+    def municipal_councilors(self) -> List[dict]:
+        return self._municipal_councilors
+    @municipal_councilors.setter
+    def municipal_councilors(self, id: List[dict]) -> None:
+        if type(id) != List[dict]:
+            raise TypeError('municipal_councilors must be List[dict]')
+        self._municipal_councilors = id
 

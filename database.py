@@ -2015,3 +2015,47 @@ class Persistence:
                 except Exception as e:
                     print(
                         f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
+
+    @staticmethod
+    def write_sea_aq_meeting_data(data, table):
+        if not isinstance(data, list):
+            raise TypeError(
+                'Data being written to database must be a list of Rows or dictionaries!')
+        
+        with CursorFromConnectionFromPool() as cur:
+            try:
+                create_table_query = sql.SQL("""
+                    CREATE TABLE IF NOT EXISTS {table} (
+                        meeting_date text,
+                        num_matches int,
+                        meeting_minutes text
+                    );
+
+                    ALTER TABLE {table} OWNER TO rds_ad;
+                    """).format(table=sql.Identifier(table))
+
+                cur.execute(create_table_query)
+                cur.connection.commit()
+            
+            except Exception as e:
+                print(f'An exception occurred executing a query:\n{e}')
+                cur.connection.rollback()
+            
+            insert_query = sql.SQL("""
+                    INSERT INTO {table}
+                    VALUES (
+                        %s, %s, %s)
+                    ON CONFLICT DO NOTHING;
+                    """).format(table=sql.Identifier(table))
+            for item in data:
+                if isinstance(item, dict):
+                    item = utils.DotDict(item)
+                else:
+                    print("error")
+                tup = (
+                    item.meeting_date,
+                    item.num_matches,
+                    item.meeting_minutes
+                )
+
+                cur.execute(insert_query, tup)  

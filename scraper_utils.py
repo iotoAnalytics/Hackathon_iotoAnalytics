@@ -7,14 +7,14 @@ import functools
 import io
 import numpy as np
 import pandas as pd
-import pdfplumber
+#import pdfplumber
 import random
 import re
 import requests
 import sys
 import tempfile
 import time
-import torch
+# import torch
 
 from bs4 import BeautifulSoup as soup
 from database import Database, CursorFromConnectionFromPool, Persistence
@@ -1420,7 +1420,6 @@ class PDF_Table_Reader(PDF_Reader):
         return tables
 
 # region Election Scraper Utils
-
 ##########################################
 # PREVIOUS ELECTION SCRAPER UTILS
 ##########################################
@@ -1615,4 +1614,24 @@ class BankAccountUtils(ScraperUtils):
         """
         table = database_table if database_table else self.database_table_name
         Persistence.write_bank_account(data, table)
+# end region
+
+
+# region Municipal scraper utils
+##########################################
+# MUNICIPAL SCRAPER UTILS
+##########################################
+
+class MunicipalUtils(ScraperUtils):
+    """Base scraper class. Contains methods common to all legislator scrapers."""
+
+    def __init__(self, database_table_name):
+        super().__init__('ca', database_table_name, row_type=MunicipalRow())
+    
+    # get attribute?
+    
+    def write_sea_aq_meeting(self,data,database_table=None):
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_sea_aq_meeting_data(data, table)
+
 # end region
