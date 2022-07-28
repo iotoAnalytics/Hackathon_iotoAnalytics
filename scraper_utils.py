@@ -1650,4 +1650,15 @@ class MunicipalUtils(ScraperUtils):
         table = database_table if database_table else self.database_table_name
         Persistence.write_aq_meeting_data(data, table)
 
+    def write_cos_aq_meeting(self,data,database_table=None):
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_aq_meeting_data(data, table)
+
+    def write_den_aq_meeting(self,data,database_table=None):
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_aq_meeting_data(data, table)
+
+    def write_mke_aq_meeting(self,data,database_table=None):
+        table = database_table if database_table else self.database_table_name
+        Persistence.write_aq_meeting_data(data, table)
 # end region
