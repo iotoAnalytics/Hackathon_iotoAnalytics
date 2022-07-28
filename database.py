@@ -2017,7 +2017,7 @@ class Persistence:
                         f'An exception occurred inserting {row.candidate_election_finances_id}:\n{e}')
 
     @staticmethod
-    def write_sea_aq_meeting_data(data, table):
+    def write_aq_meeting_data(data, table):
         if not isinstance(data, list):
             raise TypeError(
                 'Data being written to database must be a list of Rows or dictionaries!')
@@ -2058,4 +2058,6 @@ class Persistence:
                     item.meeting_minutes
                 )
 
-                cur.execute(insert_query, tup)  
+                cur.execute(insert_query, tup)
+ 
+
