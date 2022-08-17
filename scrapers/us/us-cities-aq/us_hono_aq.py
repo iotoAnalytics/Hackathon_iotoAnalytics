@@ -74,6 +74,7 @@ scraper_utils.crawl_delay(crawl_delay)
 textp = []
 dates = []
 numh = []
+key = []
 
 view = driver.find_element(by=By.LINK_TEXT, value='Advanced Search').click()
 
@@ -93,11 +94,16 @@ date = driver.find_elements(by=By.CSS_SELECTOR,value='td.listItem.searchClipDate
 
 scraper_utils.crawl_delay(crawl_delay)
 
+i = 0
 for a in table:
-    textp.append(a.get_attribute('text'))
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'air' + r'\b', t.lower()):
+        textp.append(t.rstrip())
+        dates.append(strip_tags(date[i].get_attribute('innerHTML')))
+        key.append("air pollution")
+    i += 1
 
-for d in date:
-    dates.append(strip_tags(d.get_attribute('innerHTML')))
+####//////////
 
 search = driver.find_element(by=By.ID, value='phrase')
 
@@ -115,19 +121,53 @@ date = driver.find_elements(by=By.CSS_SELECTOR,value='td.listItem.searchClipDate
 
 scraper_utils.crawl_delay(crawl_delay)
 
+i = 0
 for a in table:
-    textp.append(a.get_attribute('text'))
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'air quality' + r'\b', t.lower()):
+        textp.append(t.rstrip())
+        dates.append(strip_tags(date[i].get_attribute('innerHTML')))
+        key.append("air quality")
+    i += 1
 
-for d in date:
-    dates.append(strip_tags(d.get_attribute('innerHTML')))
+####//////////
+
+search = driver.find_element(by=By.ID, value='phrase')
+
+search.clear()
+
+search.send_keys("greenhouse gas")
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td:nth-child(2) a')
+
+date = driver.find_elements(by=By.CSS_SELECTOR,value='td.listItem.searchClipDate')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+i = 0
+for a in table:
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'greenhouse' + r'\b', t.lower()):
+        textp.append(t.rstrip())
+        key.append("greenhouse gas")
+    i += 1
+
+i = [0,2,2,4,5,5]
+
+for x in i:
+    dates.append(strip_tags(date[x].get_attribute('innerHTML')))
 
 driver.quit()
 
 for i in textp:
     numh.append(1)
 
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes', 'keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_hono_aq_meeting(df_dict)

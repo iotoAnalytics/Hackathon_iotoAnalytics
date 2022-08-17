@@ -28,6 +28,7 @@ from io import StringIO
 from html.parser import HTMLParser
 import re
 
+
 class MLStripper(HTMLParser):
     def __init__(self):
         super().__init__()
@@ -74,12 +75,44 @@ scraper_utils.crawl_delay(crawl_delay)
 textp = []
 dates = []
 numh = []
+key = []
 
 search = driver.find_element(by=By.ID, value='gas_keywords')
 
 search.clear()
 
-search.send_keys("air quality")
+search.send_keys('"air quality"')
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
+
+
+i=0
+for a in table:
+    p = a.get_attribute('text').lower()
+    if "quality" in p:
+        textp.append(p)
+        dates.append(((strip_tags(date[i].get_attribute('innerHTML')).replace(" ","")).replace("\n","")[:12]).replace("-",""))
+        key.append("air quality")
+    if not p == "agenda" and not p == "video" and not p == "open video only in windows media player":
+        i+=1
+
+
+
+#/////////
+
+search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
+
+search.send_keys("air pollution")
 
 search.send_keys(Keys.ENTER)
 
@@ -91,20 +124,46 @@ scraper_utils.crawl_delay(crawl_delay)
 
 for a in table:
     p = a.get_attribute('text').lower()
-    if "quality" in p:
+    if "pollution" in p:
         textp.append(p)
 
+
+#/////////
+
+search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
+
+search.send_keys("carbon dioxide")
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+
+scraper_utils.crawl_delay(crawl_delay)
+
 date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
-for d in date:
-    dates.append(((strip_tags(d.get_attribute('innerHTML')).replace(" ","")).replace("\n","")[:12]).replace("-",""))
+
+i=0
+for a in table:
+    p = a.get_attribute('text').lower()
+    if "present" in p or "haven" in p:
+        textp.append(p)
+        dates.append(((strip_tags(date[i].get_attribute('innerHTML')).replace(" ","")).replace("\n","")[:12]).replace("-",""))
+        key.append("carbon dioxide")
+    if not p == "agenda" and not p == "video" and not p == "open video only in windows media player":
+        i+=1
 
 driver.quit()
 
-for i in textp:
-    numh.append(1)
+for i in dates:
+    numh.append('1')
 
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes','keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_cha_aq_meeting(df_dict)

@@ -68,6 +68,11 @@ print('driver found')
 
 driver.get('https://milwaukee.legistar.com/Legislation.aspx')
 
+dates = []
+textp = []
+numh = []
+key = []
+
 scraper_utils.crawl_delay(crawl_delay)
 
 select = driver.find_element(by=By.ID, value='ctl00_ContentPlaceHolder1_tdYears').click()
@@ -92,9 +97,6 @@ scraper_utils.crawl_delay(crawl_delay)
 
 show = driver.find_element(by=By.XPATH, value='/html/body/form/div[3]/div[6]/div/div/div[5]/table[3]/tbody/tr/td/div/ul/li[2]/div/ul/li[6]/a').click()
 
-dates = []
-textp = []
-numh = []
 text = driver.find_elements(by=By.CSS_SELECTOR,value="[id^='ctl00_ContentPlaceHolder1_gridMain_ctl00__'] td:nth-child(6)")
 datet = driver.find_elements(by=By.CSS_SELECTOR,value="[id^='ctl00_ContentPlaceHolder1_gridMain_ctl00__'] td:nth-child(5)")
 
@@ -103,6 +105,7 @@ for a in text:
     t = strip_tags(a.get_attribute('innerHTML'))
     if re.search(r'\b' + 'air' + r'\b', t.lower()):
         textp.append(t.rstrip())
+        key.append("air quality")
         if strip_tags(datet[i].get_attribute('innerHTML')) == '\xa0':
             dates.append("Not Available")
         else:
@@ -121,6 +124,40 @@ for a in text:
     t = strip_tags(a.get_attribute('innerHTML'))
     if re.search(r'\b' + 'air' + r'\b', t.lower()):
         textp.append(t.rstrip())
+        key.append("air quality")
+        if strip_tags(datet[i].get_attribute('innerHTML')) == '\xa0':
+            dates.append("Not Available")
+        else:
+            dates.append(strip_tags(datet[i].get_attribute('innerHTML')))
+    i += 1
+
+#/////////
+
+search = driver.find_element(by=By.ID, value='ctl00_ContentPlaceHolder1_txtSearch')
+
+search.clear()
+
+search.send_keys('"clean air"')
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+show = driver.find_element(by=By.XPATH, value='/html/body/form/div[3]/div[6]/div/div/div[5]/table[3]/tbody/tr/td/div/ul/li[2]/a').click()
+
+scraper_utils.crawl_delay(crawl_delay)
+
+show = driver.find_element(by=By.XPATH, value='/html/body/form/div[3]/div[6]/div/div/div[5]/table[3]/tbody/tr/td/div/ul/li[2]/div/ul/li[6]/a').click()
+
+text = driver.find_elements(by=By.CSS_SELECTOR,value="[id^='ctl00_ContentPlaceHolder1_gridMain_ctl00__'] td:nth-child(6)")
+datet = driver.find_elements(by=By.CSS_SELECTOR,value="[id^='ctl00_ContentPlaceHolder1_gridMain_ctl00__'] td:nth-child(5)")
+
+i = 0
+for a in text:
+    t = strip_tags(a.get_attribute('innerHTML'))
+    if re.search(r'\b' + 'air' + r'\b', t.lower()):
+        textp.append(t.rstrip())
+        key.append("clean air")
         if strip_tags(datet[i].get_attribute('innerHTML')) == '\xa0':
             dates.append("Not Available")
         else:
@@ -132,8 +169,8 @@ driver.quit()
 for i in textp:
     numh.append(1)
 
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes', 'keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_mke_aq_meeting(df_dict)

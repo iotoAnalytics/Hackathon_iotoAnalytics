@@ -52,7 +52,7 @@ scraper_utils.crawl_delay(crawl_delay)
 
 search = driver.find_element(by=By.ID, value='s1')
 
-search.send_keys("air pollution")
+search.send_keys('"air pollution"')
 
 search.send_keys(Keys.ENTER)
 
@@ -60,6 +60,8 @@ links = []
 dates = []
 textp = []
 numh = []
+key = []
+
 table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
 for a in table:
     links.append(a.get_attribute('href'))
@@ -85,8 +87,178 @@ for link in links:
                 temp.append(temp2)
                 temp2 = ""
                 num += 1
-    textp.append(temp)
-    numh.append(num)
+    if not num == 0:
+        textp.append(temp)
+        numh.append(num)
+        key.append("air pollution")
+
+driver.get('http://clerk.seattle.gov/search/minutes/')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+search = driver.find_element(by=By.ID, value='s1')
+
+search.clear()
+
+search.send_keys('"air quality"')
+
+search.send_keys(Keys.ENTER)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+for a in table:
+    links.append(a.get_attribute('href'))
+    dates.append(a.get_attribute('text'))
+
+for link in links:
+    driver.get(link)
+    page = requests.get(driver.current_url)
+    usoup = soup(page.content, 'lxml')
+    text = usoup.find_all('p')
+    temp = []
+    temp2 = ""
+    cont = False
+    num = 0
+    for p in text:
+        if "air quality" in p.get_text().lower() or cont == True:
+            if ". " not in p.get_text():
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = True
+            else:
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = False
+                temp.append(temp2)
+                temp2 = ""
+                num += 1
+    if not num == 0:
+        textp.append(temp)
+        numh.append(num)
+        key.append("air quality")
+
+driver.get('http://clerk.seattle.gov/search/minutes/')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+search = driver.find_element(by=By.ID, value='s1')
+
+search.clear()
+
+search.send_keys('"greenhouse gas"')
+
+search.send_keys(Keys.ENTER)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+for a in table:
+    links.append(a.get_attribute('href'))
+    dates.append(a.get_attribute('text'))
+
+for link in links:
+    driver.get(link)
+    page = requests.get(driver.current_url)
+    usoup = soup(page.content, 'lxml')
+    text = usoup.find_all('p')
+    temp = []
+    temp2 = ""
+    cont = False
+    num = 0
+    for p in text:
+        if "greenhouse gas" in p.get_text().lower() or cont == True:
+            if ". " not in p.get_text():
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = True
+            else:
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = False
+                temp.append(temp2)
+                temp2 = ""
+                num += 1
+    if not num == 0:
+        textp.append(temp)
+        numh.append(num)
+        key.append("greenhouse gas")
+
+driver.get('http://clerk.seattle.gov/search/minutes/')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+search = driver.find_element(by=By.ID, value='s1')
+
+search.clear()
+
+search.send_keys('"clean air"')
+
+search.send_keys(Keys.ENTER)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+for a in table:
+    links.append(a.get_attribute('href'))
+    dates.append(a.get_attribute('text'))
+
+for link in links:
+    driver.get(link)
+    page = requests.get(driver.current_url)
+    usoup = soup(page.content, 'lxml')
+    text = usoup.find_all('p')
+    temp = []
+    temp2 = ""
+    cont = False
+    num = 0
+    for p in text:
+        if "clean air" in p.get_text().lower() or cont == True:
+            if ". " not in p.get_text():
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = True
+            else:
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = False
+                temp.append(temp2)
+                temp2 = ""
+                num += 1
+    if not num == 0:
+        textp.append(temp)
+        numh.append(num)
+        key.append("clean air")
+
+driver.get('http://clerk.seattle.gov/search/minutes/')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+search = driver.find_element(by=By.ID, value='s1')
+
+search.clear()
+
+search.send_keys('"carbon dioxide"')
+
+search.send_keys(Keys.ENTER)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+for a in table:
+    links.append(a.get_attribute('href'))
+    dates.append(a.get_attribute('text'))
+
+for link in links:
+    driver.get(link)
+    page = requests.get(driver.current_url)
+    usoup = soup(page.content, 'lxml')
+    text = usoup.find_all('p')
+    temp = []
+    temp2 = ""
+    cont = False
+    num = 0
+    for p in text:
+        if "carbon dioxide" in p.get_text().lower() or cont == True:
+            if ". " not in p.get_text():
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = True
+            else:
+                temp2 += p.get_text().replace("\r\n", " ")
+                cont = False
+                temp.append(temp2)
+                temp2 = ""
+                num += 1
+    if not num == 0:
+        textp.append(temp)
+        numh.append(num)
+        key.append("carbon dioxide")
 
 driver.quit()
 
@@ -96,8 +268,8 @@ for i in dates:
     nums.append(num)
     num += 1 """
 
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes', 'keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_sea_aq_meeting(df_dict)

@@ -69,6 +69,11 @@ print('driver found')
 
 driver.get('http://stpete.granicus.com/ViewPublisher.php?view_id=2')
 
+dates = []
+textp = []
+numh = []
+key = []
+
 scraper_utils.crawl_delay(crawl_delay)
 
 search = driver.find_element(by=By.ID, value='gas_keywords')
@@ -77,19 +82,19 @@ search.send_keys('"air pollution"')
 
 search.send_keys(Keys.ENTER)
 
-dates = []
-textp = []
-numh = []
 text = driver.find_elements(by=By.CSS_SELECTOR,value="[id='items'] table tr td a")
 date = driver.find_elements(by=By.CSS_SELECTOR,value="[id='contentss'] table tr:nth-child(1) td.listItem.searchClipDate")
 for a in text:
     textp.append(a.get_attribute('text'))
+    key.append("air pollution")
 
 for d in date:
     dates.append((strip_tags(d.get_attribute('innerHTML'))))
-
+####///////////
 
 search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
 
 search.send_keys('"air quality"')
 
@@ -99,6 +104,63 @@ text = driver.find_elements(by=By.CSS_SELECTOR,value="[id='items'] table tr td a
 date = driver.find_elements(by=By.CSS_SELECTOR,value="[id='contentss'] table tr:nth-child(1) td.listItem.searchClipDate")
 for a in text:
     textp.append(a.get_attribute('text'))
+    key.append("air quality")
+
+for d in date:
+    dates.append(str((strip_tags(d.get_attribute('innerHTML')))))
+####///////////
+
+search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
+
+search.send_keys('"clean air"')
+
+search.send_keys(Keys.ENTER)
+
+text = driver.find_elements(by=By.CSS_SELECTOR,value="[id='items'] table tr td a")
+date = driver.find_elements(by=By.CSS_SELECTOR,value="[id='contentss'] table tr:nth-child(1) td.listItem.searchClipDate")
+for a in text:
+    textp.append(a.get_attribute('text'))
+    key.append("clean air")
+
+for d in date:
+    dates.append(str((strip_tags(d.get_attribute('innerHTML')))))
+
+####///////////
+
+search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
+
+search.send_keys('"air pollutants"')
+
+search.send_keys(Keys.ENTER)
+
+text = driver.find_elements(by=By.CSS_SELECTOR,value="[id='items'] table tr td a")
+date = driver.find_elements(by=By.CSS_SELECTOR,value="[id='contentss'] table tr:nth-child(1) td.listItem.searchClipDate")
+for a in text:
+    textp.append(a.get_attribute('text'))
+    key.append("air pollutants")
+
+for d in date:
+    dates.append(str((strip_tags(d.get_attribute('innerHTML')))))
+
+####///////////
+
+search = driver.find_element(by=By.ID, value='gas_keywords')
+
+search.clear()
+
+search.send_keys('"greenhouse gas"')
+
+search.send_keys(Keys.ENTER)
+
+text = driver.find_elements(by=By.CSS_SELECTOR,value="[id='items'] table tr td a")
+date = driver.find_elements(by=By.CSS_SELECTOR,value="[id='contentss'] table tr:nth-child(1) td.listItem.searchClipDate")
+for a in text:
+    textp.append(a.get_attribute('text'))
+    key.append("greenhouse gas")
 
 for d in date:
     dates.append(str((strip_tags(d.get_attribute('innerHTML')))))
@@ -108,8 +170,8 @@ driver.quit()
 for i in textp:
     numh.append(1)
 
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes', 'keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_spb_aq_meeting(df_dict)

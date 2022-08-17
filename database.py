@@ -2028,7 +2028,8 @@ class Persistence:
                     CREATE TABLE IF NOT EXISTS {table} (
                         meeting_date text,
                         num_matches int,
-                        meeting_minutes text
+                        meeting_minutes text,
+                        keyword text
                     );
 
                     ALTER TABLE {table} OWNER TO rds_ad;
@@ -2044,7 +2045,7 @@ class Persistence:
             insert_query = sql.SQL("""
                     INSERT INTO {table}
                     VALUES (
-                        %s, %s, %s)
+                        %s, %s, %s, %s)
                     ON CONFLICT DO NOTHING;
                     """).format(table=sql.Identifier(table))
             for item in data:
@@ -2055,7 +2056,8 @@ class Persistence:
                 tup = (
                     item.meeting_date,
                     item.num_matches,
-                    item.meeting_minutes
+                    item.meeting_minutes,
+                    item.keyword
                 )
 
                 cur.execute(insert_query, tup)

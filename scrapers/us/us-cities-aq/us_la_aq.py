@@ -17,12 +17,33 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import Select
 import imaplib
 import email
 import base64
 import time
 import zipfile
 import time
+from io import StringIO
+from html.parser import HTMLParser
+import re
+
+class MLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.reset()
+        self.strict = False
+        self.convert_charrefs= True
+        self.text = StringIO()
+    def handle_data(self, d):
+        self.text.write(d)
+    def get_data(self):
+        return self.text.getvalue()
+
+def strip_tags(html):
+    s = MLStripper()
+    s.feed(html)
+    return s.get_data()
 
 
 # Get path to the root directory so we can import necessary modules
@@ -50,6 +71,11 @@ driver.get('https://lacity.granicus.com/ViewPublisher.php?view_id=129')
 
 scraper_utils.crawl_delay(crawl_delay)
 
+textp = []
+dates = []
+numh = []
+key = []
+
 view = driver.find_element(by=By.LINK_TEXT, value='Advanced Search').click()
 
 search = driver.find_element(by=By.ID, value='phrase')
@@ -60,33 +86,120 @@ search.send_keys(Keys.ENTER)
 
 scraper_utils.crawl_delay(crawl_delay)
 
-textp = []
-dates = []
-numh = []
-
 table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
 
 scraper_utils.crawl_delay(crawl_delay)
 
+previous = ''
+i = 0
 for a in table:
-    p = a.get_attribute('text').lower()
-    if "pollution" in p:
-        textp.append(p)
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'air pollution' + r'\b', t.lower()):
+        if not t == previous:
+            textp.append(t.rstrip())
+            dates.append(strip_tags((date[i].get_attribute('innerHTML'))[-8:]))
+            key.append("air pollution")
+    if not t == 'Agenda' and not t == 'Journal' and not t == 'Video' and not t == 'Open Audio Only in Windows Media Player' and not t == 'MP3' and not t == 'MP4':
+        i += 1
+    previous = t
 
+####/////
+
+search = driver.find_element(by=By.ID, value='phrase')
+
+search.clear()
+
+search.send_keys("air quality")
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
 date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
-for d in date:
-    dates.append((d.get_attribute('innerHTML'))[-8:])
+
+scraper_utils.crawl_delay(crawl_delay)
+
+previous = ''
+i = 0
+for a in table:
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'air quality' + r'\b', t.lower()):
+        if not t == previous:
+            textp.append(t.rstrip())
+            dates.append(strip_tags((date[i].get_attribute('innerHTML'))[-8:]))
+            key.append("air quality")
+    if not t == 'Agenda' and not t == 'Journal' and not t == 'Video' and not t == 'Open Audio Only in Windows Media Player' and not t == 'MP3' and not t == 'MP4' and not t[:10] == previous[:10]:
+        i += 1
+    previous = t
+####/////
+
+search = driver.find_element(by=By.ID, value='phrase')
+
+search.clear()
+
+search.send_keys("greenhouse gas")
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+previous = ''
+i = 0
+for a in table:
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'greenhouse gas' + r'\b', t.lower()):
+        if not t == previous:
+            textp.append(t.rstrip())
+            dates.append(strip_tags((date[i].get_attribute('innerHTML'))[-8:]))
+            key.append("greenhouse gas")
+    if not t == 'Agenda' and not t == 'Journal' and not t == 'Video' and not t == 'Open Audio Only in Windows Media Player' and not t == 'MP3' and not t == 'MP4':
+        i += 1
+    previous = t
+
+####/////
+
+search = driver.find_element(by=By.ID, value='phrase')
+
+search.clear()
+
+search.send_keys("clean air")
+
+search.send_keys(Keys.ENTER)
+
+scraper_utils.crawl_delay(crawl_delay)
+
+table = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td a')
+date = driver.find_elements(by=By.CSS_SELECTOR,value='table tr td[headers^=Date] ')
+
+scraper_utils.crawl_delay(crawl_delay)
+
+previous = ''
+i = 0
+for a in table:
+    t = strip_tags(a.get_attribute('text'))
+    if re.search(r'\b' + 'clean air' + r'\b', t.lower()):
+        if not t == previous:
+            textp.append(t.rstrip())
+            dates.append(strip_tags((date[i].get_attribute('innerHTML'))[-8:]))
+            key.append("clean air")
+    if not t == 'Agenda' and not t == 'Journal' and not t == 'Video' and not t == 'Open Audio Only in Windows Media Player' and not t == 'MP3' and not t == 'MP4' and not t[:10] == previous[:10]:
+        i += 1
+    previous = t
 
 driver.quit()
 
 for i in textp:
     numh.append(1)
 
-dates.pop()
-dates.pop()
-textp.pop()
-zipped = list(zip(dates, numh, textp))
-df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes'])
+zipped = list(zip(dates, numh, textp, key))
+df = pd.DataFrame(zipped, columns=['meeting_date', 'num_matches', 'meeting_minutes', 'keyword'])
 df_dict = df.to_dict('records')
 
 scraper_utils.write_la_aq_meeting(df_dict)
