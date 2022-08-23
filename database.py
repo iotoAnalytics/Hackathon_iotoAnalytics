@@ -15,14 +15,6 @@ import utils
 import pandas as pd
 
 
-db_host = 'openparl.cia2zobysfwo.us-west-2.rds.amazonaws.com'
-db_port = 5432
-db_user = 'rds'
-db_region = 'us-west-2'
-db_name = 'openparl'
-
-client = boto3.client('rds', db_region)
-
 
 class Database:
     """

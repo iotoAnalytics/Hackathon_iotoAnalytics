@@ -22,3 +22,4 @@ utils==1.0.1
 webdriver_manager
 matplotlib
 nbformat
+scipy
