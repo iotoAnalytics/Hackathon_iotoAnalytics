@@ -9,7 +9,7 @@ pdfplumber
 pycryptodome
 #psycopg2==2.8.6 
 psycopg2
-PyPDF2==1.26.0
+PyPDF2==1.27.5
 pytest 
 requests==2.25.1 
 selenium 
